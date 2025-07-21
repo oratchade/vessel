@@ -28,6 +28,10 @@ func (d MSSQLDialect) Operator(op string) string {
 		return ">"
 	case greaterThanOrEqual:
 		return ">="
+	case and:
+		return strings.ToUpper(and)
+	case or:
+		return strings.ToUpper(or)
 	case like:
 		return strings.ToUpper(like)
 	case notLike:

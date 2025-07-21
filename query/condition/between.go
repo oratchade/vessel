@@ -1,5 +1,7 @@
 package condition
 
+import "fmt"
+
 type Between struct {
 	column    string
 	operator  string
@@ -41,6 +43,21 @@ func (b *Between) ParamBase(base int) *Between {
 	return b
 }
 
-func (b *Between) ToSQL() (string, []any, error) {
-	return "", nil, nil
+func (b *Between) ToSQL(paramBase int) (string, []any, error) {
+	if b.column == "" || b.operator == "" || b.from == nil || b.to == nil {
+		return "", nil, fmt.Errorf("invalid expression")
+	}
+
+	if paramBase > 0 {
+		b.paramBase = paramBase
+	}
+
+	fromPlaceholder := b.dialect.Placeholder(b.paramBase)
+	toPlaceholder := b.dialect.Placeholder(b.paramBase + 1)
+	sql := fmt.Sprintf(
+		"%s %s %s %s %s",
+		b.column, b.dialect.Operator(b.operator), fromPlaceholder, b.dialect.Operator("AND"), toPlaceholder,
+	)
+
+	return sql, []any{b.from, b.to}, nil
 }

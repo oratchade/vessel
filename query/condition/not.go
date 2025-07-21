@@ -1,5 +1,7 @@
 package condition
 
+import "fmt"
+
 type Not struct {
 	condition Condition
 	operator  string
@@ -29,6 +31,15 @@ func (n *Not) ParamBase(base int) *Not {
 	return n
 }
 
-func (n *Not) ToSQL() (string, []any, error) {
-	return "", nil, nil
+func (n *Not) ToSQL(paramBase int) (string, []any, error) {
+	if paramBase > 0 {
+		n.paramBase = paramBase
+	}
+
+	str, args, err := n.condition.ToSQL(n.paramBase)
+	if err != nil {
+		return "", nil, fmt.Errorf("error converting condition to SQL: %w", err)
+	}
+
+	return fmt.Sprintf("%s %s", n.dialect.Operator(n.operator), str), args, nil
 }

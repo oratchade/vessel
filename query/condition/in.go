@@ -1,5 +1,10 @@
 package condition
 
+import (
+	"fmt"
+	"strings"
+)
+
 type In struct {
 	column    string
 	operator  string
@@ -35,6 +40,26 @@ func (i *In) ParamBase(base int) *In {
 	return i
 }
 
-func (i *In) ToSQL() (string, []any, error) {
-	return "", nil, nil
+func (i *In) ToSQL(paramBase int) (string, []any, error) {
+	if i.column == "" || i.operator == "" || i.values == nil {
+		return "", nil, fmt.Errorf("invalid expression")
+	}
+
+	if paramBase > 0 {
+		i.paramBase = paramBase
+	}
+
+	placeholder := []string{}
+
+	for range i.values {
+		placeholder = append(placeholder, i.dialect.Placeholder(i.paramBase))
+		i.paramBase++
+	}
+
+	sql := fmt.Sprintf(
+		"%s %s (%s)",
+		i.column, i.dialect.Operator(i.operator), strings.Join(placeholder, ", "),
+	)
+
+	return sql, i.values, nil
 }

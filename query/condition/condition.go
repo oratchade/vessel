@@ -1,7 +1,7 @@
 package condition
 
 type Condition interface {
-	ToSQL() (string, []any, error)
+	ToSQL(paramBase int) (string, []any, error)
 }
 
 type SQLDialect interface {

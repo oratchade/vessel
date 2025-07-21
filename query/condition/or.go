@@ -1,5 +1,7 @@
 package condition
 
+import "fmt"
+
 type Or struct {
 	conditions []Condition
 	operator   string
@@ -29,6 +31,24 @@ func (o *Or) ParamBase(base int) *Or {
 	return o
 }
 
-func (o *Or) ToSQL() (string, []any, error) {
-	return "", nil, nil
+func (o *Or) ToSQL(paramBase int) (string, []any, error) {
+	var values []any
+	strCdt := ""
+
+	for i, cdt := range o.conditions {
+		if i > 0 {
+			strCdt = fmt.Sprintf("%s %s", strCdt, o.dialect.Operator(o.operator))
+		}
+
+		str, args, err := cdt.ToSQL(o.paramBase)
+		if err != nil {
+			return "", nil, fmt.Errorf("error converting condition %d to SQL: %w", i, err)
+		}
+
+		strCdt = fmt.Sprintf("%s (%s)", strCdt, str)
+		values = append(values, args...)
+		o.paramBase += len(args)
+	}
+
+	return strCdt, values, nil
 }

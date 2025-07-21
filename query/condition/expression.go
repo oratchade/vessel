@@ -1,5 +1,7 @@
 package condition
 
+import "fmt"
+
 type Expr struct {
 	column    string
 	operator  string
@@ -37,6 +39,17 @@ func (e *Expr) ParamBase(base int) *Expr {
 	return e
 }
 
-func (e *Expr) ToSQL() (string, []any, error) {
-	return "", nil, nil
+func (e *Expr) ToSQL(paramBase int) (string, []any, error) {
+	if e.column == "" || e.operator == "" || e.value == nil {
+		return "", nil, fmt.Errorf("invalid expression")
+	}
+
+	if paramBase > 0 {
+		e.paramBase = paramBase
+	}
+
+	placeholder := e.dialect.Placeholder(e.paramBase)
+	sql := fmt.Sprintf("%s %s %s", e.column, e.dialect.Operator(e.operator), placeholder)
+
+	return sql, []any{e.value}, nil
 }

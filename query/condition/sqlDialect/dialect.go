@@ -7,6 +7,8 @@ const (
 	lowerThanOrEqual        = "lte"
 	greaterThan             = "gt"
 	greaterThanOrEqual      = "gte"
+	and                     = "and"
+	or                      = "or"
 	like                    = "like"
 	notLike                 = "not like"
 	insensitiveCaseLike     = "ilike"
