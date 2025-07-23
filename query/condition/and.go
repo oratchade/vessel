@@ -1,18 +1,18 @@
 package condition
 
-import "fmt"
+import (
+	"fmt"
+	"strings"
+)
 
 type And struct {
 	conditions []Condition
 	operator   string
-	dialect    SQLDialect
-	paramBase  int
 }
 
 func NewAnd() *And {
 	return &And{
-		paramBase: 1,
-		operator:  "AND",
+		operator: "AND",
 	}
 }
 
@@ -21,34 +21,22 @@ func (a *And) Conditions(conditions ...Condition) *And {
 	return a
 }
 
-func (a *And) Dialect(d SQLDialect) *And {
-	a.dialect = d
-	return a
-}
-
 func (a *And) ParamBase(base int) *And {
-	a.paramBase = base
 	return a
 }
 
-func (a *And) ToSQL(paramBase int) (string, []any, error) {
-	var values []any
-	strCdt := ""
+func (a *And) ToSQL(dialect SQLDialect, paramBase int) (string, []any, error) {
+	values, parts := make([]any, 0), make([]string, 0)
 
-	for i, cdt := range a.conditions {
-		if i > 0 {
-			strCdt = fmt.Sprintf("%s %s", strCdt, a.dialect.Operator(a.operator))
-		}
-
-		str, args, err := cdt.ToSQL(a.paramBase)
+	for _, cdt := range a.conditions {
+		str, args, err := cdt.ToSQL(dialect, paramBase)
 		if err != nil {
-			return "", nil, fmt.Errorf("error converting condition %d to SQL: %w", i, err)
+			return "", nil, fmt.Errorf("error converting and condition to SQL: %w", err)
 		}
-
-		strCdt = fmt.Sprintf("%s (%s)", strCdt, str)
+		parts = append(parts, fmt.Sprintf("(%s)", str))
 		values = append(values, args...)
-		a.paramBase += len(args)
+		paramBase += len(args)
 	}
 
-	return fmt.Sprintf("(%s)", strCdt), values, nil
+	return strings.Join(parts, fmt.Sprintf(" %s ", dialect.Operator(a.operator))), values, nil
 }

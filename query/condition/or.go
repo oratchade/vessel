@@ -1,18 +1,18 @@
 package condition
 
-import "fmt"
+import (
+	"fmt"
+	"strings"
+)
 
 type Or struct {
 	conditions []Condition
 	operator   string
-	dialect    SQLDialect
-	paramBase  int
 }
 
 func NewOr() *Or {
 	return &Or{
-		paramBase: 1,
-		operator:  "OR",
+		operator: "OR",
 	}
 }
 
@@ -21,34 +21,18 @@ func (o *Or) Conditions(conditions ...Condition) *Or {
 	return o
 }
 
-func (o *Or) Dialect(d SQLDialect) *Or {
-	o.dialect = d
-	return o
-}
+func (o *Or) ToSQL(dialect SQLDialect, paramBase int) (string, []any, error) {
+	values, parts := make([]any, 0), make([]string, 0)
 
-func (o *Or) ParamBase(base int) *Or {
-	o.paramBase = base
-	return o
-}
-
-func (o *Or) ToSQL(paramBase int) (string, []any, error) {
-	var values []any
-	strCdt := ""
-
-	for i, cdt := range o.conditions {
-		if i > 0 {
-			strCdt = fmt.Sprintf("%s %s", strCdt, o.dialect.Operator(o.operator))
-		}
-
-		str, args, err := cdt.ToSQL(o.paramBase)
+	for _, cdt := range o.conditions {
+		str, args, err := cdt.ToSQL(dialect, paramBase)
 		if err != nil {
-			return "", nil, fmt.Errorf("error converting condition %d to SQL: %w", i, err)
+			return "", nil, fmt.Errorf("error converting or condition to SQL: %w", err)
 		}
-
-		strCdt = fmt.Sprintf("%s (%s)", strCdt, str)
+		parts = append(parts, fmt.Sprintf("(%s)", str))
 		values = append(values, args...)
-		o.paramBase += len(args)
+		paramBase += len(args)
 	}
 
-	return strCdt, values, nil
+	return strings.Join(parts, fmt.Sprintf(" %s ", dialect.Operator(o.operator))), values, nil
 }
