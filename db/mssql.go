@@ -7,6 +7,8 @@ import (
 
 	// Import the MSSQL driver
 	_ "github.com/denisenkom/go-mssqldb"
+
+	"tounilab.com/db-connector/query/definition"
 )
 
 // DBConfig holds configuration for connecting to a MSSQL database.
@@ -30,7 +32,7 @@ type MSSQLConfig struct {
 //
 // string: The name of the database driver to use for this configuration.
 func (cfg MSSQLConfig) Driver() string {
-	return DriverMSSQL
+	return definition.DriverMSSQL
 }
 
 // DSN returns the Data Source Name (DSN) for connecting to the MSSQL database.
@@ -59,6 +61,8 @@ func (cfg MSSQLConfig) DSN() string {
 
 type MSSQL struct {
 	DB *sql.DB
+	// queryBuilder builder.QueryBuilder // Query builder for constructing SQL queries
+	// logger       Logger               // Logger for logging database operations
 }
 
 // NewMSSQL initializes a new MSSQL connection using the provided config.

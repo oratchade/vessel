@@ -7,6 +7,7 @@ import (
 
 	// Import the PostgreSQL driver
 	"github.com/jackc/pgx/v5/pgxpool"
+	"tounilab.com/db-connector/query/definition"
 )
 
 // DBConfig holds all configuration options for connecting to a PostgreSQL database.
@@ -31,7 +32,7 @@ type PostgresConfig struct {
 //
 //	string: The name of the database driver to use for this configuration.
 func (cfg PostgresConfig) Driver() string {
-	return DriverPostgres
+	return definition.DriverPostgres
 }
 
 // DSN returns the Data Source Name (DSN) for connecting to the PostgreSQL database.
@@ -57,6 +58,8 @@ func (cfg PostgresConfig) DSN() string {
 
 type Postgres struct {
 	Pool *pgxpool.Pool
+	// queryBuilder builder.QueryBuilder // Query builder for constructing SQL queries
+	// logger       Logger               // Logger for logging database operations
 }
 
 // NewPostgres initializes a new Postgres connection pool using the provided config.

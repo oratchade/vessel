@@ -7,6 +7,7 @@ import (
 
 	// Import the SQLLite driver
 	_ "github.com/mattn/go-sqlite3"
+	"tounilab.com/db-connector/query/definition"
 )
 
 // DBConfig holds configuration for connecting to a SQLLite database.
@@ -24,7 +25,7 @@ type SQLLiteConfig struct {
 // Driver returns the driver name for SQLLite databases.
 
 func (cfg SQLLiteConfig) Driver() string {
-	return DriverSQLLite
+	return definition.DriverSQLLite
 }
 
 // DSN returns the Data Source Name (DSN) for connecting to the SQLLite database.
@@ -44,6 +45,8 @@ func (cfg SQLLiteConfig) DSN() string {
 
 type SQLLite struct {
 	DB *sql.DB
+	// queryBuilder builder.QueryBuilder // Query builder for constructing SQL queries
+	// logger       Logger               // Logger for logging database operations
 }
 
 // NewSQLLite initializes a new SQLLite connection using the provided config.
