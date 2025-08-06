@@ -28,4 +28,18 @@ const (
 	NotRegex                = "not regex"
 	InsensitiveCaseRegex    = "iregex"
 	NotInsensitiveCaseRegex = "not iregex"
+
+	Inner = "inner"
+	Left  = "left"
+	Right = "right"
+	Full  = "full"
+	Using = "using"
+
+	Limit     = "limit"
+	Offset    = "offset"
+	Returning = "returning"
+	OrderBy   = "order by"
+	GroupBy   = "group by"
+	Having    = "having"
+	Output    = "output"
 )
