@@ -1,12 +1,158 @@
 package builder
 
 import (
+	"fmt"
+	"strings"
+
 	cdt "tounilab.com/db-connector/query/condition"
 )
 
+// QueryBuilder defines methods for building SQL queries, including support for SQL joins.
+// Each method returns the SQL string, its arguments, and an error if building fails.
 type QueryBuilder interface {
-	Select(table string, columns []string, cond cdt.Condition) (string, []any, error)
+	// Select builds a SELECT query for the given table, columns, joins, and conditions.
+	//
+	// Parameters:
+	//   table: Name of the table to query.
+	//   columns: List of columns to select.
+	//   joins: Slice of Join structs describing SQL JOIN clauses (e.g., INNER, LEFT).
+	//   cond: Query conditions for filtering results.
+	//
+	// Returns:
+	//   string: The generated SQL query.
+	//   []any: Arguments for parameterized query.
+	//   error: Error if query building fails.
+	Select(table string, columns []string, joins []Join, cond cdt.Condition) (string, []any, error)
+
+	// Insert builds an INSERT query for the given table and data.
+	//
+	// Parameters:
+	//   table: Name of the table to insert into.
+	//   data: Map of column names to values for the new row.
+	//
+	// Returns:
+	//   string: The generated SQL query.
+	//   []any: Arguments for parameterized query.
+	//   error: Error if query building fails.
 	Insert(table string, data map[string]any) (string, []any, error)
+
+	// Update builds an UPDATE query for the given table, data, and conditions.
+	//
+	// Parameters:
+	//   table: Name of the table to update.
+	//   data: Map of column names to new values.
+	//   cond: Query conditions to select rows to update.
+	//
+	// Returns:
+	//   string: The generated SQL query.
+	//   []any: Arguments for parameterized query.
+	//   error: Error if query building fails.
 	Update(table string, data map[string]any, cond cdt.Condition) (string, []any, error)
+
+	// Delete builds a DELETE query for the given table and conditions.
+	//
+	// Parameters:
+	//   table: Name of the table to delete from.
+	//   cond: Query conditions to select rows to delete.
+	//
+	// Returns:
+	//   string: The generated SQL query.
+	//   []any: Arguments for parameterized query.
+	//   error: Error if query building fails.
 	Delete(table string, cond cdt.Condition) (string, []any, error)
+}
+
+func selectQ(
+	dialect cdt.SQLDialect,
+	table string,
+	columns []string,
+	joins []Join,
+	cond cdt.Condition,
+	joinFn func(table string, join *Join) string,
+) (string, []any, error) {
+	for i, col := range columns {
+		columns[i] = dialect.QuoteIdentifier(col)
+	}
+
+	sql := "SELECT " + strings.Join(columns, ", ") + " FROM " + dialect.QuoteIdentifier(table)
+	if cond == nil {
+		return fmt.Sprintf("%s;", sql), nil, nil
+	}
+
+	where, values, err := cond.ToSQL(dialect, 1)
+	if err != nil {
+		return "", nil, fmt.Errorf("select mssqlSQL Builder: error converting condition to SQL: %w", err)
+	}
+
+	join := ""
+	for _, j := range joins {
+		join += joinFn(table, &j) + " "
+	}
+
+	return fmt.Sprintf("%s WHERE %s %s;", sql, where, join), values, nil
+}
+
+func insert(dialect cdt.SQLDialect, table string, data map[string]any) (string, []any, error) {
+	if len(data) == 0 {
+		return "", nil, fmt.Errorf("insert builder: no data provided for insertion")
+	}
+
+	index := 1
+	columns, placeholders, values := make([]string, 0), make([]string, 0), make([]any, 0)
+
+	for col, val := range data {
+		columns = append(columns, dialect.QuoteIdentifier(col))
+		placeholders = append(placeholders, dialect.Placeholder(index))
+		values = append(values, val)
+		index++
+	}
+
+	return fmt.Sprintf(
+		"INSERT INTO %s (%s) VALUES (%s);",
+		dialect.QuoteIdentifier(table),
+		strings.Join(columns, ", "),
+		strings.Join(placeholders, ", "),
+	), values, nil
+}
+
+func update(
+	dialect cdt.SQLDialect,
+	table string,
+	data map[string]any,
+	cond cdt.Condition,
+) (string, []any, error) {
+	index := 1
+	sets, values := make([]string, 0), make([]any, 0)
+
+	for col, val := range data {
+		sets = append(sets, fmt.Sprintf("%s = %s", dialect.QuoteIdentifier(col), dialect.Placeholder(index)))
+		values = append(values, val)
+		index++
+	}
+
+	sql := fmt.Sprintf("UPDATE %s SET %s", dialect.QuoteIdentifier(table), strings.Join(sets, ", "))
+	if cond == nil {
+		return fmt.Sprintf("%s;", sql), values, nil
+	}
+
+	where, condValues, err := cond.ToSQL(dialect, index)
+	if err != nil {
+		return "", nil, fmt.Errorf("update builder: error converting condition to SQL: %w", err)
+	}
+	values = append(values, condValues...)
+
+	return fmt.Sprintf("%s WHERE %s;", sql, where), values, nil
+}
+
+func delete(dialect cdt.SQLDialect, table string, cond cdt.Condition) (string, []any, error) {
+	if cond == nil {
+		return fmt.Sprintf("DELETE FROM %s;", dialect.QuoteIdentifier(table)), nil, nil
+	}
+
+	where, values, err := cond.ToSQL(dialect, 1)
+	if err != nil {
+		return "", nil, fmt.Errorf("delete builder: error converting condition to SQL: %w", err)
+	}
+
+	return fmt.Sprintf("DELETE FROM %s WHERE %s;", dialect.QuoteIdentifier(table), where), values, nil
 }

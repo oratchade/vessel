@@ -1,9 +1,12 @@
 package sqldialect
 
 import (
+	"fmt"
 	"strings"
 
 	"tounilab.com/db-connector/query"
+	"tounilab.com/db-connector/query/definition"
+	"tounilab.com/db-connector/query/options"
 )
 
 // MySQL and SQLite use the same placeholder syntax
@@ -32,38 +35,16 @@ func (d MySQLDialect) Operator(op string) string {
 		return ">"
 	case query.GreaterThanOrEqual:
 		return ">="
-	case query.And:
-		return strings.ToUpper(query.And)
-	case query.Or:
-		return strings.ToUpper(query.Or)
-	case query.Like:
-		return strings.ToUpper(query.Like)
-	case query.NotLike:
-		return strings.ToUpper(query.NotLike)
+	case query.Returning:
+		return ""
 	case query.InsensitiveCaseLike:
 		return strings.ToUpper(query.Like) // MySQL does not have a case-insensitive LIKE, so we use LIKE
-	case query.In:
-		return strings.ToUpper(query.In)
-	case query.NotIn:
-		return strings.ToUpper(query.NotIn)
-	case query.Between:
-		return strings.ToUpper(query.Between)
-	case query.NotBetween:
-		return strings.ToUpper(query.NotBetween)
-	case query.IsNull:
-		return strings.ToUpper(query.IsNull)
-	case query.IsNotNull:
-		return strings.ToUpper(query.IsNotNull)
 	case query.Distinct:
 		return strings.ToUpper(query.IsDistinctFrom) // MySQL does not support IS DISTINCT FROM, but we can emulate it
 	case query.NotDistinct:
 		return "IS NOT DISTINCT FROM"
-	case query.Contains:
+	case query.Contains, query.Contained, query.Overlaps:
 		return strings.ToUpper(query.Like) // MySQL does not support @> like Postgres, so we use LIKE
-	case query.Contained:
-		return strings.ToUpper(query.Like) // MySQL does not support <@ like Postgres, so we use LIKE
-	case query.Overlaps:
-		return strings.ToUpper(query.Like) // MySQL does not support && like Postgres, so we use LIKE
 	case query.Regex:
 		return "REGEXP"
 	case query.NotRegex:
@@ -73,6 +54,51 @@ func (d MySQLDialect) Operator(op string) string {
 	case query.NotInsensitiveCaseRegex:
 		return "NOT REGEXP"
 	default:
-		return op
+		return strings.ToUpper(op)
 	}
+}
+
+func (d MySQLDialect) QuoteIdentifier(value string) string {
+	return "`" + value + "`"
+}
+
+func (d MySQLDialect) QuoteString(value string) string {
+	return "'" + strings.ReplaceAll(value, "'", "''") + "'"
+}
+
+func (d MySQLDialect) SupportedOptions(queryType definition.QueryType, opts *options.QueryOptions) string {
+	var o []string
+
+	// Avoid reflection for performance: access fields directly
+	if opts == nil {
+		return ""
+	}
+
+	if queryType == definition.QueryTypeSelect {
+		if opts.Limit != nil {
+			o = append(o, fmt.Sprintf("%s %d", d.Operator(query.Limit), *opts.Limit))
+		}
+		if opts.Offset != nil {
+			o = append(o, fmt.Sprintf("%s %d", d.Operator(query.Offset), *opts.Offset))
+		}
+		if len(opts.OrderBy) > 0 {
+			o = append(o, fmt.Sprintf(
+				"%s %s",
+				d.Operator(query.OrderBy),
+				strings.Join(query.QuoteIdentifierSlice(d, opts.OrderBy, ""), ", "),
+			))
+		}
+		if opts.Having != nil {
+			o = append(o, fmt.Sprintf("%s %s", d.Operator(query.Having), d.QuoteIdentifier(*opts.Having)))
+		}
+		if len(opts.GroupBy) > 0 {
+			o = append(o, fmt.Sprintf(
+				"%s %s",
+				d.Operator(query.GroupBy),
+				strings.Join(query.QuoteIdentifierSlice(d, opts.GroupBy, ""), ", "),
+			))
+		}
+	}
+
+	return strings.Join(o, " ")
 }
