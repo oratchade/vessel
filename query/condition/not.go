@@ -24,5 +24,5 @@ func (n *Not) ToSQL(dialect SQLDialect, paramBase int) (string, []any, error) {
 		return "", nil, fmt.Errorf("error converting condition to SQL: %w", err)
 	}
 
-	return fmt.Sprintf("%s %s", dialect.Operator(n.operator), str), args, nil
+	return fmt.Sprintf("%s (%s)", dialect.Operator(n.operator), str), args, nil
 }

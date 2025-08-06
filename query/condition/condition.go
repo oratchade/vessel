@@ -1,5 +1,10 @@
 package condition
 
+import (
+	"tounilab.com/db-connector/query/definition"
+	"tounilab.com/db-connector/query/options"
+)
+
 type Condition interface {
 	ToSQL(dialect SQLDialect, paramBase int) (string, []any, error)
 }
@@ -7,6 +12,19 @@ type Condition interface {
 type SQLDialect interface {
 	Placeholder(index int) string
 	Operator(op string) string
+	QuoteIdentifier(value string) string
+	QuoteString(value string) string
+
+	// SupportedOptions generates the SQL fragment for supported options in a query,
+	// based on the query type (e.g., "SELECT", "INSERT") and the provided QueryOptions.
+	//
+	// Parameters:
+	//   queryType: The type of SQL query ("SELECT", "INSERT", etc.).
+	//   opts: The QueryOptions struct containing optional parameters.
+	//
+	// Returns:
+	//   string: The SQL fragment representing the supported options for the query.
+	SupportedOptions(queryType definition.QueryType, opts *options.QueryOptions) string
 }
 
 /*
