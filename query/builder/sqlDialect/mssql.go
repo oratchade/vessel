@@ -42,6 +42,10 @@ func (d MSSQLDialect) Operator(op string) string {
 		return strings.ToUpper(query.Like) // MSSQL does not support IS NOT DISTINCT FROM, so we use LIKE
 	case query.Regex, query.NotRegex, query.InsensitiveCaseRegex, query.NotInsensitiveCaseRegex:
 		return "" // not supported
+	case query.Limit:
+		return "FETCH NEXT %d ROWS ONLY"
+	case query.Offset:
+		return "OFFSET %d ROWS"
 	default:
 		return strings.ToUpper(op)
 	}
@@ -65,7 +69,29 @@ func (d MSSQLDialect) SupportedOptions(queryType definition.QueryType, opts *opt
 
 	switch queryType {
 	case definition.QueryTypeSelect:
-		o = append(o, retrieveSelectOpts(d, opts)...)
+		if opts.Limit != nil {
+			o = append(o, fmt.Sprintf(d.Operator(query.Limit), *opts.Limit))
+		}
+		if opts.Offset != nil {
+			o = append(o, fmt.Sprintf(d.Operator(query.Offset), *opts.Offset))
+		}
+		if len(opts.OrderBy) > 0 {
+			o = append(o, fmt.Sprintf(
+				"%s %s",
+				d.Operator(query.OrderBy),
+				strings.Join(query.QuoteIdentifierSlice(d, opts.OrderBy, ""), ", "),
+			))
+		}
+		if opts.Having != nil {
+			o = append(o, fmt.Sprintf("%s %s", d.Operator(query.Having), d.QuoteIdentifier(*opts.Having)))
+		}
+		if len(opts.GroupBy) > 0 {
+			o = append(o, fmt.Sprintf(
+				"%s %s",
+				d.Operator(query.GroupBy),
+				strings.Join(query.QuoteIdentifierSlice(d, opts.GroupBy, ""), ", "),
+			))
+		}
 	case definition.QueryTypeInsert, definition.QueryTypeUpdate, definition.QueryTypeDelete:
 		if len(opts.Returning) > 0 {
 			o = append(o, fmt.Sprintf(
