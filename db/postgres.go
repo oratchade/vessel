@@ -7,7 +7,10 @@ import (
 
 	// Import the PostgreSQL driver
 	"github.com/jackc/pgx/v5/pgxpool"
+	builder "tounilab.com/db-connector/query/builder"
+	"tounilab.com/db-connector/query/condition"
 	"tounilab.com/db-connector/query/definition"
+	"tounilab.com/db-connector/query/options"
 )
 
 // DBConfig holds all configuration options for connecting to a PostgreSQL database.
@@ -57,9 +60,9 @@ func (cfg PostgresConfig) DSN() string {
 }
 
 type Postgres struct {
-	Pool *pgxpool.Pool
-	// queryBuilder builder.QueryBuilder // Query builder for constructing SQL queries
-	// logger       Logger               // Logger for logging database operations
+	pool         *pgxpool.Pool
+	queryBuilder builder.QueryBuilder // Query builder for constructing SQL queries
+	logger       Logger               // Logger for logging database operations
 }
 
 // NewPostgres initializes a new Postgres connection pool using the provided config.
@@ -84,13 +87,153 @@ func NewPostgres(cfg PostgresConfig) (*Postgres, error) {
 		return nil, fmt.Errorf("failed to create connection pool: %w", err)
 	}
 
-	return &Postgres{Pool: pool}, nil
+	return &Postgres{pool: pool}, nil
+}
+
+func (pg *Postgres) Get(
+	ctx context.Context,
+	table string,
+	columns []string,
+	joins []builder.Join,
+	conditions condition.Condition,
+	opts *options.QueryOptions,
+) ([]map[string]any, error) {
+	query, args, err := pg.queryBuilder.Select(table, columns, joins, conditions)
+	if err != nil {
+		return nil, fmt.Errorf("failed to build select query: %w", err)
+	}
+
+	rows, err := pg.pool.Query(ctx, query, args...)
+	if err != nil {
+		return nil, fmt.Errorf("failed to execute query: %w", err)
+	}
+	defer rows.Close()
+
+	results := make([]map[string]any, 0)
+	for rows.Next() {
+		rowData := make(map[string]any)
+		if err := rows.Scan(rowData); err != nil {
+			return nil, fmt.Errorf("failed to scan row: %w", err)
+		}
+		results = append(results, rowData)
+	}
+
+	if err := rows.Err(); err != nil && pg.logger != nil {
+		pg.logger.Error("failed to get rows", "error", err)
+	}
+
+	return results, nil
+}
+
+func (pg *Postgres) GetByID(
+	ctx context.Context,
+	table string,
+	id any,
+	joins []builder.Join,
+	opts *options.QueryOptions,
+) ([]map[string]any, error) {
+	cdt := &condition.Expr{}
+	cdt.Column("id").Value(id)
+
+	query, args, err := pg.queryBuilder.Select(table, []string{"*"}, joins, cdt)
+	if err != nil {
+		return nil, fmt.Errorf("failed to build select query: %w", err)
+	}
+
+	rows, err := pg.pool.Query(ctx, query, args...)
+	if err != nil {
+		return nil, fmt.Errorf("failed to execute query: %w", err)
+	}
+	defer rows.Close()
+
+	results := make([]map[string]any, 0)
+	for rows.Next() {
+		rowData := make(map[string]any)
+		if err := rows.Scan(rowData); err != nil {
+			return nil, fmt.Errorf("failed to scan row: %w", err)
+		}
+		results = append(results, rowData)
+	}
+
+	if err := rows.Err(); err != nil && pg.logger != nil {
+		pg.logger.Error("failed to get rows", "error", err)
+	}
+
+	return results, nil
+}
+
+func (pg *Postgres) Insert(
+	ctx context.Context,
+	table string,
+	data map[string]any,
+	opts *options.QueryOptions,
+) (*ExecResult, error) {
+	query, args, err := pg.queryBuilder.Insert(table, data)
+	if err != nil {
+		return nil, fmt.Errorf("failed to build insert query: %w", err)
+	}
+
+	result, err := pg.pool.Exec(ctx, query, args...)
+	return fromCommandTag(result), fmt.Errorf("failed to execute insert query: %w", err)
+}
+
+func (pg *Postgres) Update(
+	ctx context.Context,
+	table string,
+	data map[string]any,
+	conditions condition.Condition,
+	opts *options.QueryOptions,
+) (*ExecResult, error) {
+	query, args, err := pg.queryBuilder.Update(table, data, conditions)
+	if err != nil {
+		return nil, fmt.Errorf("failed to build update query: %w", err)
+	}
+
+	result, err := pg.pool.Exec(ctx, query, args...)
+	if err != nil {
+		return nil, fmt.Errorf("failed to execute update query: %w", err)
+	}
+	return fromCommandTag(result), nil
+}
+
+func (pg *Postgres) Delete(
+	ctx context.Context,
+	table string,
+	conditions condition.Condition,
+	opts *options.QueryOptions,
+) (*ExecResult, error) {
+	query, args, err := pg.queryBuilder.Delete(table, conditions)
+	if err != nil {
+		return nil, fmt.Errorf("failed to build delete query: %w", err)
+	}
+
+	result, err := pg.pool.Exec(ctx, query, args...)
+	if err != nil {
+		return nil, fmt.Errorf("failed to execute delete query: %w", err)
+	}
+	return fromCommandTag(result), nil
+}
+
+// func (pg *Postgres) Query(ctx context.Context, query string, args ...any) (*sql.Rows, error) {}
+// func (pg *Postgres) QueryRow(ctx context.Context, query string, args ...any) *sql.Row        {}
+
+func (pg *Postgres) Exec(
+	ctx context.Context,
+	query string,
+	opts *options.QueryOptions,
+	values ...any,
+) (*ExecResult, error) {
+	result, err := pg.pool.Exec(ctx, query, values...)
+	if err != nil {
+		return nil, fmt.Errorf("failed to execute query: %w", err)
+	}
+	return fromCommandTag(result), nil
 }
 
 // Close closes the database connection pool.
 func (pg *Postgres) Close() {
-	if pg.Pool == nil {
+	if pg.pool == nil {
 		return
 	}
-	pg.Pool.Close()
+	pg.pool.Close()
 }

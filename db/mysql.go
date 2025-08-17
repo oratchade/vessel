@@ -66,7 +66,7 @@ func (cfg MysqlConfig) DSN() string {
 }
 
 type MySQL struct {
-	DB           *sql.DB
+	db           *sql.DB
 	queryBuilder builder.QueryBuilder // Query builder for constructing SQL queries
 	logger       Logger               // Logger for logging database operations
 }
@@ -90,7 +90,7 @@ func NewMySQL(cfg MysqlConfig) (*MySQL, error) {
 	}
 
 	return &MySQL{
-		DB:           db,
+		db:           db,
 		queryBuilder: builder.NewMySQLQueryBuilder(sqldialect.MySQLDialect{}),
 	}, nil
 }
@@ -108,7 +108,7 @@ func (m *MySQL) Get(
 		return nil, fmt.Errorf("failed to build select query: %w", err)
 	}
 
-	rows, err := m.DB.QueryContext(ctx, query, args...)
+	rows, err := m.db.QueryContext(ctx, query, args...)
 	if err != nil {
 		return nil, fmt.Errorf("failed to execute query: %w", err)
 	}
@@ -149,7 +149,7 @@ func (m *MySQL) GetByID(
 		return nil, fmt.Errorf("failed to build select query: %w", err)
 	}
 
-	rows, err := m.DB.QueryContext(ctx, query, args...)
+	rows, err := m.db.QueryContext(ctx, query, args...)
 	if err != nil {
 		return nil, fmt.Errorf("failed to execute query: %w", err)
 	}
@@ -180,14 +180,17 @@ func (m *MySQL) Insert(
 	table string,
 	data map[string]any,
 	opts *options.QueryOptions,
-) (sql.Result, error) {
+) (*ExecResult, error) {
 	query, args, err := m.queryBuilder.Insert(table, data)
 	if err != nil {
 		return nil, fmt.Errorf("failed to build insert query: %w", err)
 	}
 
-	result, err := m.DB.ExecContext(ctx, query, args...)
-	return result, fmt.Errorf("failed to execute insert query: %w", err)
+	result, err := m.db.ExecContext(ctx, query, args...)
+	if err != nil {
+		return nil, fmt.Errorf("failed to execute insert query: %w", err)
+	}
+	return fromSQLResult(result), nil
 }
 
 func (m *MySQL) Update(
@@ -196,14 +199,17 @@ func (m *MySQL) Update(
 	data map[string]any,
 	conditions condition.Condition,
 	opts *options.QueryOptions,
-) (sql.Result, error) {
+) (*ExecResult, error) {
 	query, args, err := m.queryBuilder.Update(table, data, conditions)
 	if err != nil {
 		return nil, fmt.Errorf("failed to build update query: %w", err)
 	}
 
-	result, err := m.DB.ExecContext(ctx, query, args...)
-	return result, fmt.Errorf("failed to execute update query: %w", err)
+	result, err := m.db.ExecContext(ctx, query, args...)
+	if err != nil {
+		return nil, fmt.Errorf("failed to execute update query: %w", err)
+	}
+	return fromSQLResult(result), nil
 }
 
 func (m *MySQL) Delete(
@@ -211,14 +217,17 @@ func (m *MySQL) Delete(
 	table string,
 	conditions condition.Condition,
 	opts *options.QueryOptions,
-) (sql.Result, error) {
+) (*ExecResult, error) {
 	query, args, err := m.queryBuilder.Delete(table, conditions)
 	if err != nil {
 		return nil, fmt.Errorf("failed to build delete query: %w", err)
 	}
 
-	result, err := m.DB.ExecContext(ctx, query, args...)
-	return result, fmt.Errorf("failed to execute delete query: %w", err)
+	result, err := m.db.ExecContext(ctx, query, args...)
+	if err != nil {
+		return nil, fmt.Errorf("failed to execute delete query: %w", err)
+	}
+	return fromSQLResult(result), nil
 }
 
 // func (m *MySQL) Query(ctx context.Context, query string, args ...any) (*sql.Rows, error) {}
@@ -229,15 +238,18 @@ func (m *MySQL) Exec(
 	query string,
 	opts *options.QueryOptions,
 	values ...any,
-) (sql.Result, error) {
-	result, err := m.DB.ExecContext(ctx, query, values...)
-	return result, fmt.Errorf("failed to execute query: %w", err)
+) (*ExecResult, error) {
+	result, err := m.db.ExecContext(ctx, query, values...)
+	if err != nil {
+		return nil, fmt.Errorf("failed to execute query: %w", err)
+	}
+	return fromSQLResult(result), nil
 }
 
 // Close closes the MySQL database connection.
 func (m *MySQL) Close() {
-	if m.DB == nil {
+	if m.db == nil {
 		return
 	}
-	_ = m.DB.Close()
+	_ = m.db.Close()
 }

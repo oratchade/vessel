@@ -4,10 +4,32 @@ import (
 	"context"
 	"database/sql"
 
+	"github.com/jackc/pgx/v5/pgconn"
 	builder "tounilab.com/db-connector/query/builder"
 	cdt "tounilab.com/db-connector/query/condition"
 	"tounilab.com/db-connector/query/options"
 )
+
+type ExecResult struct {
+	LastInsertID int64
+	RowsAffected int64
+}
+
+func fromSQLResult(res sql.Result) *ExecResult {
+	liid, _ := res.LastInsertId() // ignore unsupported err
+	ra, _ := res.RowsAffected()
+	return &ExecResult{
+		LastInsertID: liid,
+		RowsAffected: ra,
+	}
+}
+
+func fromCommandTag(tag pgconn.CommandTag) *ExecResult {
+	return &ExecResult{
+		LastInsertID: 0, // use RETURNING if you want this
+		RowsAffected: tag.RowsAffected(),
+	}
+}
 
 type DBConfig interface {
 	// Driver returns the database driver name (e.g., "mysql", "postgres", "SQLLite3").
@@ -73,7 +95,7 @@ type DB interface {
 	// Returns:
 	//   sql.Result: Result of the insert operation.
 	//   error: Error if the insert fails.
-	Insert(ctx context.Context, table string, data map[string]any, opts *options.QueryOptions) (sql.Result, error)
+	Insert(ctx context.Context, table string, data map[string]any, opts *options.QueryOptions) (ExecResult, error)
 
 	// Update modifies existing rows in the specified table, with optional query options.
 	//
@@ -106,7 +128,7 @@ type DB interface {
 	// Returns:
 	//   sql.Result: Result of the delete operation.
 	//   error: Error if the delete fails.
-	Delete(ctx context.Context, table string, conditions cdt.Condition, opts *options.QueryOptions) (sql.Result, error)
+	Delete(ctx context.Context, table string, conditions cdt.Condition, opts *options.QueryOptions) (ExecResult, error)
 
 	// Query executes a raw SQL query and returns multiple rows, with optional query options.
 	//
@@ -144,7 +166,7 @@ type DB interface {
 	// Returns:
 	//   sql.Result: Result of the execution.
 	//   error: Error if the execution fails.
-	Exec(ctx context.Context, query string, opts *options.QueryOptions, args ...any) (sql.Result, error)
+	Exec(ctx context.Context, query string, opts *options.QueryOptions, args ...any) (ExecResult, error)
 
 	// WithTransaction executes a function within a database transaction.
 	//
