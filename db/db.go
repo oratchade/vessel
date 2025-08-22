@@ -93,7 +93,7 @@ type DB interface {
 	//   opts: Optional query parameters (e.g., returning columns).
 	//
 	// Returns:
-	//   sql.Result: Result of the insert operation.
+	//   ExecResult: Result of the insert operation.
 	//   error: Error if the insert fails.
 	Insert(ctx context.Context, table string, data map[string]any, opts *options.QueryOptions) (ExecResult, error)
 
@@ -107,7 +107,7 @@ type DB interface {
 	//   opts: Optional query parameters (limit, order, etc.).
 	//
 	// Returns:
-	//   sql.Result: Result of the update operation.
+	//   ExecResult: Result of the update operation.
 	//   error: Error if the update fails.
 	Update(
 		ctx context.Context,
@@ -126,7 +126,7 @@ type DB interface {
 	//   opts: Optional query parameters (limit, order, etc.).
 	//
 	// Returns:
-	//   sql.Result: Result of the delete operation.
+	//   ExecResult: Result of the delete operation.
 	//   error: Error if the delete fails.
 	Delete(ctx context.Context, table string, conditions cdt.Condition, opts *options.QueryOptions) (ExecResult, error)
 
@@ -164,7 +164,7 @@ type DB interface {
 	//   opts: Optional query parameters.
 	//
 	// Returns:
-	//   sql.Result: Result of the execution.
+	//   ExecResult: Result of the execution.
 	//   error: Error if the execution fails.
 	Exec(ctx context.Context, query string, opts *options.QueryOptions, args ...any) (ExecResult, error)
 
@@ -200,9 +200,9 @@ type Tx interface {
 	//   args: The arguments to the query.
 	//
 	// Returns:
-	//   sql.Result: The result of the execution.
+	//   ExecResult: The result of the execution.
 	//   error: An error if the execution fails.
-	Exec(query string, args ...any) (sql.Result, error)
+	Exec(query string, args ...any) (ExecResult, error)
 
 	// Query executes a SQL query with the given arguments and returns the result rows.
 	//

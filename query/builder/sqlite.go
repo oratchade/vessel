@@ -6,6 +6,7 @@ import (
 
 	"tounilab.com/db-connector/query"
 	"tounilab.com/db-connector/query/condition"
+	"tounilab.com/db-connector/query/options"
 )
 
 type SQLiteQueryBuilder struct {
@@ -22,9 +23,10 @@ func (s *SQLiteQueryBuilder) Select(
 	table string,
 	columns []string,
 	joins []Join,
+	opts *options.QueryOptions,
 	cond condition.Condition,
 ) (string, []any, error) {
-	q, v, err := selectQ(s.dialect, table, columns, joins, cond, s.join)
+	q, v, err := selectQ(s.dialect, table, columns, joins, cond, opts, s.join)
 	if err != nil {
 		return "", nil, fmt.Errorf("select sqliteSQL Builder: error building select query: %w", err)
 	}

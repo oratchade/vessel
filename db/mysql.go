@@ -103,7 +103,7 @@ func (m *MySQL) Get(
 	conditions condition.Condition,
 	opts *options.QueryOptions,
 ) ([]map[string]any, error) {
-	query, args, err := m.queryBuilder.Select(table, columns, joins, conditions)
+	query, args, err := m.queryBuilder.Select(table, columns, joins, opts, conditions)
 	if err != nil {
 		return nil, fmt.Errorf("failed to build select query: %w", err)
 	}
@@ -144,7 +144,7 @@ func (m *MySQL) GetByID(
 	cdt := &condition.Expr{}
 	cdt.Column("id").Value(id)
 
-	query, args, err := m.queryBuilder.Select(table, []string{"*"}, joins, cdt)
+	query, args, err := m.queryBuilder.Select(table, []string{"*"}, joins, opts, cdt)
 	if err != nil {
 		return nil, fmt.Errorf("failed to build select query: %w", err)
 	}

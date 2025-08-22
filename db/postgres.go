@@ -8,6 +8,7 @@ import (
 	// Import the PostgreSQL driver
 	"github.com/jackc/pgx/v5/pgxpool"
 	builder "tounilab.com/db-connector/query/builder"
+	sqldialect "tounilab.com/db-connector/query/builder/sqlDialect"
 	"tounilab.com/db-connector/query/condition"
 	"tounilab.com/db-connector/query/definition"
 	"tounilab.com/db-connector/query/options"
@@ -87,7 +88,10 @@ func NewPostgres(cfg PostgresConfig) (*Postgres, error) {
 		return nil, fmt.Errorf("failed to create connection pool: %w", err)
 	}
 
-	return &Postgres{pool: pool}, nil
+	return &Postgres{
+		pool:         pool,
+		queryBuilder: builder.NewPostgresQueryBuilder(sqldialect.PostgresDialect{}),
+	}, nil
 }
 
 func (pg *Postgres) Get(
@@ -98,7 +102,7 @@ func (pg *Postgres) Get(
 	conditions condition.Condition,
 	opts *options.QueryOptions,
 ) ([]map[string]any, error) {
-	query, args, err := pg.queryBuilder.Select(table, columns, joins, conditions)
+	query, args, err := pg.queryBuilder.Select(table, columns, joins, opts, conditions)
 	if err != nil {
 		return nil, fmt.Errorf("failed to build select query: %w", err)
 	}
@@ -135,7 +139,7 @@ func (pg *Postgres) GetByID(
 	cdt := &condition.Expr{}
 	cdt.Column("id").Value(id)
 
-	query, args, err := pg.queryBuilder.Select(table, []string{"*"}, joins, cdt)
+	query, args, err := pg.queryBuilder.Select(table, []string{"*"}, joins, opts, cdt)
 	if err != nil {
 		return nil, fmt.Errorf("failed to build select query: %w", err)
 	}

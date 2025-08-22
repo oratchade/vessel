@@ -6,6 +6,7 @@ import (
 
 	"tounilab.com/db-connector/query"
 	"tounilab.com/db-connector/query/condition"
+	"tounilab.com/db-connector/query/options"
 )
 
 type MySQLQueryBuilder struct {
@@ -22,9 +23,10 @@ func (m *MySQLQueryBuilder) Select(
 	table string,
 	columns []string,
 	joins []Join,
+	opts *options.QueryOptions,
 	cond condition.Condition,
 ) (string, []any, error) {
-	q, v, err := selectQ(m.dialect, table, columns, joins, cond, m.join)
+	q, v, err := selectQ(m.dialect, table, columns, joins, cond, opts, m.join)
 	if err != nil {
 		return "", nil, fmt.Errorf("select mssqlSQL Builder: error building select query: %w", err)
 	}

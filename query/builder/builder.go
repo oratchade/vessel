@@ -5,6 +5,8 @@ import (
 	"strings"
 
 	cdt "tounilab.com/db-connector/query/condition"
+	"tounilab.com/db-connector/query/definition"
+	"tounilab.com/db-connector/query/options"
 )
 
 // QueryBuilder defines methods for building SQL queries, including support for SQL joins.
@@ -16,13 +18,20 @@ type QueryBuilder interface {
 	//   table: Name of the table to query.
 	//   columns: List of columns to select.
 	//   joins: Slice of Join structs describing SQL JOIN clauses (e.g., INNER, LEFT).
+	//   opts: Optional query parameters (limit, offset, order, etc.).
 	//   cond: Query conditions for filtering results.
 	//
 	// Returns:
 	//   string: The generated SQL query.
 	//   []any: Arguments for parameterized query.
 	//   error: Error if query building fails.
-	Select(table string, columns []string, joins []Join, cond cdt.Condition) (string, []any, error)
+	Select(
+		table string,
+		columns []string,
+		joins []Join,
+		opts *options.QueryOptions,
+		cond cdt.Condition,
+	) (string, []any, error)
 
 	// Insert builds an INSERT query for the given table and data.
 	//
@@ -68,33 +77,37 @@ func selectQ(
 	columns []string,
 	joins []Join,
 	cond cdt.Condition,
+	opts *options.QueryOptions,
 	joinFn func(table string, join *Join) string,
 ) (string, []any, error) {
+	cols := make([]string, len(columns))
 	for i, col := range columns {
-		columns[i] = dialect.QuoteIdentifier(col)
+		cols[i] = dialect.QuoteIdentifier(col)
 	}
 
-	sql := "SELECT " + strings.Join(columns, ", ") + " FROM " + dialect.QuoteIdentifier(table)
+	sql := "SELECT " + strings.Join(cols, ", ") + " FROM " + dialect.QuoteIdentifier(table)
 	if cond == nil {
 		return fmt.Sprintf("%s;", sql), nil, nil
 	}
 
 	where, values, err := cond.ToSQL(dialect, 1)
 	if err != nil {
-		return "", nil, fmt.Errorf("select mssqlSQL Builder: error converting condition to SQL: %w", err)
+		return "", nil, fmt.Errorf("builder.selectQ: %w", err)
 	}
 
-	join := ""
+	join := make([]string, 0, len(joins))
 	for _, j := range joins {
-		join += joinFn(table, &j) + " "
+		join = append(join, joinFn(table, &j))
 	}
 
-	return fmt.Sprintf("%s WHERE %s %s;", sql, where, join), values, nil
+	opt := dialect.SupportedOptions(definition.QueryTypeSelect, opts)
+
+	return fmt.Sprintf("%s %s WHERE %s %s;", sql, strings.Join(join, " "), where, opt), values, nil
 }
 
 func insert(dialect cdt.SQLDialect, table string, data map[string]any) (string, []any, error) {
 	if len(data) == 0 {
-		return "", nil, fmt.Errorf("insert builder: no data provided for insertion")
+		return "", nil, fmt.Errorf("builder.insert: no data provided for insertion")
 	}
 
 	index := 1
@@ -137,7 +150,7 @@ func update(
 
 	where, condValues, err := cond.ToSQL(dialect, index)
 	if err != nil {
-		return "", nil, fmt.Errorf("update builder: error converting condition to SQL: %w", err)
+		return "", nil, fmt.Errorf("builder.update: %w", err)
 	}
 	values = append(values, condValues...)
 
@@ -151,7 +164,7 @@ func delete(dialect cdt.SQLDialect, table string, cond cdt.Condition) (string, [
 
 	where, values, err := cond.ToSQL(dialect, 1)
 	if err != nil {
-		return "", nil, fmt.Errorf("delete builder: error converting condition to SQL: %w", err)
+		return "", nil, fmt.Errorf("builder.delete: %w", err)
 	}
 
 	return fmt.Sprintf("DELETE FROM %s WHERE %s;", dialect.QuoteIdentifier(table), where), values, nil
