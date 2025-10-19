@@ -22,6 +22,9 @@ func (m MockDialect) QuoteString(id string) string {
 	return `"` + id + `"`
 }
 
-func (m MockDialect) SupportedOptions(queryType string, opts *options.QueryOptions) string {
-	return ""
+func (m MockDialect) SupportedOptions(queryType string,
+	opts *options.QueryOptions,
+	paramBase int,
+) (string, []any, error) {
+	return "", nil, nil
 }

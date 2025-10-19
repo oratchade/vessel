@@ -59,59 +59,10 @@ func (d MSSQLDialect) QuoteString(value string) string {
 	return "'" + strings.ReplaceAll(value, "'", "''") + "'"
 }
 
-func (d MSSQLDialect) SupportedOptions(queryType definition.QueryType, opts *options.QueryOptions) string {
-	var o []string
-
-	// Avoid reflection for performance: access fields directly
-	if opts == nil {
-		return ""
-	}
-
-	switch queryType {
-	case definition.QueryTypeSelect:
-		if opts.Limit != nil {
-			o = append(o, fmt.Sprintf(d.Operator(query.Limit), *opts.Limit))
-		}
-		if opts.Offset != nil {
-			o = append(o, fmt.Sprintf(d.Operator(query.Offset), *opts.Offset))
-		}
-		if len(opts.OrderBy) > 0 {
-			o = append(o, fmt.Sprintf(
-				"%s %s",
-				d.Operator(query.OrderBy),
-				strings.Join(query.QuoteIdentifierSlice(d, opts.OrderBy, ""), ", "),
-			))
-		}
-		if opts.Having != nil {
-			o = append(o, fmt.Sprintf("%s %s", d.Operator(query.Having), d.QuoteIdentifier(*opts.Having)))
-		}
-		if len(opts.GroupBy) > 0 {
-			o = append(o, fmt.Sprintf(
-				"%s %s",
-				d.Operator(query.GroupBy),
-				strings.Join(query.QuoteIdentifierSlice(d, opts.GroupBy, ""), ", "),
-			))
-		}
-	case definition.QueryTypeInsert, definition.QueryTypeUpdate, definition.QueryTypeDelete:
-		if len(opts.Returning) > 0 {
-			o = append(o, fmt.Sprintf(
-				"%s %s",
-				d.Operator(query.Returning),
-				strings.Join(query.QuoteIdentifierSlice(d, opts.Returning, getPrefix(queryType)), ", "),
-			))
-		}
-	}
-
-	return strings.Join(o, " ")
-}
-
-func getPrefix(qt definition.QueryType) string {
-	switch qt {
-	case definition.QueryTypeInsert, definition.QueryTypeUpdate:
-		return "inserted."
-	case definition.QueryTypeDelete:
-		return "deleted."
-	default:
-		return ""
-	}
+func (d MSSQLDialect) SupportedOptions(
+	queryType definition.QueryType,
+	opts *options.QueryOptions,
+	paramBase int,
+) (string, []any, error) {
+	return supportedOptions(d, queryType, opts, paramBase)
 }

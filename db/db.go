@@ -3,6 +3,7 @@ package db
 import (
 	"context"
 	"database/sql"
+	"fmt"
 
 	"github.com/jackc/pgx/v5/pgconn"
 	builder "tounilab.com/db-connector/query/builder"
@@ -38,10 +39,35 @@ type DBConfig interface {
 	DSN() string
 }
 
-// DB represents a database connection interface.
-// Each method is documented with its purpose, parameters, and expected return values.
-// Now supports SQL joins via the joins parameter and accepts options.QueryOptions for extensibility.
-type DB interface {
+// DBActions defines the core, context-aware data access operations that any
+// database connection or transaction must provide. It is a stable,
+// implementation-agnostic contract used by higher-level code (builders,
+// services) to perform SQL work without depending on driver details.
+//
+// Responsibilities and expectations:
+//
+//   - Context propagation: every method accepts context.Context so callers can
+//     control timeouts and cancellations.
+//   - Parameter ordering: implementations must preserve placeholder ↔ arg
+//     ordering. Convention: condition args first, then option args.
+//   - Identifier handling: callers should provide identifiers; implementations
+//     must quote/validate identifiers using the dialect helpers to avoid injection.
+//   - Mutation results: mutation methods return *ExecResult (LastInsertID, RowsAffected)
+//     so callers can inspect execution metadata consistently across drivers.
+//   - Error handling: return wrapped errors (fmt.Errorf("%w")) and provide sentinel
+//     errors (e.g. ErrNotFound) when useful for caller-side handling.
+//   - Concurrency: implementations must be safe for concurrent use (connection
+//     pooling handled internally).
+//
+// Transactions:
+//   - Tx implementations embed DBActions and add Commit/Rollback lifecycle methods.
+//   - WithTransaction helpers should Begin, call the provided function, Commit on
+//     success and Rollback on error or panic.
+//
+// Testing:
+//   - Keep DBActions small and mockable; add integration tests that verify SQL+args
+//     ordering, option rendering per
+type DBActions interface {
 	// Get retrieves multiple rows from the specified table, with optional SQL joins and query options.
 	//
 	// Parameters:
@@ -95,7 +121,7 @@ type DB interface {
 	// Returns:
 	//   ExecResult: Result of the insert operation.
 	//   error: Error if the insert fails.
-	Insert(ctx context.Context, table string, data map[string]any, opts *options.QueryOptions) (ExecResult, error)
+	Insert(ctx context.Context, table string, data map[string]any, opts *options.QueryOptions) (*ExecResult, error)
 
 	// Update modifies existing rows in the specified table, with optional query options.
 	//
@@ -115,7 +141,7 @@ type DB interface {
 		data map[string]any,
 		conditions cdt.Condition,
 		opts *options.QueryOptions,
-	) (sql.Result, error)
+	) (*ExecResult, error)
 
 	// Delete removes rows from the specified table, with optional query options.
 	//
@@ -128,7 +154,7 @@ type DB interface {
 	// Returns:
 	//   ExecResult: Result of the delete operation.
 	//   error: Error if the delete fails.
-	Delete(ctx context.Context, table string, conditions cdt.Condition, opts *options.QueryOptions) (ExecResult, error)
+	Delete(ctx context.Context, table string, conditions cdt.Condition, opts *options.QueryOptions) (*ExecResult, error)
 
 	// Query executes a raw SQL query and returns multiple rows, with optional query options.
 	//
@@ -141,7 +167,7 @@ type DB interface {
 	// Returns:
 	//   *sql.Rows: Result rows from the query.
 	//   error: Error if the query fails.
-	Query(ctx context.Context, query string, opts *options.QueryOptions, args ...any) (*sql.Rows, error)
+	// Query(ctx context.Context, query string, opts *options.QueryOptions, args ...any) (*sql.Rows, error)
 
 	// QueryRow executes a raw SQL query and returns a single row, with optional query options.
 	//
@@ -153,7 +179,7 @@ type DB interface {
 	//
 	// Returns:
 	//   *sql.Row: Single result row from the query.
-	QueryRow(ctx context.Context, query string, opts *options.QueryOptions, args ...any) *sql.Row
+	// QueryRow(ctx context.Context, query string, opts *options.QueryOptions, args ...any) *sql.Row
 
 	// Exec executes a raw SQL statement (insert, update, delete, etc.), with optional query options.
 	//
@@ -166,9 +192,30 @@ type DB interface {
 	// Returns:
 	//   ExecResult: Result of the execution.
 	//   error: Error if the execution fails.
-	Exec(ctx context.Context, query string, opts *options.QueryOptions, args ...any) (ExecResult, error)
+	Exec(ctx context.Context, query string, opts *options.QueryOptions, args ...any) (*ExecResult, error)
+}
+
+// DB represents a database connection interface.
+// Each method is documented with its purpose, parameters, and expected return values.
+// Now supports SQL joins via the joins parameter and accepts options.QueryOptions for extensibility.
+type DB interface {
+	DBActions
+
+	// Begin starts a new transaction and returns a Tx.
+	//
+	// Parameters:
+	//   ctx: Context for cancellation and deadlines.
+	//
+	// Returns:
+	//   Tx: Transaction object to execute queries within the transaction.
+	//   error: Error if starting the transaction fails.
+	Begin(ctx context.Context) (Tx, error)
 
 	// WithTransaction executes a function within a database transaction.
+	//
+	// Implementation note:
+	//   This helper should call Begin(ctx) to start a Tx, pass the Tx to fn, and commit the transaction
+	//   if fn returns nil. If fn returns an error, the transaction should be rolled back.
 	//
 	// Parameters:
 	//   ctx: Context for cancellation and deadlines.
@@ -191,35 +238,27 @@ type DB interface {
 	Close() error
 }
 
-// Tx represents a database transaction
+// Tx represents a database transaction. All methods accept context so deadlines and cancellations propagate.
 type Tx interface {
-	// Exec executes a SQL query with the given arguments.
+	DBActions
+
+	// Commit commits the transaction.
 	//
-	// Args:
-	//   query: The SQL query to execute.
-	//   args: The arguments to the query.
+	// Parameters:
+	//   ctx: Context for cancellation and deadlines.
 	//
 	// Returns:
-	//   ExecResult: The result of the execution.
-	//   error: An error if the execution fails.
-	Exec(query string, args ...any) (ExecResult, error)
+	//   error: An error if the commit fails.
+	Commit(ctx context.Context) error
 
-	// Query executes a SQL query with the given arguments and returns the result rows.
+	// Rollback rolls back the transaction.
 	//
-	// Args:
-	//   query: The SQL query to execute.
-	//   args: The arguments to the query.
-	//
-	// Returns:
-	//   *sql.Rows: The result rows.
-	//   error: An error if the execution fails.
-	Query(query string, args ...any) (*sql.Rows, error)
-
-	// Rollback rolls back the current transaction.
+	// Parameters:
+	//   ctx: Context for cancellation and deadlines.
 	//
 	// Returns:
 	//   error: An error if the rollback fails.
-	Rollback() error
+	Rollback(ctx context.Context) error
 }
 
 type Logger interface {
@@ -228,4 +267,35 @@ type Logger interface {
 	Warn(msg string, args ...any)
 	Error(msg string, args ...any)
 	With(fields ...any) Logger
+}
+
+func scanRows(rows *sql.Rows, cols []string) ([]map[string]any, error) {
+	results := make([]map[string]any, 0)
+	vals := make([]any, len(cols))
+	ptrs := make([]any, len(cols))
+	for i := range vals {
+		ptrs[i] = &vals[i]
+	}
+
+	for rows.Next() {
+		if err := rows.Scan(ptrs...); err != nil {
+			return nil, fmt.Errorf("scan: %w", err)
+		}
+		row := make(map[string]any, len(cols))
+		for i, c := range cols {
+			v := vals[i]
+			if b, ok := v.([]byte); ok {
+				row[c] = string(b)
+			} else {
+				row[c] = v
+			}
+		}
+		results = append(results, row)
+	}
+
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("rows iteration: %w", err)
+	}
+
+	return results, nil
 }

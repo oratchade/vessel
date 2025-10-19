@@ -86,23 +86,60 @@ func selectQ(
 	}
 
 	sql := "SELECT " + strings.Join(cols, ", ") + " FROM " + dialect.QuoteIdentifier(table)
-	if cond == nil {
-		return fmt.Sprintf("%s;", sql), nil, nil
-	}
-
-	where, values, err := cond.ToSQL(dialect, 1)
-	if err != nil {
-		return "", nil, fmt.Errorf("builder.selectQ: %w", err)
-	}
 
 	join := make([]string, 0, len(joins))
 	for _, j := range joins {
 		join = append(join, joinFn(table, &j))
 	}
 
-	opt := dialect.SupportedOptions(definition.QueryTypeSelect, opts)
+	// Build condition fragment (if any)
+	var where string
+	var values []any
+	if cond != nil {
+		w, v, err := cond.ToSQL(dialect, 1)
+		if err != nil {
+			return "", nil, fmt.Errorf("builder.selectQ: %w", err)
+		}
+		where = w
+		values = v
+	}
 
-	return fmt.Sprintf("%s %s WHERE %s %s;", sql, strings.Join(join, " "), where, opt), values, nil
+	// compute param base for options: placeholders used so far + starting index (1-based)
+	nextParam := 1 + len(values)
+
+	// Ask dialect to render supported options with placeholders starting at nextParam
+	optFragment, optArgs, err := dialect.SupportedOptions(definition.QueryTypeSelect, opts, nextParam)
+	if err != nil {
+		return "", nil, fmt.Errorf("builder.selectQ: %w", err)
+	}
+
+	// assemble SQL parts
+	var b strings.Builder
+	b.WriteString(sql)
+
+	if len(join) > 0 {
+		b.WriteString(" ")
+		b.WriteString(strings.Join(join, " "))
+	}
+
+	if where != "" {
+		b.WriteString(" WHERE ")
+		b.WriteString(where)
+	}
+
+	if optFragment != "" {
+		b.WriteString(" ")
+		b.WriteString(optFragment)
+	}
+
+	b.WriteString(";")
+
+	// merge args: condition args first, then options args
+	allArgs := make([]any, 0, len(values)+len(optArgs))
+	allArgs = append(allArgs, values...)
+	allArgs = append(allArgs, optArgs...)
+
+	return b.String(), allArgs, nil
 }
 
 func insert(dialect cdt.SQLDialect, table string, data map[string]any) (string, []any, error) {

@@ -21,10 +21,13 @@ type SQLDialect interface {
 	// Parameters:
 	//   queryType: The type of SQL query ("SELECT", "INSERT", etc.).
 	//   opts: The QueryOptions struct containing optional parameters.
+	//   paramBase: The base index to use for placeholders (1-based).
 	//
 	// Returns:
 	//   string: The SQL fragment representing the supported options for the query.
-	SupportedOptions(queryType definition.QueryType, opts *options.QueryOptions) string
+	//   []any:  Arguments corresponding to placeholders in the fragment.
+	//   error:  Error if option building/validation fails.
+	SupportedOptions(queryType definition.QueryType, opts *options.QueryOptions, paramBase int) (string, []any, error)
 }
 
 /*

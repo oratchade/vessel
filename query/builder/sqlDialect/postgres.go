@@ -63,48 +63,10 @@ func (d PostgresDialect) QuoteString(value string) string {
 	return fmt.Sprintf("'%s'", strings.ReplaceAll(value, "'", "''"))
 }
 
-func (d PostgresDialect) SupportedOptions(queryType definition.QueryType, opts *options.QueryOptions) string {
-	var o []string
-
-	// Avoid reflection for performance: access fields directly
-	if opts == nil {
-		return ""
-	}
-
-	switch queryType {
-	case definition.QueryTypeSelect:
-		if opts.Limit != nil {
-			o = append(o, fmt.Sprintf("%s %d", d.Operator(query.Limit), *opts.Limit))
-		}
-		if opts.Offset != nil {
-			o = append(o, fmt.Sprintf("%s %d", d.Operator(query.Offset), *opts.Offset))
-		}
-		if len(opts.OrderBy) > 0 {
-			o = append(o, fmt.Sprintf(
-				"%s %s",
-				d.Operator(query.OrderBy),
-				strings.Join(query.QuoteIdentifierSlice(d, opts.OrderBy, ""), ", "),
-			))
-		}
-		if opts.Having != nil {
-			o = append(o, fmt.Sprintf("%s %s", d.Operator(query.Having), d.QuoteIdentifier(*opts.Having)))
-		}
-		if len(opts.GroupBy) > 0 {
-			o = append(o, fmt.Sprintf(
-				"%s %s",
-				d.Operator(query.GroupBy),
-				strings.Join(query.QuoteIdentifierSlice(d, opts.GroupBy, ""), ", "),
-			))
-		}
-	case definition.QueryTypeInsert, definition.QueryTypeUpdate, definition.QueryTypeDelete:
-		if len(opts.Returning) > 0 {
-			o = append(o, fmt.Sprintf(
-				"%s %s",
-				d.Operator(query.Returning),
-				strings.Join(query.QuoteIdentifierSlice(d, opts.Returning, ""), ", "),
-			))
-		}
-	}
-
-	return strings.Join(o, " ")
+func (d PostgresDialect) SupportedOptions(
+	queryType definition.QueryType,
+	opts *options.QueryOptions,
+	paramBase int,
+) (string, []any, error) {
+	return supportedOptions(d, queryType, opts, paramBase)
 }
