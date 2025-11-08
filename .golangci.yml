@@ -1,5 +1,7 @@
 version: "2"
 run:
+  build-tags:
+    - test
   tests: true
 linters:
   enable:

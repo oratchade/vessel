@@ -1,6 +1,6 @@
 module tounilab.com/db-connector
 
-go 1.25.0
+go 1.25.4
 
 require (
 	github.com/denisenkom/go-mssqldb v0.12.3
