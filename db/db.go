@@ -5,9 +5,9 @@ import (
 	"database/sql"
 	"fmt"
 
-	"github.com/jackc/pgx/v5/pgconn"
 	builder "tounilab.com/db-connector/query/builder"
 	cdt "tounilab.com/db-connector/query/condition"
+	"tounilab.com/db-connector/query/definition"
 	"tounilab.com/db-connector/query/options"
 )
 
@@ -25,18 +25,26 @@ func fromSQLResult(res sql.Result) *ExecResult {
 	}
 }
 
-func fromCommandTag(tag pgconn.CommandTag) *ExecResult {
-	return &ExecResult{
-		LastInsertID: 0, // use RETURNING if you want this
-		RowsAffected: tag.RowsAffected(),
-	}
-}
-
 type DBConfig interface {
 	// Driver returns the database driver name (e.g., "mysql", "postgres", "SQLLite3").
 	Driver() string
 	// DSN returns the Data Source Name (DSN) for connecting to the database.
 	DSN() string
+}
+
+func NewDB(cfg DBConfig, logger Logger) (DB, error) {
+	switch cfg.Driver() {
+	case definition.DriverMySQL:
+		return newMySQL(cfg.(MysqlConfig))
+	case definition.DriverPostgres:
+		return newPostgres(cfg.(PostgresConfig))
+	case definition.DriverSQLLite:
+		return newSQLLite(cfg.(SQLLiteConfig))
+	case definition.DriverMSSQL:
+		return newMSSQL(cfg.(MSSQLConfig))
+	default:
+		return nil, fmt.Errorf("unsupported driver: %s", cfg.Driver())
+	}
 }
 
 // DBActions defines the core, context-aware data access operations that any
@@ -229,7 +237,7 @@ type DB interface {
 	//
 	// Returns:
 	//   error: Error if the connection fails.
-	Ping() error
+	// Ping() error
 
 	// Close closes the database connection.
 	//

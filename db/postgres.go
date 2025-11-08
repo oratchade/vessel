@@ -16,6 +16,13 @@ import (
 	"tounilab.com/db-connector/query/options"
 )
 
+func fromCommandTag(tag pgconn.CommandTag) *ExecResult {
+	return &ExecResult{
+		LastInsertID: 0, // use RETURNING if you want this
+		RowsAffected: tag.RowsAffected(),
+	}
+}
+
 type pgQuerier interface {
 	Exec(ctx context.Context, sql string, arguments ...any) (pgconn.CommandTag, error)
 	Query(ctx context.Context, sql string, args ...any) (pgx.Rows, error)
@@ -73,8 +80,8 @@ type Postgres struct {
 	logger       Logger               // Logger for logging database operations
 }
 
-// NewPostgres initializes a new Postgres connection pool using the provided config.
-func NewPostgres(cfg PostgresConfig) (*Postgres, error) {
+// newPostgres initializes a new Postgres connection pool using the provided config.
+func newPostgres(cfg PostgresConfig) (*Postgres, error) {
 	dsn := cfg.DSN()
 
 	ctx, cancel := context.WithTimeout(context.Background(), cfg.ConnectTimeout)
@@ -133,7 +140,7 @@ func (pg *Postgres) Get(
 
 	rows, err := pg.querier.Query(ctx, query, args...)
 	if err != nil {
-		return nil, fmt.Errorf("failed to execute query: %w", err)
+		return nil, fmt.Errorf("failed to execute query (%s): %w", query, err)
 	}
 	defer rows.Close()
 
@@ -166,7 +173,7 @@ func (pg *Postgres) GetByID(
 	opts *options.QueryOptions,
 ) ([]map[string]any, error) {
 	cdt := &condition.Expr{}
-	cdt.Column("id").Value(id)
+	cdt.Column("id").Op("=").Value(id)
 
 	query, args, err := pg.queryBuilder.Select(table, []string{"*"}, joins, opts, cdt)
 	if err != nil {

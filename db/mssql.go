@@ -1,6 +1,7 @@
 package db
 
 import (
+	"context"
 	"database/sql"
 	"fmt"
 	"time"
@@ -8,7 +9,11 @@ import (
 	// Import the MSSQL driver
 	_ "github.com/denisenkom/go-mssqldb"
 
+	"tounilab.com/db-connector/query/builder"
+	"tounilab.com/db-connector/query/builder/sqldialect"
+	"tounilab.com/db-connector/query/condition"
 	"tounilab.com/db-connector/query/definition"
+	"tounilab.com/db-connector/query/options"
 )
 
 // DBConfig holds configuration for connecting to a MSSQL database.
@@ -60,13 +65,14 @@ func (cfg MSSQLConfig) DSN() string {
 }
 
 type MSSQL struct {
-	DB *sql.DB
-	// queryBuilder builder.QueryBuilder // Query builder for constructing SQL queries
-	// logger       Logger               // Logger for logging database operations
+	querier sqlQuerier // Underlying sql.DB connection pool
+
+	queryBuilder builder.QueryBuilder // Query builder for constructing SQL queries
+	logger       Logger               // Logger for logging database operations
 }
 
-// NewMSSQL initializes a new MSSQL connection using the provided config.
-func NewMSSQL(cfg MSSQLConfig) (*MSSQL, error) {
+// newMSSQL initializes a new MSSQL connection using the provided config.
+func newMSSQL(cfg MSSQLConfig) (*MSSQL, error) {
 	dsn := cfg.DSN()
 
 	db, err := sql.Open("sqlserver", dsn)
@@ -82,13 +88,199 @@ func NewMSSQL(cfg MSSQLConfig) (*MSSQL, error) {
 		return nil, fmt.Errorf("failed to ping MSSQL: %w", err)
 	}
 
-	return &MSSQL{DB: db}, nil
+	return &MSSQL{
+		querier:      db,
+		queryBuilder: builder.NewMySQLQueryBuilder(sqldialect.MSSQLDialect{}),
+	}, nil
+}
+
+func (m *MSSQL) Begin(ctx context.Context) (Tx, error) {
+	sqlDB, ok := m.querier.(*sql.DB)
+	if !ok {
+		return nil, fmt.Errorf("mssql.Begin: underlying db is not *sql.DB")
+	}
+	t, err := sqlDB.BeginTx(ctx, nil)
+	if err != nil {
+		return nil, fmt.Errorf("mssql.Begin: failed to begin transaction: %w", err)
+	}
+
+	return &MSSQL{
+		querier: t,
+
+		queryBuilder: m.queryBuilder,
+		logger:       m.logger,
+	}, nil
+}
+
+func (m *MSSQL) Get(
+	ctx context.Context,
+	table string,
+	columns []string,
+	joins []builder.Join,
+	conditions condition.Condition,
+	opts *options.QueryOptions,
+) ([]map[string]any, error) {
+	o := dbOpts{
+		builder: m.queryBuilder,
+		querier: m.querier,
+		logger:  m.logger,
+	}
+	return get(ctx, table, columns, joins, conditions, opts, o)
+}
+
+func (m *MSSQL) GetByID(
+	ctx context.Context,
+	table string,
+	id any,
+	joins []builder.Join,
+	opts *options.QueryOptions,
+) ([]map[string]any, error) {
+	o := dbOpts{
+		builder: m.queryBuilder,
+		querier: m.querier,
+		logger:  m.logger,
+	}
+	return getByID(ctx, table, id, joins, opts, o)
+}
+
+func (m *MSSQL) Insert(
+	ctx context.Context,
+	table string,
+	data map[string]any,
+	opts *options.QueryOptions,
+) (*ExecResult, error) {
+	o := dbOpts{
+		builder: m.queryBuilder,
+		querier: m.querier,
+		logger:  m.logger,
+	}
+	return insert(ctx, table, data, opts, o)
+}
+
+func (m *MSSQL) Update(
+	ctx context.Context,
+	table string,
+	data map[string]any,
+	conditions condition.Condition,
+	opts *options.QueryOptions,
+) (*ExecResult, error) {
+	o := dbOpts{
+		builder: m.queryBuilder,
+		querier: m.querier,
+		logger:  m.logger,
+	}
+	return update(ctx, table, data, conditions, opts, o)
+}
+
+func (m *MSSQL) Delete(
+	ctx context.Context,
+	table string,
+	conditions condition.Condition,
+	opts *options.QueryOptions,
+) (*ExecResult, error) {
+	o := dbOpts{
+		builder: m.queryBuilder,
+		querier: m.querier,
+		logger:  m.logger,
+	}
+	return delete(ctx, table, conditions, opts, o)
+}
+
+// func (m *MSSQL) Query(
+// 	ctx context.Context,
+// 	query string,
+// 	opts *options.QueryOptions,
+// 	args ...any,
+// ) (*sql.Rows, error) {
+// 	return m.querier.QueryContext(ctx, query, args...)
+// }
+
+// func (m *MSSQL) QueryRow(
+// 	ctx context.Context,
+// 	query string,
+// 	opts *options.QueryOptions,
+// 	args ...any,
+// ) *sql.Row {
+// 	return m.querier.QueryRowContext(ctx, query, args...)
+// }
+
+func (m *MSSQL) Exec(
+	ctx context.Context,
+	query string,
+	opts *options.QueryOptions,
+	values ...any,
+) (*ExecResult, error) {
+	result, err := m.querier.ExecContext(ctx, query, values...)
+	if err != nil {
+		return nil, fmt.Errorf("failed to execute query: %w", err)
+	}
+	return fromSQLResult(result), nil
+}
+
+func (m *MSSQL) WithTransaction(ctx context.Context, fn func(tx Tx) error) error {
+	tx, err := m.Begin(ctx)
+	if err != nil {
+		return fmt.Errorf("failed to begin transaction: %w", err)
+	}
+
+	defer func() {
+		var e error
+		if p := recover(); p != nil {
+			e = tx.Rollback(ctx)
+			if m.logger != nil {
+				m.logger.Error("panic in transaction, rolled back", "panic", p, "error", e)
+			}
+		} else if err != nil {
+			e = tx.Rollback(ctx) // err is non-nil; don't change it
+			if e != nil {
+				err = fmt.Errorf("execution failed with error: %w, transaction rollback: %w", err, e)
+			}
+		} else {
+			err = tx.Commit(ctx) // err is nil; if Commit returns error update err
+			if err != nil {
+				err = fmt.Errorf("failed to commit transaction: %w", err)
+			}
+		}
+	}()
+
+	err = fn(tx)
+	return err
 }
 
 // Close closes the MSSQL database connection.
-func (m *MSSQL) Close() {
-	if m.DB == nil {
-		return
+func (m *MSSQL) Close() error {
+	if m.querier == nil {
+		return nil
 	}
-	_ = m.DB.Close()
+	sqlDB, ok := m.querier.(*sql.DB)
+	if !ok {
+		return fmt.Errorf("mssql.Close: underlying db is not *sql.DB")
+	}
+	err := sqlDB.Close()
+	if err != nil {
+		return fmt.Errorf("mssql.Close: failed to close database: %w", err)
+	}
+	return nil
+}
+
+func (m *MSSQL) Commit(_ context.Context) error {
+	sqlTX, ok := m.querier.(*sql.Tx)
+	if !ok {
+		return fmt.Errorf("mssql.Commit: underlying db is not *sql.Tx")
+	}
+	if err := sqlTX.Commit(); err != nil {
+		return fmt.Errorf("mssql.Commit: failed to commit transaction: %w", err)
+	}
+	return nil
+}
+
+func (m *MSSQL) Rollback(_ context.Context) error {
+	sqlTX, ok := m.querier.(*sql.Tx)
+	if !ok {
+		return fmt.Errorf("mssql.Commit: underlying db is not *sql.Tx")
+	}
+	if err := sqlTX.Rollback(); err != nil {
+		return fmt.Errorf("mssql.Rollback: failed to rollback transaction: %w", err)
+	}
+	return nil
 }
