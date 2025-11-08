@@ -15,8 +15,12 @@ func TestJoin_ToSQL_OnClause(t *testing.T) {
 		Type:  "INNER",
 		Table: "orders",
 		Alias: "",
-		Left:  "user_id",
-		Right: "id",
+		Conditions: builder.JoinCdts{
+			{
+				Left:  "user_id",
+				Right: "id",
+			},
+		},
 	}
 	expected := "INNER JOIN `orders` ON `orders`.`user_id` = `orders`.`id`"
 	got := join.ToSQL("orders", dialect)
@@ -29,8 +33,12 @@ func TestJoin_ToSQL_OnClause_DifferentTables(t *testing.T) {
 		Type:  "LEFT",
 		Table: "orders",
 		Alias: "",
-		Left:  "id",
-		Right: "user_id",
+		Conditions: builder.JoinCdts{
+			{
+				Left:  "id",
+				Right: "user_id",
+			},
+		},
 	}
 	expected := "LEFT JOIN `orders` ON `orders`.`id` = `orders`.`user_id`"
 	got := join.ToSQL("orders", dialect)
@@ -43,8 +51,12 @@ func TestJoin_ToSQL_WithAlias(t *testing.T) {
 		Type:  "RIGHT",
 		Table: "payments",
 		Alias: "p",
-		Left:  "user_id",
-		Right: "payer_id",
+		Conditions: builder.JoinCdts{
+			{
+				Left:  "user_id",
+				Right: "payer_id",
+			},
+		},
 	}
 	expected := "RIGHT JOIN `payments` AS `p` ON `payments`.`user_id` = `payments`.`payer_id`"
 	got := join.ToSQL("payments", dialect)
@@ -57,8 +69,12 @@ func TestJoin_ToSQL_UsingClause(t *testing.T) {
 		Type:  "INNER",
 		Table: "orders",
 		Alias: "",
-		Left:  "id",
-		Right: "id",
+		Conditions: builder.JoinCdts{
+			{
+				Left:  "id",
+				Right: "id",
+			},
+		},
 	}
 	expected := "INNER JOIN `orders` USING (`id`)"
 	got := join.ToSQL("orders", dialect)
@@ -71,8 +87,12 @@ func TestJoin_ToSQL_Complex(t *testing.T) {
 		Type:  "FULL OUTER",
 		Table: "users",
 		Alias: "u",
-		Left:  "id",
-		Right: "user_id",
+		Conditions: builder.JoinCdts{
+			{
+				Left:  "id",
+				Right: "user_id",
+			},
+		},
 	}
 	expected := "FULL OUTER JOIN `users` AS `u` ON `users`.`id` = `users`.`user_id`"
 	got := join.ToSQL("users", dialect)
@@ -85,15 +105,23 @@ func TestJoin_ToSQL_MultipleJoins(t *testing.T) {
 		Type:  "INNER",
 		Table: "orders",
 		Alias: "o",
-		Left:  "id",
-		Right: "user_id",
+		Conditions: builder.JoinCdts{
+			{
+				Left:  "id",
+				Right: "user_id",
+			},
+		},
 	}
 	join2 := builder.Join{
 		Type:  "LEFT",
 		Table: "payments",
 		Alias: "p",
-		Left:  "id",
-		Right: "order_id",
+		Conditions: builder.JoinCdts{
+			{
+				Left:  "id",
+				Right: "order_id",
+			},
+		},
 	}
 	expected := "INNER JOIN `orders` AS `o` ON `users`.`id` = `orders`.`user_id`" +
 		" LEFT JOIN `payments` AS `p` ON `orders`.`id` = `payments`.`order_id`"

@@ -67,11 +67,10 @@ func (m *SQLiteQueryBuilder) join(table string, join *Join) string {
 		return join.ToSQL(table, m.dialect)
 	case query.Right:
 		j := &Join{
-			Type:  query.Left,
-			Table: table,
-			Left:  join.Right,
-			Right: join.Left,
-			Alias: "",
+			Type:       query.Left,
+			Table:      table,
+			Conditions: join.Conditions.Reverse(),
+			Alias:      "",
 		}
 		return j.ToSQL(table, m.dialect)
 	default:
