@@ -82,7 +82,7 @@ func selectQ(
 ) (string, []any, error) {
 	cols := make([]string, len(columns))
 	for i, col := range columns {
-		cols[i] = dialect.QuoteIdentifier(col)
+		cols[i] = sanitizeColumn(dialect, col)
 	}
 
 	sql := "SELECT " + strings.Join(cols, ", ") + " FROM " + dialect.QuoteIdentifier(table)
@@ -140,6 +140,27 @@ func selectQ(
 	allArgs = append(allArgs, optArgs...)
 
 	return b.String(), allArgs, nil
+}
+
+func sanitizeColumn(dialect cdt.SQLDialect, column string) string {
+	c, alias := column, ""
+	if strings.Contains(column, dialect.Operator("AS")) {
+		p := strings.SplitN(column, dialect.Operator("AS"), 2)
+		c, alias = p[0], p[1]
+	}
+	if alias != "" {
+		alias = " " + dialect.Operator("AS") + " " + dialect.QuoteIdentifier(strings.TrimSpace(alias))
+	}
+	if strings.Contains(c, ".") {
+		parts := []string{}
+		columns := strings.Split(c, ".")
+		for _, p := range columns {
+			parts = append(parts, dialect.QuoteIdentifier(strings.TrimSpace(p)))
+		}
+
+		return fmt.Sprintf("%s%s", strings.Join(parts, "."), alias)
+	}
+	return fmt.Sprintf("%s%s", dialect.QuoteIdentifier(strings.TrimSpace(c)), alias)
 }
 
 func insert(dialect cdt.SQLDialect, table string, data map[string]any) (string, []any, error) {
