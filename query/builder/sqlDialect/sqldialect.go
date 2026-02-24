@@ -27,14 +27,26 @@ func supportedOptions(
 	switch queryType {
 	case definition.QueryTypeSelect:
 		if opts.Limit != nil {
-			ph := dialect.Placeholder(next)
-			parts = append(parts, fmt.Sprintf("%s %s", dialect.Operator(query.Limit), ph))
+			parts = append(
+				parts,
+				expandLimitOffset(
+					dialect,
+					dialect.Operator(query.Limit),
+					next,
+				),
+			)
 			args = append(args, *opts.Limit)
 			next++
 		}
 		if opts.Offset != nil {
-			ph := dialect.Placeholder(next)
-			parts = append(parts, fmt.Sprintf("%s %s", dialect.Operator(query.Offset), ph))
+			parts = append(
+				parts,
+				expandLimitOffset(
+					dialect,
+					dialect.Operator(query.Offset),
+					next,
+				),
+			)
 			args = append(args, *opts.Offset)
 		}
 		if len(opts.OrderBy) > 0 {
@@ -83,4 +95,19 @@ func getPrefix(qt definition.QueryType) string {
 	default:
 		return ""
 	}
+}
+
+func expandLimitOffset(
+	dialect condition.SQLDialect,
+	op string,
+	paramBase int,
+) string {
+	part := ""
+	ph := dialect.Placeholder(paramBase)
+	if strings.Contains(op, "%") {
+		part = strings.ReplaceAll(op, "%%d", ph)
+	} else {
+		part = fmt.Sprintf("%s %s", op, ph)
+	}
+	return part
 }

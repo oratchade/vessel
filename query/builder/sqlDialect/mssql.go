@@ -43,9 +43,9 @@ func (d MSSQLDialect) Operator(op string) string {
 	case query.Regex, query.NotRegex, query.InsensitiveCaseRegex, query.NotInsensitiveCaseRegex:
 		return "" // not supported
 	case query.Limit:
-		return "FETCH NEXT %d ROWS ONLY"
+		return "FETCH NEXT %%d ROWS ONLY"
 	case query.Offset:
-		return "OFFSET %d ROWS"
+		return "OFFSET %%d ROWS"
 	default:
 		return strings.ToUpper(op)
 	}
