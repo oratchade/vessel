@@ -142,6 +142,7 @@ func selectQ(
 	return b.String(), allArgs, nil
 }
 
+//nolint:prealloc
 func sanitizeColumn(dialect cdt.SQLDialect, column string) string {
 	c, alias := column, ""
 	if strings.Contains(column, dialect.Operator("AS")) {
@@ -186,6 +187,7 @@ func insert(dialect cdt.SQLDialect, table string, data map[string]any) (string, 
 	), values, nil
 }
 
+//nolint:prealloc
 func update(
 	dialect cdt.SQLDialect,
 	table string,
