@@ -29,7 +29,7 @@ func supportedOptions(
 		if opts.Limit != nil {
 			parts = append(
 				parts,
-				expandLimitOffset(
+				formatLimitOffset(
 					dialect,
 					dialect.Operator(query.Limit),
 					next,
@@ -41,7 +41,7 @@ func supportedOptions(
 		if opts.Offset != nil {
 			parts = append(
 				parts,
-				expandLimitOffset(
+				formatLimitOffset(
 					dialect,
 					dialect.Operator(query.Offset),
 					next,
@@ -97,17 +97,15 @@ func getPrefix(qt definition.QueryType) string {
 	}
 }
 
-func expandLimitOffset(
+func formatLimitOffset(
 	dialect condition.SQLDialect,
 	op string,
 	paramBase int,
 ) string {
-	part := ""
 	ph := dialect.Placeholder(paramBase)
 	if strings.Contains(op, "%") {
-		part = strings.ReplaceAll(op, "%%d", ph)
-	} else {
-		part = fmt.Sprintf("%s %s", op, ph)
+		return strings.ReplaceAll(op, "%%d", ph)
 	}
-	return part
+
+	return fmt.Sprintf("%s %s", op, ph)
 }
