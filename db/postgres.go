@@ -30,9 +30,10 @@ type pgQuerier interface {
 
 // DBConfig holds all configuration options for connecting to a PostgreSQL database.
 type PostgresConfig struct {
-	Host            string        // Database server hostname or IP
-	Port            uint16        // Database server port
-	User            string        // Username for authentication
+	Host string // Database server hostname or IP
+	Port uint16 // Database server port
+	User string // Username for authentication
+	//nolint:gosec
 	Password        string        // Password for authentication
 	Database        string        // Database name
 	SSLMode         string        // SSL mode (disable, require, verify-ca, verify-full)

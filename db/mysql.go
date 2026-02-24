@@ -24,7 +24,8 @@ type sqlQuerier interface {
 
 // DBConfig holds configuration for connecting to a MySQL database.
 type MysqlConfig struct {
-	User            string        // Username for authentication
+	User string // Username for authentication
+	//nolint:gosec
 	Password        string        // Password for authentication
 	Host            string        // Hostname or IP address
 	Port            uint16        // Port number
