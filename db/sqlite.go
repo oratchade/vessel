@@ -74,7 +74,7 @@ func newSQLLite(cfg SQLLiteConfig) (*SQLLite, error) {
 
 	return &SQLLite{
 		querier:      db,
-		queryBuilder: builder.NewMySQLQueryBuilder(sqldialect.MySQLDialect{}),
+		queryBuilder: builder.NewSQLiteQueryBuilder(sqldialect.MySQLDialect{}),
 	}, nil
 }
 

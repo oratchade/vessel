@@ -18,7 +18,8 @@ import (
 
 // DBConfig holds configuration for connecting to a MSSQL database.
 type MSSQLConfig struct {
-	User              string        // Username for authentication
+	User string // Username for authentication
+	//nolint:gosec
 	Password          string        // Password for authentication
 	Host              string        // Hostname or IP address
 	Port              uint16        // Port number
@@ -90,7 +91,7 @@ func newMSSQL(cfg MSSQLConfig) (*MSSQL, error) {
 
 	return &MSSQL{
 		querier:      db,
-		queryBuilder: builder.NewMySQLQueryBuilder(sqldialect.MSSQLDialect{}),
+		queryBuilder: builder.NewMSSQLQueryBuilder(sqldialect.MSSQLDialect{}),
 	}, nil
 }
 
