@@ -19,7 +19,7 @@ const (
 	// DriverPostgres is the driver name for PostgreSQL databases.
 	DriverPostgres DBType = "postgres"
 	// DriverSQLLite is the driver name for SQLLite databases.
-	DriverSQLLite DBType = "SQLLite3"
+	DriverSQLLite DBType = "sqlite3"
 	// DriverMSSQL is the driver name for Microsoft SQL Server databases.
 	DriverMSSQL DBType = "sqlserver"
 )
