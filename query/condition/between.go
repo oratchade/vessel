@@ -2,6 +2,7 @@ package condition
 
 import "fmt"
 
+// Between represents a SQL BETWEEN condition (column BETWEEN from AND to).
 type Between struct {
 	column   string
 	operator string
@@ -9,6 +10,7 @@ type Between struct {
 	to       any
 }
 
+// NewBetween constructs a Between condition builder.
 func NewBetween() *Between {
 	return &Between{
 		operator: "BETWEEN",

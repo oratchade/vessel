@@ -6,8 +6,8 @@ import (
 	"fmt"
 	"time"
 
-	// Import the MySQL driver
-	_ "github.com/go-sql-driver/mysql"
+	// Import the MySQL driver and provide config builder
+	mysql "github.com/go-sql-driver/mysql"
 
 	"tounilab.com/db-connector/query/builder"
 	sqldialect "tounilab.com/db-connector/query/builder/sqldialect"
@@ -22,7 +22,9 @@ type sqlQuerier interface {
 	QueryRowContext(ctx context.Context, query string, args ...any) *sql.Row
 }
 
-// DBConfig holds configuration for connecting to a MySQL database.
+// MysqlConfig holds configuration for connecting to a MySQL database.
+//
+// Fields include authentication, network, timeouts and connection pool settings.
 type MysqlConfig struct {
 	User string // Username for authentication
 	//nolint:gosec
@@ -64,14 +66,28 @@ func (cfg MysqlConfig) Driver() string {
 // * readTimeout: the read timeout
 // * writeTimeout: the write timeout
 func (cfg MysqlConfig) DSN() string {
-	return fmt.Sprintf(
-		"%s:%s@tcp(%s:%d)/%s?charset=%s&parseTime=%t&loc=%s&timeout=%s&readTimeout=%s&writeTimeout=%s",
-		cfg.User, cfg.Password, cfg.Host, cfg.Port, cfg.Database,
-		cfg.Charset, cfg.ParseTime, cfg.Loc,
-		cfg.Timeout.String(), cfg.ReadTimeout.String(), cfg.WriteTimeout.String(),
-	)
+	cfgMap := map[string]string{
+		"charset":      cfg.Charset,
+		"parseTime":    fmt.Sprintf("%t", cfg.ParseTime),
+		"loc":          cfg.Loc,
+		"timeout":      cfg.Timeout.String(),
+		"readTimeout":  cfg.ReadTimeout.String(),
+		"writeTimeout": cfg.WriteTimeout.String(),
+	}
+
+	c := mysql.Config{
+		User:   cfg.User,
+		Passwd: cfg.Password,
+		Net:    "tcp",
+		Addr:   fmt.Sprintf("%s:%d", cfg.Host, cfg.Port),
+		DBName: cfg.Database,
+		Params: cfgMap,
+	}
+
+	return c.FormatDSN()
 }
 
+// MySQL is a DB implementation for MySQL using database/sql.
 type MySQL struct {
 	querier sqlQuerier // Underlying sql.DB connection pool
 

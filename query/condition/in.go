@@ -5,12 +5,14 @@ import (
 	"strings"
 )
 
+// In represents a SQL IN condition (column IN (...)).
 type In struct {
 	column   string
 	operator string
 	values   []any
 }
 
+// NewIn constructs an In condition builder.
 func NewIn() *In {
 	return &In{
 		operator: "IN",

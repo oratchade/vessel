@@ -2,11 +2,13 @@ package condition
 
 import "fmt"
 
+// Not negates a child condition.
 type Not struct {
 	condition Condition
 	operator  string
 }
 
+// NewNot constructs a Not condition.
 func NewNot() *Not {
 	return &Not{
 		operator: "NOT",

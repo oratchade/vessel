@@ -5,10 +5,14 @@ import (
 	"tounilab.com/db-connector/query/options"
 )
 
+// Condition represents a composable SQL condition expression that can be
+// converted to a parameterized SQL fragment for a specific dialect.
 type Condition interface {
 	ToSQL(dialect SQLDialect, paramBase int) (string, []any, error)
 }
 
+// SQLDialect defines the dialect-specific behaviors required by the query
+// builder: placeholder formatting, operator mapping and quoting rules.
 type SQLDialect interface {
 	Placeholder(index int) string
 	Operator(op string) string

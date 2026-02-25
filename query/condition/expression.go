@@ -2,12 +2,15 @@ package condition
 
 import "fmt"
 
+// Expr represents a simple column operator value expression, e.g. `age > 30`.
+// It implements the Condition interface and can be converted to SQL with placeholders.
 type Expr struct {
 	column   string
 	operator string
 	value    any
 }
 
+// NewExpr constructs an empty Expr that can be populated via fluent setters.
 func NewExpr() *Expr {
 	return &Expr{}
 }

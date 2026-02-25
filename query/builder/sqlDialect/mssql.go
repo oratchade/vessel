@@ -9,6 +9,8 @@ import (
 	"tounilab.com/db-connector/query/options"
 )
 
+// MSSQLDialect implements SQL dialect behavior specific to Microsoft SQL Server.
+// It provides placeholder syntax, quoting and operator mappings for MSSQL.
 type MSSQLDialect struct{}
 
 func (d MSSQLDialect) Placeholder(index int) string {

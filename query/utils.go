@@ -6,6 +6,9 @@ import (
 	"tounilab.com/db-connector/query/condition"
 )
 
+// QuoteIdentifierSlice returns a slice of identifiers where each dotted segment
+// is quoted using the provided dialect. If a non-empty prefix is provided it
+// is prepended (unquoted) to each resulting identifier.
 func QuoteIdentifierSlice(dialect condition.SQLDialect, identifiers []string, prefix string) []string {
 	quoted := make([]string, len(identifiers))
 	for i, id := range identifiers {

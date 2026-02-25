@@ -8,11 +8,13 @@ import (
 	"tounilab.com/db-connector/query/condition"
 )
 
+// JoinCdt represents a pair of columns used for JOIN conditions.
 type JoinCdt struct {
 	Left  string // Column from the left table, generally the main table
 	Right string // Column from the right table, generally the joined table
 }
 
+// JoinCdts is a slice of JoinCdt and provides helpers for JOIN condition rendering.
 type JoinCdts []JoinCdt
 
 func (j JoinCdts) on(table string, joinTable string, dialect condition.SQLDialect) string {
@@ -53,6 +55,7 @@ func (j JoinCdts) Reverse() JoinCdts {
 	return reversed
 }
 
+// Join describes a SQL JOIN clause including type, table, alias and join conditions.
 type Join struct {
 	Type       string // e.g., "INNER", "LEFT", "RIGHT"
 	Table      string // Table to join

@@ -16,7 +16,9 @@ import (
 	"tounilab.com/db-connector/query/options"
 )
 
-// DBConfig holds configuration for connecting to a MSSQL database.
+// MSSQLConfig holds configuration for connecting to a MSSQL database.
+//
+// Fields include authentication, network and timeout settings plus pool options.
 type MSSQLConfig struct {
 	User string // Username for authentication
 	//nolint:gosec
@@ -65,6 +67,7 @@ func (cfg MSSQLConfig) DSN() string {
 	return fmt.Sprintf("sqlserver://%s?database=%s&%s&%s", auth, cfg.Database, encryption, timeout)
 }
 
+// MSSQL is a DB implementation for Microsoft SQL Server using database/sql.
 type MSSQL struct {
 	querier sqlQuerier // Underlying sql.DB connection pool
 

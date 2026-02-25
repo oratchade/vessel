@@ -7,10 +7,12 @@ import (
 	"tounilab.com/db-connector/query/options"
 )
 
+// MSSQLQueryBuilder builds SQL queries compatible with Microsoft SQL Server.
 type MSSQLQueryBuilder struct {
 	dialect condition.SQLDialect
 }
 
+// NewMSSQLQueryBuilder constructs a new MSSQLQueryBuilder using the provided dialect.
 func NewMSSQLQueryBuilder(dialect condition.SQLDialect) *MSSQLQueryBuilder {
 	return &MSSQLQueryBuilder{
 		dialect: dialect,

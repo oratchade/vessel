@@ -8,9 +8,8 @@ import (
 	"tounilab.com/db-connector/query/options"
 )
 
-// MySQL and SQLite use the same placeholder syntax
-// and similar operators, so we can use the same dialect for both.
-
+// MySQLDialect implements SQL dialect behavior used by MySQL and SQLite.
+// It provides placeholder syntax, quoting and operator mappings for those engines.
 type MySQLDialect struct{}
 
 func (d MySQLDialect) Placeholder(_ int) string {

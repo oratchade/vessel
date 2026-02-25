@@ -11,6 +11,8 @@ import (
 	"tounilab.com/db-connector/query/options"
 )
 
+// ExecResult holds metadata returned by mutation statements such as INSERT,
+// UPDATE and DELETE (last insert id when available and number of rows affected).
 type ExecResult struct {
 	LastInsertID int64
 	RowsAffected int64
@@ -25,6 +27,8 @@ func fromSQLResult(res sql.Result) *ExecResult {
 	}
 }
 
+// DBConfig represents configuration needed to create a DB connection. It
+// exposes the driver name and a DSN builder for connecting to the database.
 type DBConfig interface {
 	// Driver returns the database driver name (e.g., "mysql", "postgres", "SQLLite3").
 	Driver() string
@@ -32,6 +36,8 @@ type DBConfig interface {
 	DSN() string
 }
 
+// NewDB returns a DB implementation for the provided DBConfig.
+// It selects the concrete driver implementation based on cfg.Driver().
 func NewDB(cfg DBConfig, logger Logger) (DB, error) {
 	switch cfg.Driver() {
 	case definition.DriverMySQL:
@@ -48,33 +54,29 @@ func NewDB(cfg DBConfig, logger Logger) (DB, error) {
 }
 
 // DBActions defines the core, context-aware data access operations that any
-// database connection or transaction must provide. It is a stable,
-// implementation-agnostic contract used by higher-level code (builders,
-// services) to perform SQL work without depending on driver details.
+// database connection or transaction must provide. It is an implementation-
+// agnostic contract used by higher-level code (builders and services) to perform
+// SQL operations without depending on driver details.
 //
-// Responsibilities and expectations:
-//
-//   - Context propagation: every method accepts context.Context so callers can
-//     control timeouts and cancellations.
-//   - Parameter ordering: implementations must preserve placeholder ↔ arg
-//     ordering. Convention: condition args first, then option args.
-//   - Identifier handling: callers should provide identifiers; implementations
-//     must quote/validate identifiers using the dialect helpers to avoid injection.
-//   - Mutation results: mutation methods return *ExecResult (LastInsertID, RowsAffected)
-//     so callers can inspect execution metadata consistently across drivers.
-//   - Error handling: return wrapped errors (fmt.Errorf("%w")) and provide sentinel
-//     errors (e.g. ErrNotFound) when useful for caller-side handling.
-//   - Concurrency: implementations must be safe for concurrent use (connection
-//     pooling handled internally).
+// Expectations:
+//   - Context propagation: every method accepts a context.Context for
+//     cancellation and deadlines.
+//   - Parameter ordering: implementations must preserve placeholder↔arg
+//     ordering (convention: condition args first, then option args).
+//   - Identifier handling: implementations should use dialect helpers to quote
+//     identifiers and avoid injection.
+//   - Mutation results: mutation methods return *ExecResult so callers can
+//     inspect execution metadata consistently across drivers.
+//   - Concurrency: implementations must be safe for concurrent use.
 //
 // Transactions:
 //   - Tx implementations embed DBActions and add Commit/Rollback lifecycle methods.
-//   - WithTransaction helpers should Begin, call the provided function, Commit on
-//     success and Rollback on error or panic.
+//   - WithTransaction helpers should Begin, execute the provided function, and
+//     Commit on success or Rollback on error/panic.
 //
-// Testing:
-//   - Keep DBActions small and mockable; add integration tests that verify SQL+args
-//     ordering, option rendering per
+// Testing guidance:
+//   - Keep DBActions small and mockable; add integration tests that verify
+//     SQL+args ordering and option rendering for each dialect.
 type DBActions interface {
 	// Get retrieves multiple rows from the specified table, with optional SQL joins and query options.
 	//
@@ -269,6 +271,7 @@ type Tx interface {
 	Rollback(ctx context.Context) error
 }
 
+// Logger is a minimal structured logging interface used by DB implementations.
 type Logger interface {
 	Debug(msg string, args ...any)
 	Info(msg string, args ...any)

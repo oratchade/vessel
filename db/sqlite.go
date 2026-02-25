@@ -15,7 +15,9 @@ import (
 	"tounilab.com/db-connector/query/options"
 )
 
-// DBConfig holds configuration for connecting to a SQLLite database.
+// SQLLiteConfig holds configuration for connecting to a SQLLite database.
+//
+// Fields include file path, access mode, and connection pool settings.
 type SQLLiteConfig struct {
 	FilePath        string        // Path to the SQLLite database file
 	CacheMode       string        // Cache mode (shared, private)
@@ -48,6 +50,7 @@ func (cfg SQLLiteConfig) DSN() string {
 	)
 }
 
+// SQLLite is a DB implementation for SQLite using database/sql.
 type SQLLite struct {
 	querier sqlQuerier // Underlying sql.DB connection pool
 

@@ -5,11 +5,13 @@ import (
 	"strings"
 )
 
+// And composes multiple conditions using the logical AND operator.
 type And struct {
 	conditions []Condition
 	operator   string
 }
 
+// NewAnd constructs an And condition ready to accept child conditions.
 func NewAnd() *And {
 	return &And{
 		operator: "AND",

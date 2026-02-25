@@ -9,6 +9,8 @@ import (
 	"tounilab.com/db-connector/query/options"
 )
 
+// PostgresDialect implements SQL dialect behavior specific to PostgreSQL.
+// It provides placeholder syntax, quoting and operator mappings for Postgres.
 type PostgresDialect struct{}
 
 func (d PostgresDialect) Placeholder(index int) string {

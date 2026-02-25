@@ -9,10 +9,12 @@ import (
 	"tounilab.com/db-connector/query/options"
 )
 
+// SQLiteQueryBuilder builds SQL queries compatible with SQLite dialects.
 type SQLiteQueryBuilder struct {
 	dialect condition.SQLDialect
 }
 
+// NewSQLiteQueryBuilder constructs a new SQLiteQueryBuilder using the provided dialect.
 func NewSQLiteQueryBuilder(dialect condition.SQLDialect) *SQLiteQueryBuilder {
 	return &SQLiteQueryBuilder{
 		dialect: dialect,

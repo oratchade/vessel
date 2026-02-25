@@ -9,10 +9,12 @@ import (
 	"tounilab.com/db-connector/query/options"
 )
 
+// MySQLQueryBuilder builds SQL queries that are compatible with MySQL dialects.
 type MySQLQueryBuilder struct {
 	dialect condition.SQLDialect
 }
 
+// NewMySQLQueryBuilder constructs a new MySQLQueryBuilder using the provided dialect.
 func NewMySQLQueryBuilder(dialect condition.SQLDialect) *MySQLQueryBuilder {
 	return &MySQLQueryBuilder{
 		dialect: dialect,

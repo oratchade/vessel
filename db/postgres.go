@@ -3,6 +3,8 @@ package db
 import (
 	"context"
 	"fmt"
+	"net/url"
+	"strconv"
 	"time"
 
 	// Import the PostgreSQL driver
@@ -28,7 +30,9 @@ type pgQuerier interface {
 	Query(ctx context.Context, sql string, args ...any) (pgx.Rows, error)
 }
 
-// DBConfig holds all configuration options for connecting to a PostgreSQL database.
+// PostgresConfig holds configuration options for connecting to a PostgreSQL database.
+//
+// Fields include connection, pooling and application-specific settings.
 type PostgresConfig struct {
 	Host string // Database server hostname or IP
 	Port uint16 // Database server port
@@ -69,12 +73,32 @@ func (cfg PostgresConfig) Driver() string {
 //
 // See the pgx documentation for more information on the available options.
 func (cfg PostgresConfig) DSN() string {
-	return fmt.Sprintf(
-		"user=%s password=%s host=%s port=%d dbname=%s sslmode=%s application_name=%s search_path=%s",
-		cfg.User, cfg.Password, cfg.Host, cfg.Port, cfg.Database, cfg.SSLMode, cfg.ApplicationName, cfg.SearchPath,
-	)
+	u := &url.URL{
+		Scheme: "postgres",
+		User:   url.UserPassword(cfg.User, cfg.Password),
+		Host:   fmt.Sprintf("%s:%d", cfg.Host, cfg.Port),
+		Path:   cfg.Database,
+	}
+
+	q := url.Values{}
+	if cfg.SSLMode != "" {
+		q.Set("sslmode", cfg.SSLMode)
+	}
+	if cfg.ApplicationName != "" {
+		q.Set("application_name", cfg.ApplicationName)
+	}
+	if cfg.SearchPath != "" {
+		q.Set("search_path", cfg.SearchPath)
+	}
+	if cfg.ConnectTimeout > 0 {
+		q.Set("connect_timeout", strconv.Itoa(int(cfg.ConnectTimeout.Seconds())))
+	}
+
+	u.RawQuery = q.Encode()
+	return u.String()
 }
 
+// Postgres is a DB implementation for PostgreSQL using pgx.
 type Postgres struct {
 	querier      pgQuerier            // PostgreSQL connection pool
 	queryBuilder builder.QueryBuilder // Query builder for constructing SQL queries

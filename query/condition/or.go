@@ -5,11 +5,13 @@ import (
 	"strings"
 )
 
+// Or composes multiple conditions using the logical OR operator.
 type Or struct {
 	conditions []Condition
 	operator   string
 }
 
+// NewOr constructs an Or condition ready to accept child conditions.
 func NewOr() *Or {
 	return &Or{
 		operator: "OR",
