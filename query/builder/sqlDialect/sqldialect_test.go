@@ -31,7 +31,7 @@ func TestSupportedOptions_SelectLimitOffsetOrderBy(t *testing.T) {
 				Offset:  intPtr(5),
 				OrderBy: []string{"name"},
 			},
-			wantFrag: "LIMIT ? OFFSET ? ORDER BY `name`",
+			wantFrag: "ORDER BY `name` LIMIT ? OFFSET ?",
 			wantArgs: []any{10, 5},
 		},
 		{
@@ -42,7 +42,7 @@ func TestSupportedOptions_SelectLimitOffsetOrderBy(t *testing.T) {
 				Offset:  intPtr(7),
 				OrderBy: []string{"username"},
 			},
-			wantFrag: "LIMIT $1 OFFSET $2 ORDER BY \"username\"",
+			wantFrag: "ORDER BY \"username\" LIMIT $1 OFFSET $2",
 			wantArgs: []any{20, 7},
 		},
 		{
@@ -53,8 +53,8 @@ func TestSupportedOptions_SelectLimitOffsetOrderBy(t *testing.T) {
 				Offset:  intPtr(2),
 				OrderBy: []string{"id"},
 			},
-			wantFrag: "FETCH NEXT @p1 ROWS ONLY OFFSET @p2 ROWS ORDER BY [id]",
-			wantArgs: []any{3, 2},
+			wantFrag: "ORDER BY [id] OFFSET @p1 ROWS FETCH NEXT @p2 ROWS ONLY",
+			wantArgs: []any{2, 3},
 		},
 	}
 
@@ -131,7 +131,7 @@ func TestSupportedOptions_GroupByHavingAndMultipleOrderBy(t *testing.T) {
 				Having:  func() *string { return &count }(),
 				OrderBy: []string{"country", "city"},
 			},
-			wantFrag: "ORDER BY `country`, `city` HAVING `count>10` GROUP BY `country`, `city`",
+			wantFrag: "GROUP BY `country`, `city` HAVING `count>10` ORDER BY `country`, `city`",
 		},
 		{
 			name:    "postgres-groupby-having-orderby",
@@ -141,7 +141,7 @@ func TestSupportedOptions_GroupByHavingAndMultipleOrderBy(t *testing.T) {
 				Having:  func() *string { return &count }(),
 				OrderBy: []string{"country", "city"},
 			},
-			wantFrag: "ORDER BY \"country\", \"city\" HAVING \"count>10\" GROUP BY \"country\", \"city\"",
+			wantFrag: "GROUP BY \"country\", \"city\" HAVING \"count>10\" ORDER BY \"country\", \"city\"",
 		},
 		{
 			name:    "mssql-groupby-having-orderby",
@@ -151,7 +151,7 @@ func TestSupportedOptions_GroupByHavingAndMultipleOrderBy(t *testing.T) {
 				Having:  func() *string { return &count }(),
 				OrderBy: []string{"country", "city"},
 			},
-			wantFrag: "ORDER BY [country], [city] HAVING [count>10] GROUP BY [country], [city]",
+			wantFrag: "GROUP BY [country], [city] HAVING [count>10] ORDER BY [country], [city]",
 		},
 	}
 

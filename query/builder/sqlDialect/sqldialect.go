@@ -10,6 +10,7 @@ import (
 	"tounilab.com/db-connector/query/options"
 )
 
+//nolint:cyclop
 func supportedOptions(
 	dialect condition.SQLDialect,
 	queryType definition.QueryType,
@@ -26,29 +27,23 @@ func supportedOptions(
 
 	switch queryType {
 	case definition.QueryTypeSelect:
-		if opts.Limit != nil {
-			parts = append(
-				parts,
-				formatLimitOffset(
-					dialect,
-					dialect.Operator(query.Limit),
-					next,
-				),
-			)
-			args = append(args, *opts.Limit)
-			next++
+		// Build fragments in SQL-correct order: GROUP BY -> HAVING -> ORDER BY
+		if len(opts.GroupBy) > 0 {
+			parts = append(parts, fmt.Sprintf(
+				"%s %s",
+				dialect.Operator(query.GroupBy),
+				strings.Join(query.QuoteIdentifierSlice(dialect, opts.GroupBy, ""), ", "),
+			))
 		}
-		if opts.Offset != nil {
-			parts = append(
-				parts,
-				formatLimitOffset(
-					dialect,
-					dialect.Operator(query.Offset),
-					next,
-				),
-			)
-			args = append(args, *opts.Offset)
+
+		if opts.Having != nil {
+			parts = append(parts, fmt.Sprintf(
+				"%s %s",
+				dialect.Operator(query.Having),
+				dialect.QuoteIdentifier(*opts.Having),
+			))
 		}
+
 		if len(opts.OrderBy) > 0 {
 			parts = append(parts, fmt.Sprintf(
 				"%s %s",
@@ -56,22 +51,30 @@ func supportedOptions(
 				strings.Join(query.QuoteIdentifierSlice(dialect, opts.OrderBy, ""), ", "),
 			))
 		}
-		if opts.Having != nil {
-			parts = append(
-				parts,
-				fmt.Sprintf(
-					"%s %s",
-					dialect.Operator(query.Having),
-					dialect.QuoteIdentifier(*opts.Having),
-				),
-			)
-		}
-		if len(opts.GroupBy) > 0 {
-			parts = append(parts, fmt.Sprintf(
-				"%s %s",
-				dialect.Operator(query.GroupBy),
-				strings.Join(query.QuoteIdentifierSlice(dialect, opts.GroupBy, ""), ", "),
-			))
+
+		// LIMIT/OFFSET (tail) should appear after ORDER BY/HAVING/GROUP BY.
+		// MSSQL requires OFFSET before FETCH (limit), so handle dialect-specific ordering.
+		switch dialect.(type) {
+		case MSSQLDialect:
+			if opts.Offset != nil {
+				parts = append(parts, formatLimitOffset(dialect, dialect.Operator(query.Offset), next))
+				args = append(args, *opts.Offset)
+				next++
+			}
+			if opts.Limit != nil {
+				parts = append(parts, formatLimitOffset(dialect, dialect.Operator(query.Limit), next))
+				args = append(args, *opts.Limit)
+			}
+		default:
+			if opts.Limit != nil {
+				parts = append(parts, formatLimitOffset(dialect, dialect.Operator(query.Limit), next))
+				args = append(args, *opts.Limit)
+				next++
+			}
+			if opts.Offset != nil {
+				parts = append(parts, formatLimitOffset(dialect, dialect.Operator(query.Offset), next))
+				args = append(args, *opts.Offset)
+			}
 		}
 	case definition.QueryTypeInsert, definition.QueryTypeUpdate, definition.QueryTypeDelete:
 		if len(opts.Returning) > 0 {
@@ -104,7 +107,8 @@ func formatLimitOffset(
 ) string {
 	ph := dialect.Placeholder(paramBase)
 	if strings.Contains(op, "%") {
-		return strings.ReplaceAll(op, "%%d", ph)
+		// treat operator as format string (e.g. "OFFSET %s ROWS")
+		return fmt.Sprintf(op, ph)
 	}
 
 	return fmt.Sprintf("%s %s", op, ph)
