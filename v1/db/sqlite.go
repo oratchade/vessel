@@ -10,7 +10,7 @@ import (
 	_ "github.com/mattn/go-sqlite3"
 	"tounilab.com/db-connector/internal/pkg/sqldialect"
 	builder "tounilab.com/db-connector/pkg/query/builder"
-	"tounilab.com/db-connector/pkg/query/condition"
+	cdt "tounilab.com/db-connector/pkg/query/condition"
 	"tounilab.com/db-connector/pkg/query/definition"
 	"tounilab.com/db-connector/pkg/query/options"
 )
@@ -114,8 +114,8 @@ func (m *SQLLite) Get(
 	ctx context.Context,
 	table string,
 	columns []string,
-	joins []builder.Join,
-	conditions condition.Condition,
+	joins []cdt.Join,
+	conditions cdt.Condition,
 	opts *options.QueryOptions,
 ) ([]map[string]any, error) {
 	o := dbOpts{
@@ -130,7 +130,7 @@ func (m *SQLLite) GetByID(
 	ctx context.Context,
 	table string,
 	id any,
-	joins []builder.Join,
+	joins []cdt.Join,
 	opts *options.QueryOptions,
 ) ([]map[string]any, error) {
 	o := dbOpts{
@@ -159,7 +159,7 @@ func (m *SQLLite) Update(
 	ctx context.Context,
 	table string,
 	data map[string]any,
-	conditions condition.Condition,
+	conditions cdt.Condition,
 	opts *options.QueryOptions,
 ) (*ExecResult, error) {
 	o := dbOpts{
@@ -173,7 +173,7 @@ func (m *SQLLite) Update(
 func (m *SQLLite) Delete(
 	ctx context.Context,
 	table string,
-	conditions condition.Condition,
+	conditions cdt.Condition,
 	opts *options.QueryOptions,
 ) (*ExecResult, error) {
 	o := dbOpts{

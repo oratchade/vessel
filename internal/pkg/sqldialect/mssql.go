@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"strings"
 
-	"tounilab.com/db-connector/pkg/query"
+	"tounilab.com/db-connector/internal/pkg/operator"
 	"tounilab.com/db-connector/pkg/query/definition"
 	"tounilab.com/db-connector/pkg/query/options"
 )
@@ -22,31 +22,31 @@ func (d MSSQLDialect) Placeholder(index int) string {
 //nolint:cyclop
 func (d MSSQLDialect) Operator(op string) string {
 	switch strings.ToLower(op) {
-	case query.Equal:
+	case operator.Equal:
 		return "="
-	case query.NotEqual:
+	case operator.NotEqual:
 		return "!="
-	case query.LowerThan:
+	case operator.LowerThan:
 		return "<"
-	case query.LowerThanOrEqual:
+	case operator.LowerThanOrEqual:
 		return "<="
-	case query.GreaterThan:
+	case operator.GreaterThan:
 		return ">"
-	case query.GreaterThanOrEqual:
+	case operator.GreaterThanOrEqual:
 		return ">="
-	case query.Returning:
-		return strings.ToUpper(query.Output)
-	case query.InsensitiveCaseLike:
-		return strings.ToUpper(query.Like) // MSSQL does not have a case-insensitive LIKE, so we use LIKE
-	case query.Distinct:
-		return strings.ToUpper(query.IsDistinctFrom) // emulate
-	case query.NotDistinct, query.Contains, query.Contained, query.Overlaps:
-		return strings.ToUpper(query.Like) // MSSQL does not support IS NOT DISTINCT FROM, so we use LIKE
-	case query.Regex, query.NotRegex, query.InsensitiveCaseRegex, query.NotInsensitiveCaseRegex:
+	case operator.Returning:
+		return strings.ToUpper(operator.Output)
+	case operator.InsensitiveCaseLike:
+		return strings.ToUpper(operator.Like) // MSSQL does not have a case-insensitive LIKE, so we use LIKE
+	case operator.Distinct:
+		return strings.ToUpper(operator.IsDistinctFrom) // emulate
+	case operator.NotDistinct, operator.Contains, operator.Contained, operator.Overlaps:
+		return strings.ToUpper(operator.Like) // MSSQL does not support IS NOT DISTINCT FROM, so we use LIKE
+	case operator.Regex, operator.NotRegex, operator.InsensitiveCaseRegex, operator.NotInsensitiveCaseRegex:
 		return "" // not supported
-	case query.Limit:
+	case operator.Limit:
 		return "FETCH NEXT %s ROWS ONLY"
-	case query.Offset:
+	case operator.Offset:
 		return "OFFSET %s ROWS"
 	default:
 		return strings.ToUpper(op)

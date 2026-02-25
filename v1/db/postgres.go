@@ -13,7 +13,7 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 	sqldialect "tounilab.com/db-connector/internal/pkg/sqldialect"
 	builder "tounilab.com/db-connector/pkg/query/builder"
-	"tounilab.com/db-connector/pkg/query/condition"
+	cdt "tounilab.com/db-connector/pkg/query/condition"
 	"tounilab.com/db-connector/pkg/query/definition"
 	"tounilab.com/db-connector/pkg/query/options"
 )
@@ -165,8 +165,8 @@ func (pg *Postgres) Get(
 	ctx context.Context,
 	table string,
 	columns []string,
-	joins []builder.Join,
-	conditions condition.Condition,
+	joins []cdt.Join,
+	conditions cdt.Condition,
 	opts *options.QueryOptions,
 ) ([]map[string]any, error) {
 	query, args, err := pg.queryBuilder.Select(table, columns, joins, opts, conditions)
@@ -205,10 +205,10 @@ func (pg *Postgres) GetByID(
 	ctx context.Context,
 	table string,
 	id any,
-	joins []builder.Join,
+	joins []cdt.Join,
 	opts *options.QueryOptions,
 ) ([]map[string]any, error) {
-	cdt := &condition.Expr{}
+	cdt := &cdt.Expr{}
 	cdt.Column("id").Op("=").Value(id)
 
 	query, args, err := pg.queryBuilder.Select(table, []string{"*"}, joins, opts, cdt)
@@ -265,7 +265,7 @@ func (pg *Postgres) Update(
 	ctx context.Context,
 	table string,
 	data map[string]any,
-	conditions condition.Condition,
+	conditions cdt.Condition,
 	opts *options.QueryOptions,
 ) (*ExecResult, error) {
 	query, args, err := pg.queryBuilder.Update(table, data, conditions)
@@ -283,7 +283,7 @@ func (pg *Postgres) Update(
 func (pg *Postgres) Delete(
 	ctx context.Context,
 	table string,
-	conditions condition.Condition,
+	conditions cdt.Condition,
 	opts *options.QueryOptions,
 ) (*ExecResult, error) {
 	query, args, err := pg.queryBuilder.Delete(table, conditions)

@@ -28,7 +28,7 @@ type QueryBuilder interface {
 	Select(
 		table string,
 		columns []string,
-		joins []Join,
+		joins []cdt.Join,
 		opts *options.QueryOptions,
 		cond cdt.Condition,
 	) (string, []any, error)
@@ -75,10 +75,10 @@ func selectQ(
 	dialect cdt.SQLDialect,
 	table string,
 	columns []string,
-	joins []Join,
+	joins []cdt.Join,
 	cond cdt.Condition,
 	opts *options.QueryOptions,
-	joinFn func(table string, join *Join) string,
+	joinFn func(table string, join *cdt.Join) string,
 ) (string, []any, error) {
 	cols := make([]string, len(columns))
 	for i, col := range columns {

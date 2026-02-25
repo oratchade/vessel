@@ -1,21 +1,21 @@
-package builder_test
+package condition_test
 
 import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
 
-	"tounilab.com/db-connector/pkg/query/builder"
+	"tounilab.com/db-connector/pkg/query/condition"
 	"tounilab.com/db-connector/tests"
 )
 
 func TestJoin_ToSQL_OnClause(t *testing.T) {
 	dialect := tests.MockDialect{}
-	join := builder.Join{
+	join := condition.Join{
 		Type:  "INNER",
 		Table: "orders",
 		Alias: "",
-		Conditions: builder.JoinCdts{
+		Conditions: condition.JoinCdts{
 			{
 				Left:  "user_id",
 				Right: "id",
@@ -29,11 +29,11 @@ func TestJoin_ToSQL_OnClause(t *testing.T) {
 
 func TestJoin_ToSQL_OnClause_DifferentTables(t *testing.T) {
 	dialect := tests.MockDialect{}
-	join := builder.Join{
+	join := condition.Join{
 		Type:  "LEFT",
 		Table: "orders",
 		Alias: "",
-		Conditions: builder.JoinCdts{
+		Conditions: condition.JoinCdts{
 			{
 				Left:  "id",
 				Right: "user_id",
@@ -47,11 +47,11 @@ func TestJoin_ToSQL_OnClause_DifferentTables(t *testing.T) {
 
 func TestJoin_ToSQL_WithAlias(t *testing.T) {
 	dialect := tests.MockDialect{}
-	join := builder.Join{
+	join := condition.Join{
 		Type:  "RIGHT",
 		Table: "payments",
 		Alias: "p",
-		Conditions: builder.JoinCdts{
+		Conditions: condition.JoinCdts{
 			{
 				Left:  "user_id",
 				Right: "payer_id",
@@ -65,11 +65,11 @@ func TestJoin_ToSQL_WithAlias(t *testing.T) {
 
 func TestJoin_ToSQL_UsingClause(t *testing.T) {
 	dialect := tests.MockDialect{}
-	join := builder.Join{
+	join := condition.Join{
 		Type:  "INNER",
 		Table: "orders",
 		Alias: "",
-		Conditions: builder.JoinCdts{
+		Conditions: condition.JoinCdts{
 			{
 				Left:  "id",
 				Right: "id",
@@ -83,11 +83,11 @@ func TestJoin_ToSQL_UsingClause(t *testing.T) {
 
 func TestJoin_ToSQL_Complex(t *testing.T) {
 	dialect := tests.MockDialect{}
-	join := builder.Join{
+	join := condition.Join{
 		Type:  "FULL OUTER",
 		Table: "users",
 		Alias: "u",
-		Conditions: builder.JoinCdts{
+		Conditions: condition.JoinCdts{
 			{
 				Left:  "id",
 				Right: "user_id",
@@ -101,22 +101,22 @@ func TestJoin_ToSQL_Complex(t *testing.T) {
 
 func TestJoin_ToSQL_MultipleJoins(t *testing.T) {
 	dialect := tests.MockDialect{}
-	join1 := builder.Join{
+	join1 := condition.Join{
 		Type:  "INNER",
 		Table: "orders",
 		Alias: "o",
-		Conditions: builder.JoinCdts{
+		Conditions: condition.JoinCdts{
 			{
 				Left:  "id",
 				Right: "user_id",
 			},
 		},
 	}
-	join2 := builder.Join{
+	join2 := condition.Join{
 		Type:  "LEFT",
 		Table: "payments",
 		Alias: "p",
-		Conditions: builder.JoinCdts{
+		Conditions: condition.JoinCdts{
 			{
 				Left:  "id",
 				Right: "order_id",
@@ -131,7 +131,7 @@ func TestJoin_ToSQL_MultipleJoins(t *testing.T) {
 
 // func TestJoin_ToSQL_WithCondition(t *testing.T) {
 // 	dialect := tests.MockDialect{}
-// 	join := builder.Join{
+// 	join := condition.Join{
 // 		Type:  "INNER",
 // 		Table: "orders",
 // 		Alias: "",

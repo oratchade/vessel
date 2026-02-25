@@ -4,7 +4,8 @@ import (
 	"fmt"
 	"strings"
 
-	"tounilab.com/db-connector/pkg/query"
+	"tounilab.com/db-connector/internal/pkg/helpers"
+	"tounilab.com/db-connector/internal/pkg/operator"
 	"tounilab.com/db-connector/pkg/query/condition"
 	"tounilab.com/db-connector/pkg/query/definition"
 	"tounilab.com/db-connector/pkg/query/options"
@@ -31,15 +32,15 @@ func supportedOptions(
 		if len(opts.GroupBy) > 0 {
 			parts = append(parts, fmt.Sprintf(
 				"%s %s",
-				dialect.Operator(query.GroupBy),
-				strings.Join(query.QuoteIdentifierSlice(dialect, opts.GroupBy, ""), ", "),
+				dialect.Operator(operator.GroupBy),
+				strings.Join(helpers.QuoteIdentifierSlice(dialect, opts.GroupBy, ""), ", "),
 			))
 		}
 
 		if opts.Having != nil {
 			parts = append(parts, fmt.Sprintf(
 				"%s %s",
-				dialect.Operator(query.Having),
+				dialect.Operator(operator.Having),
 				dialect.QuoteIdentifier(*opts.Having),
 			))
 		}
@@ -47,8 +48,8 @@ func supportedOptions(
 		if len(opts.OrderBy) > 0 {
 			parts = append(parts, fmt.Sprintf(
 				"%s %s",
-				dialect.Operator(query.OrderBy),
-				strings.Join(query.QuoteIdentifierSlice(dialect, opts.OrderBy, ""), ", "),
+				dialect.Operator(operator.OrderBy),
+				strings.Join(helpers.QuoteIdentifierSlice(dialect, opts.OrderBy, ""), ", "),
 			))
 		}
 
@@ -57,22 +58,22 @@ func supportedOptions(
 		switch dialect.(type) {
 		case MSSQLDialect:
 			if opts.Offset != nil {
-				parts = append(parts, formatOperator(dialect, dialect.Operator(query.Offset), next))
+				parts = append(parts, formatOperator(dialect, dialect.Operator(operator.Offset), next))
 				args = append(args, *opts.Offset)
 				next++
 			}
 			if opts.Limit != nil {
-				parts = append(parts, formatOperator(dialect, dialect.Operator(query.Limit), next))
+				parts = append(parts, formatOperator(dialect, dialect.Operator(operator.Limit), next))
 				args = append(args, *opts.Limit)
 			}
 		default:
 			if opts.Limit != nil {
-				parts = append(parts, formatOperator(dialect, dialect.Operator(query.Limit), next))
+				parts = append(parts, formatOperator(dialect, dialect.Operator(operator.Limit), next))
 				args = append(args, *opts.Limit)
 				next++
 			}
 			if opts.Offset != nil {
-				parts = append(parts, formatOperator(dialect, dialect.Operator(query.Offset), next))
+				parts = append(parts, formatOperator(dialect, dialect.Operator(operator.Offset), next))
 				args = append(args, *opts.Offset)
 			}
 		}
@@ -80,8 +81,8 @@ func supportedOptions(
 		if len(opts.Returning) > 0 {
 			parts = append(parts, fmt.Sprintf(
 				"%s %s",
-				dialect.Operator(query.Returning),
-				strings.Join(query.QuoteIdentifierSlice(dialect, opts.Returning, getPrefix(queryType)), ", "),
+				dialect.Operator(operator.Returning),
+				strings.Join(helpers.QuoteIdentifierSlice(dialect, opts.Returning, getPrefix(queryType)), ", "),
 			))
 		}
 	}

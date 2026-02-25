@@ -3,17 +3,17 @@ package builder
 import (
 	"fmt"
 
-	"tounilab.com/db-connector/pkg/query/condition"
+	cdt "tounilab.com/db-connector/pkg/query/condition"
 	"tounilab.com/db-connector/pkg/query/options"
 )
 
 // MSSQLQueryBuilder builds SQL queries compatible with Microsoft SQL Server.
 type MSSQLQueryBuilder struct {
-	dialect condition.SQLDialect
+	dialect cdt.SQLDialect
 }
 
 // NewMSSQLQueryBuilder constructs a new MSSQLQueryBuilder using the provided dialect.
-func NewMSSQLQueryBuilder(dialect condition.SQLDialect) *MSSQLQueryBuilder {
+func NewMSSQLQueryBuilder(dialect cdt.SQLDialect) *MSSQLQueryBuilder {
 	return &MSSQLQueryBuilder{
 		dialect: dialect,
 	}
@@ -22,9 +22,9 @@ func NewMSSQLQueryBuilder(dialect condition.SQLDialect) *MSSQLQueryBuilder {
 func (m *MSSQLQueryBuilder) Select(
 	table string,
 	columns []string,
-	joins []Join,
+	joins []cdt.Join,
 	opts *options.QueryOptions,
-	cond condition.Condition,
+	cond cdt.Condition,
 ) (string, []any, error) {
 	q, v, err := selectQ(m.dialect, table, columns, joins, cond, opts, m.join)
 	if err != nil {
@@ -41,7 +41,7 @@ func (m *MSSQLQueryBuilder) Insert(table string, data map[string]any) (string, [
 	return q, v, nil
 }
 
-func (m *MSSQLQueryBuilder) Update(table string, data map[string]any, cond condition.Condition) (string, []any, error) {
+func (m *MSSQLQueryBuilder) Update(table string, data map[string]any, cond cdt.Condition) (string, []any, error) {
 	q, v, err := update(m.dialect, table, data, cond)
 	if err != nil {
 		return "", nil, fmt.Errorf("update mssqlSQL Builder: error building update query: %w", err)
@@ -49,7 +49,7 @@ func (m *MSSQLQueryBuilder) Update(table string, data map[string]any, cond condi
 	return q, v, nil
 }
 
-func (m *MSSQLQueryBuilder) Delete(table string, cond condition.Condition) (string, []any, error) {
+func (m *MSSQLQueryBuilder) Delete(table string, cond cdt.Condition) (string, []any, error) {
 	q, v, err := delete(m.dialect, table, cond)
 	if err != nil {
 		return "", nil, fmt.Errorf("delete mssqlSQL Builder: error building delete query: %w", err)
@@ -57,6 +57,6 @@ func (m *MSSQLQueryBuilder) Delete(table string, cond condition.Condition) (stri
 	return q, v, nil
 }
 
-func (m *MSSQLQueryBuilder) join(table string, join *Join) string {
+func (m *MSSQLQueryBuilder) join(table string, join *cdt.Join) string {
 	return join.ToSQL(table, m.dialect)
 }

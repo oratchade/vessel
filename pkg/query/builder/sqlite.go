@@ -4,18 +4,18 @@ import (
 	"fmt"
 	"strings"
 
-	"tounilab.com/db-connector/pkg/query"
-	"tounilab.com/db-connector/pkg/query/condition"
+	"tounilab.com/db-connector/internal/pkg/operator"
+	cdt "tounilab.com/db-connector/pkg/query/condition"
 	"tounilab.com/db-connector/pkg/query/options"
 )
 
 // SQLiteQueryBuilder builds SQL queries compatible with SQLite dialects.
 type SQLiteQueryBuilder struct {
-	dialect condition.SQLDialect
+	dialect cdt.SQLDialect
 }
 
 // NewSQLiteQueryBuilder constructs a new SQLiteQueryBuilder using the provided dialect.
-func NewSQLiteQueryBuilder(dialect condition.SQLDialect) *SQLiteQueryBuilder {
+func NewSQLiteQueryBuilder(dialect cdt.SQLDialect) *SQLiteQueryBuilder {
 	return &SQLiteQueryBuilder{
 		dialect: dialect,
 	}
@@ -24,9 +24,9 @@ func NewSQLiteQueryBuilder(dialect condition.SQLDialect) *SQLiteQueryBuilder {
 func (s *SQLiteQueryBuilder) Select(
 	table string,
 	columns []string,
-	joins []Join,
+	joins []cdt.Join,
 	opts *options.QueryOptions,
-	cond condition.Condition,
+	cond cdt.Condition,
 ) (string, []any, error) {
 	q, v, err := selectQ(s.dialect, table, columns, joins, cond, opts, s.join)
 	if err != nil {
@@ -46,7 +46,7 @@ func (s *SQLiteQueryBuilder) Insert(table string, data map[string]any) (string, 
 func (s *SQLiteQueryBuilder) Update(
 	table string,
 	data map[string]any,
-	cond condition.Condition,
+	cond cdt.Condition,
 ) (string, []any, error) {
 	q, v, err := update(s.dialect, table, data, cond)
 	if err != nil {
@@ -55,7 +55,7 @@ func (s *SQLiteQueryBuilder) Update(
 	return q, v, nil
 }
 
-func (s *SQLiteQueryBuilder) Delete(table string, cond condition.Condition) (string, []any, error) {
+func (s *SQLiteQueryBuilder) Delete(table string, cond cdt.Condition) (string, []any, error) {
 	q, v, err := delete(s.dialect, table, cond)
 	if err != nil {
 		return "", nil, fmt.Errorf("delete sqliteSQL Builder: error building delete query: %w", err)
@@ -63,13 +63,13 @@ func (s *SQLiteQueryBuilder) Delete(table string, cond condition.Condition) (str
 	return q, v, nil
 }
 
-func (m *SQLiteQueryBuilder) join(table string, join *Join) string {
+func (m *SQLiteQueryBuilder) join(table string, join *cdt.Join) string {
 	switch strings.ToLower(join.Type) {
-	case query.Inner, query.Left:
+	case operator.Inner, operator.Left:
 		return join.ToSQL(table, m.dialect)
-	case query.Right:
-		j := &Join{
-			Type:       query.Left,
+	case operator.Right:
+		j := &cdt.Join{
+			Type:       operator.Left,
 			Table:      table,
 			Conditions: join.Conditions.Reverse(),
 			Alias:      "",

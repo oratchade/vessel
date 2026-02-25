@@ -5,7 +5,6 @@ import (
 	"database/sql"
 	"fmt"
 
-	builder "tounilab.com/db-connector/pkg/query/builder"
 	cdt "tounilab.com/db-connector/pkg/query/condition"
 	"tounilab.com/db-connector/pkg/query/definition"
 	"tounilab.com/db-connector/pkg/query/options"
@@ -95,7 +94,7 @@ type DBActions interface {
 		ctx context.Context,
 		table string,
 		columns []string,
-		joins []builder.Join,
+		joins []cdt.Join,
 		conditions cdt.Condition,
 		opts *options.QueryOptions,
 	) ([]map[string]any, error)
@@ -116,7 +115,7 @@ type DBActions interface {
 		ctx context.Context,
 		table string,
 		id any,
-		joins []builder.Join,
+		joins []cdt.Join,
 		opts *options.QueryOptions,
 	) ([]map[string]any, error)
 

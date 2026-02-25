@@ -1,11 +1,10 @@
-package builder
+package condition
 
 import (
 	"fmt"
 	"strings"
 
-	"tounilab.com/db-connector/pkg/query"
-	"tounilab.com/db-connector/pkg/query/condition"
+	"tounilab.com/db-connector/internal/pkg/operator"
 )
 
 // JoinCdt represents a pair of columns used for JOIN conditions.
@@ -17,7 +16,7 @@ type JoinCdt struct {
 // JoinCdts is a slice of JoinCdt and provides helpers for JOIN condition rendering.
 type JoinCdts []JoinCdt
 
-func (j JoinCdts) on(table string, joinTable string, dialect condition.SQLDialect) string {
+func (j JoinCdts) on(table string, joinTable string, dialect SQLDialect) string {
 	similar := true
 	columns := []string{}
 	for _, cdt := range j {
@@ -29,7 +28,7 @@ func (j JoinCdts) on(table string, joinTable string, dialect condition.SQLDialec
 	}
 
 	if similar {
-		return fmt.Sprintf("%s (%s)", dialect.Operator(query.Using), strings.Join(columns, ", "))
+		return fmt.Sprintf("%s (%s)", dialect.Operator(operator.Using), strings.Join(columns, ", "))
 	}
 
 	columns = []string{}
@@ -63,7 +62,7 @@ type Join struct {
 	Conditions JoinCdts
 }
 
-func (j *Join) ToSQL(table string, dialect condition.SQLDialect) string {
+func (j *Join) ToSQL(table string, dialect SQLDialect) string {
 	jn := fmt.Sprintf("%s JOIN %s", dialect.Operator(j.Type), dialect.QuoteIdentifier(j.Table))
 
 	if j.Alias != "" {

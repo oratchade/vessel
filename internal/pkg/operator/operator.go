@@ -1,4 +1,4 @@
-package query
+package operator
 
 // Operators and SQL keywords used by query builders and dialects. These
 // constants represent logical operators, join types and clause keywords that

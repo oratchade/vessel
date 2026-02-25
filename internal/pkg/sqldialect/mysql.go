@@ -3,7 +3,7 @@ package sqldialect
 import (
 	"strings"
 
-	"tounilab.com/db-connector/pkg/query"
+	"tounilab.com/db-connector/internal/pkg/operator"
 	"tounilab.com/db-connector/pkg/query/definition"
 	"tounilab.com/db-connector/pkg/query/options"
 )
@@ -21,35 +21,36 @@ func (d MySQLDialect) Placeholder(_ int) string {
 //nolint:cyclop
 func (d MySQLDialect) Operator(op string) string {
 	switch strings.ToLower(op) {
-	case query.Equal:
+	case operator.Equal:
 		return "="
-	case query.NotEqual:
+	case operator.NotEqual:
 		return "!="
-	case query.LowerThan:
+	case operator.LowerThan:
 		return "<"
-	case query.LowerThanOrEqual:
+	case operator.LowerThanOrEqual:
 		return "<="
-	case query.GreaterThan:
+	case operator.GreaterThan:
 		return ">"
-	case query.GreaterThanOrEqual:
+	case operator.GreaterThanOrEqual:
 		return ">="
-	case query.Returning:
+	case operator.Returning:
 		return ""
-	case query.InsensitiveCaseLike:
-		return strings.ToUpper(query.Like) // MySQL does not have a case-insensitive LIKE, so we use LIKE
-	case query.Distinct:
-		return strings.ToUpper(query.IsDistinctFrom) // MySQL does not support IS DISTINCT FROM, but we can emulate it
-	case query.NotDistinct:
+	case operator.InsensitiveCaseLike:
+		return strings.ToUpper(operator.Like) // MySQL does not have a case-insensitive LIKE, so we use LIKE
+	case operator.Distinct:
+		// MySQL does not support IS DISTINCT FROM, but we can emulate it
+		return strings.ToUpper(operator.IsDistinctFrom)
+	case operator.NotDistinct:
 		return "IS NOT DISTINCT FROM"
-	case query.Contains, query.Contained, query.Overlaps:
-		return strings.ToUpper(query.Like) // MySQL does not support @> like Postgres, so we use LIKE
-	case query.Regex:
+	case operator.Contains, operator.Contained, operator.Overlaps:
+		return strings.ToUpper(operator.Like) // MySQL does not support @> like Postgres, so we use LIKE
+	case operator.Regex:
 		return "REGEXP"
-	case query.NotRegex:
+	case operator.NotRegex:
 		return "NOT REGEXP"
-	case query.InsensitiveCaseRegex:
+	case operator.InsensitiveCaseRegex:
 		return "REGEXP" // MySQL does not have a case-insensitive regex operator, so we use REGEXP
-	case query.NotInsensitiveCaseRegex:
+	case operator.NotInsensitiveCaseRegex:
 		return "NOT REGEXP"
 	default:
 		return strings.ToUpper(op)

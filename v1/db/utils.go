@@ -5,7 +5,7 @@ import (
 	"fmt"
 
 	builder "tounilab.com/db-connector/pkg/query/builder"
-	"tounilab.com/db-connector/pkg/query/condition"
+	cdt "tounilab.com/db-connector/pkg/query/condition"
 	"tounilab.com/db-connector/pkg/query/options"
 )
 
@@ -19,8 +19,8 @@ func get(
 	ctx context.Context,
 	table string,
 	columns []string,
-	joins []builder.Join,
-	conditions condition.Condition,
+	joins []cdt.Join,
+	conditions cdt.Condition,
 	opts *options.QueryOptions,
 	dbOpts dbOpts,
 ) ([]map[string]any, error) {
@@ -56,11 +56,11 @@ func getByID(
 	ctx context.Context,
 	table string,
 	id any,
-	joins []builder.Join,
+	joins []cdt.Join,
 	opts *options.QueryOptions,
 	dbOpts dbOpts,
 ) ([]map[string]any, error) {
-	cdt := &condition.Expr{}
+	cdt := &cdt.Expr{}
 	cdt.Column("id").Op("=").Value(id)
 
 	query, args, err := dbOpts.builder.Select(table, []string{"*"}, joins, opts, cdt)
@@ -114,7 +114,7 @@ func update(
 	ctx context.Context,
 	table string,
 	data map[string]any,
-	conditions condition.Condition,
+	conditions cdt.Condition,
 	_ *options.QueryOptions,
 	dbOpts dbOpts,
 ) (*ExecResult, error) {
@@ -133,7 +133,7 @@ func update(
 func delete(
 	ctx context.Context,
 	table string,
-	conditions condition.Condition,
+	conditions cdt.Condition,
 	_ *options.QueryOptions,
 	dbOpts dbOpts,
 ) (*ExecResult, error) {

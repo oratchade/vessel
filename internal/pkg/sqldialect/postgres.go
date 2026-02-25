@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"strings"
 
-	"tounilab.com/db-connector/pkg/query"
+	"tounilab.com/db-connector/internal/pkg/operator"
 	"tounilab.com/db-connector/pkg/query/definition"
 	"tounilab.com/db-connector/pkg/query/options"
 )
@@ -22,35 +22,35 @@ func (d PostgresDialect) Placeholder(index int) string {
 //nolint:cyclop
 func (d PostgresDialect) Operator(op string) string {
 	switch strings.ToLower(op) {
-	case query.Equal:
+	case operator.Equal:
 		return "="
-	case query.NotEqual:
+	case operator.NotEqual:
 		return "!="
-	case query.LowerThan:
+	case operator.LowerThan:
 		return "<"
-	case query.LowerThanOrEqual:
+	case operator.LowerThanOrEqual:
 		return "<="
-	case query.GreaterThan:
+	case operator.GreaterThan:
 		return ">"
-	case query.GreaterThanOrEqual:
+	case operator.GreaterThanOrEqual:
 		return ">="
-	case query.Distinct:
-		return strings.ToUpper(query.IsDistinctFrom)
-	case query.NotDistinct:
+	case operator.Distinct:
+		return strings.ToUpper(operator.IsDistinctFrom)
+	case operator.NotDistinct:
 		return "IS NOT DISTINCT FROM"
-	case query.Contains:
+	case operator.Contains:
 		return "@>"
-	case query.Contained:
+	case operator.Contained:
 		return "<@"
-	case query.Overlaps:
+	case operator.Overlaps:
 		return "&&"
-	case query.Regex:
+	case operator.Regex:
 		return "~"
-	case query.NotRegex:
+	case operator.NotRegex:
 		return "!~"
-	case query.InsensitiveCaseRegex:
+	case operator.InsensitiveCaseRegex:
 		return "~*"
-	case query.NotInsensitiveCaseRegex:
+	case operator.NotInsensitiveCaseRegex:
 		return "!~*"
 	default:
 		return strings.ToUpper(op)
