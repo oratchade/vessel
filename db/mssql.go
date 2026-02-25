@@ -95,6 +95,17 @@ func newMSSQL(cfg MSSQLConfig) (*MSSQL, error) {
 	}, nil
 }
 
+func mssqlCfgToDB(cfg DBConfig) (*MSSQL, error) {
+	switch c := cfg.(type) {
+	case MSSQLConfig:
+		return newMSSQL(c)
+	case *MSSQLConfig:
+		return newMSSQL(*c)
+	default:
+		return nil, fmt.Errorf("unsupported mssql config type: %T", cfg)
+	}
+}
+
 func (m *MSSQL) Begin(ctx context.Context) (Tx, error) {
 	sqlDB, ok := m.querier.(*sql.DB)
 	if !ok {

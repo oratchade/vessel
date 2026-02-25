@@ -109,6 +109,17 @@ func newPostgres(cfg PostgresConfig) (*Postgres, error) {
 	}, nil
 }
 
+func postgresCfgToDB(cfg DBConfig) (*Postgres, error) {
+	switch c := cfg.(type) {
+	case PostgresConfig:
+		return newPostgres(c)
+	case *PostgresConfig:
+		return newPostgres(*c)
+	default:
+		return nil, fmt.Errorf("unsupported postgres config type: %T", cfg)
+	}
+}
+
 func (pg *Postgres) Begin(ctx context.Context) (Tx, error) {
 	pgPool, ok := pg.querier.(*pgxpool.Pool)
 	if !ok {

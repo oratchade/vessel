@@ -103,6 +103,17 @@ func newMySQL(cfg MysqlConfig) (*MySQL, error) {
 	}, nil
 }
 
+func mysqlCfgToDB(cfg DBConfig) (*MySQL, error) {
+	switch c := cfg.(type) {
+	case MysqlConfig:
+		return newMySQL(c)
+	case *MysqlConfig:
+		return newMySQL(*c)
+	default:
+		return nil, fmt.Errorf("unsupported mysql config type: %T", cfg)
+	}
+}
+
 func (m *MySQL) Begin(ctx context.Context) (Tx, error) {
 	sqlDB, ok := m.querier.(*sql.DB)
 	if !ok {

@@ -35,13 +35,13 @@ type DBConfig interface {
 func NewDB(cfg DBConfig, logger Logger) (DB, error) {
 	switch cfg.Driver() {
 	case definition.DriverMySQL:
-		return newMySQL(cfg.(MysqlConfig))
+		return mysqlCfgToDB(cfg)
 	case definition.DriverPostgres:
-		return newPostgres(cfg.(PostgresConfig))
+		return postgresCfgToDB(cfg)
 	case definition.DriverSQLLite:
-		return newSQLLite(cfg.(SQLLiteConfig))
+		return sqliteCfgToDB(cfg)
 	case definition.DriverMSSQL:
-		return newMSSQL(cfg.(MSSQLConfig))
+		return mssqlCfgToDB(cfg)
 	default:
 		return nil, fmt.Errorf("unsupported driver: %s", cfg.Driver())
 	}

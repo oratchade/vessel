@@ -78,6 +78,17 @@ func newSQLLite(cfg SQLLiteConfig) (*SQLLite, error) {
 	}, nil
 }
 
+func sqliteCfgToDB(cfg DBConfig) (*SQLLite, error) {
+	switch c := cfg.(type) {
+	case SQLLiteConfig:
+		return newSQLLite(c)
+	case *SQLLiteConfig:
+		return newSQLLite(*c)
+	default:
+		return nil, fmt.Errorf("unsupported sqlite config type: %T", cfg)
+	}
+}
+
 func (m *SQLLite) Begin(ctx context.Context) (Tx, error) {
 	sqlDB, ok := m.querier.(*sql.DB)
 	if !ok {
