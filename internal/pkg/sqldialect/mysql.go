@@ -1,0 +1,73 @@
+package sqldialect
+
+import (
+	"strings"
+
+	"tounilab.com/db-connector/pkg/query"
+	"tounilab.com/db-connector/pkg/query/definition"
+	"tounilab.com/db-connector/pkg/query/options"
+)
+
+// MySQLDialect implements SQL dialect behavior used by MySQL and SQLite.
+// It provides placeholder syntax, quoting and operator mappings for those engines.
+type MySQLDialect struct{}
+
+func (d MySQLDialect) Placeholder(_ int) string {
+	return "?"
+}
+
+// reason: this function is complex by design and refactoring would reduce clarity
+//
+//nolint:cyclop
+func (d MySQLDialect) Operator(op string) string {
+	switch strings.ToLower(op) {
+	case query.Equal:
+		return "="
+	case query.NotEqual:
+		return "!="
+	case query.LowerThan:
+		return "<"
+	case query.LowerThanOrEqual:
+		return "<="
+	case query.GreaterThan:
+		return ">"
+	case query.GreaterThanOrEqual:
+		return ">="
+	case query.Returning:
+		return ""
+	case query.InsensitiveCaseLike:
+		return strings.ToUpper(query.Like) // MySQL does not have a case-insensitive LIKE, so we use LIKE
+	case query.Distinct:
+		return strings.ToUpper(query.IsDistinctFrom) // MySQL does not support IS DISTINCT FROM, but we can emulate it
+	case query.NotDistinct:
+		return "IS NOT DISTINCT FROM"
+	case query.Contains, query.Contained, query.Overlaps:
+		return strings.ToUpper(query.Like) // MySQL does not support @> like Postgres, so we use LIKE
+	case query.Regex:
+		return "REGEXP"
+	case query.NotRegex:
+		return "NOT REGEXP"
+	case query.InsensitiveCaseRegex:
+		return "REGEXP" // MySQL does not have a case-insensitive regex operator, so we use REGEXP
+	case query.NotInsensitiveCaseRegex:
+		return "NOT REGEXP"
+	default:
+		return strings.ToUpper(op)
+	}
+}
+
+func (d MySQLDialect) QuoteIdentifier(value string) string {
+	return "`" + value + "`"
+}
+
+func (d MySQLDialect) QuoteString(value string) string {
+	return "'" + strings.ReplaceAll(value, "'", "''") + "'"
+}
+
+func (d MySQLDialect) SupportedOptions(
+	queryType definition.QueryType,
+	opts *options.QueryOptions,
+	paramBase int,
+) (string, []any, error) {
+	return supportedOptions(d, queryType, opts, paramBase)
+}
