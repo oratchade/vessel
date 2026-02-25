@@ -57,22 +57,22 @@ func supportedOptions(
 		switch dialect.(type) {
 		case MSSQLDialect:
 			if opts.Offset != nil {
-				parts = append(parts, formatLimitOffset(dialect, dialect.Operator(query.Offset), next))
+				parts = append(parts, formatOperator(dialect, dialect.Operator(query.Offset), next))
 				args = append(args, *opts.Offset)
 				next++
 			}
 			if opts.Limit != nil {
-				parts = append(parts, formatLimitOffset(dialect, dialect.Operator(query.Limit), next))
+				parts = append(parts, formatOperator(dialect, dialect.Operator(query.Limit), next))
 				args = append(args, *opts.Limit)
 			}
 		default:
 			if opts.Limit != nil {
-				parts = append(parts, formatLimitOffset(dialect, dialect.Operator(query.Limit), next))
+				parts = append(parts, formatOperator(dialect, dialect.Operator(query.Limit), next))
 				args = append(args, *opts.Limit)
 				next++
 			}
 			if opts.Offset != nil {
-				parts = append(parts, formatLimitOffset(dialect, dialect.Operator(query.Offset), next))
+				parts = append(parts, formatOperator(dialect, dialect.Operator(query.Offset), next))
 				args = append(args, *opts.Offset)
 			}
 		}
@@ -100,7 +100,7 @@ func getPrefix(qt definition.QueryType) string {
 	}
 }
 
-func formatLimitOffset(
+func formatOperator(
 	dialect condition.SQLDialect,
 	op string,
 	paramBase int,
