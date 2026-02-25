@@ -6,8 +6,8 @@ import (
 
 	"github.com/stretchr/testify/assert"
 
+	"tounilab.com/db-connector/internal/pkg/builder"
 	"tounilab.com/db-connector/internal/pkg/sqldialect"
-	"tounilab.com/db-connector/pkg/query/builder"
 	"tounilab.com/db-connector/pkg/query/condition"
 )
 

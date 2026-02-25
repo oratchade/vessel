@@ -9,8 +9,8 @@ import (
 	// Import the MySQL driver and provide config builder
 	mysql "github.com/go-sql-driver/mysql"
 
+	"tounilab.com/db-connector/internal/pkg/builder"
 	sqldialect "tounilab.com/db-connector/internal/pkg/sqldialect"
-	"tounilab.com/db-connector/pkg/query/builder"
 	cdt "tounilab.com/db-connector/pkg/query/condition"
 	"tounilab.com/db-connector/pkg/query/definition"
 	"tounilab.com/db-connector/pkg/query/options"

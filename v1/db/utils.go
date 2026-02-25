@@ -4,7 +4,7 @@ import (
 	"context"
 	"fmt"
 
-	builder "tounilab.com/db-connector/pkg/query/builder"
+	builder "tounilab.com/db-connector/internal/pkg/builder"
 	cdt "tounilab.com/db-connector/pkg/query/condition"
 	"tounilab.com/db-connector/pkg/query/options"
 )

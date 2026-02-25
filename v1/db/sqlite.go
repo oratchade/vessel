@@ -8,8 +8,8 @@ import (
 
 	// Import the SQLLite driver
 	_ "github.com/mattn/go-sqlite3"
+	builder "tounilab.com/db-connector/internal/pkg/builder"
 	"tounilab.com/db-connector/internal/pkg/sqldialect"
-	builder "tounilab.com/db-connector/pkg/query/builder"
 	cdt "tounilab.com/db-connector/pkg/query/condition"
 	"tounilab.com/db-connector/pkg/query/definition"
 	"tounilab.com/db-connector/pkg/query/options"

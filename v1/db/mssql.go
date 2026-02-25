@@ -9,8 +9,8 @@ import (
 	// Import the MSSQL driver
 	_ "github.com/denisenkom/go-mssqldb"
 
+	"tounilab.com/db-connector/internal/pkg/builder"
 	"tounilab.com/db-connector/internal/pkg/sqldialect"
-	"tounilab.com/db-connector/pkg/query/builder"
 	cdt "tounilab.com/db-connector/pkg/query/condition"
 	"tounilab.com/db-connector/pkg/query/definition"
 	"tounilab.com/db-connector/pkg/query/options"
