@@ -210,6 +210,8 @@ type DBActions interface {
 type DB interface {
 	DBActions
 
+	Ping(ctx context.Context) error
+
 	// Begin starts a new transaction and returns a Tx.
 	//
 	// Parameters:

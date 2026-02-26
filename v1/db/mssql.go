@@ -109,6 +109,18 @@ func mssqlCfgToDB(cfg DBConfig) (*MSSQL, error) {
 	}
 }
 
+func (m *MSSQL) Ping(ctx context.Context) error {
+	sqlDB, ok := m.querier.(*sql.DB)
+	if !ok {
+		return fmt.Errorf("mssql.Ping: underlying db is not *sql.DB")
+	}
+	err := sqlDB.PingContext(ctx)
+	if err != nil {
+		return fmt.Errorf("mssql.Ping: failed to ping database: %w", err)
+	}
+	return nil
+}
+
 func (m *MSSQL) Begin(ctx context.Context) (Tx, error) {
 	sqlDB, ok := m.querier.(*sql.DB)
 	if !ok {

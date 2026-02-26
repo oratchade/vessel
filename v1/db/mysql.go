@@ -130,6 +130,18 @@ func mysqlCfgToDB(cfg DBConfig) (*MySQL, error) {
 	}
 }
 
+func (m *MySQL) Ping(ctx context.Context) error {
+	sqlDB, ok := m.querier.(*sql.DB)
+	if !ok {
+		return fmt.Errorf("mysql.Ping: underlying db is not *sql.DB")
+	}
+	err := sqlDB.PingContext(ctx)
+	if err != nil {
+		return fmt.Errorf("mysql.Ping: failed to ping database: %w", err)
+	}
+	return nil
+}
+
 func (m *MySQL) Begin(ctx context.Context) (Tx, error) {
 	sqlDB, ok := m.querier.(*sql.DB)
 	if !ok {

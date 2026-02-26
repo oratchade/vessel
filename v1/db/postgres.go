@@ -144,6 +144,19 @@ func postgresCfgToDB(cfg DBConfig) (*Postgres, error) {
 	}
 }
 
+func (pg *Postgres) Ping(ctx context.Context) error {
+	pgPool, ok := pg.querier.(*pgxpool.Pool)
+	if !ok {
+		return fmt.Errorf("postgres.Ping: invalid querier type, expected *pgxpool.Pool")
+	}
+
+	err := pgPool.Ping(ctx)
+	if err != nil {
+		return fmt.Errorf("postgres.Ping: failed to ping database: %w", err)
+	}
+	return nil
+}
+
 func (pg *Postgres) Begin(ctx context.Context) (Tx, error) {
 	pgPool, ok := pg.querier.(*pgxpool.Pool)
 	if !ok {

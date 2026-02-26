@@ -92,6 +92,18 @@ func sqliteCfgToDB(cfg DBConfig) (*SQLLite, error) {
 	}
 }
 
+func (m *SQLLite) Ping(ctx context.Context) error {
+	sqlDB, ok := m.querier.(*sql.DB)
+	if !ok {
+		return fmt.Errorf("sqlite.Ping: underlying db is not *sql.DB")
+	}
+	err := sqlDB.PingContext(ctx)
+	if err != nil {
+		return fmt.Errorf("sqlite.Ping: failed to ping database: %w", err)
+	}
+	return nil
+}
+
 func (m *SQLLite) Begin(ctx context.Context) (Tx, error) {
 	sqlDB, ok := m.querier.(*sql.DB)
 	if !ok {
