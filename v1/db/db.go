@@ -171,24 +171,11 @@ type DBActions interface {
 	//   ctx: Context for cancellation and deadlines.
 	//   query: Raw SQL query string.
 	//   args: Arguments for parameterized query.
-	//   opts: Optional query parameters (limit, offset, etc.).
 	//
 	// Returns:
 	//   *sql.Rows: Result rows from the query.
 	//   error: Error if the query fails.
-	// Query(ctx context.Context, query string, opts *options.QueryOptions, args ...any) (*sql.Rows, error)
-
-	// QueryRow executes a raw SQL query and returns a single row, with optional query options.
-	//
-	// Parameters:
-	//   ctx: Context for cancellation and deadlines.
-	//   query: Raw SQL query string.
-	//   args: Arguments for parameterized query.
-	//   opts: Optional query parameters.
-	//
-	// Returns:
-	//   *sql.Row: Single result row from the query.
-	// QueryRow(ctx context.Context, query string, opts *options.QueryOptions, args ...any) *sql.Row
+	Query(ctx context.Context, query string, args ...any) ([]map[string]any, error)
 
 	// Exec executes a raw SQL statement (insert, update, delete, etc.), with optional query options.
 	//
@@ -196,12 +183,11 @@ type DBActions interface {
 	//   ctx: Context for cancellation and deadlines.
 	//   query: Raw SQL statement.
 	//   args: Arguments for parameterized statement.
-	//   opts: Optional query parameters.
 	//
 	// Returns:
 	//   ExecResult: Result of the execution.
 	//   error: Error if the execution fails.
-	Exec(ctx context.Context, query string, opts *options.QueryOptions, args ...any) (*ExecResult, error)
+	Exec(ctx context.Context, query string, args ...any) (*ExecResult, error)
 }
 
 // DB represents a database connection interface.
@@ -210,6 +196,13 @@ type DBActions interface {
 type DB interface {
 	DBActions
 
+	// Ping checks the database connection.
+	//
+	// Parameters:
+	//   ctx: Context for cancellation and deadlines.
+	//
+	// Returns:
+	//   error: Error if the connection fails.
 	Ping(ctx context.Context) error
 
 	// Begin starts a new transaction and returns a Tx.
@@ -270,44 +263,4 @@ type Tx interface {
 	// Returns:
 	//   error: An error if the rollback fails.
 	Rollback(ctx context.Context) error
-}
-
-// Logger is a minimal structured logging interface used by DB implementations.
-type Logger interface {
-	Debug(msg string, args ...any)
-	Info(msg string, args ...any)
-	Warn(msg string, args ...any)
-	Error(msg string, args ...any)
-	With(fields ...any) Logger
-}
-
-func scanRows(rows *sql.Rows, cols []string) ([]map[string]any, error) {
-	results := make([]map[string]any, 0)
-	vals := make([]any, len(cols))
-	ptrs := make([]any, len(cols))
-	for i := range vals {
-		ptrs[i] = &vals[i]
-	}
-
-	for rows.Next() {
-		if err := rows.Scan(ptrs...); err != nil {
-			return nil, fmt.Errorf("scan: %w", err)
-		}
-		row := make(map[string]any, len(cols))
-		for i, c := range cols {
-			v := vals[i]
-			if b, ok := v.([]byte); ok {
-				row[c] = string(b)
-			} else {
-				row[c] = v
-			}
-		}
-		results = append(results, row)
-	}
-
-	if err := rows.Err(); err != nil {
-		return nil, fmt.Errorf("rows iteration: %w", err)
-	}
-
-	return results, nil
 }

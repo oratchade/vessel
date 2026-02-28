@@ -213,33 +213,39 @@ func (m *MSSQL) Delete(
 	return delete(ctx, table, conditions, opts, o)
 }
 
-// func (m *MSSQL) Query(
-// 	ctx context.Context,
-// 	query string,
-// 	opts *options.QueryOptions,
-// 	args ...any,
-// ) (*sql.Rows, error) {
-// 	return m.querier.QueryContext(ctx, query, args...)
-// }
+func (m *MSSQL) Query(
+	ctx context.Context,
+	query string,
+	args ...any,
+) ([]map[string]any, error) {
+	rows, err := m.querier.QueryContext(ctx, query, args...)
+	if err != nil {
+		return nil, fmt.Errorf("mssql.Query: failed to execute query: %w", err)
+	}
+	defer func() {
+		if err := rows.Close(); err != nil {
+			if m.logger != nil {
+				m.logger.Error("mssql.Query: failed to close rows", "error", err)
+			}
+		}
+	}()
 
-// func (m *MSSQL) QueryRow(
-// 	ctx context.Context,
-// 	query string,
-// 	opts *options.QueryOptions,
-// 	args ...any,
-// ) *sql.Row {
-// 	return m.querier.QueryRowContext(ctx, query, args...)
-// }
+	cols, err := rows.Columns()
+	if err != nil {
+		return nil, fmt.Errorf("mssql.Query: failed to get columns: %w", err)
+	}
+
+	return scanRows(rows, cols)
+}
 
 func (m *MSSQL) Exec(
 	ctx context.Context,
 	query string,
-	opts *options.QueryOptions,
 	values ...any,
 ) (*ExecResult, error) {
 	result, err := m.querier.ExecContext(ctx, query, values...)
 	if err != nil {
-		return nil, fmt.Errorf("failed to execute query: %w", err)
+		return nil, fmt.Errorf("mssql.Exec: failed to execute query: %w", err)
 	}
 	return fromSQLResult(result), nil
 }
@@ -247,7 +253,7 @@ func (m *MSSQL) Exec(
 func (m *MSSQL) WithTransaction(ctx context.Context, fn func(tx Tx) error) error {
 	tx, err := m.Begin(ctx)
 	if err != nil {
-		return fmt.Errorf("failed to begin transaction: %w", err)
+		return fmt.Errorf("mssql.WithTransaction: failed to begin transaction: %w", err)
 	}
 
 	defer func() {
@@ -255,17 +261,21 @@ func (m *MSSQL) WithTransaction(ctx context.Context, fn func(tx Tx) error) error
 		if p := recover(); p != nil {
 			e = tx.Rollback(ctx)
 			if m.logger != nil {
-				m.logger.Error("panic in transaction, rolled back", "panic", p, "error", e)
+				m.logger.Error("mssql.WithTransaction: panic in transaction, rolled back", "panic", p, "error", e)
 			}
 		} else if err != nil {
 			e = tx.Rollback(ctx) // err is non-nil; don't change it
 			if e != nil {
-				err = fmt.Errorf("execution failed with error: %w, transaction rollback: %w", err, e)
+				err = fmt.Errorf(
+					"mssql.WithTransaction: execution failed with error: %w, transaction rollback: %w",
+					err,
+					e,
+				)
 			}
 		} else {
 			err = tx.Commit(ctx) // err is nil; if Commit returns error update err
 			if err != nil {
-				err = fmt.Errorf("failed to commit transaction: %w", err)
+				err = fmt.Errorf("mssql.WithTransaction: failed to commit transaction: %w", err)
 			}
 		}
 	}()
@@ -304,7 +314,7 @@ func (m *MSSQL) Commit(_ context.Context) error {
 func (m *MSSQL) Rollback(_ context.Context) error {
 	sqlTX, ok := m.querier.(*sql.Tx)
 	if !ok {
-		return fmt.Errorf("mssql.Commit: underlying db is not *sql.Tx")
+		return fmt.Errorf("mssql.Rollback: underlying db is not *sql.Tx")
 	}
 	if err := sqlTX.Rollback(); err != nil {
 		return fmt.Errorf("mssql.Rollback: failed to rollback transaction: %w", err)

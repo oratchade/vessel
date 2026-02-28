@@ -184,34 +184,22 @@ func (pg *Postgres) Get(
 ) ([]map[string]any, error) {
 	query, args, err := pg.queryBuilder.Select(table, columns, joins, opts, conditions)
 	if err != nil {
-		return nil, fmt.Errorf("failed to build select query: %w", err)
+		return nil, fmt.Errorf("postgres.Get: failed to build select query: %w", err)
 	}
 
 	rows, err := pg.querier.Query(ctx, query, args...)
 	if err != nil {
-		return nil, fmt.Errorf("failed to execute query (%s): %w", query, err)
+		return nil, fmt.Errorf("postgres.Get: failed to execute query (%s): %w", query, err)
 	}
 	defer rows.Close()
 
-	results := make([]map[string]any, 0)
-	for rows.Next() {
-		values, err := rows.Values() // pgx.Rows.Values() returns []any
-		if err != nil {
-			return nil, fmt.Errorf("failed to read row values: %w", err)
-		}
-		fds := rows.FieldDescriptions()
-		rowData := make(map[string]any, len(fds))
-		for i, fd := range fds {
-			rowData[fd.Name] = values[i]
-		}
-		results = append(results, rowData)
+	fds := rows.FieldDescriptions()
+	cols := make([]string, len(fds))
+	for i, fd := range fds {
+		cols[i] = fmt.Sprint(fd.Name)
 	}
 
-	if err := rows.Err(); err != nil && pg.logger != nil {
-		pg.logger.Error("failed to get rows", "error", err)
-	}
-
-	return results, nil
+	return scanRows(rows, cols)
 }
 
 func (pg *Postgres) GetByID(
@@ -226,34 +214,22 @@ func (pg *Postgres) GetByID(
 
 	query, args, err := pg.queryBuilder.Select(table, []string{"*"}, joins, opts, cdt)
 	if err != nil {
-		return nil, fmt.Errorf("failed to build select query: %w", err)
+		return nil, fmt.Errorf("postgres.GetByID: failed to build select query: %w", err)
 	}
 
 	rows, err := pg.querier.Query(ctx, query, args...)
 	if err != nil {
-		return nil, fmt.Errorf("failed to execute query: %w", err)
+		return nil, fmt.Errorf("postgres.GetByID: failed to execute query: %w", err)
 	}
 	defer rows.Close()
 
-	results := make([]map[string]any, 0)
-	for rows.Next() {
-		values, err := rows.Values() // pgx.Rows.Values() returns []any
-		if err != nil {
-			return nil, fmt.Errorf("failed to read row values: %w", err)
-		}
-		fds := rows.FieldDescriptions()
-		rowData := make(map[string]any, len(fds))
-		for i, fd := range fds {
-			rowData[fd.Name] = values[i]
-		}
-		results = append(results, rowData)
+	fds := rows.FieldDescriptions()
+	cols := make([]string, len(fds))
+	for i, fd := range fds {
+		cols[i] = fmt.Sprint(fd.Name)
 	}
 
-	if err := rows.Err(); err != nil && pg.logger != nil {
-		pg.logger.Error("failed to get rows", "error", err)
-	}
-
-	return results, nil
+	return scanRows(rows, cols)
 }
 
 func (pg *Postgres) Insert(
@@ -264,12 +240,12 @@ func (pg *Postgres) Insert(
 ) (*ExecResult, error) {
 	query, args, err := pg.queryBuilder.Insert(table, data)
 	if err != nil {
-		return nil, fmt.Errorf("failed to build insert query: %w", err)
+		return nil, fmt.Errorf("postgres.Insert: failed to build insert query: %w", err)
 	}
 
 	result, err := pg.querier.Exec(ctx, query, args...)
 	if err != nil {
-		return nil, fmt.Errorf("failed to execute insert query: %w", err)
+		return nil, fmt.Errorf("postgres.Insert: failed to execute insert query: %w", err)
 	}
 	return fromCommandTag(result), nil
 }
@@ -283,12 +259,12 @@ func (pg *Postgres) Update(
 ) (*ExecResult, error) {
 	query, args, err := pg.queryBuilder.Update(table, data, conditions)
 	if err != nil {
-		return nil, fmt.Errorf("failed to build update query: %w", err)
+		return nil, fmt.Errorf("postgres.Update: failed to build update query: %w", err)
 	}
 
 	result, err := pg.querier.Exec(ctx, query, args...)
 	if err != nil {
-		return nil, fmt.Errorf("failed to execute update query: %w", err)
+		return nil, fmt.Errorf("postgres.Update: failed to execute update query: %w", err)
 	}
 	return fromCommandTag(result), nil
 }
@@ -301,28 +277,44 @@ func (pg *Postgres) Delete(
 ) (*ExecResult, error) {
 	query, args, err := pg.queryBuilder.Delete(table, conditions)
 	if err != nil {
-		return nil, fmt.Errorf("failed to build delete query: %w", err)
+		return nil, fmt.Errorf("postgres.Delete: failed to build delete query: %w", err)
 	}
 
 	result, err := pg.querier.Exec(ctx, query, args...)
 	if err != nil {
-		return nil, fmt.Errorf("failed to execute delete query: %w", err)
+		return nil, fmt.Errorf("postgres.Delete: failed to execute delete query: %w", err)
 	}
 	return fromCommandTag(result), nil
 }
 
-// func (pg *Postgres) Query(ctx context.Context, query string, args ...any) (*sql.Rows, error) {}
-// func (pg *Postgres) QueryRow(ctx context.Context, query string, args ...any) *sql.Row        {}
+func (pg *Postgres) Query(
+	ctx context.Context,
+	query string,
+	args ...any,
+) ([]map[string]any, error) {
+	rows, err := pg.querier.Query(ctx, query, args...)
+	if err != nil {
+		return nil, fmt.Errorf("postgres.Query: failed to execute query: %w", err)
+	}
+	defer rows.Close()
+
+	fds := rows.FieldDescriptions()
+	cols := make([]string, len(fds))
+	for i, fd := range fds {
+		cols[i] = fmt.Sprint(fd.Name)
+	}
+
+	return scanRows(rows, cols)
+}
 
 func (pg *Postgres) Exec(
 	ctx context.Context,
 	query string,
-	opts *options.QueryOptions,
 	values ...any,
 ) (*ExecResult, error) {
 	result, err := pg.querier.Exec(ctx, query, values...)
 	if err != nil {
-		return nil, fmt.Errorf("failed to execute query: %w", err)
+		return nil, fmt.Errorf("postgres.Exec: failed to execute query: %w", err)
 	}
 	return fromCommandTag(result), nil
 }
@@ -330,7 +322,7 @@ func (pg *Postgres) Exec(
 func (pg *Postgres) WithTransaction(ctx context.Context, fn func(tx Tx) error) error {
 	tx, err := pg.Begin(ctx)
 	if err != nil {
-		return fmt.Errorf("failed to begin transaction: %w", err)
+		return fmt.Errorf("postgres.WithTransaction: failed to begin transaction: %w", err)
 	}
 
 	defer func() {
@@ -338,17 +330,21 @@ func (pg *Postgres) WithTransaction(ctx context.Context, fn func(tx Tx) error) e
 		if p := recover(); p != nil {
 			e = tx.Rollback(ctx)
 			if pg.logger != nil {
-				pg.logger.Error("panic in transaction, rolled back", "panic", p, "error", e)
+				pg.logger.Error("postgres.WithTransaction: panic in transaction, rolled back", "panic", p, "error", e)
 			}
 		} else if err != nil {
 			e = tx.Rollback(ctx) // err is non-nil; don't change it
 			if e != nil {
-				err = fmt.Errorf("execution failed with error: %w, transaction rollback: %w", err, e)
+				err = fmt.Errorf(
+					"postgres.WithTransaction: execution failed with error: %w, transaction rollback: %w",
+					err,
+					e,
+				)
 			}
 		} else {
 			err = tx.Commit(ctx) // err is nil; if Commit returns error update err
 			if err != nil {
-				err = fmt.Errorf("failed to commit transaction: %w", err)
+				err = fmt.Errorf("postgres.WithTransaction: failed to commit transaction: %w", err)
 			}
 		}
 	}()
@@ -373,10 +369,10 @@ func (pg *Postgres) Close() error {
 func (pg *Postgres) Commit(ctx context.Context) error {
 	pgxTx, ok := pg.querier.(pgx.Tx)
 	if !ok {
-		return fmt.Errorf("postgres.Close: invalid querier type, expected *pgxpool.Pool")
+		return fmt.Errorf("postgres.Commit: invalid querier type, expected *pgxpool.Pool")
 	}
 	if err := pgxTx.Commit(ctx); err != nil {
-		return fmt.Errorf("failed to commit transaction: %w", err)
+		return fmt.Errorf("postgres.Commit: failed to commit transaction: %w", err)
 	}
 	return nil
 }
@@ -384,10 +380,10 @@ func (pg *Postgres) Commit(ctx context.Context) error {
 func (pg *Postgres) Rollback(ctx context.Context) error {
 	pgxTx, ok := pg.querier.(pgx.Tx)
 	if !ok {
-		return fmt.Errorf("postgres.Close: invalid querier type, expected *pgxpool.Pool")
+		return fmt.Errorf("postgres.Rollback: invalid querier type, expected *pgxpool.Pool")
 	}
 	if err := pgxTx.Rollback(ctx); err != nil {
-		return fmt.Errorf("failed to rollback transaction: %w", err)
+		return fmt.Errorf("postgres.Rollback: failed to rollback transaction: %w", err)
 	}
 	return nil
 }

@@ -234,33 +234,39 @@ func (m *MySQL) Delete(
 	return delete(ctx, table, conditions, opts, o)
 }
 
-// func (m *MySQL) Query(
-// 	ctx context.Context,
-// 	query string,
-// 	opts *options.QueryOptions,
-// 	args ...any,
-// ) (*sql.Rows, error) {
-// 	return m.querier.QueryContext(ctx, query, args...)
-// }
+func (m *MySQL) Query(
+	ctx context.Context,
+	query string,
+	args ...any,
+) ([]map[string]any, error) {
+	rows, err := m.querier.QueryContext(ctx, query, args...)
+	if err != nil {
+		return nil, fmt.Errorf("mysql.Query: failed to execute query: %w", err)
+	}
+	defer func() {
+		if err := rows.Close(); err != nil {
+			if m.logger != nil {
+				m.logger.Error("mysql.Query: failed to close rows", "error", err)
+			}
+		}
+	}()
 
-// func (m *MySQL) QueryRow(
-// 	ctx context.Context,
-// 	query string,
-// 	opts *options.QueryOptions,
-// 	args ...any,
-// ) *sql.Row {
-// 	return m.querier.QueryRowContext(ctx, query, args...)
-// }
+	cols, err := rows.Columns()
+	if err != nil {
+		return nil, fmt.Errorf("mysql.Query: failed to get columns: %w", err)
+	}
+
+	return scanRows(rows, cols)
+}
 
 func (m *MySQL) Exec(
 	ctx context.Context,
 	query string,
-	opts *options.QueryOptions,
 	values ...any,
 ) (*ExecResult, error) {
 	result, err := m.querier.ExecContext(ctx, query, values...)
 	if err != nil {
-		return nil, fmt.Errorf("failed to execute query: %w", err)
+		return nil, fmt.Errorf("mysql.Exec: failed to execute query: %w", err)
 	}
 	return fromSQLResult(result), nil
 }
@@ -268,7 +274,7 @@ func (m *MySQL) Exec(
 func (m *MySQL) WithTransaction(ctx context.Context, fn func(tx Tx) error) error {
 	tx, err := m.Begin(ctx)
 	if err != nil {
-		return fmt.Errorf("failed to begin transaction: %w", err)
+		return fmt.Errorf("mysql.WithTransaction: failed to begin transaction: %w", err)
 	}
 
 	defer func() {
@@ -276,17 +282,21 @@ func (m *MySQL) WithTransaction(ctx context.Context, fn func(tx Tx) error) error
 		if p := recover(); p != nil {
 			e = tx.Rollback(ctx)
 			if m.logger != nil {
-				m.logger.Error("panic in transaction, rolled back", "panic", p, "error", e)
+				m.logger.Error("mysql.WithTransaction: panic in transaction, rolled back", "panic", p, "error", e)
 			}
 		} else if err != nil {
 			e = tx.Rollback(ctx) // err is non-nil; don't change it
 			if e != nil {
-				err = fmt.Errorf("execution failed with error: %w, transaction rollback: %w", err, e)
+				err = fmt.Errorf(
+					"mysql.WithTransaction: execution failed with error: %w, transaction rollback: %w",
+					err,
+					e,
+				)
 			}
 		} else {
 			err = tx.Commit(ctx) // err is nil; if Commit returns error update err
 			if err != nil {
-				err = fmt.Errorf("failed to commit transaction: %w", err)
+				err = fmt.Errorf("mysql.WithTransaction: failed to commit transaction: %w", err)
 			}
 		}
 	}()
@@ -325,7 +335,7 @@ func (m *MySQL) Commit(_ context.Context) error {
 func (m *MySQL) Rollback(_ context.Context) error {
 	sqlTX, ok := m.querier.(*sql.Tx)
 	if !ok {
-		return fmt.Errorf("mysql.Commit: underlying db is not *sql.Tx")
+		return fmt.Errorf("mysql.Rollback: underlying db is not *sql.Tx")
 	}
 	if err := sqlTX.Rollback(); err != nil {
 		return fmt.Errorf("mysql.Rollback: failed to rollback transaction: %w", err)
