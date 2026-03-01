@@ -52,6 +52,38 @@ func get(
 	return results, nil
 }
 
+func getRaw(
+	ctx context.Context,
+	table string,
+	columns []string,
+	joins []cdt.Join,
+	conditions cdt.Condition,
+	opts *options.QueryOptions,
+	dbOpts dbOpts,
+) (*RowsAdapter, error) {
+	query, args, err := dbOpts.builder.Select(table, columns, joins, opts, conditions)
+	if err != nil {
+		return nil, fmt.Errorf("failed to build select query: %w", err)
+	}
+
+	rows, err := dbOpts.querier.QueryContext(ctx, query, args...)
+	if err != nil {
+		return nil, fmt.Errorf("failed to execute query: %w", err)
+	}
+	defer func() {
+		if err := rows.Close(); err != nil && dbOpts.logger != nil {
+			dbOpts.logger.Error("failed to close rows", "error", err)
+		}
+	}()
+
+	ra, err := newRowsAdapter(rows)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create RowsAdapter: %w", err)
+	}
+
+	return ra, nil
+}
+
 func getByID(
 	ctx context.Context,
 	table string,
@@ -89,6 +121,40 @@ func getByID(
 	}
 
 	return results, nil
+}
+
+func getByIDRaw(
+	ctx context.Context,
+	table string,
+	id any,
+	joins []cdt.Join,
+	opts *options.QueryOptions,
+	dbOpts dbOpts,
+) (*RowsAdapter, error) {
+	cdt := &cdt.Expr{}
+	cdt.Column("id").Op("=").Value(id)
+
+	query, args, err := dbOpts.builder.Select(table, []string{"*"}, joins, opts, cdt)
+	if err != nil {
+		return nil, fmt.Errorf("failed to build select query: %w", err)
+	}
+
+	rows, err := dbOpts.querier.QueryContext(ctx, query, args...)
+	if err != nil {
+		return nil, fmt.Errorf("failed to execute query: %w", err)
+	}
+	defer func() {
+		if err := rows.Close(); err != nil && dbOpts.logger != nil {
+			dbOpts.logger.Error("failed to close rows", "error", err)
+		}
+	}()
+
+	ra, err := newRowsAdapter(rows)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create RowsAdapter: %w", err)
+	}
+
+	return ra, nil
 }
 
 func insert(

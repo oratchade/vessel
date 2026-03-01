@@ -1,5 +1,7 @@
 package db
 
+//go:generate mockgen -source=logger.go -destination=logger_mocks.go -package=db Logger
+
 // Logger is a minimal structured logging interface used by DB implementations.
 type Logger interface {
 	Debug(msg string, args ...any)

@@ -4,6 +4,8 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
+	"reflect"
+	"strings"
 
 	cdt "tounilab.com/db-connector/pkg/query/condition"
 	"tounilab.com/db-connector/pkg/query/definition"
@@ -25,6 +27,8 @@ func fromSQLResult(res sql.Result) *ExecResult {
 		RowsAffected: ra,
 	}
 }
+
+//go:generate mockgen -source=db.go -destination=db_mocks.go -package=db DBConfig
 
 // DBConfig represents configuration needed to create a DB connection. It
 // exposes the driver name and a DSN builder for connecting to the database.
@@ -51,6 +55,8 @@ func NewDB(cfg DBConfig, logger Logger) (DB, error) {
 		return nil, fmt.Errorf("unsupported driver: %s", cfg.Driver())
 	}
 }
+
+//go:generate mockgen -source=db.go -destination=db_mocks.go -package=db DBActions
 
 // DBActions defines the core, context-aware data access operations that any
 // database connection or transaction must provide. It is an implementation-
@@ -99,6 +105,15 @@ type DBActions interface {
 		opts *options.QueryOptions,
 	) ([]map[string]any, error)
 
+	GetRaw(
+		ctx context.Context,
+		table string,
+		columns []string,
+		joins []cdt.Join,
+		conditions cdt.Condition,
+		opts *options.QueryOptions,
+	) (*RowsAdapter, error)
+
 	// GetByID retrieves a single row by its primary key, with optional SQL joins and query options.
 	//
 	// Parameters:
@@ -118,6 +133,14 @@ type DBActions interface {
 		joins []cdt.Join,
 		opts *options.QueryOptions,
 	) ([]map[string]any, error)
+
+	GetByIDRaw(
+		ctx context.Context,
+		table string,
+		id any,
+		joins []cdt.Join,
+		opts *options.QueryOptions,
+	) (*RowsAdapter, error)
 
 	// Insert adds a new row to the specified table, with optional query options.
 	//
@@ -177,6 +200,8 @@ type DBActions interface {
 	//   error: Error if the query fails.
 	Query(ctx context.Context, query string, args ...any) ([]map[string]any, error)
 
+	QueryRaw(ctx context.Context, query string, args ...any) (*RowsAdapter, error)
+
 	// Exec executes a raw SQL statement (insert, update, delete, etc.), with optional query options.
 	//
 	// Parameters:
@@ -189,6 +214,8 @@ type DBActions interface {
 	//   error: Error if the execution fails.
 	Exec(ctx context.Context, query string, args ...any) (*ExecResult, error)
 }
+
+//go:generate mockgen -source=db.go -destination=db_mocks.go -package=db DB
 
 // DB represents a database connection interface.
 // Each method is documented with its purpose, parameters, and expected return values.
@@ -242,6 +269,8 @@ type DB interface {
 	Close() error
 }
 
+//go:generate mockgen -source=db.go -destination=db_mocks.go -package=db Tx
+
 // Tx represents a database transaction. All methods accept context so deadlines and cancellations propagate.
 type Tx interface {
 	DBActions
@@ -263,4 +292,88 @@ type Tx interface {
 	// Returns:
 	//   error: An error if the rollback fails.
 	Rollback(ctx context.Context) error
+}
+
+// ScanRowsTo takes a RowsAdapter and scans the rows into a slice of T.
+//
+// The slice of T is returned, and an error if the scan fails.
+//
+// ScanRowsTo expects T to be a struct or pointer to a struct.
+// The Columns of the RowsAdapter are mapped to fields in T
+// by column name, ignoring case. If a column does not map to a field in T,
+// the value is skipped.
+//
+// The order of the columns in the RowsAdapter does not affect the order of
+// the fields in T. The order of the fields in T is determined by the order of
+// the fields in the reflect.Struct.
+//
+//nolint:cyclop
+func ScanRowsTo[T any](ra *RowsAdapter) ([]T, error) {
+	var cols []string
+	var err error
+
+	cols, err = ra.columns()
+	if err != nil {
+		return nil, fmt.Errorf("scanRowsTo: failed to get columns: %w", err)
+	}
+
+	var out []T
+
+	// prepare scan destinations
+	vals, ptrs := makeScanPtrs(len(cols))
+
+	// reflect type information for T
+	tType := reflect.TypeOf((*T)(nil)).Elem()
+	isPtr := false
+	if tType.Kind() == reflect.Ptr {
+		isPtr = true
+		tType = tType.Elem()
+	}
+	if tType.Kind() != reflect.Struct {
+		return nil, fmt.Errorf("scanRowsTo: T must be a struct or pointer to struct")
+	}
+
+	// build mapping column -> struct field index
+	fieldMap := buildFieldMap(tType)
+
+	for ra.next() {
+		if err := ra.scan(ptrs...); err != nil {
+			return nil, fmt.Errorf("scan: %w", err)
+		}
+
+		var itemVal reflect.Value
+		var itemPtr reflect.Value
+		if isPtr {
+			itemPtr = reflect.New(tType)
+			itemVal = itemPtr.Elem()
+		} else {
+			itemVal = reflect.New(tType).Elem()
+		}
+
+		for i, col := range cols {
+			raw := vals[i]
+			if raw == nil {
+				continue
+			}
+			colKey := strings.ToLower(col)
+			if fi, ok := fieldMap[colKey]; ok {
+				f := itemVal.Field(fi)
+				if !f.CanSet() {
+					continue
+				}
+				setFieldFromValue(f, raw)
+			}
+		}
+
+		if isPtr {
+			out = append(out, itemPtr.Interface().(T))
+		} else {
+			out = append(out, itemVal.Interface().(T))
+		}
+	}
+
+	if err := ra.err(); err != nil {
+		return nil, fmt.Errorf("scanRowsTo: rows iteration failed: %w", err)
+	}
+	return out, nil
 }

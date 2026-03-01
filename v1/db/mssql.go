@@ -155,6 +155,22 @@ func (m *MSSQL) Get(
 	return get(ctx, table, columns, joins, conditions, opts, o)
 }
 
+func (m *MSSQL) GetRaw(
+	ctx context.Context,
+	table string,
+	columns []string,
+	joins []cdt.Join,
+	conditions cdt.Condition,
+	opts *options.QueryOptions,
+) (*RowsAdapter, error) {
+	o := dbOpts{
+		builder: m.queryBuilder,
+		querier: m.querier,
+		logger:  m.logger,
+	}
+	return getRaw(ctx, table, columns, joins, conditions, opts, o)
+}
+
 func (m *MSSQL) GetByID(
 	ctx context.Context,
 	table string,
@@ -168,6 +184,21 @@ func (m *MSSQL) GetByID(
 		logger:  m.logger,
 	}
 	return getByID(ctx, table, id, joins, opts, o)
+}
+
+func (m *MSSQL) GetByIDRaw(
+	ctx context.Context,
+	table string,
+	id any,
+	joins []cdt.Join,
+	opts *options.QueryOptions,
+) (*RowsAdapter, error) {
+	o := dbOpts{
+		builder: m.queryBuilder,
+		querier: m.querier,
+		logger:  m.logger,
+	}
+	return getByIDRaw(ctx, table, id, joins, opts, o)
 }
 
 func (m *MSSQL) Insert(
@@ -236,6 +267,27 @@ func (m *MSSQL) Query(
 	}
 
 	return scanRows(rows, cols)
+}
+
+func (m *MSSQL) QueryRaw(ctx context.Context, query string, args ...any) (*RowsAdapter, error) {
+	rows, err := m.querier.QueryContext(ctx, query, args...)
+	if err != nil {
+		return nil, fmt.Errorf("mssql.QueryRaw: failed to execute query: %w", err)
+	}
+	defer func() {
+		if err := rows.Close(); err != nil {
+			if m.logger != nil {
+				m.logger.Error("mssql.QueryRaw: failed to close rows", "error", err)
+			}
+		}
+	}()
+
+	ra, err := newRowsAdapter(rows)
+	if err != nil {
+		return nil, fmt.Errorf("mssql.QueryRaw: failed to create rows adapter: %w", err)
+	}
+
+	return ra, nil
 }
 
 func (m *MSSQL) Exec(

@@ -202,6 +202,33 @@ func (pg *Postgres) Get(
 	return scanRows(rows, cols)
 }
 
+func (pg *Postgres) GetRaw(
+	ctx context.Context,
+	table string,
+	columns []string,
+	joins []cdt.Join,
+	conditions cdt.Condition,
+	opts *options.QueryOptions,
+) (*RowsAdapter, error) {
+	query, args, err := pg.queryBuilder.Select(table, columns, joins, opts, conditions)
+	if err != nil {
+		return nil, fmt.Errorf("postgres.Get: failed to build select query: %w", err)
+	}
+
+	rows, err := pg.querier.Query(ctx, query, args...)
+	if err != nil {
+		return nil, fmt.Errorf("postgres.Get: failed to execute query (%s): %w", query, err)
+	}
+	defer rows.Close()
+
+	ra, err := newRowsAdapter(rows)
+	if err != nil {
+		return nil, fmt.Errorf("postgres.Get: failed to create rows adapter: %w", err)
+	}
+
+	return ra, nil
+}
+
 func (pg *Postgres) GetByID(
 	ctx context.Context,
 	table string,
@@ -230,6 +257,35 @@ func (pg *Postgres) GetByID(
 	}
 
 	return scanRows(rows, cols)
+}
+
+func (pg *Postgres) GetByIDRaw(
+	ctx context.Context,
+	table string,
+	id any,
+	joins []cdt.Join,
+	opts *options.QueryOptions,
+) (*RowsAdapter, error) {
+	cdt := &cdt.Expr{}
+	cdt.Column("id").Op("=").Value(id)
+
+	query, args, err := pg.queryBuilder.Select(table, []string{"*"}, joins, opts, cdt)
+	if err != nil {
+		return nil, fmt.Errorf("postgres.GetByIDRaw: failed to build select query: %w", err)
+	}
+
+	rows, err := pg.querier.Query(ctx, query, args...)
+	if err != nil {
+		return nil, fmt.Errorf("postgres.GetByIDRaw: failed to execute query: %w", err)
+	}
+	defer rows.Close()
+
+	ra, err := newRowsAdapter(rows)
+	if err != nil {
+		return nil, fmt.Errorf("postgres.GetByIDRaw: failed to create rows adapter: %w", err)
+	}
+
+	return ra, nil
 }
 
 func (pg *Postgres) Insert(
@@ -305,6 +361,21 @@ func (pg *Postgres) Query(
 	}
 
 	return scanRows(rows, cols)
+}
+
+func (pg *Postgres) QueryRaw(ctx context.Context, query string, args ...any) (*RowsAdapter, error) {
+	rows, err := pg.querier.Query(ctx, query, args...)
+	if err != nil {
+		return nil, fmt.Errorf("postgres.QueryRaw: failed to execute query: %w", err)
+	}
+	defer rows.Close()
+
+	ra, err := newRowsAdapter(rows)
+	if err != nil {
+		return nil, fmt.Errorf("postgres.QueryRaw: failed to create rows adapter: %w", err)
+	}
+
+	return ra, nil
 }
 
 func (pg *Postgres) Exec(

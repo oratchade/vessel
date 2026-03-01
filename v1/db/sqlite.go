@@ -138,6 +138,22 @@ func (m *SQLLite) Get(
 	return get(ctx, table, columns, joins, conditions, opts, o)
 }
 
+func (m *SQLLite) GetRaw(
+	ctx context.Context,
+	table string,
+	columns []string,
+	joins []cdt.Join,
+	conditions cdt.Condition,
+	opts *options.QueryOptions,
+) (*RowsAdapter, error) {
+	o := dbOpts{
+		builder: m.queryBuilder,
+		querier: m.querier,
+		logger:  m.logger,
+	}
+	return getRaw(ctx, table, columns, joins, conditions, opts, o)
+}
+
 func (m *SQLLite) GetByID(
 	ctx context.Context,
 	table string,
@@ -151,6 +167,21 @@ func (m *SQLLite) GetByID(
 		logger:  m.logger,
 	}
 	return getByID(ctx, table, id, joins, opts, o)
+}
+
+func (m *SQLLite) GetByIDRaw(
+	ctx context.Context,
+	table string,
+	id any,
+	joins []cdt.Join,
+	opts *options.QueryOptions,
+) (*RowsAdapter, error) {
+	o := dbOpts{
+		builder: m.queryBuilder,
+		querier: m.querier,
+		logger:  m.logger,
+	}
+	return getByIDRaw(ctx, table, id, joins, opts, o)
 }
 
 func (m *SQLLite) Insert(
@@ -219,6 +250,26 @@ func (m *SQLLite) Query(
 	}
 
 	return scanRows(rows, cols)
+}
+
+func (m *SQLLite) QueryRaw(ctx context.Context, query string, args ...any) (*RowsAdapter, error) {
+	rows, err := m.querier.QueryContext(ctx, query, args...)
+	if err != nil {
+		return nil, fmt.Errorf("sqlite.QueryRaw: failed to execute query: %w", err)
+	}
+	defer func() {
+		if err := rows.Close(); err != nil {
+			if m.logger != nil {
+				m.logger.Error("sqlite.QueryRaw: failed to close rows", "error", err)
+			}
+		}
+	}()
+
+	ra, err := newRowsAdapter(rows)
+	if err != nil {
+		return nil, fmt.Errorf("sqlite.QueryRaw: failed to create RowsAdapter: %w", err)
+	}
+	return ra, nil
 }
 
 func (m *SQLLite) Exec(
