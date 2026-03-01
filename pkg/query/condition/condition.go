@@ -5,11 +5,15 @@ import (
 	"tounilab.com/db-connector/pkg/query/options"
 )
 
+//go:generate mockgen -source=condition.go -destination=condition_mocks.go -package=condition Condition
+
 // Condition represents a composable SQL condition expression that can be
 // converted to a parameterized SQL fragment for a specific dialect.
 type Condition interface {
 	ToSQL(dialect SQLDialect, paramBase int) (string, []any, error)
 }
+
+//go:generate mockgen -source=condition.go -destination=condition_mocks.go -package=condition SQLDialect
 
 // SQLDialect defines the dialect-specific behaviors required by the query
 // builder: placeholder formatting, operator mapping and quoting rules.

@@ -9,6 +9,8 @@ import (
 	"tounilab.com/db-connector/pkg/query/options"
 )
 
+//go:generate mockgen -source=builder.go -destination=builder_mocks.go -package=builder QueryBuilder
+
 // QueryBuilder defines methods for building SQL queries, including support for SQL joins.
 // Each method returns the SQL string, its arguments, and an error if building fails.
 type QueryBuilder interface {
