@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"reflect"
 	"strings"
+	"time"
 
 	cdt "tounilab.com/db-connector/pkg/query/condition"
 	"tounilab.com/db-connector/pkg/query/definition"
@@ -17,6 +18,19 @@ import (
 type ExecResult struct {
 	LastInsertID int64
 	RowsAffected int64
+}
+
+// PoolStatistics exposes connection pool metrics for diagnostics and monitoring.
+type PoolStatistics struct {
+	OpenConnections    int           // Total number of open connections in the pool
+	InUse              int           // Number of connections currently in use
+	Idle               int           // Number of idle connections available
+	MaxOpenConnections int           // Maximum number of open connections allowed
+	WaitCount          int64         // Cumulative count of wait operations for connections
+	WaitDuration       time.Duration // Total time spent waiting for connections
+	MaxIdleClosed      int64         // Cumulative count of connections closed due to SetMaxIdleConns
+	MaxIdleTimeClosed  int64         // Cumulative count of connections closed due to SetConnMaxIdleTime
+	MaxLifetimeClosed  int64         // Cumulative count of connections closed due to SetConnMaxLifetime
 }
 
 func fromSQLResult(res sql.Result) *ExecResult {
@@ -232,6 +246,14 @@ type DB interface {
 	//   error: Error if the connection fails.
 	Ping(ctx context.Context) error
 
+	// PoolStats returns current connection pool statistics.
+	// Useful for monitoring and diagnosing connection pool issues.
+	//
+	// Returns:
+	//   *PoolStatistics: Current pool metrics including open, idle, and in-use connections.
+	//   error: Error if statistics cannot be retrieved.
+	PoolStats() (*PoolStatistics, error)
+
 	// Begin starts a new transaction and returns a Tx.
 	//
 	// Parameters:
@@ -255,12 +277,6 @@ type DB interface {
 	// Returns:
 	//   error: Error if the transaction fails or is rolled back.
 	WithTransaction(ctx context.Context, fn func(Tx) error) error
-
-	// Ping checks the database connection.
-	//
-	// Returns:
-	//   error: Error if the connection fails.
-	// Ping() error
 
 	// Close closes the database connection.
 	//

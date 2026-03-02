@@ -130,6 +130,26 @@ func mysqlCfgToDB(cfg DBConfig) (*MySQL, error) {
 	}
 }
 
+func (m *MySQL) PoolStats() (*PoolStatistics, error) {
+	sqlDB, ok := m.querier.(*sql.DB)
+	if !ok {
+		return nil, fmt.Errorf("mysql.PoolStats: underlying db is not *sql.DB")
+	}
+
+	stats := sqlDB.Stats()
+	return &PoolStatistics{
+		OpenConnections:    stats.OpenConnections,
+		InUse:              stats.InUse,
+		Idle:               stats.Idle,
+		MaxOpenConnections: stats.MaxOpenConnections,
+		WaitCount:          stats.WaitCount,
+		WaitDuration:       stats.WaitDuration,
+		MaxIdleClosed:      stats.MaxIdleClosed,
+		MaxIdleTimeClosed:  stats.MaxIdleTimeClosed,
+		MaxLifetimeClosed:  stats.MaxLifetimeClosed,
+	}, nil
+}
+
 func (m *MySQL) Ping(ctx context.Context) error {
 	sqlDB, ok := m.querier.(*sql.DB)
 	if !ok {

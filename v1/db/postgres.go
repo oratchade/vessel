@@ -144,6 +144,23 @@ func postgresCfgToDB(cfg DBConfig) (*Postgres, error) {
 	}
 }
 
+func (pg *Postgres) PoolStats() (*PoolStatistics, error) {
+	pool, ok := pg.querier.(*pgxpool.Pool)
+	if !ok {
+		return nil, fmt.Errorf("postgres.PoolStats: underlying connection is not *pgxpool.Pool")
+	}
+
+	pgStats := pool.Stat()
+	return &PoolStatistics{
+		OpenConnections:    int(pgStats.TotalConns()),
+		InUse:              int(pgStats.TotalConns() - pgStats.IdleConns()),
+		Idle:               int(pgStats.IdleConns()),
+		MaxOpenConnections: int(pgStats.MaxConns()),
+		WaitCount:          pgStats.AcquireCount(),
+		WaitDuration:       pgStats.AcquireDuration(),
+	}, nil
+}
+
 func (pg *Postgres) Ping(ctx context.Context) error {
 	pgPool, ok := pg.querier.(*pgxpool.Pool)
 	if !ok {

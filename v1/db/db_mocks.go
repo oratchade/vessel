@@ -428,6 +428,21 @@ func (mr *MockDBMockRecorder) Ping(ctx interface{}) *gomock.Call {
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Ping", reflect.TypeOf((*MockDB)(nil).Ping), ctx)
 }
 
+// PoolStats mocks base method.
+func (m *MockDB) PoolStats() (*PoolStatistics, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "PoolStats")
+	ret0, _ := ret[0].(*PoolStatistics)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// PoolStats indicates an expected call of PoolStats.
+func (mr *MockDBMockRecorder) PoolStats() *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "PoolStats", reflect.TypeOf((*MockDB)(nil).PoolStats))
+}
+
 // Query mocks base method.
 func (m *MockDB) Query(ctx context.Context, query string, args ...any) ([]map[string]any, error) {
 	m.ctrl.T.Helper()
