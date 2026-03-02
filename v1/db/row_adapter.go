@@ -151,12 +151,165 @@ func makeScanPtrs(n int) (vals []any, ptrs []any) {
 	return vals, ptrs
 }
 
+// setSQLNullField attempts to set a sql.Null* field with the given value.
+// Supports sql.NullString, sql.NullInt64, sql.NullBool, sql.NullFloat64, sql.NullByte, and sql.NullTime.
+// setSQLNullStringField sets a sql.NullString field.
+func setSQLNullStringField(cv any) sql.NullString {
+	var ns sql.NullString
+	if cv == nil {
+		return ns
+	}
+
+	// convert []byte to string if needed
+	if b, ok := cv.([]byte); ok {
+		cv = string(b)
+	}
+
+	if s, ok := cv.(string); ok {
+		ns.String = s
+	} else {
+		ns.String = fmt.Sprint(cv)
+	}
+	ns.Valid = true
+	return ns
+}
+
+// setSQLNullInt64Field sets a sql.NullInt64 field.
+func setSQLNullInt64Field(cv any) sql.NullInt64 {
+	var ni sql.NullInt64
+	if cv == nil {
+		return ni
+	}
+
+	s := fmt.Sprint(cv)
+	if n, err := strconv.ParseInt(s, 10, 64); err == nil {
+		ni.Int64 = n
+		ni.Valid = true
+	}
+	return ni
+}
+
+// setSQLNullFloat64Field sets a sql.NullFloat64 field.
+func setSQLNullFloat64Field(cv any) sql.NullFloat64 {
+	var nf sql.NullFloat64
+	if cv == nil {
+		return nf
+	}
+
+	s := fmt.Sprint(cv)
+	if f64, err := strconv.ParseFloat(s, 64); err == nil {
+		nf.Float64 = f64
+		nf.Valid = true
+	}
+	return nf
+}
+
+// setSQLNullBoolField sets a sql.NullBool field.
+func setSQLNullBoolField(cv any) sql.NullBool {
+	var nb sql.NullBool
+	if cv == nil {
+		return nb
+	}
+
+	s := fmt.Sprint(cv)
+	if b, err := strconv.ParseBool(s); err == nil {
+		nb.Bool = b
+		nb.Valid = true
+	}
+	return nb
+}
+
+// setSQLNullByteField sets a sql.NullByte field.
+func setSQLNullByteField(cv any) sql.NullByte {
+	var nb sql.NullByte
+	if cv == nil {
+		return nb
+	}
+
+	if b, ok := cv.(byte); ok {
+		nb.Byte = b
+		nb.Valid = true
+	} else if b, ok := cv.([]byte); ok && len(b) > 0 {
+		nb.Byte = b[0]
+		nb.Valid = true
+	}
+	return nb
+}
+
+// setSQLNullTimeField sets a sql.NullTime field.
+func setSQLNullTimeField(cv any) sql.NullTime {
+	var nt sql.NullTime
+	if cv == nil {
+		return nt
+	}
+
+	// Try to unmarshal as time.Time
+	if t, ok := cv.(sql.NullTime); ok {
+		return t
+	}
+
+	if err := json.Unmarshal([]byte(fmt.Sprint(cv)), &nt.Time); err == nil {
+		nt.Valid = true
+	}
+	return nt
+}
+
+// setSQLNullField attempts to set a sql.Null* field with the given value.
+// Supports sql.NullString, sql.NullInt64, sql.NullBool, sql.NullFloat64, sql.NullByte, and sql.NullTime.
+func setSQLNullField(f reflect.Value, cv any) error {
+	switch f.Type() {
+	case reflect.TypeOf(sql.NullString{}):
+		f.Set(reflect.ValueOf(setSQLNullStringField(cv)))
+		return nil
+	case reflect.TypeOf(sql.NullInt64{}):
+		f.Set(reflect.ValueOf(setSQLNullInt64Field(cv)))
+		return nil
+	case reflect.TypeOf(sql.NullFloat64{}):
+		f.Set(reflect.ValueOf(setSQLNullFloat64Field(cv)))
+		return nil
+	case reflect.TypeOf(sql.NullBool{}):
+		f.Set(reflect.ValueOf(setSQLNullBoolField(cv)))
+		return nil
+	case reflect.TypeOf(sql.NullByte{}):
+		f.Set(reflect.ValueOf(setSQLNullByteField(cv)))
+		return nil
+	case reflect.TypeOf(sql.NullTime{}):
+		f.Set(reflect.ValueOf(setSQLNullTimeField(cv)))
+		return nil
+	}
+
+	return fmt.Errorf("setSQLNullField: unsupported sql.Null* type: %v", f.Type())
+}
+
+// isSQLNullType checks if the given type is a sql.Null* type.
+func isSQLNullType(t reflect.Type) bool {
+	switch t {
+	case reflect.TypeOf(sql.NullString{}),
+		reflect.TypeOf(sql.NullInt64{}),
+		reflect.TypeOf(sql.NullFloat64{}),
+		reflect.TypeOf(sql.NullBool{}),
+		reflect.TypeOf(sql.NullByte{}),
+		reflect.TypeOf(sql.NullTime{}):
+		return true
+	}
+	return false
+}
+
 // setFieldFromValue attempts to set reflect.Value `f` from the generic value `cv`.
 //
 //nolint:cyclop
 func setFieldFromValue(f reflect.Value, cv any) error {
 	if cv == nil {
+		// Handle nil for sql.Null* types - set with Valid=false
+		if isSQLNullType(f.Type()) {
+			return setSQLNullField(f, nil)
+		}
 		return nil
+	}
+
+	// Handle sql.Null* types first
+	if isSQLNullType(f.Type()) {
+		return setSQLNullField(f, cv)
 	}
 
 	// convert []byte to string for common DB drivers
