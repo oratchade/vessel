@@ -154,9 +154,9 @@ func makeScanPtrs(n int) (vals []any, ptrs []any) {
 // setFieldFromValue attempts to set reflect.Value `f` from the generic value `cv`.
 //
 //nolint:cyclop
-func setFieldFromValue(f reflect.Value, cv any) {
+func setFieldFromValue(f reflect.Value, cv any) error {
 	if cv == nil {
-		return
+		return nil
 	}
 
 	// convert []byte to string for common DB drivers
@@ -168,11 +168,11 @@ func setFieldFromValue(f reflect.Value, cv any) {
 	if rv.IsValid() {
 		if rv.Type().AssignableTo(f.Type()) {
 			f.Set(rv)
-			return
+			return nil
 		}
 		if rv.Type().ConvertibleTo(f.Type()) {
 			f.Set(rv.Convert(f.Type()))
-			return
+			return nil
 		}
 	}
 
@@ -199,6 +199,11 @@ func setFieldFromValue(f reflect.Value, cv any) {
 		}
 	default:
 		// try JSON unmarshal for complex types
-		_ = json.Unmarshal([]byte(s), f.Addr().Interface())
+		err := json.Unmarshal([]byte(s), f.Addr().Interface())
+		if err != nil {
+			return fmt.Errorf("setFieldFromValue: failed to unmarshal JSON for field of type %s: %w", f.Type(), err)
+		}
 	}
+
+	return nil
 }

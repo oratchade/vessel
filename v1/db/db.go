@@ -361,7 +361,10 @@ func ScanRowsTo[T any](ra *RowsAdapter) ([]T, error) {
 				if !f.CanSet() {
 					continue
 				}
-				setFieldFromValue(f, raw)
+				err := setFieldFromValue(f, raw)
+				if err != nil {
+					return nil, fmt.Errorf("scanRowsTo: failed to set field %s: %w", col, err)
+				}
 			}
 		}
 
