@@ -24,11 +24,6 @@ func (a *And) Conditions(conditions ...Condition) *And {
 	return a
 }
 
-// ParamBase is a placeholder method for interface compatibility.
-func (a *And) ParamBase(base int) *And {
-	return a
-}
-
 // ToSQL converts this And condition to a parameterized SQL fragment.
 func (a *And) ToSQL(dialect SQLDialect, paramBase int) (string, []any, error) {
 	values, parts := make([]any, 0), make([]string, 0)
