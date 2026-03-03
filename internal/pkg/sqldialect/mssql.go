@@ -40,8 +40,10 @@ func (d MSSQLDialect) Operator(op string) string {
 		return strings.ToUpper(operator.Like) // MSSQL does not have a case-insensitive LIKE, so we use LIKE
 	case operator.Distinct:
 		return strings.ToUpper(operator.IsDistinctFrom) // emulate
-	case operator.NotDistinct, operator.Contains, operator.Contained, operator.Overlaps:
-		return strings.ToUpper(operator.Like) // MSSQL does not support IS NOT DISTINCT FROM, so we use LIKE
+	case operator.NotDistinct:
+		return "" // MSSQL does not support IS NOT DISTINCT FROM
+	case operator.Contains, operator.Contained, operator.Overlaps:
+		return strings.ToUpper(operator.Like) // MSSQL does not support @> like Postgres, so we use LIKE
 	case operator.Regex, operator.NotRegex, operator.InsensitiveCaseRegex, operator.NotInsensitiveCaseRegex:
 		return "" // not supported
 	case operator.Limit:

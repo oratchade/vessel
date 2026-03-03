@@ -175,3 +175,57 @@ func TestReturningOutput_UpdateCase(t *testing.T) {
 	assert.Equal(t, "RETURNING inserted.\"id\"", frag)
 	assert.Empty(t, args)
 }
+
+func TestMSSQLOffsetRequiresOrderBy(t *testing.T) {
+	// Test that MSSQL requires ORDER BY when using OFFSET
+	d := sd.MSSQLDialect{}
+
+	testCases := []struct {
+		name      string
+		opts      *options.QueryOptions
+		expectErr bool
+	}{
+		{
+			name: "OFFSET with ORDER BY - should succeed",
+			opts: &options.QueryOptions{
+				Offset:  intPtr(10),
+				OrderBy: []string{"id"},
+			},
+			expectErr: false,
+		},
+		{
+			name: "OFFSET without ORDER BY - should error",
+			opts: &options.QueryOptions{
+				Offset: intPtr(10),
+			},
+			expectErr: true,
+		},
+		{
+			name: "ORDER BY without OFFSET - should succeed",
+			opts: &options.QueryOptions{
+				OrderBy: []string{"id"},
+			},
+			expectErr: false,
+		},
+		{
+			name: "LIMIT with OFFSET without ORDER BY - should error",
+			opts: &options.QueryOptions{
+				Limit:  intPtr(5),
+				Offset: intPtr(10),
+			},
+			expectErr: true,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			_, _, err := d.SupportedOptions(definition.QueryTypeSelect, tc.opts, 1)
+			if tc.expectErr {
+				assert.Error(t, err)
+				assert.Equal(t, "MSSQL OFFSET requires ORDER BY clause", err.Error())
+			} else {
+				assert.NoError(t, err)
+			}
+		})
+	}
+}

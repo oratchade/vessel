@@ -57,6 +57,10 @@ func supportedOptions(
 		// MSSQL requires OFFSET before FETCH (limit), so handle dialect-specific ordering.
 		switch dialect.(type) {
 		case MSSQLDialect:
+			// MSSQL requires ORDER BY when using OFFSET
+			if opts.Offset != nil && len(opts.OrderBy) == 0 {
+				return "", nil, fmt.Errorf("MSSQL OFFSET requires ORDER BY clause")
+			}
 			if opts.Offset != nil {
 				parts = append(parts, formatOperator(dialect, dialect.Operator(operator.Offset), next))
 				args = append(args, *opts.Offset)

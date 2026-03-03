@@ -41,7 +41,7 @@ func (d MySQLDialect) Operator(op string) string {
 		// MySQL does not support IS DISTINCT FROM, but we can emulate it
 		return strings.ToUpper(operator.IsDistinctFrom)
 	case operator.NotDistinct:
-		return "IS NOT DISTINCT FROM"
+		return "" // MySQL does not support IS NOT DISTINCT FROM (no NULL-safe not-equal)
 	case operator.Contains, operator.Contained, operator.Overlaps:
 		return strings.ToUpper(operator.Like) // MySQL does not support @> like Postgres, so we use LIKE
 	case operator.Regex:
