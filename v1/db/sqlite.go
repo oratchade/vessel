@@ -13,6 +13,7 @@ import (
 	cdt "tounilab.com/db-connector/pkg/query/condition"
 	"tounilab.com/db-connector/pkg/query/definition"
 	"tounilab.com/db-connector/pkg/query/options"
+	"tounilab.com/db-connector/v1/db/dberror"
 )
 
 // SQLLiteConfig holds configuration for connecting to a SQLLite database.
@@ -56,6 +57,7 @@ type SQLLite struct {
 
 	queryBuilder builder.QueryBuilder // Query builder for constructing SQL queries
 	logger       Logger               // Logger for logging database operations
+	errorMapper  dberror.ErrorMapper  // Error mapper for standardizing database errors
 }
 
 // newSQLLite initializes a new SQLLite connection using the provided config.
@@ -78,6 +80,7 @@ func newSQLLite(cfg SQLLiteConfig) (*SQLLite, error) {
 	return &SQLLite{
 		querier:      db,
 		queryBuilder: builder.NewSQLiteQueryBuilder(sqldialect.MySQLDialect{}),
+		errorMapper:  dberror.GetMapper(definition.DriverSQLLite),
 	}, nil
 }
 
@@ -254,7 +257,7 @@ func (m *SQLLite) Query(
 ) ([]map[string]any, error) {
 	rows, err := m.querier.QueryContext(ctx, query, args...)
 	if err != nil {
-		return nil, fmt.Errorf("sqlite.Query: failed to execute query: %w", err)
+		return nil, fmt.Errorf("sqlite.Query: failed to execute query: %w", m.errorMapper.MapError(err))
 	}
 	defer func() {
 		if err := rows.Close(); err != nil {
@@ -275,7 +278,7 @@ func (m *SQLLite) Query(
 func (m *SQLLite) QueryRaw(ctx context.Context, query string, args ...any) (*RowsAdapter, error) {
 	rows, err := m.querier.QueryContext(ctx, query, args...)
 	if err != nil {
-		return nil, fmt.Errorf("sqlite.QueryRaw: failed to execute query: %w", err)
+		return nil, fmt.Errorf("sqlite.QueryRaw: failed to execute query: %w", m.errorMapper.MapError(err))
 	}
 	defer func() {
 		if err := rows.Close(); err != nil {
@@ -299,7 +302,7 @@ func (m *SQLLite) Exec(
 ) (*ExecResult, error) {
 	result, err := m.querier.ExecContext(ctx, query, values...)
 	if err != nil {
-		return nil, fmt.Errorf("sqlite.Exec: failed to execute query: %w", err)
+		return nil, fmt.Errorf("sqlite.Exec: failed to execute query: %w", m.errorMapper.MapError(err))
 	}
 	return fromSQLResult(result), nil
 }

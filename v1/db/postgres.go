@@ -16,6 +16,7 @@ import (
 	cdt "tounilab.com/db-connector/pkg/query/condition"
 	"tounilab.com/db-connector/pkg/query/definition"
 	"tounilab.com/db-connector/pkg/query/options"
+	"tounilab.com/db-connector/v1/db/dberror"
 )
 
 func fromCommandTag(tag pgconn.CommandTag) *ExecResult {
@@ -103,6 +104,7 @@ type Postgres struct {
 	querier      pgQuerier            // PostgreSQL connection pool
 	queryBuilder builder.QueryBuilder // Query builder for constructing SQL queries
 	logger       Logger               // Logger for logging database operations
+	errorMapper  dberror.ErrorMapper  // Error mapper for standardizing database errors
 }
 
 // newPostgres initializes a new Postgres connection pool using the provided config.
@@ -130,6 +132,7 @@ func newPostgres(cfg PostgresConfig) (*Postgres, error) {
 	return &Postgres{
 		querier:      pool,
 		queryBuilder: builder.NewPostgresQueryBuilder(sqldialect.PostgresDialect{}),
+		errorMapper:  dberror.GetMapper(definition.DriverPostgres),
 	}, nil
 }
 
@@ -367,7 +370,7 @@ func (pg *Postgres) Query(
 ) ([]map[string]any, error) {
 	rows, err := pg.querier.Query(ctx, query, args...)
 	if err != nil {
-		return nil, fmt.Errorf("postgres.Query: failed to execute query: %w", err)
+		return nil, fmt.Errorf("postgres.Query: failed to execute query: %w", pg.errorMapper.MapError(err))
 	}
 	defer rows.Close()
 
@@ -383,7 +386,7 @@ func (pg *Postgres) Query(
 func (pg *Postgres) QueryRaw(ctx context.Context, query string, args ...any) (*RowsAdapter, error) {
 	rows, err := pg.querier.Query(ctx, query, args...)
 	if err != nil {
-		return nil, fmt.Errorf("postgres.QueryRaw: failed to execute query: %w", err)
+		return nil, fmt.Errorf("postgres.QueryRaw: failed to execute query: %w", pg.errorMapper.MapError(err))
 	}
 	defer rows.Close()
 
@@ -402,7 +405,7 @@ func (pg *Postgres) Exec(
 ) (*ExecResult, error) {
 	result, err := pg.querier.Exec(ctx, query, values...)
 	if err != nil {
-		return nil, fmt.Errorf("postgres.Exec: failed to execute query: %w", err)
+		return nil, fmt.Errorf("postgres.Exec: failed to execute query: %w", pg.errorMapper.MapError(err))
 	}
 	return fromCommandTag(result), nil
 }

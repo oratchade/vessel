@@ -14,6 +14,7 @@ import (
 	cdt "tounilab.com/db-connector/pkg/query/condition"
 	"tounilab.com/db-connector/pkg/query/definition"
 	"tounilab.com/db-connector/pkg/query/options"
+	"tounilab.com/db-connector/v1/db/dberror"
 )
 
 // MSSQLConfig holds configuration for connecting to a MSSQL database.
@@ -73,6 +74,7 @@ type MSSQL struct {
 
 	queryBuilder builder.QueryBuilder // Query builder for constructing SQL queries
 	logger       Logger               // Logger for logging database operations
+	errorMapper  dberror.ErrorMapper  // Error mapper for standardizing database errors
 }
 
 // newMSSQL initializes a new MSSQL connection using the provided config.
@@ -95,6 +97,7 @@ func newMSSQL(cfg MSSQLConfig) (*MSSQL, error) {
 	return &MSSQL{
 		querier:      db,
 		queryBuilder: builder.NewMSSQLQueryBuilder(sqldialect.MSSQLDialect{}),
+		errorMapper:  dberror.GetMapper(definition.DriverMSSQL),
 	}, nil
 }
 
@@ -271,7 +274,7 @@ func (m *MSSQL) Query(
 ) ([]map[string]any, error) {
 	rows, err := m.querier.QueryContext(ctx, query, args...)
 	if err != nil {
-		return nil, fmt.Errorf("mssql.Query: failed to execute query: %w", err)
+		return nil, fmt.Errorf("mssql.Query: failed to execute query: %w", m.errorMapper.MapError(err))
 	}
 	defer func() {
 		if err := rows.Close(); err != nil {
@@ -292,7 +295,7 @@ func (m *MSSQL) Query(
 func (m *MSSQL) QueryRaw(ctx context.Context, query string, args ...any) (*RowsAdapter, error) {
 	rows, err := m.querier.QueryContext(ctx, query, args...)
 	if err != nil {
-		return nil, fmt.Errorf("mssql.QueryRaw: failed to execute query: %w", err)
+		return nil, fmt.Errorf("mssql.QueryRaw: failed to execute query: %w", m.errorMapper.MapError(err))
 	}
 	defer func() {
 		if err := rows.Close(); err != nil {
@@ -317,7 +320,7 @@ func (m *MSSQL) Exec(
 ) (*ExecResult, error) {
 	result, err := m.querier.ExecContext(ctx, query, values...)
 	if err != nil {
-		return nil, fmt.Errorf("mssql.Exec: failed to execute query: %w", err)
+		return nil, fmt.Errorf("mssql.Exec: failed to execute query: %w", m.errorMapper.MapError(err))
 	}
 	return fromSQLResult(result), nil
 }

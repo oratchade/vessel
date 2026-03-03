@@ -14,6 +14,7 @@ import (
 	cdt "tounilab.com/db-connector/pkg/query/condition"
 	"tounilab.com/db-connector/pkg/query/definition"
 	"tounilab.com/db-connector/pkg/query/options"
+	"tounilab.com/db-connector/v1/db/dberror"
 )
 
 type sqlQuerier interface {
@@ -93,6 +94,7 @@ type MySQL struct {
 
 	queryBuilder builder.QueryBuilder // Query builder for constructing SQL queries
 	logger       Logger               // Logger for logging database operations
+	errorMapper  dberror.ErrorMapper  // Error mapper for standardizing database errors
 }
 
 // newMySQL initializes a new MySQL connection using the provided config.
@@ -116,6 +118,7 @@ func newMySQL(cfg MysqlConfig) (*MySQL, error) {
 	return &MySQL{
 		querier:      db,
 		queryBuilder: builder.NewMySQLQueryBuilder(sqldialect.MySQLDialect{}),
+		errorMapper:  dberror.GetMapper(definition.DriverMySQL),
 	}, nil
 }
 
@@ -292,7 +295,7 @@ func (m *MySQL) Query(
 ) ([]map[string]any, error) {
 	rows, err := m.querier.QueryContext(ctx, query, args...)
 	if err != nil {
-		return nil, fmt.Errorf("mysql.Query: failed to execute query: %w", err)
+		return nil, fmt.Errorf("mysql.Query: failed to execute query: %w", m.errorMapper.MapError(err))
 	}
 	defer func() {
 		if err := rows.Close(); err != nil {
@@ -313,7 +316,7 @@ func (m *MySQL) Query(
 func (m *MySQL) QueryRaw(ctx context.Context, query string, args ...any) (*RowsAdapter, error) {
 	rows, err := m.querier.QueryContext(ctx, query, args...)
 	if err != nil {
-		return nil, fmt.Errorf("mysql.QueryRaw: failed to execute query: %w", err)
+		return nil, fmt.Errorf("mysql.QueryRaw: failed to execute query: %w", m.errorMapper.MapError(err))
 	}
 	defer func() {
 		if err := rows.Close(); err != nil {
@@ -337,7 +340,7 @@ func (m *MySQL) Exec(
 ) (*ExecResult, error) {
 	result, err := m.querier.ExecContext(ctx, query, values...)
 	if err != nil {
-		return nil, fmt.Errorf("mysql.Exec: failed to execute query: %w", err)
+		return nil, fmt.Errorf("mysql.Exec: failed to execute query: %w", m.errorMapper.MapError(err))
 	}
 	return fromSQLResult(result), nil
 }

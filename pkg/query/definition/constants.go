@@ -18,8 +18,14 @@ const (
 	DriverMySQL DBType = "mysql"
 	// DriverPostgres is the driver name for PostgreSQL databases.
 	DriverPostgres DBType = "postgres"
+	// DriverPostgresAlias is an alias for PostgreSQL databases.
+	DriverPostgresAlias DBType = "postgresql"
 	// DriverSQLLite is the driver name for SQLLite databases.
 	DriverSQLLite DBType = "sqlite3"
+	// DriverSQLiteAlias is an alias for SQLite databases.
+	DriverSQLiteAlias DBType = "sqlite"
 	// DriverMSSQL is the driver name for Microsoft SQL Server databases.
 	DriverMSSQL DBType = "sqlserver"
+	// DriverMSSQLAlias is an alias for Microsoft SQL Server databases.
+	DriverMSSQLAlias DBType = "mssql"
 )
