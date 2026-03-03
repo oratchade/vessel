@@ -1,3 +1,4 @@
+// Package sqldialect provides SQL dialect implementations for various database engines.
 package sqldialect
 
 import (

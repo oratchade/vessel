@@ -18,11 +18,13 @@ func NewOr() *Or {
 	}
 }
 
+// Conditions appends child conditions to this Or condition.
 func (o *Or) Conditions(conditions ...Condition) *Or {
 	o.conditions = append(o.conditions, conditions...)
 	return o
 }
 
+// ToSQL converts this Or condition to a parameterized SQL fragment.
 func (o *Or) ToSQL(dialect SQLDialect, paramBase int) (string, []any, error) {
 	values, parts := make([]any, 0), make([]string, 0)
 

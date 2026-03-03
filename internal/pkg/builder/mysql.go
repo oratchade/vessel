@@ -1,3 +1,4 @@
+// Package builder provides SQL query building for multiple database engines.
 package builder
 
 import (
@@ -21,6 +22,7 @@ func NewMySQLQueryBuilder(dialect cdt.SQLDialect) *MySQLQueryBuilder {
 	}
 }
 
+// Select implements the QueryBuilder interface for MySQL.
 func (m *MySQLQueryBuilder) Select(
 	table string,
 	columns []string,
@@ -35,6 +37,7 @@ func (m *MySQLQueryBuilder) Select(
 	return q, v, nil
 }
 
+// Insert implements the QueryBuilder interface for MySQL.
 func (m *MySQLQueryBuilder) Insert(table string, data map[string]any) (string, []any, error) {
 	q, v, err := insert(m.dialect, table, data)
 	if err != nil {
@@ -43,6 +46,7 @@ func (m *MySQLQueryBuilder) Insert(table string, data map[string]any) (string, [
 	return q, v, nil
 }
 
+// Update implements the QueryBuilder interface for MySQL.
 func (m *MySQLQueryBuilder) Update(table string, data map[string]any, cond cdt.Condition) (string, []any, error) {
 	q, v, err := update(m.dialect, table, data, cond)
 	if err != nil {
@@ -51,6 +55,7 @@ func (m *MySQLQueryBuilder) Update(table string, data map[string]any, cond cdt.C
 	return q, v, nil
 }
 
+// Delete implements the QueryBuilder interface for MySQL.
 func (m *MySQLQueryBuilder) Delete(table string, cond cdt.Condition) (string, []any, error) {
 	q, v, err := delete(m.dialect, table, cond)
 	if err != nil {
@@ -59,6 +64,7 @@ func (m *MySQLQueryBuilder) Delete(table string, cond cdt.Condition) (string, []
 	return q, v, nil
 }
 
+// join converts a Join to a SQL JOIN clause.
 func (m *MySQLQueryBuilder) join(table string, join *cdt.Join) string {
 	switch strings.ToLower(join.Type) {
 	case operator.Inner, operator.Right, operator.Left:

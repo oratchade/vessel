@@ -21,6 +21,7 @@ func NewSQLiteQueryBuilder(dialect cdt.SQLDialect) *SQLiteQueryBuilder {
 	}
 }
 
+// Select implements the QueryBuilder interface for SQLite.
 func (s *SQLiteQueryBuilder) Select(
 	table string,
 	columns []string,
@@ -35,6 +36,7 @@ func (s *SQLiteQueryBuilder) Select(
 	return q, v, nil
 }
 
+// Insert implements the QueryBuilder interface for SQLite.
 func (s *SQLiteQueryBuilder) Insert(table string, data map[string]any) (string, []any, error) {
 	q, v, err := insert(s.dialect, table, data)
 	if err != nil {
@@ -43,6 +45,7 @@ func (s *SQLiteQueryBuilder) Insert(table string, data map[string]any) (string, 
 	return q, v, nil
 }
 
+// Update implements the QueryBuilder interface for SQLite.
 func (s *SQLiteQueryBuilder) Update(
 	table string,
 	data map[string]any,
@@ -55,6 +58,7 @@ func (s *SQLiteQueryBuilder) Update(
 	return q, v, nil
 }
 
+// Delete implements the QueryBuilder interface for SQLite.
 func (s *SQLiteQueryBuilder) Delete(table string, cond cdt.Condition) (string, []any, error) {
 	q, v, err := delete(s.dialect, table, cond)
 	if err != nil {
@@ -63,6 +67,7 @@ func (s *SQLiteQueryBuilder) Delete(table string, cond cdt.Condition) (string, [
 	return q, v, nil
 }
 
+// join converts a Join to a SQL JOIN clause, handling SQLite-specific RIGHT JOIN conversion.
 func (m *SQLiteQueryBuilder) join(table string, join *cdt.Join) string {
 	switch strings.ToLower(join.Type) {
 	case operator.Inner, operator.Left:

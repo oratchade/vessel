@@ -1,3 +1,4 @@
+// Package operator defines operator and SQL keyword constants used by query builders and dialects.
 package operator
 
 // Operators and SQL keywords used by query builders and dialects. These

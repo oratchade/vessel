@@ -1,3 +1,4 @@
+// Package db provides database abstraction interfaces and implementations for multiple database engines.
 package db
 
 import (
@@ -18,6 +19,7 @@ type RowsAdapter struct {
 	pgxRows pgx.Rows
 }
 
+// newRowsAdapter creates a RowsAdapter from either *sql.Rows or pgx.Rows.
 func newRowsAdapter(rows any) (*RowsAdapter, error) {
 	ra := &RowsAdapter{}
 	switch r := rows.(type) {
@@ -31,6 +33,7 @@ func newRowsAdapter(rows any) (*RowsAdapter, error) {
 	return ra, nil
 }
 
+// columns returns the column names from the underlying rows.
 func (r *RowsAdapter) columns() ([]string, error) {
 	if r.sqlRows != nil {
 		c, err := r.sqlRows.Columns()
@@ -50,6 +53,7 @@ func (r *RowsAdapter) columns() ([]string, error) {
 	return nil, fmt.Errorf("RowsAdapter.columns: no rows available")
 }
 
+// next advances to the next row in the result set.
 func (r *RowsAdapter) next() bool {
 	if r.sqlRows != nil {
 		return r.sqlRows.Next()
@@ -57,6 +61,7 @@ func (r *RowsAdapter) next() bool {
 	return r.pgxRows.Next()
 }
 
+// scan scans values from the current row into the provided destinations.
 func (r *RowsAdapter) scan(dest ...any) error {
 	var err error
 	if r.sqlRows != nil {
@@ -73,6 +78,7 @@ func (r *RowsAdapter) scan(dest ...any) error {
 	return nil
 }
 
+// err returns any error that occurred during row iteration.
 func (r *RowsAdapter) err() error {
 	if r.sqlRows != nil {
 		return fmt.Errorf("RowsAdapter.err: %w", r.sqlRows.Err())
@@ -80,6 +86,7 @@ func (r *RowsAdapter) err() error {
 	return fmt.Errorf("RowsAdapter.err: %w", r.pgxRows.Err())
 }
 
+// scanRows scans all rows from the result set into a slice of maps.
 func scanRows(rows any, cols []string) ([]map[string]any, error) {
 	// use RowsAdapter to unify *sql.Rows and pgx.Rows handling
 	ra, err := newRowsAdapter(rows)

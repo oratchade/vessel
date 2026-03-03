@@ -1,3 +1,4 @@
+// Package db provides database abstraction interfaces and implementations for multiple database engines.
 package db
 
 //go:generate mockgen -source=logger.go -destination=logger_mocks.go -package=db Logger

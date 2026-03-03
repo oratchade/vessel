@@ -1,3 +1,4 @@
+// Package sqldialect provides SQL dialect implementations for various database engines.
 package sqldialect
 
 import (
@@ -11,6 +12,9 @@ import (
 	"tounilab.com/db-connector/pkg/query/options"
 )
 
+// supportedOptions builds SQL fragments for query options like ORDER BY, LIMIT, OFFSET, and RETURNING
+// according to the specified query type and dialect-specific implementations.
+//
 //nolint:cyclop
 func supportedOptions(
 	dialect condition.SQLDialect,
@@ -94,6 +98,8 @@ func supportedOptions(
 	return strings.Join(parts, " "), args, nil
 }
 
+// getPrefix returns the prefix to use for column names in RETURNING/OUTPUT clauses
+// based on the query type (e.g., "inserted." for INSERT, "deleted." for DELETE).
 func getPrefix(qt definition.QueryType) string {
 	switch qt {
 	case definition.QueryTypeInsert, definition.QueryTypeUpdate:
@@ -105,6 +111,8 @@ func getPrefix(qt definition.QueryType) string {
 	}
 }
 
+// formatOperator formats an operator string with a placeholder, treating operators
+// containing '%' as format strings (e.g., "OFFSET %s ROWS" for MSSQL).
 func formatOperator(
 	dialect condition.SQLDialect,
 	op string,

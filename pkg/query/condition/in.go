@@ -19,16 +19,19 @@ func NewIn() *In {
 	}
 }
 
+// Column sets the column name for this In condition.
 func (i *In) Column(col string) *In {
 	i.column = col
 	return i
 }
 
+// Values sets the values for this In condition.
 func (i *In) Values(vals ...any) *In {
 	i.values = vals
 	return i
 }
 
+// ToSQL converts this In condition to a parameterized SQL fragment.
 func (i *In) ToSQL(dialect SQLDialect, paramBase int) (string, []any, error) {
 	if i.column == "" || i.operator == "" || i.values == nil {
 		return "", nil, fmt.Errorf("invalid expression")

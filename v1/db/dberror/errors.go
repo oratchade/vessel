@@ -1,3 +1,4 @@
+// Package dberror provides sentinel error types and error mapping utilities for database operations.
 package dberror
 
 import (

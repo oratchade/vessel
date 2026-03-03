@@ -19,6 +19,7 @@ func NewMSSQLQueryBuilder(dialect cdt.SQLDialect) *MSSQLQueryBuilder {
 	}
 }
 
+// Select implements the QueryBuilder interface for MSSQL.
 func (m *MSSQLQueryBuilder) Select(
 	table string,
 	columns []string,
@@ -33,6 +34,7 @@ func (m *MSSQLQueryBuilder) Select(
 	return q, v, nil
 }
 
+// Insert implements the QueryBuilder interface for MSSQL.
 func (m *MSSQLQueryBuilder) Insert(table string, data map[string]any) (string, []any, error) {
 	q, v, err := insert(m.dialect, table, data)
 	if err != nil {
@@ -41,6 +43,7 @@ func (m *MSSQLQueryBuilder) Insert(table string, data map[string]any) (string, [
 	return q, v, nil
 }
 
+// Update implements the QueryBuilder interface for MSSQL.
 func (m *MSSQLQueryBuilder) Update(table string, data map[string]any, cond cdt.Condition) (string, []any, error) {
 	q, v, err := update(m.dialect, table, data, cond)
 	if err != nil {
@@ -49,6 +52,7 @@ func (m *MSSQLQueryBuilder) Update(table string, data map[string]any, cond cdt.C
 	return q, v, nil
 }
 
+// Delete implements the QueryBuilder interface for MSSQL.
 func (m *MSSQLQueryBuilder) Delete(table string, cond cdt.Condition) (string, []any, error) {
 	q, v, err := delete(m.dialect, table, cond)
 	if err != nil {
@@ -57,6 +61,7 @@ func (m *MSSQLQueryBuilder) Delete(table string, cond cdt.Condition) (string, []
 	return q, v, nil
 }
 
+// join converts a Join to a SQL JOIN clause.
 func (m *MSSQLQueryBuilder) join(table string, join *cdt.Join) string {
 	return join.ToSQL(table, m.dialect)
 }

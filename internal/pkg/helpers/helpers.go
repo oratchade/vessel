@@ -1,3 +1,4 @@
+// Package helpers provides utility functions for SQL query building and formatting.
 package helpers
 
 import (

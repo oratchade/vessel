@@ -1,3 +1,4 @@
+// Package db provides database abstraction and query execution utilities.
 package db
 
 import (
@@ -9,12 +10,14 @@ import (
 	"tounilab.com/db-connector/pkg/query/options"
 )
 
+// dbOpts holds common database operation dependencies used by helper functions.
 type dbOpts struct {
 	builder builder.QueryBuilder
 	querier sqlQuerier
 	logger  Logger
 }
 
+// get executes a SELECT query and returns results as a slice of maps.
 func get(
 	ctx context.Context,
 	table string,
@@ -52,6 +55,7 @@ func get(
 	return results, nil
 }
 
+// getRaw executes a SELECT query and returns a RowsAdapter for raw row processing.
 func getRaw(
 	ctx context.Context,
 	table string,
@@ -84,6 +88,7 @@ func getRaw(
 	return ra, nil
 }
 
+// getByID executes a SELECT query filtered by ID and returns results as a slice of maps.
 func getByID(
 	ctx context.Context,
 	table string,
@@ -123,6 +128,7 @@ func getByID(
 	return results, nil
 }
 
+// getByIDRaw executes a SELECT query filtered by ID and returns a RowsAdapter for raw row processing.
 func getByIDRaw(
 	ctx context.Context,
 	table string,
@@ -157,6 +163,7 @@ func getByIDRaw(
 	return ra, nil
 }
 
+// insert executes an INSERT query and returns the result with last insert ID and rows affected.
 func insert(
 	ctx context.Context,
 	table string,
@@ -176,6 +183,7 @@ func insert(
 	return fromSQLResult(result), nil
 }
 
+// update executes an UPDATE query and returns the result with rows affected.
 func update(
 	ctx context.Context,
 	table string,
@@ -196,6 +204,7 @@ func update(
 	return fromSQLResult(result), nil
 }
 
+// delete executes a DELETE query and returns the result with rows affected.
 func delete(
 	ctx context.Context,
 	table string,

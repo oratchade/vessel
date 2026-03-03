@@ -15,21 +15,25 @@ func NewExpr() *Expr {
 	return &Expr{}
 }
 
+// Column sets the column name for this Expr condition.
 func (e *Expr) Column(col string) *Expr {
 	e.column = col
 	return e
 }
 
+// Op sets the operator for this Expr condition.
 func (e *Expr) Op(op string) *Expr {
 	e.operator = op
 	return e
 }
 
+// Value sets the value for this Expr condition.
 func (e *Expr) Value(val any) *Expr {
 	e.value = val
 	return e
 }
 
+// ToSQL converts this Expr condition to a parameterized SQL fragment.
 func (e *Expr) ToSQL(dialect SQLDialect, paramBase int) (string, []any, error) {
 	if e.column == "" || e.operator == "" || e.value == nil {
 		return "", nil, fmt.Errorf("invalid expression")

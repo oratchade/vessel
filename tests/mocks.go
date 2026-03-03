@@ -12,12 +12,15 @@ type MockDialect struct{}
 func (m MockDialect) Placeholder(_ int) string {
 	return "?"
 }
+
 func (m MockDialect) Operator(op string) string {
 	return strings.ToUpper(op)
 }
+
 func (m MockDialect) QuoteIdentifier(id string) string {
 	return "`" + id + "`"
 }
+
 func (m MockDialect) QuoteString(id string) string {
 	return `"` + id + `"`
 }

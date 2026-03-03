@@ -1,3 +1,4 @@
+// Package options defines query option structures for controlling query behavior.
 package options
 
 // QueryOptions holds optional parameters for SQL queries.

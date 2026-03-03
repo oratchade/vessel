@@ -15,11 +15,13 @@ func NewNot() *Not {
 	}
 }
 
+// Condition sets the child condition to negate.
 func (n *Not) Condition(cond Condition) *Not {
 	n.condition = cond
 	return n
 }
 
+// ToSQL converts this Not condition to a parameterized SQL fragment.
 func (n *Not) ToSQL(dialect SQLDialect, paramBase int) (string, []any, error) {
 	str, args, err := n.condition.ToSQL(dialect, paramBase)
 	if err != nil {

@@ -16,6 +16,7 @@ type JoinCdt struct {
 // JoinCdts is a slice of JoinCdt and provides helpers for JOIN condition rendering.
 type JoinCdts []JoinCdt
 
+// on generates the ON or USING clause for this join condition.
 func (j JoinCdts) on(table string, joinTable string, dialect SQLDialect) string {
 	similar := true
 	columns := []string{}
@@ -43,6 +44,7 @@ func (j JoinCdts) on(table string, joinTable string, dialect SQLDialect) string 
 	return fmt.Sprintf("ON %s", strings.Join(columns, " AND "))
 }
 
+// Reverse returns a new JoinCdts with Left and Right columns swapped.
 func (j JoinCdts) Reverse() JoinCdts {
 	reversed := make(JoinCdts, len(j))
 	for i, cdt := range j {
@@ -62,6 +64,7 @@ type Join struct {
 	Conditions JoinCdts
 }
 
+// ToSQL converts this Join to a SQL JOIN clause for the specified table.
 func (j *Join) ToSQL(table string, dialect SQLDialect) string {
 	jn := fmt.Sprintf("%s JOIN %s", dialect.Operator(j.Type), dialect.QuoteIdentifier(j.Table))
 

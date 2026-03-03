@@ -1,3 +1,4 @@
+// Package db provides database abstraction interfaces and implementations for multiple database engines.
 package db
 
 import (
@@ -122,6 +123,7 @@ func newMySQL(cfg MysqlConfig) (*MySQL, error) {
 	}, nil
 }
 
+// mysqlCfgToDB converts a DBConfig to a MySQL instance.
 func mysqlCfgToDB(cfg DBConfig) (*MySQL, error) {
 	switch c := cfg.(type) {
 	case MysqlConfig:
@@ -133,6 +135,7 @@ func mysqlCfgToDB(cfg DBConfig) (*MySQL, error) {
 	}
 }
 
+// PoolStats implements the DB interface method for retrieving connection pool statistics.
 func (m *MySQL) PoolStats() (*PoolStatistics, error) {
 	sqlDB, ok := m.querier.(*sql.DB)
 	if !ok {
@@ -153,6 +156,7 @@ func (m *MySQL) PoolStats() (*PoolStatistics, error) {
 	}, nil
 }
 
+// Ping implements the DB interface method to verify the database connection.
 func (m *MySQL) Ping(ctx context.Context) error {
 	sqlDB, ok := m.querier.(*sql.DB)
 	if !ok {
@@ -165,6 +169,7 @@ func (m *MySQL) Ping(ctx context.Context) error {
 	return nil
 }
 
+// Begin implements the DB interface method to start a new transaction.
 func (m *MySQL) Begin(ctx context.Context) (Tx, error) {
 	sqlDB, ok := m.querier.(*sql.DB)
 	if !ok {
@@ -183,6 +188,7 @@ func (m *MySQL) Begin(ctx context.Context) (Tx, error) {
 	}, nil
 }
 
+// Get implements the DBActions interface method to retrieve multiple rows as maps.
 func (m *MySQL) Get(
 	ctx context.Context,
 	table string,
@@ -199,6 +205,7 @@ func (m *MySQL) Get(
 	return get(ctx, table, columns, joins, conditions, opts, o)
 }
 
+// GetRaw implements the DBActions interface method to retrieve multiple rows as a RowsAdapter.
 func (m *MySQL) GetRaw(
 	ctx context.Context,
 	table string,
@@ -215,6 +222,7 @@ func (m *MySQL) GetRaw(
 	return getRaw(ctx, table, columns, joins, conditions, opts, o)
 }
 
+// GetByID implements the DBActions interface method to retrieve a row by primary key.
 func (m *MySQL) GetByID(
 	ctx context.Context,
 	table string,
@@ -230,6 +238,7 @@ func (m *MySQL) GetByID(
 	return getByID(ctx, table, id, joins, opts, o)
 }
 
+// GetByIDRaw implements the DBActions interface method to retrieve a row by primary key as a RowsAdapter.
 func (m *MySQL) GetByIDRaw(
 	ctx context.Context,
 	table string,
@@ -245,6 +254,7 @@ func (m *MySQL) GetByIDRaw(
 	return getByIDRaw(ctx, table, id, joins, opts, o)
 }
 
+// Insert implements the DBActions interface method to insert a new row.
 func (m *MySQL) Insert(
 	ctx context.Context,
 	table string,
@@ -259,6 +269,7 @@ func (m *MySQL) Insert(
 	return insert(ctx, table, data, opts, o)
 }
 
+// Update implements the DBActions interface method to update existing rows.
 func (m *MySQL) Update(
 	ctx context.Context,
 	table string,
@@ -274,6 +285,7 @@ func (m *MySQL) Update(
 	return update(ctx, table, data, conditions, opts, o)
 }
 
+// Delete implements the DBActions interface method to delete rows.
 func (m *MySQL) Delete(
 	ctx context.Context,
 	table string,
@@ -288,6 +300,7 @@ func (m *MySQL) Delete(
 	return delete(ctx, table, conditions, opts, o)
 }
 
+// Query implements the DBActions interface method to execute a raw query and return results as maps.
 func (m *MySQL) Query(
 	ctx context.Context,
 	query string,
@@ -313,6 +326,7 @@ func (m *MySQL) Query(
 	return scanRows(rows, cols)
 }
 
+// QueryRaw implements the DBActions interface method to execute a raw query and return a RowsAdapter.
 func (m *MySQL) QueryRaw(ctx context.Context, query string, args ...any) (*RowsAdapter, error) {
 	rows, err := m.querier.QueryContext(ctx, query, args...)
 	if err != nil {
@@ -333,6 +347,7 @@ func (m *MySQL) QueryRaw(ctx context.Context, query string, args ...any) (*RowsA
 	return ra, nil
 }
 
+// Exec implements the DBActions interface method to execute a raw statement (insert, update, delete, etc.).
 func (m *MySQL) Exec(
 	ctx context.Context,
 	query string,
@@ -345,6 +360,7 @@ func (m *MySQL) Exec(
 	return fromSQLResult(result), nil
 }
 
+// WithTransaction implements the DB interface method to execute a function within a database transaction.
 func (m *MySQL) WithTransaction(ctx context.Context, fn func(tx Tx) error) error {
 	tx, err := m.Begin(ctx)
 	if err != nil {
@@ -380,6 +396,7 @@ func (m *MySQL) WithTransaction(ctx context.Context, fn func(tx Tx) error) error
 }
 
 // Close closes the MySQL database connection.
+// Close implements the DB interface method to close the database connection.
 func (m *MySQL) Close() error {
 	if m.querier == nil {
 		return nil
@@ -395,6 +412,7 @@ func (m *MySQL) Close() error {
 	return nil
 }
 
+// Commit implements the Tx interface method to commit the transaction.
 func (m *MySQL) Commit(_ context.Context) error {
 	sqlTX, ok := m.querier.(*sql.Tx)
 	if !ok {
@@ -406,6 +424,7 @@ func (m *MySQL) Commit(_ context.Context) error {
 	return nil
 }
 
+// Rollback implements the Tx interface method to rollback the transaction.
 func (m *MySQL) Rollback(_ context.Context) error {
 	sqlTX, ok := m.querier.(*sql.Tx)
 	if !ok {

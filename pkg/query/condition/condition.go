@@ -1,3 +1,5 @@
+// Package condition provides composable SQL condition expressions and SQL dialect abstractions
+// for building parameterized queries.
 package condition
 
 import (

@@ -1,3 +1,4 @@
+// Package builder provides SQL query building for multiple database engines.
 package builder
 
 import (
@@ -73,6 +74,7 @@ type QueryBuilder interface {
 	Delete(table string, cond cdt.Condition) (string, []any, error)
 }
 
+// selectQ builds a SELECT query with support for columns, joins, conditions, and options.
 func selectQ(
 	dialect cdt.SQLDialect,
 	table string,
@@ -144,6 +146,8 @@ func selectQ(
 	return b.String(), allArgs, nil
 }
 
+// sanitizeColumn quotes and processes a column identifier, handling aliases and qualified names.
+//
 //nolint:prealloc
 func sanitizeColumn(dialect cdt.SQLDialect, column string) string {
 	c, alias := column, ""
@@ -166,6 +170,7 @@ func sanitizeColumn(dialect cdt.SQLDialect, column string) string {
 	return fmt.Sprintf("%s%s", dialect.QuoteIdentifier(strings.TrimSpace(c)), alias)
 }
 
+// insert builds an INSERT query for the given table and data.
 func insert(dialect cdt.SQLDialect, table string, data map[string]any) (string, []any, error) {
 	if len(data) == 0 {
 		return "", nil, fmt.Errorf("builder.insert: no data provided for insertion")
@@ -189,6 +194,8 @@ func insert(dialect cdt.SQLDialect, table string, data map[string]any) (string, 
 	), values, nil
 }
 
+// update builds an UPDATE query for the given table, data, and conditions.
+//
 //nolint:prealloc
 func update(
 	dialect cdt.SQLDialect,
@@ -219,6 +226,7 @@ func update(
 	return fmt.Sprintf("%s WHERE %s;", sql, where), values, nil
 }
 
+// delete builds a DELETE query for the given table and conditions.
 func delete(dialect cdt.SQLDialect, table string, cond cdt.Condition) (string, []any, error) {
 	if cond == nil {
 		return fmt.Sprintf("DELETE FROM %s;", dialect.QuoteIdentifier(table)), nil, nil
