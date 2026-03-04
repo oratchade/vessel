@@ -19,7 +19,7 @@ A lightweight, multi-database SQL abstraction library for Go with support for My
 ## Installation
 
 ```bash
-go get github.com/oratchade/db-connector
+go get tounilab.com/db-connector
 ```
 
 Requires Go 1.26.0 or later.
@@ -35,14 +35,18 @@ import (
     "context"
     "log"
 
-    "github.com/oratchade/db-connector/v1/db"
+    "tounilab.com/db-connector/v1/db"
 )
 
 func main() {
     // Open a connection
-    database, err := db.NewMySQL(context.Background(), &db.MySQLConfig{
-        DSN: "user:password@tcp(localhost:3306)/mydb",
-    })
+    database, err := db.NewDB(db.MysqlConfig{
+        User:     "user",
+        Password: "password",
+        Host:     "localhost",
+        Port:     3306,
+        Database: "mydb",
+    }, nil)
     if err != nil {
         log.Fatal(err)
     }
@@ -63,7 +67,7 @@ func main() {
 ctx := context.Background()
 
 // Get all users
-users, err := database.Get(ctx, "users", []string{"id", "name", "email"}, "", nil, nil)
+users, err := database.Get(ctx, "users", []string{"id", "name", "email"}, nil, nil, nil)
 if err != nil {
     log.Fatal(err)
 }
@@ -81,7 +85,7 @@ result, err := database.Insert(ctx, "users", map[string]any{
     "name":  "Bob",
     "email": "bob@example.com",
     "age":   30,
-})
+}, nil)
 if err != nil {
     log.Fatal(err)
 }
@@ -92,13 +96,17 @@ log.Printf("Inserted %d rows, ID: %v\n", result.RowsAffected, result.LastInsertI
 ### Updating Data
 
 ```go
+import (
+    cdt "tounilab.com/db-connector/pkg/query/condition"
+)
+
 updates := map[string]any{
     "email": "newemail@example.com",
     "age":   31,
 }
 
 result, err := database.Update(ctx, "users", updates,
-    "id = ?", []any{1}, nil)
+    cdt.NewExpr().Column("id").Op("=").Value(1), nil)
 if err != nil {
     log.Fatal(err)
 }
@@ -110,7 +118,7 @@ log.Printf("Updated %d rows\n", result.RowsAffected)
 
 ```go
 result, err := database.Delete(ctx, "users",
-    "age > ?", []any{50}, nil)
+    cdt.NewExpr().Column("age").Op(">").Value(50), nil)
 if err != nil {
     log.Fatal(err)
 }
@@ -125,7 +133,7 @@ err := database.WithTransaction(ctx, func(tx db.Tx) error {
     // Insert user
     _, err := tx.Insert(ctx, "users", map[string]any{
         "name": "Charlie",
-    })
+    }, nil)
     if err != nil {
         return err
     }
@@ -134,7 +142,7 @@ err := database.WithTransaction(ctx, func(tx db.Tx) error {
     _, err = tx.Insert(ctx, "profiles", map[string]any{
         "user_id": 3,
         "bio":     "Developer",
-    })
+    }, nil)
     if err != nil {
         return err
     }
@@ -153,7 +161,7 @@ if err != nil {
 ```go
 // Execute custom SQL
 results, err := database.Query(ctx,
-    "SELECT id, name FROM users WHERE age > ?", []any{25})
+    "SELECT id, name FROM users WHERE age > ?", 25)
 if err != nil {
     log.Fatal(err)
 }
@@ -179,7 +187,7 @@ type User struct {
 }
 
 // Execute raw SQL and get unscanned rows
-rowsAdapter, err := database.GetRaw(ctx, "", []string{"*"}, "users", "", "(1=1)", nil)
+rowsAdapter, err := database.GetRaw(ctx, "users", []string{"*"}, nil, nil, nil)
 if err != nil {
     log.Fatal(err)
 }
@@ -221,40 +229,52 @@ See [OPERATORS_COMPATIBILITY.md](./OPERATORS_COMPATIBILITY.md) for detailed oper
 ### MySQL
 
 ```go
-db, err := db.NewMySQL(ctx, &db.MySQLConfig{
-    DSN: "user:password@tcp(host:3306)/database",
-    MaxOpenConns: 25,
-    MaxIdleConns: 5,
+database, err := db.NewDB(db.MysqlConfig{
+    User:            "user",
+    Password:        "password",
+    Host:            "host",
+    Port:            3306,
+    Database:        "database",
+    MaxOpenConns:    25,
+    MaxIdleConns:    5,
     ConnMaxLifetime: 5 * time.Minute,
-})
+}, nil)
 ```
 
 ### PostgreSQL
 
 ```go
-db, err := db.NewPostgres(ctx, &db.PostgresConfig{
-    DSN: "postgres://user:password@host:5432/database",
-    MaxConnections: 25,
-    MinConnections: 5,
-})
+database, err := db.NewDB(db.PostgresConfig{
+    User:         "user",
+    Password:     "password",
+    Host:         "host",
+    Port:         5432,
+    Database:     "database",
+    PoolMaxConns: 25,
+    PoolMinConns: 5,
+}, nil)
 ```
 
 ### SQLite
 
 ```go
-db, err := db.NewSQLite(ctx, &db.SQLiteConfig{
-    Path: "/path/to/database.db",
-})
+database, err := db.NewDB(db.SQLLiteConfig{
+    FilePath: "/path/to/database.db",
+}, nil)
 ```
 
 ### MSSQL
 
 ```go
-db, err := db.NewMSSQL(ctx, &db.MSSQLConfig{
-    ConnectionString: "server=localhost;user id=sa;password=...;database=mydb",
+database, err := db.NewDB(db.MSSQLConfig{
+    User:         "sa",
+    Password:     "...",
+    Host:         "localhost",
+    Port:         1433,
+    Database:     "mydb",
     MaxOpenConns: 25,
     MaxIdleConns: 5,
-})
+}, nil)
 ```
 
 ## Error Handling
@@ -262,9 +282,9 @@ db, err := db.NewMSSQL(ctx, &db.MSSQLConfig{
 The library provides structured error handling with database-dialect-specific error mapping. See [ERROR_HANDLING.md](./ERROR_HANDLING.md) for comprehensive guidance on error handling patterns.
 
 ```go
-import "github.com/oratchade/db-connector/v1/db/dberror"
+import "tounilab.com/db-connector/v1/db/dberror"
 
-result, err := database.Insert(ctx, "users", data)
+result, err := database.Insert(ctx, "users", data, nil)
 if err != nil {
     if errors.Is(err, dberror.ErrDuplicateKey) {
         log.Println("Email already exists")
