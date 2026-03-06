@@ -269,6 +269,21 @@ func (m *MySQL) Insert(
 	return insert(ctx, table, data, opts, o)
 }
 
+// Inserts implements the DBActions interface method to insert multiple new rows.
+func (m *MySQL) Inserts(
+	ctx context.Context,
+	table string,
+	data []map[string]any,
+	opts *options.QueryOptions,
+) (*ExecResult, error) {
+	o := dbOpts{
+		builder: m.queryBuilder,
+		querier: m.querier,
+		logger:  m.logger,
+	}
+	return inserts(ctx, table, data, opts, o)
+}
+
 // Update implements the DBActions interface method to update existing rows.
 func (m *MySQL) Update(
 	ctx context.Context,
@@ -310,13 +325,6 @@ func (m *MySQL) Query(
 	if err != nil {
 		return nil, fmt.Errorf("mysql.Query: failed to execute query: %w", m.errorMapper.MapError(err))
 	}
-	defer func() {
-		if err := rows.Close(); err != nil {
-			if m.logger != nil {
-				m.logger.Error("mysql.Query: failed to close rows", "error", err)
-			}
-		}
-	}()
 
 	cols, err := rows.Columns()
 	if err != nil {

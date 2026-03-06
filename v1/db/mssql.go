@@ -239,6 +239,20 @@ func (m *MSSQL) Insert(
 	return insert(ctx, table, data, opts, o)
 }
 
+func (m *MSSQL) Inserts(
+	ctx context.Context,
+	table string,
+	data []map[string]any,
+	opts *options.QueryOptions,
+) (*ExecResult, error) {
+	o := dbOpts{
+		builder: m.queryBuilder,
+		querier: m.querier,
+		logger:  m.logger,
+	}
+	return inserts(ctx, table, data, opts, o)
+}
+
 func (m *MSSQL) Update(
 	ctx context.Context,
 	table string,
@@ -298,13 +312,6 @@ func (m *MSSQL) QueryRaw(ctx context.Context, query string, args ...any) (*RowsA
 	if err != nil {
 		return nil, fmt.Errorf("mssql.QueryRaw: failed to execute query: %w", m.errorMapper.MapError(err))
 	}
-	defer func() {
-		if err := rows.Close(); err != nil {
-			if m.logger != nil {
-				m.logger.Error("mssql.QueryRaw: failed to close rows", "error", err)
-			}
-		}
-	}()
 
 	ra, err := newRowsAdapter(rows)
 	if err != nil {

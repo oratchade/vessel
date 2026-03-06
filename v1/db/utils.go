@@ -74,11 +74,6 @@ func getRaw(
 	if err != nil {
 		return nil, fmt.Errorf("failed to execute query: %w", err)
 	}
-	defer func() {
-		if err := rows.Close(); err != nil && dbOpts.logger != nil {
-			dbOpts.logger.Error("failed to close rows", "error", err)
-		}
-	}()
 
 	ra, err := newRowsAdapter(rows)
 	if err != nil {
@@ -149,11 +144,6 @@ func getByIDRaw(
 	if err != nil {
 		return nil, fmt.Errorf("failed to execute query: %w", err)
 	}
-	defer func() {
-		if err := rows.Close(); err != nil && dbOpts.logger != nil {
-			dbOpts.logger.Error("failed to close rows", "error", err)
-		}
-	}()
 
 	ra, err := newRowsAdapter(rows)
 	if err != nil {
@@ -172,6 +162,26 @@ func insert(
 	dbOpts dbOpts,
 ) (*ExecResult, error) {
 	query, args, err := dbOpts.builder.Insert(table, data)
+	if err != nil {
+		return nil, fmt.Errorf("failed to build insert query: %w", err)
+	}
+
+	result, err := dbOpts.querier.ExecContext(ctx, query, args...)
+	if err != nil {
+		return nil, fmt.Errorf("failed to execute insert query: %w", err)
+	}
+	return fromSQLResult(result), nil
+}
+
+// inserts executes an INSERT query for multiple rows and returns the result with last insert ID and rows affected.
+func inserts(
+	ctx context.Context,
+	table string,
+	data []map[string]any,
+	_ *options.QueryOptions,
+	dbOpts dbOpts,
+) (*ExecResult, error) {
+	query, args, err := dbOpts.builder.Inserts(table, data)
 	if err != nil {
 		return nil, fmt.Errorf("failed to build insert query: %w", err)
 	}

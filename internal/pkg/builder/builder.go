@@ -48,6 +48,18 @@ type QueryBuilder interface {
 	//   error: Error if query building fails.
 	Insert(table string, data map[string]any) (string, []any, error)
 
+	// Inserts builds an INSERT query for the given table and multiple rows of data.
+	//
+	// Parameters:
+	//   table: Name of the table to insert into.
+	//   data: Slice of maps, each representing a row to insert with column names as keys and values as values.
+	//
+	// Returns:
+	//   string: The generated SQL query.
+	//   []any: Arguments for parameterized query.
+	//   error: Error if query building fails.
+	Inserts(table string, data []map[string]any) (string, []any, error)
+
 	// Update builds an UPDATE query for the given table, data, and conditions.
 	//
 	// Parameters:
@@ -147,10 +159,12 @@ func selectQ(
 }
 
 // sanitizeColumn quotes and processes a column identifier, handling aliases and qualified names.
-//
-//nolint:prealloc
 func sanitizeColumn(dialect cdt.SQLDialect, column string) string {
 	c, alias := column, ""
+	if column == "*" {
+		return "*"
+	}
+
 	if strings.Contains(column, dialect.Operator("AS")) {
 		p := strings.SplitN(column, dialect.Operator("AS"), 2)
 		c, alias = p[0], p[1]
@@ -192,6 +206,60 @@ func insert(dialect cdt.SQLDialect, table string, data map[string]any) (string, 
 		strings.Join(columns, ", "),
 		strings.Join(placeholders, ", "),
 	), values, nil
+}
+
+// insert builds an INSERT query for the given table and multiple rows of data.
+func inserts(dialect cdt.SQLDialect, table string, data []map[string]any) (string, []any, error) {
+	if len(data) == 0 {
+		return "", nil, fmt.Errorf("builder.inserts: no data provided for insertion")
+	}
+
+	// Get column names from the first row
+	var columns []string
+	for col := range data[0] {
+		columns = append(columns, col)
+	}
+
+	// Build placeholders for each row
+	index := 1
+	var rowPlaceholders []string
+	var values []any
+
+	for _, row := range data {
+		i, rowValues, rowVals := rowValues(dialect, row, columns, index)
+		rowPlaceholders = append(rowPlaceholders, fmt.Sprintf("(%s)", strings.Join(rowValues, ", ")))
+		values = append(values, rowVals...)
+		index = i
+	}
+
+	// Quote column names
+	var quotedColumns []string
+	for _, col := range columns {
+		quotedColumns = append(quotedColumns, dialect.QuoteIdentifier(col))
+	}
+
+	return fmt.Sprintf(
+		"INSERT INTO %s (%s) VALUES %s;",
+		dialect.QuoteIdentifier(table),
+		strings.Join(quotedColumns, ", "),
+		strings.Join(rowPlaceholders, ", "),
+	), values, nil
+}
+
+func rowValues(dialect cdt.SQLDialect, row map[string]any, columns []string, index int) (int, []string, []any) {
+	var rowValues []string
+	var values []any
+	for _, col := range columns {
+		if val, ok := row[col]; ok {
+			rowValues = append(rowValues, dialect.Placeholder(index))
+			values = append(values, val)
+			index++
+		} else {
+			rowValues = append(rowValues, "NULL")
+		}
+	}
+
+	return index, rowValues, values
 }
 
 // update builds an UPDATE query for the given table, data, and conditions.

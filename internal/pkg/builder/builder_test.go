@@ -93,6 +93,7 @@ func TestSanitizeColumn_MultipleDialects(t *testing.T) {
 		{"with alias", "col AS alias", `"col" AS "alias"`},
 		{"qualified with alias", "table.col AS alias", `"table"."col" AS "alias"`},
 		{"whitespace tolerance", "  table .  col  AS   alias  ", `"table"."col" AS "alias"`},
+		{"all columns", "*", "*"},
 	}
 
 	dialects := []struct {
@@ -125,4 +126,121 @@ func TestSanitizeColumn_MultipleDialects(t *testing.T) {
 		got := builder.ExportSanitizeColumn(baseDialect, tc.input)
 		assert.Equal(t, tc.expected, got, "postgres sanitizeColumn(%q)", tc.input)
 	}
+}
+
+func TestInserts_MySQL(t *testing.T) {
+	dialect := sqldialect.MySQLDialect{}
+	qb := builder.NewMySQLQueryBuilder(dialect)
+
+	tests := []struct {
+		name          string
+		table         string
+		data          []map[string]any
+		expectedQuery string
+		expectedArgs  []any
+	}{
+		{
+			name:          "single row",
+			table:         "users",
+			data:          []map[string]any{{"id": 1, "name": "Alice"}},
+			expectedQuery: "INSERT INTO `users` (`id`, `name`) VALUES (?, ?);",
+			expectedArgs:  []any{1, "Alice"},
+		},
+		{
+			name:  "multiple rows",
+			table: "users",
+			data: []map[string]any{
+				{"id": 1, "name": "Alice"},
+				{"id": 2, "name": "Bob"},
+			},
+			expectedQuery: "INSERT INTO `users` (`id`, `name`) VALUES (?, ?), (?, ?);",
+			expectedArgs:  []any{1, "Alice", 2, "Bob"},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			query, args, err := qb.Inserts(tt.table, tt.data)
+			assert.NoError(t, err)
+			assert.Equal(t, tt.expectedQuery, query)
+			assert.Equal(t, tt.expectedArgs, args)
+		})
+	}
+}
+
+//nolint:dupl
+func TestInserts_Postgres(t *testing.T) {
+	dialect := sqldialect.PostgresDialect{}
+	qb := builder.NewPostgresQueryBuilder(dialect)
+
+	tests := []struct {
+		name          string
+		table         string
+		data          []map[string]any
+		expectedQuery string
+		expectedArgs  []any
+	}{
+		{
+			name:  "multiple rows",
+			table: "users",
+			data: []map[string]any{
+				{"id": 1, "name": "Alice"},
+				{"id": 2, "name": "Bob"},
+			},
+			expectedQuery: `INSERT INTO "users" ("id", "name") VALUES ($1, $2), ($3, $4);`,
+			expectedArgs:  []any{1, "Alice", 2, "Bob"},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			query, args, err := qb.Inserts(tt.table, tt.data)
+			assert.NoError(t, err)
+			assert.Equal(t, tt.expectedQuery, query)
+			assert.Equal(t, tt.expectedArgs, args)
+		})
+	}
+}
+
+//nolint:dupl
+func TestInserts_MSSQL(t *testing.T) {
+	dialect := sqldialect.MSSQLDialect{}
+	qb := builder.NewMSSQLQueryBuilder(dialect)
+
+	tests := []struct {
+		name          string
+		table         string
+		data          []map[string]any
+		expectedQuery string
+		expectedArgs  []any
+	}{
+		{
+			name:  "multiple rows",
+			table: "users",
+			data: []map[string]any{
+				{"id": 1, "name": "Alice"},
+				{"id": 2, "name": "Bob"},
+			},
+			expectedQuery: "INSERT INTO [users] ([id], [name]) VALUES (@p1, @p2), (@p3, @p4);",
+			expectedArgs:  []any{1, "Alice", 2, "Bob"},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			query, args, err := qb.Inserts(tt.table, tt.data)
+			assert.NoError(t, err)
+			assert.Equal(t, tt.expectedQuery, query)
+			assert.Equal(t, tt.expectedArgs, args)
+		})
+	}
+}
+
+func TestInserts_EmptyDataError(t *testing.T) {
+	dialect := sqldialect.MySQLDialect{}
+	qb := builder.NewMySQLQueryBuilder(dialect)
+
+	_, _, err := qb.Inserts("users", []map[string]any{})
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "no data provided")
 }

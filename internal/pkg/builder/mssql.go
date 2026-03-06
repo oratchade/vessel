@@ -43,6 +43,15 @@ func (m *MSSQLQueryBuilder) Insert(table string, data map[string]any) (string, [
 	return q, v, nil
 }
 
+// Inserts implements the QueryBuilder interface for MSSQL.
+func (m *MSSQLQueryBuilder) Inserts(table string, data []map[string]any) (string, []any, error) {
+	q, v, err := inserts(m.dialect, table, data)
+	if err != nil {
+		return "", nil, fmt.Errorf("inserts mssqlSQL Builder: error building insert query: %w", err)
+	}
+	return q, v, nil
+}
+
 // Update implements the QueryBuilder interface for MSSQL.
 func (m *MSSQLQueryBuilder) Update(table string, data map[string]any, cond cdt.Condition) (string, []any, error) {
 	q, v, err := update(m.dialect, table, data, cond)

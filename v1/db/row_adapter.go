@@ -81,9 +81,30 @@ func (r *RowsAdapter) scan(dest ...any) error {
 // err returns any error that occurred during row iteration.
 func (r *RowsAdapter) err() error {
 	if r.sqlRows != nil {
-		return fmt.Errorf("RowsAdapter.err: %w", r.sqlRows.Err())
+		if sqlErr := r.sqlRows.Err(); sqlErr != nil {
+			return fmt.Errorf("RowsAdapter.err: %w", sqlErr)
+		}
+		return nil
 	}
-	return fmt.Errorf("RowsAdapter.err: %w", r.pgxRows.Err())
+	if pgxErr := r.pgxRows.Err(); pgxErr != nil {
+		return fmt.Errorf("RowsAdapter.err: %w", pgxErr)
+	}
+	return nil
+}
+
+// err returns any error that occurred during row iteration.
+func (r *RowsAdapter) Close() error {
+	if r.sqlRows != nil {
+		err := r.sqlRows.Close()
+		if err != nil {
+			return fmt.Errorf("RowsAdapter.Close: %w", err)
+		}
+		return nil
+	}
+	if pgxErr := r.pgxRows.Err(); pgxErr != nil {
+		r.pgxRows.Close()
+	}
+	return nil
 }
 
 // scanRows scans all rows from the result set into a slice of maps.

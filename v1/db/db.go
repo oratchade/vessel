@@ -170,6 +170,19 @@ type DBActions interface {
 	//   error: Error if the insert fails.
 	Insert(ctx context.Context, table string, data map[string]any, opts *options.QueryOptions) (*ExecResult, error)
 
+	// Inserts adds multiple new rows to the specified table, with optional query options.
+	//
+	// Parameters:
+	//   ctx: Context for cancellation and deadlines.
+	//   table: Name of the table to insert into.
+	//   data: Slice of maps, each representing a row to insert with column names as keys and values as values.
+	//   opts: Optional query parameters (e.g., returning columns).
+	//
+	// Returns:
+	//   ExecResult: Result of the insert operation.
+	//   error: Error if the insert fails.
+	Inserts(ctx context.Context, table string, data []map[string]any, opts *options.QueryOptions) (*ExecResult, error)
+
 	// Update modifies existing rows in the specified table, with optional query options.
 	//
 	// Parameters:
@@ -335,6 +348,8 @@ func ScanRowsTo[T any](ra *RowsAdapter) ([]T, error) {
 	}
 
 	var out []T
+
+	defer func() { _ = ra.Close() }()
 
 	// prepare scan destinations
 	vals, ptrs := makeScanPtrs(len(cols))

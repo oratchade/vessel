@@ -45,6 +45,15 @@ func (s *SQLiteQueryBuilder) Insert(table string, data map[string]any) (string, 
 	return q, v, nil
 }
 
+// Inserts implements the QueryBuilder interface for SQLite.
+func (s *SQLiteQueryBuilder) Inserts(table string, data []map[string]any) (string, []any, error) {
+	q, v, err := inserts(s.dialect, table, data)
+	if err != nil {
+		return "", nil, fmt.Errorf("inserts sqliteSQL Builder: error building insert query: %w", err)
+	}
+	return q, v, nil
+}
+
 // Update implements the QueryBuilder interface for SQLite.
 func (s *SQLiteQueryBuilder) Update(
 	table string,

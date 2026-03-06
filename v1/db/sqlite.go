@@ -17,10 +17,10 @@ import (
 	"tounilab.com/db-connector/v1/db/dberror"
 )
 
-// SQLLiteConfig holds configuration for connecting to a SQLLite database.
+// SQLiteConfig holds configuration for connecting to a SQLLite database.
 //
 // Fields include file path, access mode, and connection pool settings.
-type SQLLiteConfig struct {
+type SQLiteConfig struct {
 	FilePath        string        // Path to the SQLLite database file
 	CacheMode       string        // Cache mode (shared, private)
 	Mode            string        // Access mode (ro, rw, rwc, memory)
@@ -33,7 +33,7 @@ type SQLLiteConfig struct {
 
 // Driver returns the driver name for SQLLite databases.
 
-func (cfg SQLLiteConfig) Driver() string {
+func (cfg SQLiteConfig) Driver() string {
 	return definition.DriverSQLLite
 }
 
@@ -45,7 +45,7 @@ func (cfg SQLLiteConfig) Driver() string {
 // * mode: the access mode (e.g., ro, rw, rwc, memory)
 // * _foreign_keys: whether to enable foreign key constraints
 // * _busy_timeout: the busy timeout duration in milliseconds
-func (cfg SQLLiteConfig) DSN() string {
+func (cfg SQLiteConfig) DSN() string {
 	return fmt.Sprintf(
 		"file:%s?cache=%s&mode=%s&_foreign_keys=%t&_busy_timeout=%d",
 		cfg.FilePath, cfg.CacheMode, cfg.Mode, cfg.ForeignKeys, int(cfg.BusyTimeout.Milliseconds()),
@@ -62,7 +62,7 @@ type SQLLite struct {
 }
 
 // newSQLLite initializes a new SQLLite connection using the provided config.
-func newSQLLite(cfg SQLLiteConfig) (*SQLLite, error) {
+func newSQLLite(cfg SQLiteConfig) (*SQLLite, error) {
 	dsn := cfg.DSN()
 
 	db, err := sql.Open("sqlite3", dsn)
@@ -87,9 +87,9 @@ func newSQLLite(cfg SQLLiteConfig) (*SQLLite, error) {
 
 func sqliteCfgToDB(cfg DBConfig) (*SQLLite, error) {
 	switch c := cfg.(type) {
-	case SQLLiteConfig:
+	case SQLiteConfig:
 		return newSQLLite(c)
-	case *SQLLiteConfig:
+	case *SQLiteConfig:
 		return newSQLLite(*c)
 	default:
 		return nil, fmt.Errorf("unsupported sqlite config type: %T", cfg)
@@ -222,6 +222,20 @@ func (m *SQLLite) Insert(
 	return insert(ctx, table, data, opts, o)
 }
 
+func (m *SQLLite) Inserts(
+	ctx context.Context,
+	table string,
+	data []map[string]any,
+	opts *options.QueryOptions,
+) (*ExecResult, error) {
+	o := dbOpts{
+		builder: m.queryBuilder,
+		querier: m.querier,
+		logger:  m.logger,
+	}
+	return inserts(ctx, table, data, opts, o)
+}
+
 func (m *SQLLite) Update(
 	ctx context.Context,
 	table string,
@@ -281,13 +295,6 @@ func (m *SQLLite) QueryRaw(ctx context.Context, query string, args ...any) (*Row
 	if err != nil {
 		return nil, fmt.Errorf("sqlite.QueryRaw: failed to execute query: %w", m.errorMapper.MapError(err))
 	}
-	defer func() {
-		if err := rows.Close(); err != nil {
-			if m.logger != nil {
-				m.logger.Error("sqlite.QueryRaw: failed to close rows", "error", err)
-			}
-		}
-	}()
 
 	ra, err := newRowsAdapter(rows)
 	if err != nil {

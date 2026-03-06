@@ -223,6 +223,7 @@ func (pg *Postgres) Get(
 	return scanRows(rows, cols)
 }
 
+//nolint:sqlclosecheck
 func (pg *Postgres) GetRaw(
 	ctx context.Context,
 	table string,
@@ -240,7 +241,6 @@ func (pg *Postgres) GetRaw(
 	if err != nil {
 		return nil, fmt.Errorf("postgres.Get: failed to execute query (%s): %w", query, err)
 	}
-	defer rows.Close()
 
 	ra, err := newRowsAdapter(rows)
 	if err != nil {
@@ -280,6 +280,7 @@ func (pg *Postgres) GetByID(
 	return scanRows(rows, cols)
 }
 
+//nolint:sqlclosecheck
 func (pg *Postgres) GetByIDRaw(
 	ctx context.Context,
 	table string,
@@ -299,7 +300,6 @@ func (pg *Postgres) GetByIDRaw(
 	if err != nil {
 		return nil, fmt.Errorf("postgres.GetByIDRaw: failed to execute query: %w", err)
 	}
-	defer rows.Close()
 
 	ra, err := newRowsAdapter(rows)
 	if err != nil {
@@ -323,6 +323,24 @@ func (pg *Postgres) Insert(
 	result, err := pg.querier.Exec(ctx, query, args...)
 	if err != nil {
 		return nil, fmt.Errorf("postgres.Insert: failed to execute insert query: %w", err)
+	}
+	return fromCommandTag(result), nil
+}
+
+func (pg *Postgres) Inserts(
+	ctx context.Context,
+	table string,
+	data []map[string]any,
+	opts *options.QueryOptions,
+) (*ExecResult, error) {
+	query, args, err := pg.queryBuilder.Inserts(table, data)
+	if err != nil {
+		return nil, fmt.Errorf("postgres.Inserts: failed to build insert query: %w", err)
+	}
+
+	result, err := pg.querier.Exec(ctx, query, args...)
+	if err != nil {
+		return nil, fmt.Errorf("postgres.Inserts: failed to execute insert query: %w", err)
 	}
 	return fromCommandTag(result), nil
 }
@@ -384,12 +402,12 @@ func (pg *Postgres) Query(
 	return scanRows(rows, cols)
 }
 
+//nolint:sqlclosecheck
 func (pg *Postgres) QueryRaw(ctx context.Context, query string, args ...any) (*RowsAdapter, error) {
 	rows, err := pg.querier.Query(ctx, query, args...)
 	if err != nil {
 		return nil, fmt.Errorf("postgres.QueryRaw: failed to execute query: %w", pg.errorMapper.MapError(err))
 	}
-	defer rows.Close()
 
 	ra, err := newRowsAdapter(rows)
 	if err != nil {
