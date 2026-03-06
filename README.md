@@ -368,6 +368,141 @@ log.Printf("Wait Count: %d\n", stats.WaitCount)
 log.Printf("Wait Duration: %v\n", stats.WaitDuration)
 ```
 
+## Plugin System
+
+The db-connector supports a registry-based plugin system that allows you to register custom database drivers without modifying the core library.
+
+### Creating a Custom Driver
+
+Implement the `DriverFactory` interface and register it in an `init()` function:
+
+```go
+package mydb
+
+import (
+    "context"
+    "fmt"
+    "tounilab.com/db-connector/v1/db/plugin"
+)
+
+// Config implements db.DBConfig for your custom database
+type Config struct {
+    Host     string
+    Port     int
+    User     string
+    Password string
+    Database string
+}
+
+func (c *Config) Driver() string { return "mydb" }
+func (c *Config) DSN() string    { return fmt.Sprintf("...") }
+
+// Factory implements plugin.DriverFactory
+type Factory struct{}
+
+func (f *Factory) Name() string {
+    return "mydb"
+}
+
+func (f *Factory) Create(ctx context.Context, cfg interface{}) (interface{}, error) {
+    mydbCfg, ok := cfg.(*Config)
+    if !ok {
+        return nil, fmt.Errorf("expected *Config, got %T", cfg)
+    }
+    // Create and return your DB implementation
+    return NewMyDB(mydbCfg)
+}
+
+// init() auto-registers the driver when the package is imported
+func init() {
+    plugin.MustRegister(&Factory{})
+}
+```
+
+### Using a Custom Driver
+
+Simply import the plugin package (with blank import `_`) and use it:
+
+```go
+import (
+    "tounilab.com/db-connector/v1/db"
+    _ "mydb"  // Auto-registers via init()
+)
+
+func main() {
+    cfg := &mydb.Config{
+        Host:     "localhost",
+        Port:     5432,
+        User:     "user",
+        Password: "password",
+        Database: "mydb",
+    }
+
+    database, err := db.NewDB(cfg, nil)
+    if err != nil {
+        log.Fatal(err)
+    }
+    defer database.Close()
+
+    // Use database normally
+}
+```
+
+### Reusing Built-in Drivers
+
+Plugin authors can reuse built-in driver implementations:
+
+```go
+// If your database is compatible with PostgreSQL wire protocol
+func (f *Factory) Create(ctx context.Context, cfg interface{}) (interface{}, error) {
+    customCfg, _ := cfg.(*Config)
+
+    // Convert to PostgreSQL config and reuse the implementation
+    pgCfg := &db.PostgresConfig{
+        Host:     customCfg.Host,
+        Port:     customCfg.Port,
+        User:     customCfg.User,
+        Password: customCfg.Password,
+        Database: customCfg.Database,
+    }
+
+    return db.PostgresCfgToDB(pgCfg)
+}
+```
+
+Exported driver functions available for reuse:
+
+- `MySQLCfgToDB(cfg DBConfig) (DB, error)`
+- `PostgresCfgToDB(cfg DBConfig) (DB, error)`
+- `SQLiteCfgToDB(cfg DBConfig) (DB, error)`
+- `MSSQLCfgToDB(cfg DBConfig) (DB, error)`
+
+### Plugin Registry API
+
+The `plugin` package provides these functions:
+
+```go
+package plugin
+
+// Register a driver (prevents duplicate registrations)
+func Register(factory DriverFactory) error
+
+// Register a driver, panic on error (use in init())
+func MustRegister(factory DriverFactory)
+
+// Look up a registered driver by name
+func Get(driverName string) (DriverFactory, bool)
+
+// List all registered driver names
+func List() []string
+
+// Remove a driver (testing)
+func Unregister(driverName string) error
+
+// Clear all drivers (testing)
+func Clear()
+```
+
 ## Examples
 
 See the [examples](./examples) directory for complete working examples:
@@ -379,6 +514,7 @@ See the [examples](./examples) directory for complete working examples:
 - `error_handling.go` - Comprehensive error handling patterns
 - `pool_stats.go` - Connection pool monitoring
 - `raw_sql.go` - Custom SQL execution
+- [`plugin-example/`](./examples/plugin-example/) - Plugin system with CockroachDB example (register custom database drivers)
 
 ## Type Support
 

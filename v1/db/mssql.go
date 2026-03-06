@@ -22,8 +22,7 @@ import (
 //
 // Fields include authentication, network and timeout settings plus pool options.
 type MSSQLConfig struct {
-	User string // Username for authentication
-	//nolint:gosec
+	User              string        // Username for authentication
 	Password          string        // Password for authentication
 	Host              string        // Hostname or IP address
 	Port              uint16        // Port number
@@ -111,6 +110,13 @@ func mssqlCfgToDB(cfg DBConfig) (*MSSQL, error) {
 	default:
 		return nil, fmt.Errorf("unsupported mssql config type: %T", cfg)
 	}
+}
+
+// MSSQLCfgToDB is an exported version of mssqlCfgToDB for use by plugin implementations.
+// Plugin authors can use this to reuse the MSSQL driver implementation.
+// The config type must be MSSQLConfig or *MSSQLConfig.
+func MSSQLCfgToDB(cfg DBConfig) (DB, error) {
+	return mssqlCfgToDB(cfg)
 }
 
 func (m *MSSQL) PoolStats() (*PoolStatistics, error) {

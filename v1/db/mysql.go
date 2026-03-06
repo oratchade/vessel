@@ -28,8 +28,7 @@ type sqlQuerier interface {
 //
 // Fields include authentication, network, timeouts and connection pool settings.
 type MysqlConfig struct {
-	User string // Username for authentication
-	//nolint:gosec
+	User            string        // Username for authentication
 	Password        string        // Password for authentication
 	Host            string        // Hostname or IP address
 	Port            uint16        // Port number
@@ -133,6 +132,13 @@ func mysqlCfgToDB(cfg DBConfig) (*MySQL, error) {
 	default:
 		return nil, fmt.Errorf("unsupported mysql config type: %T", cfg)
 	}
+}
+
+// MySQLCfgToDB is an exported version of mysqlCfgToDB for use by plugin implementations.
+// Plugin authors can use this to reuse the MySQL driver implementation.
+// The config type must be MysqlConfig or *MysqlConfig.
+func MySQLCfgToDB(cfg DBConfig) (DB, error) {
+	return mysqlCfgToDB(cfg)
 }
 
 // PoolStats implements the DB interface method for retrieving connection pool statistics.

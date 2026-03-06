@@ -36,10 +36,9 @@ type pgQuerier interface {
 //
 // Fields include connection, pooling and application-specific settings.
 type PostgresConfig struct {
-	Host string // Database server hostname or IP
-	Port uint16 // Database server port
-	User string // Username for authentication
-	//nolint:gosec
+	Host            string        // Database server hostname or IP
+	Port            uint16        // Database server port
+	User            string        // Username for authentication
 	Password        string        // Password for authentication
 	Database        string        // Database name
 	SSLMode         string        // SSL mode (disable, require, verify-ca, verify-full)
@@ -146,6 +145,13 @@ func postgresCfgToDB(cfg DBConfig) (*Postgres, error) {
 	default:
 		return nil, fmt.Errorf("unsupported postgres config type: %T", cfg)
 	}
+}
+
+// PostgresCfgToDB is an exported version of postgresCfgToDB for use by plugin implementations.
+// Plugin authors can use this to reuse the PostgreSQL driver implementation.
+// The config type must be PostgresConfig or *PostgresConfig.
+func PostgresCfgToDB(cfg DBConfig) (DB, error) {
+	return postgresCfgToDB(cfg)
 }
 
 func (pg *Postgres) PoolStats() (*PoolStatistics, error) {

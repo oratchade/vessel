@@ -96,6 +96,13 @@ func sqliteCfgToDB(cfg DBConfig) (*SQLLite, error) {
 	}
 }
 
+// SQLiteCfgToDB is an exported version of sqliteCfgToDB for use by plugin implementations.
+// Plugin authors can use this to reuse the SQLite driver implementation.
+// The config type must be SQLiteConfig or *SQLiteConfig.
+func SQLiteCfgToDB(cfg DBConfig) (DB, error) {
+	return sqliteCfgToDB(cfg)
+}
+
 func (m *SQLLite) PoolStats() (*PoolStatistics, error) {
 	sqlDB, ok := m.querier.(*sql.DB)
 	if !ok {

@@ -12,6 +12,7 @@ import (
 	cdt "tounilab.com/db-connector/pkg/query/condition"
 	"tounilab.com/db-connector/pkg/query/definition"
 	"tounilab.com/db-connector/pkg/query/options"
+	"tounilab.com/db-connector/v1/db/plugin"
 )
 
 // ExecResult holds metadata returned by mutation statements such as INSERT,
@@ -55,9 +56,28 @@ type DBConfig interface {
 }
 
 // NewDB returns a DB implementation for the provided DBConfig.
-// It selects the concrete driver implementation based on cfg.Driver().
+// It first checks the plugin registry for custom drivers, then falls back to
+// the built-in driver implementations (MySQL, PostgreSQL, SQLite, MSSQL).
+// Custom drivers can be registered via the plugin package.
 func NewDB(cfg DBConfig, logger Logger) (DB, error) {
-	switch cfg.Driver() {
+	driverName := cfg.Driver()
+
+	// Check plugin registry first - allows custom drivers to override or extend built-in ones
+	if factory, ok := plugin.Get(driverName); ok {
+		result, err := factory.Create(context.Background(), cfg)
+		if err != nil {
+			return nil, fmt.Errorf("plugin driver %q failed: %w", driverName, err)
+		}
+		// Type assert the result to DB interface
+		db, ok := result.(DB)
+		if !ok {
+			return nil, fmt.Errorf("plugin driver %q returned invalid DB type: %T", driverName, result)
+		}
+		return db, nil
+	}
+
+	// Fall back to built-in drivers
+	switch driverName {
 	case definition.DriverMySQL:
 		return mysqlCfgToDB(cfg)
 	case definition.DriverPostgres, definition.DriverPostgresAlias:
@@ -67,7 +87,7 @@ func NewDB(cfg DBConfig, logger Logger) (DB, error) {
 	case definition.DriverMSSQL, definition.DriverMSSQLAlias:
 		return mssqlCfgToDB(cfg)
 	default:
-		return nil, fmt.Errorf("unsupported driver: %s", cfg.Driver())
+		return nil, fmt.Errorf("unsupported driver: %s", driverName)
 	}
 }
 
