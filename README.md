@@ -93,6 +93,31 @@ if err != nil {
 log.Printf("Inserted %d rows, ID: %v\n", result.RowsAffected, result.LastInsertID)
 ```
 
+### Bulk Insert (Multiple Rows)
+
+```go
+// Insert multiple rows efficiently in a single query
+data := []map[string]any{
+    {"name": "Alice", "email": "alice@example.com", "age": 28},
+    {"name": "Bob", "email": "bob@example.com", "age": 32},
+    {"name": "Charlie", "email": "charlie@example.com", "age": 25},
+}
+
+result, err := database.Inserts(ctx, "users", data, nil)
+if err != nil {
+    log.Fatal(err)
+}
+
+log.Printf("Inserted %d rows\n", result.RowsAffected)
+// Output: Inserted 3 rows
+```
+
+**Benefits of Bulk Insert:**
+
+- Single database round-trip (3 rows in 1 query vs 3 separate queries)
+- Automatic parameterization (no SQL injection risk)
+- Works identically across MySQL, PostgreSQL, SQLite, and MSSQL
+
 ### Updating Data
 
 ```go
@@ -205,18 +230,48 @@ for _, user := range users {
 }
 ```
 
+⚠️ **Important: RowsAdapter Lifecycle Management**
+
+The methods `GetRaw()`, `GetByIDRaw()`, and `QueryRaw()` return a `RowsAdapter` which you must explicitly close. This design allows you the flexibility to:
+
+- Use `db.ScanRowsTo[T]()` for type-safe scanning into structs
+- Use third-party row scanning libraries of your choice
+- Implement custom row processing logic
+
+**You are responsible for closing the RowsAdapter to prevent resource leaks.** Always use `defer` to ensure proper cleanup:
+
+```go
+rowsAdapter, err := database.GetRaw(ctx, "users", []string{"*"}, nil, nil, nil)
+if err != nil {
+    log.Fatal(err)
+}
+defer rowsAdapter.Close()  // ⚠️ REQUIRED: Always close the adapter
+
+// Now you can scan or process the rows
+users, err := db.ScanRowsTo[User](rowsAdapter)
+// ... your code
+```
+
+Failure to close the adapter may result in:
+
+- Database connection pool exhaustion
+- Memory leaks (unclosed database cursors)
+- Degraded application performance
+
 **Benefits:**
 
 - ✅ **Type safety** - Compile-time column mapping verification
 - ✅ **Zero-copy** - Efficient field scanning without intermediate allocations
 - ✅ **Null handling** - Automatic SQL.Null\* type conversion
 - ✅ **Custom queries** - Full SQL flexibility with typed results
+- ✅ **Flexibility** - Works with any row scanning approach you prefer
 
 ## Database Support
 
 | Feature               | MySQL | PostgreSQL | SQLite | MSSQL |
 | --------------------- | ----- | ---------- | ------ | ----- |
 | Basic CRUD            | ✅    | ✅         | ✅     | ✅    |
+| Bulk Insert (Inserts) | ✅    | ✅         | ✅     | ✅    |
 | Transactions          | ✅    | ✅         | ✅     | ✅    |
 | Parameterized Queries | ✅    | ✅         | ✅     | ✅    |
 | Connection Pool Stats | ✅    | ✅         | ✅     | ✅    |
@@ -258,7 +313,7 @@ database, err := db.NewDB(db.PostgresConfig{
 ### SQLite
 
 ```go
-database, err := db.NewDB(db.SQLLiteConfig{
+database, err := db.NewDB(db.SQLiteConfig{
     FilePath: "/path/to/database.db",
 }, nil)
 ```
@@ -318,6 +373,7 @@ log.Printf("Wait Duration: %v\n", stats.WaitDuration)
 See the [examples](./examples) directory for complete working examples:
 
 - `basic_crud.go` - Insert, Get, Update, Delete operations
+- `bulk_insert.go` - Efficient multi-row insertion (Inserts method)
 - `query_builder.go` - Dynamic query construction with the builder DSL
 - `transactions.go` - Multi-step transactions with automatic rollback
 - `error_handling.go` - Comprehensive error handling patterns

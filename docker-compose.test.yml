@@ -1,0 +1,92 @@
+version: "3.8"
+
+services:
+  mysql:
+    image: mysql:8.0
+    container_name: test-mysql
+    environment:
+      MYSQL_ROOT_PASSWORD: password
+      MYSQL_DATABASE: test_db
+    ports:
+      - "3306:3306"
+    volumes:
+      - ./dockerfiles/init-mysql.sql:/docker-entrypoint-initdb.d/01-schema.sql
+      - ./dockerfiles/seed-mysql.sql:/docker-entrypoint-initdb.d/02-seed.sql
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
+      timeout: 20s
+      retries: 10
+    networks:
+      - test-network
+
+  postgres:
+    image: postgres:15-alpine
+    container_name: test-postgres
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: password
+      POSTGRES_DB: test_db
+    ports:
+      - "5432:5432"
+    volumes:
+      - ./dockerfiles/init-postgres.sql:/docker-entrypoint-initdb.d/01-schema.sql
+      - ./dockerfiles/seed-postgres.sql:/docker-entrypoint-initdb.d/02-seed.sql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      timeout: 20s
+      retries: 10
+    networks:
+      - test-network
+
+  mssql:
+    image: mcr.microsoft.com/mssql/server:2022-latest
+    container_name: test-mssql
+    environment:
+      SA_PASSWORD: YourPassword123
+      ACCEPT_EULA: "Y"
+      MSSQL_SA_PASSWORD: YourPassword123
+    ports:
+      - "1433:1433"
+    volumes:
+      - ./dockerfiles/init-mssql.sql:/docker-entrypoint-initdb.d/01-schema.sql
+      - ./dockerfiles/seed-mssql.sql:/docker-entrypoint-initdb.d/02-seed.sql
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "/opt/mssql-tools/bin/sqlcmd -S localhost -U sa -P",
+          "YourPassword123",
+          "-Q",
+          "SELECT 1",
+        ]
+      timeout: 20s
+      retries: 10
+    networks:
+      - test-network
+
+  test-runner:
+    build:
+      context: .
+      dockerfile: dockerfiles/Dockerfile.test
+    container_name: db-connector-tests
+    depends_on:
+      mysql:
+        condition: service_healthy
+      postgres:
+        condition: service_healthy
+      mssql:
+        condition: service_healthy
+    environment:
+      DB_TYPE: ${DB_TYPE:-sqlite3}
+      MYSQL_DSN: "root:password@tcp(mysql:3306)/test_db?parseTime=true"
+      POSTGRES_DSN: "host=postgres user=postgres password=password dbname=test_db sslmode=disable"
+      MSSQL_DSN: "sqlserver://sa:YourPassword123@mssql:1433?database=TestDB"
+    volumes:
+      - .:/app
+    working_dir: /app
+    networks:
+      - test-network
+
+networks:
+  test-network:
+    driver: bridge

@@ -1,4 +1,4 @@
-.PHONY: test coverage cobertura cover-html cover-func tools fmt fmt-check lint deps-install deps-validate check all mocks
+.PHONY: test coverage cobertura cover-html cover-func tools fmt fmt-check lint deps-install deps-validate check all mocks integration-test integration-test-sqlite integration-test-mysql integration-test-postgres integration-test-mssql integration-test-all
 
 TEST_PKGS ?= ./...
 
@@ -84,6 +84,53 @@ cover-html: coverage
 
 cover-func: coverage
 	go tool cover -func=$(COVER_FILE) | awk '/total/ {print $$3}'
+
+# Integration tests
+.PHONY: integration-test integration-test-sqlite integration-test-mysql integration-test-postgres integration-test-mssql integration-test-all
+
+integration-test: integration-test-sqlite
+	@echo "Integration tests completed"
+
+integration-test-sqlite:
+	@echo "Running SQLite integration tests..."
+	@chmod +x scripts/run-integration-tests.sh
+	@./scripts/run-integration-tests.sh sqlite
+
+integration-test-mysql:
+	@echo "Running MySQL integration tests..."
+	@chmod +x scripts/run-integration-tests.sh
+	@docker-compose -f docker-compose.test.yml up -d mysql
+	@sleep 10
+	@DB_TYPE=mysql go test -timeout 300s -v ./tests -run "TestIntegration"
+	@docker-compose -f docker-compose.test.yml down mysql
+
+integration-test-postgres:
+	@echo "Running PostgreSQL integration tests..."
+	@chmod +x scripts/run-integration-tests.sh
+	@docker-compose -f docker-compose.test.yml up -d postgres
+	@sleep 10
+	@DB_TYPE=postgres go test -timeout 300s -v ./tests -run "TestIntegration"
+	@docker-compose -f docker-compose.test.yml down postgres
+
+integration-test-mssql:
+	@echo "Running MSSQL integration tests..."
+	@chmod +x scripts/run-integration-tests.sh
+	@docker-compose -f docker-compose.test.yml up -d mssql
+	@sleep 15
+	@DB_TYPE=sqlserver go test -timeout 300s -v ./tests -run "TestIntegration"
+	@docker-compose -f docker-compose.test.yml down mssql
+
+integration-test-all:
+	@echo "Running all integration tests..."
+	@chmod +x scripts/run-integration-tests.sh
+	@docker-compose -f docker-compose.test.yml up -d
+	@sleep 15
+	@$(MAKE) integration-test-sqlite
+	@$(MAKE) integration-test-mysql
+	@$(MAKE) integration-test-postgres
+	@$(MAKE) integration-test-mssql
+	@docker-compose -f docker-compose.test.yml down
+
 
 # Formatting
 fmt:
