@@ -2,6 +2,28 @@
 
 Brief description of the changes and their purpose.
 
+## Conventional Commits — Cheat Sheet
+
+### **Types**
+
+- **feat:** new feature
+- **fix:** bug fix
+- **docs:** documentation only
+- **style:** formatting only (no logic)
+- **refactor:** code restructuring (no behavior change)
+- **perf:** performance improvements
+- **test:** add or update tests
+- **build:** build system or dependencies
+- **ci:** CI configuration changes
+- **chore:** maintenance tasks (no src or test changes)
+- **revert:** undo a previous commit
+
+### **Extras**
+
+- **Scopes:** `feat(auth):`, `fix(ui):`
+- **Breaking change:** `feat!:`, `refactor!:`
+- **Issue reference:** `fix: handle null user #123`
+
 ## Type of Change
 
 - [ ] Bug fix (non-breaking change that fixes an issue)
@@ -37,6 +59,8 @@ Related to #(issue number)
 - [ ] All existing tests pass
 
 ## File Changes Summary
+
+<!-- List the key files changed -->
 
 <!-- List the key files changed -->
 - `file1.go` - Brief description
