@@ -27,7 +27,7 @@ func get(
 	opts *options.QueryOptions,
 	dbOpts dbOpts,
 ) ([]map[string]any, error) {
-	query, args, err := dbOpts.builder.Select(table, columns, joins, opts, conditions)
+	query, args, err := getQuery(table, columns, joins, conditions, opts, dbOpts)
 	if err != nil {
 		return nil, fmt.Errorf("failed to build select query: %w", err)
 	}
@@ -65,7 +65,7 @@ func getRaw(
 	opts *options.QueryOptions,
 	dbOpts dbOpts,
 ) (*RowsAdapter, error) {
-	query, args, err := dbOpts.builder.Select(table, columns, joins, opts, conditions)
+	query, args, err := getQuery(table, columns, joins, conditions, opts, dbOpts)
 	if err != nil {
 		return nil, fmt.Errorf("failed to build select query: %w", err)
 	}
@@ -83,6 +83,23 @@ func getRaw(
 	return ra, nil
 }
 
+// getQuery executes a SELECT query and returns the query string and arguments.
+func getQuery(
+	table string,
+	columns []string,
+	joins []cdt.Join,
+	conditions cdt.Condition,
+	opts *options.QueryOptions,
+	dbOpts dbOpts,
+) (string, []any, error) {
+	query, args, err := dbOpts.builder.Select(table, columns, joins, opts, conditions)
+	if err != nil {
+		return "", nil, fmt.Errorf("failed to build select query: %w", err)
+	}
+
+	return query, args, nil
+}
+
 // getByID executes a SELECT query filtered by ID and returns results as a slice of maps.
 func getByID(
 	ctx context.Context,
@@ -92,10 +109,7 @@ func getByID(
 	opts *options.QueryOptions,
 	dbOpts dbOpts,
 ) ([]map[string]any, error) {
-	cdt := &cdt.Expr{}
-	cdt.Column("id").Op("=").Value(id)
-
-	query, args, err := dbOpts.builder.Select(table, []string{"*"}, joins, opts, cdt)
+	query, args, err := getByIDQuery(table, id, joins, opts, dbOpts)
 	if err != nil {
 		return nil, fmt.Errorf("failed to build select query: %w", err)
 	}
@@ -132,10 +146,7 @@ func getByIDRaw(
 	opts *options.QueryOptions,
 	dbOpts dbOpts,
 ) (*RowsAdapter, error) {
-	cdt := &cdt.Expr{}
-	cdt.Column("id").Op("=").Value(id)
-
-	query, args, err := dbOpts.builder.Select(table, []string{"*"}, joins, opts, cdt)
+	query, args, err := getByIDQuery(table, id, joins, opts, dbOpts)
 	if err != nil {
 		return nil, fmt.Errorf("failed to build select query: %w", err)
 	}
@@ -153,15 +164,33 @@ func getByIDRaw(
 	return ra, nil
 }
 
+func getByIDQuery(
+	table string,
+	id any,
+	joins []cdt.Join,
+	opts *options.QueryOptions,
+	dbOpts dbOpts,
+) (string, []any, error) {
+	cdt := &cdt.Expr{}
+	cdt.Column("id").Op("=").Value(id)
+
+	query, args, err := dbOpts.builder.Select(table, []string{"*"}, joins, opts, cdt)
+	if err != nil {
+		return "", nil, fmt.Errorf("failed to build select query: %w", err)
+	}
+
+	return query, args, nil
+}
+
 // insert executes an INSERT query and returns the result with last insert ID and rows affected.
 func insert(
 	ctx context.Context,
 	table string,
 	data map[string]any,
-	_ *options.QueryOptions,
+	opts *options.QueryOptions,
 	dbOpts dbOpts,
 ) (*ExecResult, error) {
-	query, args, err := dbOpts.builder.Insert(table, data)
+	query, args, err := insertQuery(table, data, opts, dbOpts)
 	if err != nil {
 		return nil, fmt.Errorf("failed to build insert query: %w", err)
 	}
@@ -173,15 +202,29 @@ func insert(
 	return fromSQLResult(result), nil
 }
 
+func insertQuery(
+	table string,
+	data map[string]any,
+	_ *options.QueryOptions,
+	dbOpts dbOpts,
+) (string, []any, error) {
+	query, args, err := dbOpts.builder.Insert(table, data)
+	if err != nil {
+		return "", nil, fmt.Errorf("failed to build insert query: %w", err)
+	}
+
+	return query, args, nil
+}
+
 // inserts executes an INSERT query for multiple rows and returns the result with last insert ID and rows affected.
 func inserts(
 	ctx context.Context,
 	table string,
 	data []map[string]any,
-	_ *options.QueryOptions,
+	opts *options.QueryOptions,
 	dbOpts dbOpts,
 ) (*ExecResult, error) {
-	query, args, err := dbOpts.builder.Inserts(table, data)
+	query, args, err := insertsQuery(table, data, opts, dbOpts)
 	if err != nil {
 		return nil, fmt.Errorf("failed to build insert query: %w", err)
 	}
@@ -191,6 +234,20 @@ func inserts(
 		return nil, fmt.Errorf("failed to execute insert query: %w", err)
 	}
 	return fromSQLResult(result), nil
+}
+
+func insertsQuery(
+	table string,
+	data []map[string]any,
+	_ *options.QueryOptions,
+	dbOpts dbOpts,
+) (string, []any, error) {
+	query, args, err := dbOpts.builder.Inserts(table, data)
+	if err != nil {
+		return "", nil, fmt.Errorf("failed to build insert query: %w", err)
+	}
+
+	return query, args, nil
 }
 
 // update executes an UPDATE query and returns the result with rows affected.
@@ -199,10 +256,10 @@ func update(
 	table string,
 	data map[string]any,
 	conditions cdt.Condition,
-	_ *options.QueryOptions,
+	opts *options.QueryOptions,
 	dbOpts dbOpts,
 ) (*ExecResult, error) {
-	query, args, err := dbOpts.builder.Update(table, data, conditions)
+	query, args, err := updateQuery(table, data, conditions, opts, dbOpts)
 	if err != nil {
 		return nil, fmt.Errorf("failed to build update query: %w", err)
 	}
@@ -214,15 +271,30 @@ func update(
 	return fromSQLResult(result), nil
 }
 
+func updateQuery(
+	table string,
+	data map[string]any,
+	conditions cdt.Condition,
+	_ *options.QueryOptions,
+	dbOpts dbOpts,
+) (string, []any, error) {
+	query, args, err := dbOpts.builder.Update(table, data, conditions)
+	if err != nil {
+		return "", nil, fmt.Errorf("failed to build update query: %w", err)
+	}
+
+	return query, args, nil
+}
+
 // delete executes a DELETE query and returns the result with rows affected.
 func delete(
 	ctx context.Context,
 	table string,
 	conditions cdt.Condition,
-	_ *options.QueryOptions,
+	opts *options.QueryOptions,
 	dbOpts dbOpts,
 ) (*ExecResult, error) {
-	query, args, err := dbOpts.builder.Delete(table, conditions)
+	query, args, err := deleteQuery(table, conditions, opts, dbOpts)
 	if err != nil {
 		return nil, fmt.Errorf("failed to build delete query: %w", err)
 	}
@@ -232,4 +304,18 @@ func delete(
 		return nil, fmt.Errorf("failed to execute delete query: %w", err)
 	}
 	return fromSQLResult(result), nil
+}
+
+func deleteQuery(
+	table string,
+	conditions cdt.Condition,
+	_ *options.QueryOptions,
+	dbOpts dbOpts,
+) (string, []any, error) {
+	query, args, err := dbOpts.builder.Delete(table, conditions)
+	if err != nil {
+		return "", nil, fmt.Errorf("failed to build delete query: %w", err)
+	}
+
+	return query, args, nil
 }

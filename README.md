@@ -266,6 +266,64 @@ Failure to close the adapter may result in:
 - ✅ **Custom queries** - Full SQL flexibility with typed results
 - ✅ **Flexibility** - Works with any row scanning approach you prefer
 
+### Query Introspection and Performance Analysis
+
+Generate SQL queries without executing them to inspect, log, or validate before execution. This is especially useful for debugging and performance analysis:
+
+```go
+// Introspect a GET query
+query, args, err := database.GetQuery(
+    "users",
+    []string{"id", "name", "email"},
+    nil,
+    cdt.NewExpr().Column("age").Op(">").Value(25),
+    nil,
+)
+if err != nil {
+    log.Fatal(err)
+}
+
+log.Printf("Generated SQL: %s\n", query)
+log.Printf("Parameters: %v\n", args)
+// Output:
+// Generated SQL: SELECT id, name, email FROM users WHERE age > ?
+// Parameters: [25]
+
+// Execute the EXPLAIN query to analyze performance
+explainRows, err := database.Explain(context.Background(), query, args...)
+if err != nil {
+    log.Fatal(err)
+}
+defer explainRows.Close()
+
+// Read and display execution plan
+for explainRows.Next() {
+    var line string
+    if err := explainRows.Scan(&line); err != nil {
+        log.Fatal(err)
+    }
+    log.Println(line)
+}
+```
+
+**Available Query Introspection Methods:**
+
+- `GetQuery()` - Preview SELECT queries
+- `GetByIDQuery()` - Preview SELECT queries by primary key
+- `InsertQuery()` - Preview INSERT queries
+- `InsertsQuery()` - Preview bulk INSERT queries
+- `UpdateQuery()` - Preview UPDATE queries
+- `DeleteQuery()` - Preview DELETE queries
+- `Explain()` - Execute EXPLAIN to analyze query performance
+
+**Benefits:**
+
+- ✅ **SQL Injection Prevention** - When combined with xxxQuery methods, ensures safe, parameterized SQL
+- ✅ **Query Debugging** - Verify the actual SQL before execution
+- ✅ **Performance Analysis** - Run EXPLAIN to understand query execution plans
+- ✅ **Query Logging** - Log all generated SQL for audit trails
+- ✅ **Batch Operations** - Build and verify multiple queries before execution
+
 ## Database Support
 
 | Feature               | MySQL | PostgreSQL | SQLite | MSSQL |
@@ -274,6 +332,8 @@ Failure to close the adapter may result in:
 | Bulk Insert (Inserts) | ✅    | ✅         | ✅     | ✅    |
 | Transactions          | ✅    | ✅         | ✅     | ✅    |
 | Parameterized Queries | ✅    | ✅         | ✅     | ✅    |
+| Query Introspection   | ✅    | ✅         | ✅     | ✅    |
+| EXPLAIN Analysis      | ✅    | ✅         | ✅     | ✅    |
 | Connection Pool Stats | ✅    | ✅         | ✅     | ✅    |
 | Error Mapping         | ✅    | ✅         | ✅     | ✅    |
 

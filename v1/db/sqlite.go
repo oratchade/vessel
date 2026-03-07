@@ -7,7 +7,7 @@ import (
 	"fmt"
 	"time"
 
-	// Import the SQLLite driver
+	// Import the SQLITE driver
 	_ "github.com/mattn/go-sqlite3"
 	builder "tounilab.com/db-connector/internal/pkg/builder"
 	"tounilab.com/db-connector/internal/pkg/sqldialect"
@@ -17,11 +17,11 @@ import (
 	"tounilab.com/db-connector/v1/db/dberror"
 )
 
-// SQLiteConfig holds configuration for connecting to a SQLLite database.
+// SQLiteConfig holds configuration for connecting to a SQLITE database.
 //
 // Fields include file path, access mode, and connection pool settings.
 type SQLiteConfig struct {
-	FilePath        string        // Path to the SQLLite database file
+	FilePath        string        // Path to the SQLITE database file
 	CacheMode       string        // Cache mode (shared, private)
 	Mode            string        // Access mode (ro, rw, rwc, memory)
 	ForeignKeys     bool          // Enable foreign key constraints
@@ -31,16 +31,16 @@ type SQLiteConfig struct {
 	ConnMaxLifetime time.Duration // Maximum lifetime of a connection
 }
 
-// Driver returns the driver name for SQLLite databases.
+// Driver returns the driver name for SQLITE databases.
 
 func (cfg SQLiteConfig) Driver() string {
 	return definition.DriverSQLLite
 }
 
-// DSN returns the Data Source Name (DSN) for connecting to the SQLLite database.
+// DSN returns the Data Source Name (DSN) for connecting to the SQLITE database.
 // The DSN includes the following options:
 //
-// * file: the path to the SQLLite database file
+// * file: the path to the SQLITE database file
 // * cache: the cache mode (e.g., shared, private)
 // * mode: the access mode (e.g., ro, rw, rwc, memory)
 // * _foreign_keys: whether to enable foreign key constraints
@@ -52,8 +52,8 @@ func (cfg SQLiteConfig) DSN() string {
 	)
 }
 
-// SQLLite is a DB implementation for SQLite using database/sql.
-type SQLLite struct {
+// SQLITE is a DB implementation for SQLite using database/sql.
+type SQLITE struct {
 	querier sqlQuerier // Underlying sql.DB connection pool
 
 	queryBuilder builder.QueryBuilder // Query builder for constructing SQL queries
@@ -61,13 +61,13 @@ type SQLLite struct {
 	errorMapper  dberror.ErrorMapper  // Error mapper for standardizing database errors
 }
 
-// newSQLLite initializes a new SQLLite connection using the provided config.
-func newSQLLite(cfg SQLiteConfig) (*SQLLite, error) {
+// newSQLLite initializes a new SQLITE connection using the provided config.
+func newSQLLite(cfg SQLiteConfig) (*SQLITE, error) {
 	dsn := cfg.DSN()
 
 	db, err := sql.Open("sqlite3", dsn)
 	if err != nil {
-		return nil, fmt.Errorf("failed to open SQLLite connection: %w", err)
+		return nil, fmt.Errorf("failed to open SQLITE connection: %w", err)
 	}
 
 	db.SetMaxOpenConns(cfg.MaxOpenConns)
@@ -75,17 +75,17 @@ func newSQLLite(cfg SQLiteConfig) (*SQLLite, error) {
 	db.SetConnMaxLifetime(cfg.ConnMaxLifetime)
 
 	if err := db.Ping(); err != nil {
-		return nil, fmt.Errorf("failed to ping SQLLite: %w", err)
+		return nil, fmt.Errorf("failed to ping SQLITE: %w", err)
 	}
 
-	return &SQLLite{
+	return &SQLITE{
 		querier:      db,
 		queryBuilder: builder.NewSQLiteQueryBuilder(sqldialect.MySQLDialect{}),
 		errorMapper:  dberror.GetMapper(definition.DriverSQLLite),
 	}, nil
 }
 
-func sqliteCfgToDB(cfg DBConfig) (*SQLLite, error) {
+func sqliteCfgToDB(cfg DBConfig) (*SQLITE, error) {
 	switch c := cfg.(type) {
 	case SQLiteConfig:
 		return newSQLLite(c)
@@ -103,7 +103,7 @@ func SQLiteCfgToDB(cfg DBConfig) (DB, error) {
 	return sqliteCfgToDB(cfg)
 }
 
-func (m *SQLLite) PoolStats() (*PoolStatistics, error) {
+func (m *SQLITE) PoolStats() (*PoolStatistics, error) {
 	sqlDB, ok := m.querier.(*sql.DB)
 	if !ok {
 		return nil, fmt.Errorf("sqlite.PoolStats: underlying db is not *sql.DB")
@@ -123,7 +123,7 @@ func (m *SQLLite) PoolStats() (*PoolStatistics, error) {
 	}, nil
 }
 
-func (m *SQLLite) Ping(ctx context.Context) error {
+func (m *SQLITE) Ping(ctx context.Context) error {
 	sqlDB, ok := m.querier.(*sql.DB)
 	if !ok {
 		return fmt.Errorf("sqlite.Ping: underlying db is not *sql.DB")
@@ -135,7 +135,7 @@ func (m *SQLLite) Ping(ctx context.Context) error {
 	return nil
 }
 
-func (m *SQLLite) Begin(ctx context.Context) (Tx, error) {
+func (m *SQLITE) Begin(ctx context.Context) (Tx, error) {
 	sqlDB, ok := m.querier.(*sql.DB)
 	if !ok {
 		return nil, fmt.Errorf("sqlite.Begin: underlying db is not *sql.DB")
@@ -145,7 +145,7 @@ func (m *SQLLite) Begin(ctx context.Context) (Tx, error) {
 		return nil, fmt.Errorf("sqlite.Begin: failed to begin transaction: %w", err)
 	}
 
-	return &SQLLite{
+	return &SQLITE{
 		querier: t,
 
 		queryBuilder: m.queryBuilder,
@@ -153,7 +153,23 @@ func (m *SQLLite) Begin(ctx context.Context) (Tx, error) {
 	}, nil
 }
 
-func (m *SQLLite) Get(
+// GetQuery builds the SELECT query without executing it.
+func (m *SQLITE) GetQuery(
+	table string,
+	columns []string,
+	joins []cdt.Join,
+	conditions cdt.Condition,
+	opts *options.QueryOptions,
+) (string, []any, error) {
+	o := dbOpts{
+		builder: m.queryBuilder,
+		querier: m.querier,
+		logger:  m.logger,
+	}
+	return getQuery(table, columns, joins, conditions, opts, o)
+}
+
+func (m *SQLITE) Get(
 	ctx context.Context,
 	table string,
 	columns []string,
@@ -169,7 +185,7 @@ func (m *SQLLite) Get(
 	return get(ctx, table, columns, joins, conditions, opts, o)
 }
 
-func (m *SQLLite) GetRaw(
+func (m *SQLITE) GetRaw(
 	ctx context.Context,
 	table string,
 	columns []string,
@@ -185,7 +201,22 @@ func (m *SQLLite) GetRaw(
 	return getRaw(ctx, table, columns, joins, conditions, opts, o)
 }
 
-func (m *SQLLite) GetByID(
+// GetByIDQuery builds the SELECT by ID query without executing it.
+func (m *SQLITE) GetByIDQuery(
+	table string,
+	id any,
+	joins []cdt.Join,
+	opts *options.QueryOptions,
+) (string, []any, error) {
+	o := dbOpts{
+		builder: m.queryBuilder,
+		querier: m.querier,
+		logger:  m.logger,
+	}
+	return getByIDQuery(table, id, joins, opts, o)
+}
+
+func (m *SQLITE) GetByID(
 	ctx context.Context,
 	table string,
 	id any,
@@ -200,7 +231,7 @@ func (m *SQLLite) GetByID(
 	return getByID(ctx, table, id, joins, opts, o)
 }
 
-func (m *SQLLite) GetByIDRaw(
+func (m *SQLITE) GetByIDRaw(
 	ctx context.Context,
 	table string,
 	id any,
@@ -215,7 +246,21 @@ func (m *SQLLite) GetByIDRaw(
 	return getByIDRaw(ctx, table, id, joins, opts, o)
 }
 
-func (m *SQLLite) Insert(
+// InsertQuery builds the INSERT query without executing it.
+func (m *SQLITE) InsertQuery(
+	table string,
+	data map[string]any,
+	opts *options.QueryOptions,
+) (string, []any, error) {
+	o := dbOpts{
+		builder: m.queryBuilder,
+		querier: m.querier,
+		logger:  m.logger,
+	}
+	return insertQuery(table, data, opts, o)
+}
+
+func (m *SQLITE) Insert(
 	ctx context.Context,
 	table string,
 	data map[string]any,
@@ -229,7 +274,21 @@ func (m *SQLLite) Insert(
 	return insert(ctx, table, data, opts, o)
 }
 
-func (m *SQLLite) Inserts(
+// InsertsQuery builds the INSERT query for multiple rows without executing it.
+func (m *SQLITE) InsertsQuery(
+	table string,
+	data []map[string]any,
+	opts *options.QueryOptions,
+) (string, []any, error) {
+	o := dbOpts{
+		builder: m.queryBuilder,
+		querier: m.querier,
+		logger:  m.logger,
+	}
+	return insertsQuery(table, data, opts, o)
+}
+
+func (m *SQLITE) Inserts(
 	ctx context.Context,
 	table string,
 	data []map[string]any,
@@ -243,7 +302,22 @@ func (m *SQLLite) Inserts(
 	return inserts(ctx, table, data, opts, o)
 }
 
-func (m *SQLLite) Update(
+// UpdateQuery builds the UPDATE query without executing it.
+func (m *SQLITE) UpdateQuery(
+	table string,
+	data map[string]any,
+	conditions cdt.Condition,
+	opts *options.QueryOptions,
+) (string, []any, error) {
+	o := dbOpts{
+		builder: m.queryBuilder,
+		querier: m.querier,
+		logger:  m.logger,
+	}
+	return updateQuery(table, data, conditions, opts, o)
+}
+
+func (m *SQLITE) Update(
 	ctx context.Context,
 	table string,
 	data map[string]any,
@@ -258,7 +332,21 @@ func (m *SQLLite) Update(
 	return update(ctx, table, data, conditions, opts, o)
 }
 
-func (m *SQLLite) Delete(
+// DeleteQuery builds the DELETE query without executing it.
+func (m *SQLITE) DeleteQuery(
+	table string,
+	conditions cdt.Condition,
+	opts *options.QueryOptions,
+) (string, []any, error) {
+	o := dbOpts{
+		builder: m.queryBuilder,
+		querier: m.querier,
+		logger:  m.logger,
+	}
+	return deleteQuery(table, conditions, opts, o)
+}
+
+func (m *SQLITE) Delete(
 	ctx context.Context,
 	table string,
 	conditions cdt.Condition,
@@ -272,7 +360,7 @@ func (m *SQLLite) Delete(
 	return delete(ctx, table, conditions, opts, o)
 }
 
-func (m *SQLLite) Query(
+func (m *SQLITE) Query(
 	ctx context.Context,
 	query string,
 	args ...any,
@@ -297,7 +385,7 @@ func (m *SQLLite) Query(
 	return scanRows(rows, cols)
 }
 
-func (m *SQLLite) QueryRaw(ctx context.Context, query string, args ...any) (*RowsAdapter, error) {
+func (m *SQLITE) QueryRaw(ctx context.Context, query string, args ...any) (*RowsAdapter, error) {
 	rows, err := m.querier.QueryContext(ctx, query, args...)
 	if err != nil {
 		return nil, fmt.Errorf("sqlite.QueryRaw: failed to execute query: %w", m.errorMapper.MapError(err))
@@ -310,7 +398,7 @@ func (m *SQLLite) QueryRaw(ctx context.Context, query string, args ...any) (*Row
 	return ra, nil
 }
 
-func (m *SQLLite) Exec(
+func (m *SQLITE) Exec(
 	ctx context.Context,
 	query string,
 	values ...any,
@@ -322,7 +410,20 @@ func (m *SQLLite) Exec(
 	return fromSQLResult(result), nil
 }
 
-func (m *SQLLite) WithTransaction(ctx context.Context, fn func(tx Tx) error) error {
+func (m *SQLITE) Explain(
+	ctx context.Context,
+	query string,
+	args ...any,
+) (*RowsAdapter, error) {
+	explainQuery := "EXPLAIN QUERY PLAN " + query
+	rows, err := m.QueryRaw(ctx, explainQuery, args...)
+	if err != nil {
+		return nil, fmt.Errorf("sqlite.Explain: failed to execute explain query: %w", err)
+	}
+	return rows, nil
+}
+
+func (m *SQLITE) WithTransaction(ctx context.Context, fn func(tx Tx) error) error {
 	tx, err := m.Begin(ctx)
 	if err != nil {
 		return fmt.Errorf("sqlite.WithTransaction: failed to begin transaction: %w", err)
@@ -356,8 +457,8 @@ func (m *SQLLite) WithTransaction(ctx context.Context, fn func(tx Tx) error) err
 	return err
 }
 
-// Close closes the SQLLite database connection.
-func (m *SQLLite) Close() error {
+// Close closes the SQLITE database connection.
+func (m *SQLITE) Close() error {
 	if m.querier == nil {
 		return nil
 	}
@@ -372,7 +473,7 @@ func (m *SQLLite) Close() error {
 	return nil
 }
 
-func (m *SQLLite) Commit(_ context.Context) error {
+func (m *SQLITE) Commit(_ context.Context) error {
 	sqlTX, ok := m.querier.(*sql.Tx)
 	if !ok {
 		return fmt.Errorf("sqlite.Commit: underlying db is not *sql.Tx")
@@ -383,7 +484,7 @@ func (m *SQLLite) Commit(_ context.Context) error {
 	return nil
 }
 
-func (m *SQLLite) Rollback(_ context.Context) error {
+func (m *SQLITE) Rollback(_ context.Context) error {
 	sqlTX, ok := m.querier.(*sql.Tx)
 	if !ok {
 		return fmt.Errorf("sqlite.Rollback: underlying db is not *sql.Tx")

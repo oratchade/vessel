@@ -201,6 +201,21 @@ func (pg *Postgres) Begin(ctx context.Context) (Tx, error) {
 	}, nil
 }
 
+func (pg *Postgres) GetQuery(
+	table string,
+	columns []string,
+	joins []cdt.Join,
+	conditions cdt.Condition,
+	opts *options.QueryOptions,
+) (string, []any, error) {
+	query, args, err := pg.queryBuilder.Select(table, columns, joins, opts, conditions)
+	if err != nil {
+		return "", nil, fmt.Errorf("postgres.Get: failed to build select query: %w", err)
+	}
+
+	return query, args, nil
+}
+
 func (pg *Postgres) Get(
 	ctx context.Context,
 	table string,
@@ -254,6 +269,23 @@ func (pg *Postgres) GetRaw(
 	}
 
 	return ra, nil
+}
+
+func (pg *Postgres) GetByIDQuery(
+	table string,
+	id any,
+	joins []cdt.Join,
+	opts *options.QueryOptions,
+) (string, []any, error) {
+	cdt := &cdt.Expr{}
+	cdt.Column("id").Op("=").Value(id)
+
+	query, args, err := pg.queryBuilder.Select(table, []string{"*"}, joins, opts, cdt)
+	if err != nil {
+		return "", nil, fmt.Errorf("postgres.GetByID: failed to build select query: %w", err)
+	}
+
+	return query, args, nil
 }
 
 func (pg *Postgres) GetByID(
@@ -315,6 +347,19 @@ func (pg *Postgres) GetByIDRaw(
 	return ra, nil
 }
 
+func (pg *Postgres) InsertQuery(
+	table string,
+	data map[string]any,
+	opts *options.QueryOptions,
+) (string, []any, error) {
+	query, args, err := pg.queryBuilder.Insert(table, data)
+	if err != nil {
+		return "", nil, fmt.Errorf("postgres.Insert: failed to build insert query: %w", err)
+	}
+
+	return query, args, nil
+}
+
 func (pg *Postgres) Insert(
 	ctx context.Context,
 	table string,
@@ -331,6 +376,19 @@ func (pg *Postgres) Insert(
 		return nil, fmt.Errorf("postgres.Insert: failed to execute insert query: %w", err)
 	}
 	return fromCommandTag(result), nil
+}
+
+func (pg *Postgres) InsertsQuery(
+	table string,
+	data []map[string]any,
+	opts *options.QueryOptions,
+) (string, []any, error) {
+	query, args, err := pg.queryBuilder.Inserts(table, data)
+	if err != nil {
+		return "", nil, fmt.Errorf("postgres.Inserts: failed to build insert query: %w", err)
+	}
+
+	return query, args, nil
 }
 
 func (pg *Postgres) Inserts(
@@ -351,6 +409,20 @@ func (pg *Postgres) Inserts(
 	return fromCommandTag(result), nil
 }
 
+func (pg *Postgres) UpdateQuery(
+	table string,
+	data map[string]any,
+	conditions cdt.Condition,
+	opts *options.QueryOptions,
+) (string, []any, error) {
+	query, args, err := pg.queryBuilder.Update(table, data, conditions)
+	if err != nil {
+		return "", nil, fmt.Errorf("postgres.Update: failed to build update query: %w", err)
+	}
+
+	return query, args, nil
+}
+
 func (pg *Postgres) Update(
 	ctx context.Context,
 	table string,
@@ -368,6 +440,19 @@ func (pg *Postgres) Update(
 		return nil, fmt.Errorf("postgres.Update: failed to execute update query: %w", err)
 	}
 	return fromCommandTag(result), nil
+}
+
+func (pg *Postgres) DeleteQuery(
+	table string,
+	conditions cdt.Condition,
+	opts *options.QueryOptions,
+) (string, []any, error) {
+	query, args, err := pg.queryBuilder.Delete(table, conditions)
+	if err != nil {
+		return "", nil, fmt.Errorf("postgres.Delete: failed to build delete query: %w", err)
+	}
+
+	return query, args, nil
 }
 
 func (pg *Postgres) Delete(
@@ -433,6 +518,19 @@ func (pg *Postgres) Exec(
 		return nil, fmt.Errorf("postgres.Exec: failed to execute query: %w", pg.errorMapper.MapError(err))
 	}
 	return fromCommandTag(result), nil
+}
+
+func (pg *Postgres) Explain(
+	ctx context.Context,
+	query string,
+	args ...any,
+) (*RowsAdapter, error) {
+	explainQuery := "EXPLAIN " + query
+	rows, err := pg.QueryRaw(ctx, explainQuery, args...)
+	if err != nil {
+		return nil, fmt.Errorf("postgres.Explain: failed to execute explain query: %w", err)
+	}
+	return rows, nil
 }
 
 func (pg *Postgres) WithTransaction(ctx context.Context, fn func(tx Tx) error) error {

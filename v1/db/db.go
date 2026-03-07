@@ -248,6 +248,17 @@ type DBActions interface {
 	//   error: Error if the query fails.
 	Query(ctx context.Context, query string, args ...any) ([]map[string]any, error)
 
+	// QueryRaw executes a raw SQL query and returns a RowsAdapter for streaming access to result rows,
+	// without materializing all rows into memory. This is useful for large result sets.
+	//
+	// Parameters:
+	//   ctx: Context for cancellation and deadlines.
+	//   query: Raw SQL query string.
+	//   args: Arguments for parameterized query.
+	//
+	// Returns:
+	//   *RowsAdapter: Raw row adapter for streaming result access.
+	//   error: Error if the query fails.
 	QueryRaw(ctx context.Context, query string, args ...any) (*RowsAdapter, error)
 
 	// Exec executes a raw SQL statement (insert, update, delete, etc.), with optional query options.
@@ -263,6 +274,147 @@ type DBActions interface {
 	Exec(ctx context.Context, query string, args ...any) (*ExecResult, error)
 }
 
+//go:generate mockgen -source=db.go -destination=db_mocks.go -package=db DBQueries
+
+// DBQueries provides access to the SQL queries that would be executed by mutation and query operations,
+// without actually executing them. This is useful for query introspection, logging, validation,
+// and preview purposes.
+type DBQueries interface {
+	// GetQuery constructs and returns the SQL SELECT query and arguments that would be executed by Get,
+	// without actually executing the query. This allows callers to inspect or log the query before execution.
+	//
+	// Parameters:
+	//   table: Name of the main table to query.
+	//   columns: List of columns to select.
+	//   joins: Slice of Join structs describing SQL JOIN clauses.
+	//   conditions: Query conditions for filtering results.
+	//   opts: Optional query parameters (limit, offset, order, etc.).
+	//
+	// Returns:
+	//   string: The SQL query string.
+	//   []any: The query arguments/parameters.
+	//   error: Error if the query cannot be built.
+	GetQuery(
+		table string,
+		columns []string,
+		joins []cdt.Join,
+		conditions cdt.Condition,
+		opts *options.QueryOptions,
+	) (string, []any, error)
+
+	// GetByIDQuery constructs and returns the SQL SELECT query and arguments that would be executed by GetByID,
+	// without actually executing the query. This allows callers to inspect or log the query before execution.
+	//
+	// Parameters:
+	//   table: Name of the main table to query.
+	//   id: Value of the primary key.
+	//   joins: Slice of Join structs describing SQL JOIN clauses.
+	//   opts: Optional query parameters (limit, offset, order, etc.).
+	//
+	// Returns:
+	//   string: The SQL query string.
+	//   []any: The query arguments/parameters.
+	//   error: Error if the query cannot be built.
+	GetByIDQuery(
+		table string,
+		id any,
+		joins []cdt.Join,
+		opts *options.QueryOptions,
+	) (string, []any, error)
+
+	// InsertQuery constructs and returns the SQL INSERT query and arguments that would be executed by Insert,
+	// without actually executing the query. This allows callers to inspect or log the query before execution.
+	//
+	// Parameters:
+	//   table: Name of the table to insert into.
+	//   data: Map of column names to values for the new row.
+	//   opts: Optional query parameters (e.g., returning columns).
+	//
+	// Returns:
+	//   string: The SQL query string.
+	//   []any: The query arguments/parameters.
+	//   error: Error if the query cannot be built.
+	InsertQuery(
+		table string,
+		data map[string]any,
+		opts *options.QueryOptions,
+	) (string, []any, error)
+
+	// InsertsQuery constructs and returns the SQL INSERT query and arguments that would be executed by Inserts,
+	// without actually executing the query. This allows callers to inspect or log the query before execution.
+	//
+	// Parameters:
+	//   table: Name of the table to insert into.
+	//   data: Slice of maps, each representing a row to insert with column names as keys and values as values.
+	//   opts: Optional query parameters (e.g., returning columns).
+	//
+	// Returns:
+	//   string: The SQL query string.
+	//   []any: The query arguments/parameters.
+	//   error: Error if the query cannot be built.
+	InsertsQuery(
+		table string,
+		data []map[string]any,
+		opts *options.QueryOptions,
+	) (string, []any, error)
+
+	// UpdateQuery constructs and returns the SQL UPDATE query and arguments that would be executed by Update,
+	// without actually executing the query. This allows callers to inspect or log the query before execution.
+	//
+	// Parameters:
+	//   table: Name of the table to update.
+	//   data: Map of column names to new values.
+	//   conditions: Query conditions to select rows to update.
+	//   opts: Optional query parameters (limit, order, etc.).
+	//
+	// Returns:
+	//   string: The SQL query string.
+	//   []any: The query arguments/parameters.
+	//   error: Error if the query cannot be built.
+	UpdateQuery(
+		table string,
+		data map[string]any,
+		conditions cdt.Condition,
+		opts *options.QueryOptions,
+	) (string, []any, error)
+
+	// DeleteQuery constructs and returns the SQL DELETE query and arguments that would be executed by Delete,
+	// without actually executing the query. This allows callers to inspect or log the query before execution.
+	//
+	// Parameters:
+	//   table: Name of the table to delete from.
+	//   conditions: Query conditions to select rows to delete.
+	//   opts: Optional query parameters (limit, order, etc.).
+	//
+	// Returns:
+	//   string: The SQL query string.
+	//   []any: The query arguments/parameters.
+	//   error: Error if the query cannot be built.
+	DeleteQuery(
+		table string,
+		conditions cdt.Condition,
+		opts *options.QueryOptions,
+	) (string, []any, error)
+
+	// Explain executes an EXPLAIN query on the provided SQL query and returns execution plan details.
+	// This is useful for analyzing query performance and understanding how the database executes the query.
+	// The query parameter should be generated via one of the xxxQuery methods to ensure proper SQL construction.
+	//
+	// Parameters:
+	//   ctx: Context for cancellation and deadlines.
+	//   query: SQL query string (commonly generated via GetQuery, InsertQuery, etc.).
+	//   args: Arguments for parameterized query (from the xxxQuery method).
+	//
+	// Returns:
+	//   *RowsAdapter: Raw adapter containing execution plan rows.
+	//   error: Error if the explain query fails.
+	Explain(
+		ctx context.Context,
+		query string,
+		args ...any,
+	) (*RowsAdapter, error)
+}
+
 //go:generate mockgen -source=db.go -destination=db_mocks.go -package=db DB
 
 // DB represents a database connection interface.
@@ -270,6 +422,7 @@ type DBActions interface {
 // Now supports SQL joins via the joins parameter and accepts options.QueryOptions for extensibility.
 type DB interface {
 	DBActions
+	DBQueries
 
 	// Ping checks the database connection.
 	//
@@ -324,6 +477,7 @@ type DB interface {
 // Tx represents a database transaction. All methods accept context so deadlines and cancellations propagate.
 type Tx interface {
 	DBActions
+	DBQueries
 
 	// Commit commits the transaction.
 	//

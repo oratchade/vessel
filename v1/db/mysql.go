@@ -194,6 +194,22 @@ func (m *MySQL) Begin(ctx context.Context) (Tx, error) {
 	}, nil
 }
 
+// GetQuery builds the SELECT query without executing it.
+func (m *MySQL) GetQuery(
+	table string,
+	columns []string,
+	joins []cdt.Join,
+	conditions cdt.Condition,
+	opts *options.QueryOptions,
+) (string, []any, error) {
+	o := dbOpts{
+		builder: m.queryBuilder,
+		querier: m.querier,
+		logger:  m.logger,
+	}
+	return getQuery(table, columns, joins, conditions, opts, o)
+}
+
 // Get implements the DBActions interface method to retrieve multiple rows as maps.
 func (m *MySQL) Get(
 	ctx context.Context,
@@ -228,6 +244,21 @@ func (m *MySQL) GetRaw(
 	return getRaw(ctx, table, columns, joins, conditions, opts, o)
 }
 
+// GetByIDQuery builds the SELECT by ID query without executing it.
+func (m *MySQL) GetByIDQuery(
+	table string,
+	id any,
+	joins []cdt.Join,
+	opts *options.QueryOptions,
+) (string, []any, error) {
+	o := dbOpts{
+		builder: m.queryBuilder,
+		querier: m.querier,
+		logger:  m.logger,
+	}
+	return getByIDQuery(table, id, joins, opts, o)
+}
+
 // GetByID implements the DBActions interface method to retrieve a row by primary key.
 func (m *MySQL) GetByID(
 	ctx context.Context,
@@ -260,6 +291,20 @@ func (m *MySQL) GetByIDRaw(
 	return getByIDRaw(ctx, table, id, joins, opts, o)
 }
 
+// InsertQuery builds the INSERT query without executing it.
+func (m *MySQL) InsertQuery(
+	table string,
+	data map[string]any,
+	opts *options.QueryOptions,
+) (string, []any, error) {
+	o := dbOpts{
+		builder: m.queryBuilder,
+		querier: m.querier,
+		logger:  m.logger,
+	}
+	return insertQuery(table, data, opts, o)
+}
+
 // Insert implements the DBActions interface method to insert a new row.
 func (m *MySQL) Insert(
 	ctx context.Context,
@@ -273,6 +318,20 @@ func (m *MySQL) Insert(
 		logger:  m.logger,
 	}
 	return insert(ctx, table, data, opts, o)
+}
+
+// InsertsQuery builds the INSERT query for multiple rows without executing it.
+func (m *MySQL) InsertsQuery(
+	table string,
+	data []map[string]any,
+	opts *options.QueryOptions,
+) (string, []any, error) {
+	o := dbOpts{
+		builder: m.queryBuilder,
+		querier: m.querier,
+		logger:  m.logger,
+	}
+	return insertsQuery(table, data, opts, o)
 }
 
 // Inserts implements the DBActions interface method to insert multiple new rows.
@@ -290,6 +349,21 @@ func (m *MySQL) Inserts(
 	return inserts(ctx, table, data, opts, o)
 }
 
+// UpdateQuery builds the UPDATE query without executing it.
+func (m *MySQL) UpdateQuery(
+	table string,
+	data map[string]any,
+	conditions cdt.Condition,
+	opts *options.QueryOptions,
+) (string, []any, error) {
+	o := dbOpts{
+		builder: m.queryBuilder,
+		querier: m.querier,
+		logger:  m.logger,
+	}
+	return updateQuery(table, data, conditions, opts, o)
+}
+
 // Update implements the DBActions interface method to update existing rows.
 func (m *MySQL) Update(
 	ctx context.Context,
@@ -304,6 +378,20 @@ func (m *MySQL) Update(
 		logger:  m.logger,
 	}
 	return update(ctx, table, data, conditions, opts, o)
+}
+
+// DeleteQuery builds the DELETE query without executing it.
+func (m *MySQL) DeleteQuery(
+	table string,
+	conditions cdt.Condition,
+	opts *options.QueryOptions,
+) (string, []any, error) {
+	o := dbOpts{
+		builder: m.queryBuilder,
+		querier: m.querier,
+		logger:  m.logger,
+	}
+	return deleteQuery(table, conditions, opts, o)
 }
 
 // Delete implements the DBActions interface method to delete rows.
@@ -372,6 +460,19 @@ func (m *MySQL) Exec(
 		return nil, fmt.Errorf("mysql.Exec: failed to execute query: %w", m.errorMapper.MapError(err))
 	}
 	return fromSQLResult(result), nil
+}
+
+func (m *MySQL) Explain(
+	ctx context.Context,
+	query string,
+	args ...any,
+) (*RowsAdapter, error) {
+	explainQuery := "EXPLAIN " + query
+	rows, err := m.QueryRaw(ctx, explainQuery, args...)
+	if err != nil {
+		return nil, fmt.Errorf("mysql.Explain: failed to execute explain query: %w", err)
+	}
+	return rows, nil
 }
 
 // WithTransaction implements the DB interface method to execute a function within a database transaction.

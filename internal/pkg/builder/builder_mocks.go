@@ -67,6 +67,22 @@ func (mr *MockQueryBuilderMockRecorder) Insert(table, data interface{}) *gomock.
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Insert", reflect.TypeOf((*MockQueryBuilder)(nil).Insert), table, data)
 }
 
+// Inserts mocks base method.
+func (m *MockQueryBuilder) Inserts(table string, data []map[string]any) (string, []any, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "Inserts", table, data)
+	ret0, _ := ret[0].(string)
+	ret1, _ := ret[1].([]any)
+	ret2, _ := ret[2].(error)
+	return ret0, ret1, ret2
+}
+
+// Inserts indicates an expected call of Inserts.
+func (mr *MockQueryBuilderMockRecorder) Inserts(table, data interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Inserts", reflect.TypeOf((*MockQueryBuilder)(nil).Inserts), table, data)
+}
+
 // Select mocks base method.
 func (m *MockQueryBuilder) Select(table string, columns []string, joins []condition.Join, opts *options.QueryOptions, cond condition.Condition) (string, []any, error) {
 	m.ctrl.T.Helper()

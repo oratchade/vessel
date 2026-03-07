@@ -169,6 +169,21 @@ func (m *MSSQL) Begin(ctx context.Context) (Tx, error) {
 	}, nil
 }
 
+func (m *MSSQL) GetQuery(
+	table string,
+	columns []string,
+	joins []cdt.Join,
+	conditions cdt.Condition,
+	opts *options.QueryOptions,
+) (string, []any, error) {
+	o := dbOpts{
+		builder: m.queryBuilder,
+		querier: m.querier,
+		logger:  m.logger,
+	}
+	return getQuery(table, columns, joins, conditions, opts, o)
+}
+
 func (m *MSSQL) Get(
 	ctx context.Context,
 	table string,
@@ -201,6 +216,20 @@ func (m *MSSQL) GetRaw(
 	return getRaw(ctx, table, columns, joins, conditions, opts, o)
 }
 
+func (m *MSSQL) GetByIDQuery(
+	table string,
+	id any,
+	joins []cdt.Join,
+	opts *options.QueryOptions,
+) (string, []any, error) {
+	o := dbOpts{
+		builder: m.queryBuilder,
+		querier: m.querier,
+		logger:  m.logger,
+	}
+	return getByIDQuery(table, id, joins, opts, o)
+}
+
 func (m *MSSQL) GetByID(
 	ctx context.Context,
 	table string,
@@ -231,6 +260,19 @@ func (m *MSSQL) GetByIDRaw(
 	return getByIDRaw(ctx, table, id, joins, opts, o)
 }
 
+func (m *MSSQL) InsertQuery(
+	table string,
+	data map[string]any,
+	opts *options.QueryOptions,
+) (string, []any, error) {
+	o := dbOpts{
+		builder: m.queryBuilder,
+		querier: m.querier,
+		logger:  m.logger,
+	}
+	return insertQuery(table, data, opts, o)
+}
+
 func (m *MSSQL) Insert(
 	ctx context.Context,
 	table string,
@@ -243,6 +285,19 @@ func (m *MSSQL) Insert(
 		logger:  m.logger,
 	}
 	return insert(ctx, table, data, opts, o)
+}
+
+func (m *MSSQL) InsertsQuery(
+	table string,
+	data []map[string]any,
+	opts *options.QueryOptions,
+) (string, []any, error) {
+	o := dbOpts{
+		builder: m.queryBuilder,
+		querier: m.querier,
+		logger:  m.logger,
+	}
+	return insertsQuery(table, data, opts, o)
 }
 
 func (m *MSSQL) Inserts(
@@ -259,6 +314,20 @@ func (m *MSSQL) Inserts(
 	return inserts(ctx, table, data, opts, o)
 }
 
+func (m *MSSQL) UpdateQuery(
+	table string,
+	data map[string]any,
+	conditions cdt.Condition,
+	opts *options.QueryOptions,
+) (string, []any, error) {
+	o := dbOpts{
+		builder: m.queryBuilder,
+		querier: m.querier,
+		logger:  m.logger,
+	}
+	return updateQuery(table, data, conditions, opts, o)
+}
+
 func (m *MSSQL) Update(
 	ctx context.Context,
 	table string,
@@ -272,6 +341,19 @@ func (m *MSSQL) Update(
 		logger:  m.logger,
 	}
 	return update(ctx, table, data, conditions, opts, o)
+}
+
+func (m *MSSQL) DeleteQuery(
+	table string,
+	conditions cdt.Condition,
+	opts *options.QueryOptions,
+) (string, []any, error) {
+	o := dbOpts{
+		builder: m.queryBuilder,
+		querier: m.querier,
+		logger:  m.logger,
+	}
+	return deleteQuery(table, conditions, opts, o)
 }
 
 func (m *MSSQL) Delete(
@@ -337,6 +419,19 @@ func (m *MSSQL) Exec(
 		return nil, fmt.Errorf("mssql.Exec: failed to execute query: %w", m.errorMapper.MapError(err))
 	}
 	return fromSQLResult(result), nil
+}
+
+func (m *MSSQL) Explain(
+	ctx context.Context,
+	query string,
+	args ...any,
+) (*RowsAdapter, error) {
+	explainQuery := "SET STATISTICS SHOWPLAN_TEXT ON; " + query + " SET STATISTICS SHOWPLAN_TEXT OFF;"
+	rows, err := m.QueryRaw(ctx, explainQuery, args...)
+	if err != nil {
+		return nil, fmt.Errorf("mssql.Explain: failed to execute explain query: %w", err)
+	}
+	return rows, nil
 }
 
 func (m *MSSQL) WithTransaction(ctx context.Context, fn func(tx Tx) error) error {
