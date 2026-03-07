@@ -154,6 +154,12 @@ mocks:
 	@go generate ./...
 	@echo "Mocks generated successfully!"
 
+# Clean cache to ensure clean test runs, especially important for coverage and integration tests
+clean:
+	@echo "Cleaning cache..."
+	@go clean -cache
+	@go clean -testcache
+	@echo "Cache cleaned successfully!"
 
 # Dependencies
 deps-install:

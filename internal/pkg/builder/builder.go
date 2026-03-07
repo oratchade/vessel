@@ -3,6 +3,7 @@ package builder
 
 import (
 	"fmt"
+	"sort"
 	"strings"
 
 	cdt "tounilab.com/db-connector/pkg/query/condition"
@@ -190,20 +191,32 @@ func insert(dialect cdt.SQLDialect, table string, data map[string]any) (string, 
 		return "", nil, fmt.Errorf("builder.insert: no data provided for insertion")
 	}
 
-	index := 1
-	columns, placeholders, values := make([]string, 0), make([]string, 0), make([]any, 0)
+	// Extract and sort column names for deterministic ordering
+	columns := make([]string, 0, len(data))
+	for col := range data {
+		columns = append(columns, col)
+	}
+	sort.Strings(columns)
 
-	for col, val := range data {
-		columns = append(columns, dialect.QuoteIdentifier(col))
+	index := 1
+	placeholders, values := make([]string, 0), make([]any, 0)
+
+	for _, col := range columns {
 		placeholders = append(placeholders, dialect.Placeholder(index))
-		values = append(values, val)
+		values = append(values, data[col])
 		index++
+	}
+
+	// Quote column names
+	var quotedColumns []string
+	for _, col := range columns {
+		quotedColumns = append(quotedColumns, dialect.QuoteIdentifier(col))
 	}
 
 	return fmt.Sprintf(
 		"INSERT INTO %s (%s) VALUES (%s);",
 		dialect.QuoteIdentifier(table),
-		strings.Join(columns, ", "),
+		strings.Join(quotedColumns, ", "),
 		strings.Join(placeholders, ", "),
 	), values, nil
 }
@@ -214,11 +227,12 @@ func inserts(dialect cdt.SQLDialect, table string, data []map[string]any) (strin
 		return "", nil, fmt.Errorf("builder.inserts: no data provided for insertion")
 	}
 
-	// Get column names from the first row
-	var columns []string
+	// Get column names from the first row and sort them for deterministic ordering
+	columns := make([]string, 0)
 	for col := range data[0] {
 		columns = append(columns, col)
 	}
+	sort.Strings(columns)
 
 	// Build placeholders for each row
 	index := 1
@@ -271,12 +285,19 @@ func update(
 	data map[string]any,
 	cond cdt.Condition,
 ) (string, []any, error) {
+	// Extract and sort column names for deterministic ordering
+	columns := make([]string, 0, len(data))
+	for col := range data {
+		columns = append(columns, col)
+	}
+	sort.Strings(columns)
+
 	index := 1
 	sets, values := make([]string, 0), make([]any, 0)
 
-	for col, val := range data {
+	for _, col := range columns {
 		sets = append(sets, fmt.Sprintf("%s = %s", dialect.QuoteIdentifier(col), dialect.Placeholder(index)))
-		values = append(values, val)
+		values = append(values, data[col])
 		index++
 	}
 
