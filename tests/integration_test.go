@@ -689,10 +689,12 @@ func TestIntegration_RawQuery(t *testing.T) {
 			ctx := context.Background()
 
 			// Test raw query execution (basic)
-			_, err = database.QueryRaw(ctx, "SELECT id, name FROM users LIMIT 1")
+			rows, err := database.QueryRaw(ctx, "SELECT id, name FROM users LIMIT 1")
 			if err != nil {
 				t.Fatalf("QueryRaw failed: %v", err)
 			}
+
+			defer rows.Close()
 
 			// Also test with Get which will validate the query works
 			users, err := database.Get(

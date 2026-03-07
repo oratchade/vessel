@@ -101,7 +101,7 @@ func (r *RowsAdapter) Close() error {
 		}
 		return nil
 	}
-	if pgxErr := r.pgxRows.Err(); pgxErr != nil {
+	if r.pgxRows != nil {
 		r.pgxRows.Close()
 	}
 	return nil
