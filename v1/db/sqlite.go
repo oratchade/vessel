@@ -9,7 +9,12 @@ import (
 
 	// Import the SQLITE driver
 	_ "github.com/mattn/go-sqlite3"
+	"go.opentelemetry.io/otel/codes"
+	semconv "go.opentelemetry.io/otel/semconv/v1.37.0"
+	"go.opentelemetry.io/otel/trace"
+
 	builder "tounilab.com/db-connector/internal/pkg/builder"
+	oh "tounilab.com/db-connector/internal/pkg/otel"
 	"tounilab.com/db-connector/internal/pkg/sqldialect"
 	cdt "tounilab.com/db-connector/pkg/query/condition"
 	"tounilab.com/db-connector/pkg/query/definition"
@@ -124,27 +129,54 @@ func (m *SQLITE) PoolStats() (*PoolStatistics, error) {
 }
 
 func (m *SQLITE) Ping(ctx context.Context) error {
+	c, span := oh.UseTracer(ctx, "sqlite.Ping",
+		trace.WithSpanKind(trace.SpanKindClient),
+		trace.WithAttributes(
+			semconv.DBSystemNameSQLite,
+			semconv.DBOperationName("ping"),
+		))
+	defer span.End()
 	sqlDB, ok := m.querier.(*sql.DB)
 	if !ok {
-		return fmt.Errorf("sqlite.Ping: underlying db is not *sql.DB")
+		err := fmt.Errorf("sqlite.Ping: underlying db is not *sql.DB")
+		span.RecordError(err)
+		span.SetStatus(codes.Error, err.Error())
+		return err
 	}
-	err := sqlDB.PingContext(ctx)
+	err := sqlDB.PingContext(c)
 	if err != nil {
-		return fmt.Errorf("sqlite.Ping: failed to ping database: %w", err)
+		err = fmt.Errorf("sqlite.Ping: failed to ping database: %w", err)
+		span.RecordError(err)
+		span.SetStatus(codes.Error, err.Error())
+		return err
 	}
+	span.SetStatus(codes.Ok, "ping successful")
 	return nil
 }
 
 func (m *SQLITE) Begin(ctx context.Context) (Tx, error) {
+	c, span := oh.UseTracer(ctx, "sqlite.Begin",
+		trace.WithSpanKind(trace.SpanKindClient),
+		trace.WithAttributes(
+			semconv.DBSystemNameSQLite,
+			semconv.DBOperationName("begin"),
+		))
+	defer span.End()
 	sqlDB, ok := m.querier.(*sql.DB)
 	if !ok {
-		return nil, fmt.Errorf("sqlite.Begin: underlying db is not *sql.DB")
+		err := fmt.Errorf("sqlite.Begin: underlying db is not *sql.DB")
+		span.RecordError(err)
+		span.SetStatus(codes.Error, err.Error())
+		return nil, err
 	}
-	t, err := sqlDB.BeginTx(ctx, nil)
+	t, err := sqlDB.BeginTx(c, nil)
 	if err != nil {
-		return nil, fmt.Errorf("sqlite.Begin: failed to begin transaction: %w", err)
+		err := fmt.Errorf("sqlite.Begin: failed to begin transaction: %w", err)
+		span.RecordError(err)
+		span.SetStatus(codes.Error, err.Error())
+		return nil, err
 	}
-
+	span.SetStatus(codes.Ok, "transaction begun")
 	return &SQLITE{
 		querier: t,
 
@@ -177,12 +209,27 @@ func (m *SQLITE) Get(
 	conditions cdt.Condition,
 	opts *options.QueryOptions,
 ) ([]map[string]any, error) {
+	c, span := oh.UseTracer(ctx, "sqlite.Get",
+		trace.WithSpanKind(trace.SpanKindClient),
+		trace.WithAttributes(
+			semconv.DBSystemNameSQLite,
+			semconv.DBOperationName("select"),
+			semconv.DBCollectionName(table),
+		))
+	defer span.End()
 	o := dbOpts{
 		builder: m.queryBuilder,
 		querier: m.querier,
 		logger:  m.logger,
 	}
-	return get(ctx, table, columns, joins, conditions, opts, o)
+	results, err := get(c, table, columns, joins, conditions, opts, o)
+	if err != nil {
+		span.RecordError(err)
+		span.SetStatus(codes.Error, err.Error())
+		return results, err
+	}
+	span.SetStatus(codes.Ok, "get successful")
+	return results, nil
 }
 
 func (m *SQLITE) GetRaw(
@@ -193,12 +240,27 @@ func (m *SQLITE) GetRaw(
 	conditions cdt.Condition,
 	opts *options.QueryOptions,
 ) (*RowsAdapter, error) {
+	c, span := oh.UseTracer(ctx, "sqlite.GetRaw",
+		trace.WithSpanKind(trace.SpanKindClient),
+		trace.WithAttributes(
+			semconv.DBSystemNameSQLite,
+			semconv.DBOperationName("select"),
+			semconv.DBCollectionName(table),
+		))
+	defer span.End()
 	o := dbOpts{
 		builder: m.queryBuilder,
 		querier: m.querier,
 		logger:  m.logger,
 	}
-	return getRaw(ctx, table, columns, joins, conditions, opts, o)
+	results, err := getRaw(c, table, columns, joins, conditions, opts, o)
+	if err != nil {
+		span.RecordError(err)
+		span.SetStatus(codes.Error, err.Error())
+		return results, err
+	}
+	span.SetStatus(codes.Ok, "getRaw successful")
+	return results, nil
 }
 
 // GetByIDQuery builds the SELECT by ID query without executing it.
@@ -223,12 +285,27 @@ func (m *SQLITE) GetByID(
 	joins []cdt.Join,
 	opts *options.QueryOptions,
 ) ([]map[string]any, error) {
+	c, span := oh.UseTracer(ctx, "sqlite.GetByID",
+		trace.WithSpanKind(trace.SpanKindClient),
+		trace.WithAttributes(
+			semconv.DBSystemNameSQLite,
+			semconv.DBOperationName("select"),
+			semconv.DBCollectionName(table),
+		))
+	defer span.End()
 	o := dbOpts{
 		builder: m.queryBuilder,
 		querier: m.querier,
 		logger:  m.logger,
 	}
-	return getByID(ctx, table, id, joins, opts, o)
+	results, err := getByID(c, table, id, joins, opts, o)
+	if err != nil {
+		span.RecordError(err)
+		span.SetStatus(codes.Error, err.Error())
+		return results, err
+	}
+	span.SetStatus(codes.Ok, "getByID successful")
+	return results, nil
 }
 
 func (m *SQLITE) GetByIDRaw(
@@ -238,12 +315,27 @@ func (m *SQLITE) GetByIDRaw(
 	joins []cdt.Join,
 	opts *options.QueryOptions,
 ) (*RowsAdapter, error) {
+	c, span := oh.UseTracer(ctx, "sqlite.GetByIDRaw",
+		trace.WithSpanKind(trace.SpanKindClient),
+		trace.WithAttributes(
+			semconv.DBSystemNameSQLite,
+			semconv.DBOperationName("select"),
+			semconv.DBCollectionName(table),
+		))
+	defer span.End()
 	o := dbOpts{
 		builder: m.queryBuilder,
 		querier: m.querier,
 		logger:  m.logger,
 	}
-	return getByIDRaw(ctx, table, id, joins, opts, o)
+	results, err := getByIDRaw(c, table, id, joins, opts, o)
+	if err != nil {
+		span.RecordError(err)
+		span.SetStatus(codes.Error, err.Error())
+		return results, err
+	}
+	span.SetStatus(codes.Ok, "getByIDRaw successful")
+	return results, nil
 }
 
 // InsertQuery builds the INSERT query without executing it.
@@ -266,12 +358,27 @@ func (m *SQLITE) Insert(
 	data map[string]any,
 	opts *options.QueryOptions,
 ) (*ExecResult, error) {
+	c, span := oh.UseTracer(ctx, "sqlite.Insert",
+		trace.WithSpanKind(trace.SpanKindClient),
+		trace.WithAttributes(
+			semconv.DBSystemNameSQLite,
+			semconv.DBOperationName("insert"),
+			semconv.DBCollectionName(table),
+		))
+	defer span.End()
 	o := dbOpts{
 		builder: m.queryBuilder,
 		querier: m.querier,
 		logger:  m.logger,
 	}
-	return insert(ctx, table, data, opts, o)
+	result, err := insert(c, table, data, opts, o)
+	if err != nil {
+		span.RecordError(err)
+		span.SetStatus(codes.Error, err.Error())
+		return result, err
+	}
+	span.SetStatus(codes.Ok, "insert successful")
+	return result, nil
 }
 
 // InsertsQuery builds the INSERT query for multiple rows without executing it.
@@ -294,12 +401,27 @@ func (m *SQLITE) Inserts(
 	data []map[string]any,
 	opts *options.QueryOptions,
 ) (*ExecResult, error) {
+	c, span := oh.UseTracer(ctx, "sqlite.Inserts",
+		trace.WithSpanKind(trace.SpanKindClient),
+		trace.WithAttributes(
+			semconv.DBSystemNameSQLite,
+			semconv.DBOperationName("insert"),
+			semconv.DBCollectionName(table),
+		))
+	defer span.End()
 	o := dbOpts{
 		builder: m.queryBuilder,
 		querier: m.querier,
 		logger:  m.logger,
 	}
-	return inserts(ctx, table, data, opts, o)
+	result, err := inserts(c, table, data, opts, o)
+	if err != nil {
+		span.RecordError(err)
+		span.SetStatus(codes.Error, err.Error())
+		return result, err
+	}
+	span.SetStatus(codes.Ok, "inserts successful")
+	return result, nil
 }
 
 // UpdateQuery builds the UPDATE query without executing it.
@@ -324,12 +446,27 @@ func (m *SQLITE) Update(
 	conditions cdt.Condition,
 	opts *options.QueryOptions,
 ) (*ExecResult, error) {
+	c, span := oh.UseTracer(ctx, "sqlite.Update",
+		trace.WithSpanKind(trace.SpanKindClient),
+		trace.WithAttributes(
+			semconv.DBSystemNameSQLite,
+			semconv.DBOperationName("update"),
+			semconv.DBCollectionName(table),
+		))
+	defer span.End()
 	o := dbOpts{
 		builder: m.queryBuilder,
 		querier: m.querier,
 		logger:  m.logger,
 	}
-	return update(ctx, table, data, conditions, opts, o)
+	result, err := update(c, table, data, conditions, opts, o)
+	if err != nil {
+		span.RecordError(err)
+		span.SetStatus(codes.Error, err.Error())
+		return result, err
+	}
+	span.SetStatus(codes.Ok, "update successful")
+	return result, nil
 }
 
 // DeleteQuery builds the DELETE query without executing it.
@@ -352,22 +489,48 @@ func (m *SQLITE) Delete(
 	conditions cdt.Condition,
 	opts *options.QueryOptions,
 ) (*ExecResult, error) {
+	c, span := oh.UseTracer(ctx, "sqlite.Delete",
+		trace.WithSpanKind(trace.SpanKindClient),
+		trace.WithAttributes(
+			semconv.DBSystemNameSQLite,
+			semconv.DBOperationName("delete"),
+			semconv.DBCollectionName(table),
+		))
+	defer span.End()
 	o := dbOpts{
 		builder: m.queryBuilder,
 		querier: m.querier,
 		logger:  m.logger,
 	}
-	return delete(ctx, table, conditions, opts, o)
+	result, err := delete(c, table, conditions, opts, o)
+	if err != nil {
+		span.RecordError(err)
+		span.SetStatus(codes.Error, err.Error())
+		return result, err
+	}
+	span.SetStatus(codes.Ok, "delete successful")
+	return result, nil
 }
 
+//nolint:dupl
 func (m *SQLITE) Query(
 	ctx context.Context,
 	query string,
 	args ...any,
 ) ([]map[string]any, error) {
-	rows, err := m.querier.QueryContext(ctx, query, args...)
+	c, span := oh.UseTracer(ctx, "sqlite.Query",
+		trace.WithSpanKind(trace.SpanKindClient),
+		trace.WithAttributes(
+			semconv.DBSystemNameSQLite,
+			semconv.DBOperationName("query"),
+		))
+	defer span.End()
+	rows, err := m.querier.QueryContext(c, query, args...)
 	if err != nil {
-		return nil, fmt.Errorf("sqlite.Query: failed to execute query: %w", m.errorMapper.MapError(err))
+		err := fmt.Errorf("sqlite.Query: failed to execute query: %w", m.errorMapper.MapError(err))
+		span.RecordError(err)
+		span.SetStatus(codes.Error, err.Error())
+		return nil, err
 	}
 	defer func() {
 		if err := rows.Close(); err != nil {
@@ -379,22 +542,47 @@ func (m *SQLITE) Query(
 
 	cols, err := rows.Columns()
 	if err != nil {
-		return nil, fmt.Errorf("sqlite.Query: failed to get columns: %w", err)
+		err := fmt.Errorf("sqlite.Query: failed to get columns: %w", err)
+		span.RecordError(err)
+		span.SetStatus(codes.Error, err.Error())
+		return nil, err
 	}
 
-	return scanRows(rows, cols)
+	results, err := scanRows(rows, cols)
+	if err != nil {
+		span.RecordError(err)
+		span.SetStatus(codes.Error, err.Error())
+		return results, err
+	}
+	span.SetStatus(codes.Ok, "query executed")
+	return results, nil
 }
 
+//nolint:dupl
 func (m *SQLITE) QueryRaw(ctx context.Context, query string, args ...any) (*RowsAdapter, error) {
-	rows, err := m.querier.QueryContext(ctx, query, args...)
+	c, span := oh.UseTracer(ctx, "sqlite.QueryRaw",
+		trace.WithSpanKind(trace.SpanKindClient),
+		trace.WithAttributes(
+			semconv.DBSystemNameSQLite,
+			semconv.DBOperationName("query"),
+		))
+	defer span.End()
+	rows, err := m.querier.QueryContext(c, query, args...)
 	if err != nil {
-		return nil, fmt.Errorf("sqlite.QueryRaw: failed to execute query: %w", m.errorMapper.MapError(err))
+		err := fmt.Errorf("sqlite.QueryRaw: failed to execute query: %w", m.errorMapper.MapError(err))
+		span.RecordError(err)
+		span.SetStatus(codes.Error, err.Error())
+		return nil, err
 	}
 
 	ra, err := newRowsAdapter(rows)
 	if err != nil {
-		return nil, fmt.Errorf("sqlite.QueryRaw: failed to create RowsAdapter: %w", err)
+		err := fmt.Errorf("sqlite.QueryRaw: failed to create RowsAdapter: %w", err)
+		span.RecordError(err)
+		span.SetStatus(codes.Error, err.Error())
+		return nil, err
 	}
+	span.SetStatus(codes.Ok, "query executed")
 	return ra, nil
 }
 
@@ -403,10 +591,21 @@ func (m *SQLITE) Exec(
 	query string,
 	values ...any,
 ) (*ExecResult, error) {
-	result, err := m.querier.ExecContext(ctx, query, values...)
+	c, span := oh.UseTracer(ctx, "sqlite.Exec",
+		trace.WithSpanKind(trace.SpanKindClient),
+		trace.WithAttributes(
+			semconv.DBSystemNameSQLite,
+			semconv.DBOperationName("exec"),
+		))
+	defer span.End()
+	result, err := m.querier.ExecContext(c, query, values...)
 	if err != nil {
-		return nil, fmt.Errorf("sqlite.Exec: failed to execute query: %w", m.errorMapper.MapError(err))
+		err := fmt.Errorf("sqlite.Exec: failed to execute query: %w", m.errorMapper.MapError(err))
+		span.RecordError(err)
+		span.SetStatus(codes.Error, err.Error())
+		return nil, err
 	}
+	span.SetStatus(codes.Ok, "exec completed")
 	return fromSQLResult(result), nil
 }
 
@@ -415,29 +614,53 @@ func (m *SQLITE) Explain(
 	query string,
 	args ...any,
 ) (*RowsAdapter, error) {
+	c, span := oh.UseTracer(ctx, "sqlite.Explain",
+		trace.WithSpanKind(trace.SpanKindClient),
+		trace.WithAttributes(
+			semconv.DBSystemNameSQLite,
+			semconv.DBOperationName("explain"),
+		))
+	defer span.End()
 	explainQuery := "EXPLAIN QUERY PLAN " + query
-	rows, err := m.QueryRaw(ctx, explainQuery, args...)
+	rows, err := m.QueryRaw(c, explainQuery, args...)
 	if err != nil {
-		return nil, fmt.Errorf("sqlite.Explain: failed to execute explain query: %w", err)
+		err := fmt.Errorf("sqlite.Explain: failed to execute explain query: %w", err)
+		span.RecordError(err)
+		span.SetStatus(codes.Error, err.Error())
+		return nil, err
 	}
+	span.SetStatus(codes.Ok, "explain executed")
 	return rows, nil
 }
 
+//nolint:dupl
 func (m *SQLITE) WithTransaction(ctx context.Context, fn func(tx Tx) error) error {
-	tx, err := m.Begin(ctx)
+	c, span := oh.UseTracer(ctx, "sqlite.WithTransaction",
+		trace.WithSpanKind(trace.SpanKindClient),
+		trace.WithAttributes(
+			semconv.DBSystemNameSQLite,
+			semconv.DBOperationName("transaction"),
+		))
+	defer span.End()
+	tx, err := m.Begin(c)
 	if err != nil {
-		return fmt.Errorf("sqlite.WithTransaction: failed to begin transaction: %w", err)
+		err := fmt.Errorf("sqlite.WithTransaction: failed to begin transaction: %w", err)
+		span.RecordError(err)
+		span.SetStatus(codes.Error, err.Error())
+		return err
 	}
 
 	defer func() {
 		var e error
 		if p := recover(); p != nil {
-			e = tx.Rollback(ctx)
+			e = tx.Rollback(c)
 			if m.logger != nil {
 				m.logger.Error("sqlite.WithTransaction: panic in transaction, rolled back", "panic", p, "error", e)
 			}
+			span.RecordError(fmt.Errorf("panic in transaction: %v", p))
+			span.SetStatus(codes.Error, "panic occurred in transaction")
 		} else if err != nil {
-			e = tx.Rollback(ctx) // err is non-nil; don't change it
+			e = tx.Rollback(c) // err is non-nil; don't change it
 			if e != nil {
 				err = fmt.Errorf(
 					"sqlite.WithTransaction: execution failed with error: %w, transaction rollback: %w",
@@ -445,10 +668,16 @@ func (m *SQLITE) WithTransaction(ctx context.Context, fn func(tx Tx) error) erro
 					e,
 				)
 			}
+			span.RecordError(err)
+			span.SetStatus(codes.Error, err.Error())
 		} else {
-			err = tx.Commit(ctx) // err is nil; if Commit returns error update err
+			err = tx.Commit(c) // err is nil; if Commit returns error update err
 			if err != nil {
 				err = fmt.Errorf("sqlite.WithTransaction: failed to commit transaction: %w", err)
+				span.RecordError(err)
+				span.SetStatus(codes.Error, err.Error())
+			} else {
+				span.SetStatus(codes.Ok, "transaction committed")
 			}
 		}
 	}()
@@ -473,24 +702,52 @@ func (m *SQLITE) Close() error {
 	return nil
 }
 
-func (m *SQLITE) Commit(_ context.Context) error {
+func (m *SQLITE) Commit(ctx context.Context) error {
+	_, span := oh.UseTracer(ctx, "sqlite.Commit",
+		trace.WithSpanKind(trace.SpanKindClient),
+		trace.WithAttributes(
+			semconv.DBSystemNameSQLite,
+			semconv.DBOperationName("commit"),
+		))
+	defer span.End()
 	sqlTX, ok := m.querier.(*sql.Tx)
 	if !ok {
-		return fmt.Errorf("sqlite.Commit: underlying db is not *sql.Tx")
+		err := fmt.Errorf("sqlite.Commit: underlying db is not *sql.Tx")
+		span.RecordError(err)
+		span.SetStatus(codes.Error, err.Error())
+		return err
 	}
 	if err := sqlTX.Commit(); err != nil {
-		return fmt.Errorf("sqlite.Commit: failed to commit transaction: %w", err)
+		err := fmt.Errorf("sqlite.Commit: failed to commit transaction: %w", err)
+		span.RecordError(err)
+		span.SetStatus(codes.Error, err.Error())
+		return err
 	}
+	span.SetStatus(codes.Ok, "transaction committed")
 	return nil
 }
 
-func (m *SQLITE) Rollback(_ context.Context) error {
+func (m *SQLITE) Rollback(ctx context.Context) error {
+	_, span := oh.UseTracer(ctx, "sqlite.Rollback",
+		trace.WithSpanKind(trace.SpanKindClient),
+		trace.WithAttributes(
+			semconv.DBSystemNameSQLite,
+			semconv.DBOperationName("rollback"),
+		))
+	defer span.End()
 	sqlTX, ok := m.querier.(*sql.Tx)
 	if !ok {
-		return fmt.Errorf("sqlite.Rollback: underlying db is not *sql.Tx")
+		err := fmt.Errorf("sqlite.Rollback: underlying db is not *sql.Tx")
+		span.RecordError(err)
+		span.SetStatus(codes.Error, err.Error())
+		return err
 	}
 	if err := sqlTX.Rollback(); err != nil {
-		return fmt.Errorf("sqlite.Rollback: failed to rollback transaction: %w", err)
+		err := fmt.Errorf("sqlite.Rollback: failed to rollback transaction: %w", err)
+		span.RecordError(err)
+		span.SetStatus(codes.Error, err.Error())
+		return err
 	}
+	span.SetStatus(codes.Ok, "transaction rolled back")
 	return nil
 }

@@ -9,6 +9,9 @@ import (
 	"strings"
 	"time"
 
+	"go.opentelemetry.io/otel/codes"
+	"go.opentelemetry.io/otel/trace"
+	"tounilab.com/db-connector/internal/pkg/otel"
 	cdt "tounilab.com/db-connector/pkg/query/condition"
 	"tounilab.com/db-connector/pkg/query/definition"
 	"tounilab.com/db-connector/pkg/query/options"
@@ -512,13 +515,20 @@ type Tx interface {
 // the fields in the reflect.Struct.
 //
 //nolint:cyclop
-func ScanRowsTo[T any](ra *RowsAdapter) ([]T, error) {
+func ScanRowsTo[T any](ctx context.Context, ra *RowsAdapter) ([]T, error) {
+	_, span := otel.UseTracer(ctx, "db.ScanRowsTo",
+		trace.WithSpanKind(trace.SpanKindInternal))
+	defer span.End()
+
 	var cols []string
 	var err error
 
 	cols, err = ra.columns()
 	if err != nil {
-		return nil, fmt.Errorf("scanRowsTo: failed to get columns: %w", err)
+		err := fmt.Errorf("scanRowsTo: failed to get columns: %w", err)
+		span.RecordError(err)
+		span.SetStatus(codes.Error, err.Error())
+		return nil, err
 	}
 
 	var out []T
@@ -536,7 +546,10 @@ func ScanRowsTo[T any](ra *RowsAdapter) ([]T, error) {
 		tType = tType.Elem()
 	}
 	if tType.Kind() != reflect.Struct {
-		return nil, fmt.Errorf("scanRowsTo: T must be a struct or pointer to struct")
+		err := fmt.Errorf("scanRowsTo: T must be a struct or pointer to struct")
+		span.RecordError(err)
+		span.SetStatus(codes.Error, err.Error())
+		return nil, err
 	}
 
 	// build mapping column -> struct field index
@@ -544,7 +557,10 @@ func ScanRowsTo[T any](ra *RowsAdapter) ([]T, error) {
 
 	for ra.next() {
 		if err := ra.scan(ptrs...); err != nil {
-			return nil, fmt.Errorf("scan: %w", err)
+			err := fmt.Errorf("scanRowsTo: scan failed: %w", err)
+			span.RecordError(err)
+			span.SetStatus(codes.Error, err.Error())
+			return nil, err
 		}
 
 		var itemVal reflect.Value
@@ -569,7 +585,10 @@ func ScanRowsTo[T any](ra *RowsAdapter) ([]T, error) {
 				}
 				err := setFieldFromValue(f, raw)
 				if err != nil {
-					return nil, fmt.Errorf("scanRowsTo: failed to set field %s: %w", col, err)
+					err := fmt.Errorf("scanRowsTo: failed to set field %s: %w", col, err)
+					span.RecordError(err)
+					span.SetStatus(codes.Error, err.Error())
+					return nil, err
 				}
 			}
 		}
@@ -582,7 +601,11 @@ func ScanRowsTo[T any](ra *RowsAdapter) ([]T, error) {
 	}
 
 	if err := ra.err(); err != nil {
-		return nil, fmt.Errorf("scanRowsTo: rows iteration failed: %w", err)
+		err := fmt.Errorf("scanRowsTo: rows iteration failed: %w", err)
+		span.RecordError(err)
+		span.SetStatus(codes.Error, err.Error())
+		return nil, err
 	}
+	span.SetStatus(codes.Ok, "scanRowsTo completed successfully")
 	return out, nil
 }

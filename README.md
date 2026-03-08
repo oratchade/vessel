@@ -14,6 +14,7 @@ A lightweight, multi-database SQL abstraction library for Go with support for My
 - 🔄 **Transaction Support** - ACID compliance with automatic rollback on panic
 - 📊 **Connection Pooling** - Per-dialect statistics and configuration
 - ✨ **Zero-Copy Row Scanning** - Efficient field mapping to Go types
+- 📡 **OpenTelemetry Tracing** - Distributed tracing for all database operations
 - 🧪 **Comprehensive Testing** - 97+ test cases with 100% pass rate
 
 ## Installation
@@ -23,6 +24,41 @@ go get tounilab.com/db-connector
 ```
 
 Requires Go 1.26.0 or later.
+
+## OpenTelemetry Tracing & Observability
+
+All database operations are automatically instrumented with OpenTelemetry for distributed tracing and observability. This includes metrics and spans for all queries, transactions, and row scanning operations.
+
+### Configuration
+
+Tracing is **enabled by default**. To disable tracing, set the `OTEL_ENABLED` environment variable:
+
+```bash
+# Disable tracing
+export OTEL_ENABLED=false
+
+# Enable tracing (default)
+export OTEL_ENABLED=true
+```
+
+When disabled, all tracing operations are replaced with no-op implementations, providing zero overhead.
+
+### Captured Operations
+
+Traces include:
+- Database operations: `Ping`, `Begin`, `Get`, `GetRaw`, `GetByID`, `Insert`, `Inserts`, `Update`, `Delete`, `Query`, `QueryRaw`, `Exec`, `Explain`
+- Transactions: `Commit`, `Rollback`, `WithTransaction`
+- Row scanning: `ScanRowsTo[T]` with full error context
+- Semantic conventions from OpenTelemetry specification
+- Span status and error recording for observability
+
+### Zero Overhead When Disabled
+
+When `OTEL_ENABLED=false`, the library uses OpenTelemetry's no-op tracer provider, resulting in:
+- ✅ No performance impact
+- ✅ No memory allocations for tracing
+- ✅ Complete trace API compatibility
+- ✅ Easy enable/disable via environment variable
 
 ## Quick Start
 
@@ -219,7 +255,7 @@ if err != nil {
 defer rowsAdapter.Close()
 
 // Scan rows into typed structs
-users, err := db.ScanRowsTo[User](rowsAdapter)
+users, err := db.ScanRowsTo[User](ctx, rowsAdapter)
 if err != nil {
     log.Fatal(err)
 }
@@ -234,7 +270,7 @@ for _, user := range users {
 
 The methods `GetRaw()`, `GetByIDRaw()`, and `QueryRaw()` return a `RowsAdapter` which you must explicitly close. This design allows you the flexibility to:
 
-- Use `db.ScanRowsTo[T]()` for type-safe scanning into structs
+- Use `db.ScanRowsTo[T](ctx, ...)` for type-safe scanning into structs
 - Use third-party row scanning libraries of your choice
 - Implement custom row processing logic
 
@@ -248,7 +284,7 @@ if err != nil {
 defer rowsAdapter.Close()  // ⚠️ REQUIRED: Always close the adapter
 
 // Now you can scan or process the rows
-users, err := db.ScanRowsTo[User](rowsAdapter)
+users, err := db.ScanRowsTo[User](ctx, rowsAdapter)
 // ... your code
 ```
 

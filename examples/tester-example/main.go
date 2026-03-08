@@ -103,7 +103,7 @@ func main() {
 			panic(fmt.Sprintf("GetRaw failed: %v", err))
 		}
 
-		uList, err := db.ScanRowsTo[User](usersRaw)
+		uList, err := db.ScanRowsTo[User](context.Background(), usersRaw)
 		if err != nil {
 			panic(fmt.Sprintf("ScanRowsTo failed: %v", err))
 		}

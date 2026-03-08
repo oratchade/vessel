@@ -947,7 +947,7 @@ func TestIntegration_GetByIDRaw(t *testing.T) {
 			if err != nil {
 				t.Fatalf("GetByIDRaw failed: %v", err)
 			}
-			u, err := db.ScanRowsTo[User](usersRaw)
+			u, err := db.ScanRowsTo[User](context.Background(), usersRaw)
 			if err != nil {
 				t.Fatalf("ScanRowsTo failed: %v", err)
 			}
