@@ -25,20 +25,22 @@ import (
 // MSSQLConfig holds configuration for connecting to a MSSQL database.
 //
 // Fields include authentication, network and timeout settings plus pool options.
+//
+//nolint:revive,tagalign
 type MSSQLConfig struct {
-	User              string        // Username for authentication
-	Password          string        // Password for authentication
-	Host              string        // Hostname or IP address
-	Port              uint16        // Port number
-	Database          string        // Database name
-	Encrypt           string        // Encryption mode (disable, true, false)
-	TrustServerCert   bool          // Trust server certificate
-	ConnectionTimeout time.Duration // Connection timeout
-	ReadTimeout       time.Duration // Read timeout
-	WriteTimeout      time.Duration // Write timeout
-	MaxOpenConns      int           // Maximum number of open connections
-	MaxIdleConns      int           // Maximum number of idle connections
-	ConnMaxLifetime   time.Duration // Maximum lifetime of a connection
+	User              string        `json:"user" yaml:"user" toml:"user"`                                                                         // Username for authentication
+	Password          string        `json:"password" yaml:"password" toml:"password"`                                                             // Password for authentication
+	Host              string        `json:"host" yaml:"host" toml:"host"`                                                                         // Hostname or IP address
+	Port              uint16        `json:"port" yaml:"port" toml:"port"`                                                                         // Port number
+	Database          string        `json:"database" yaml:"database" toml:"database"`                                                             // Database name
+	Encrypt           string        `json:"encrypt,omitempty" yaml:"encrypt,omitempty" toml:"encrypt,omitempty"`                                  // Encryption mode (disable, true, false)
+	TrustServerCert   bool          `json:"trust_server_cert,omitempty" yaml:"trust_server_cert,omitempty" toml:"trust_server_cert,omitempty"`    // Trust server certificate
+	ConnectionTimeout time.Duration `json:"connection_timeout,omitempty" yaml:"connection_timeout,omitempty" toml:"connection_timeout,omitempty"` // Connection timeout
+	ReadTimeout       time.Duration `json:"read_timeout,omitempty" yaml:"read_timeout,omitempty" toml:"read_timeout,omitempty"`                   // Read timeout
+	WriteTimeout      time.Duration `json:"write_timeout,omitempty" yaml:"write_timeout,omitempty" toml:"write_timeout,omitempty"`                // Write timeout
+	MaxOpenConns      int           `json:"max_open_conns,omitempty" yaml:"max_open_conns,omitempty" toml:"max_open_conns,omitempty"`             // Maximum number of open connections
+	MaxIdleConns      int           `json:"max_idle_conns,omitempty" yaml:"max_idle_conns,omitempty" toml:"max_idle_conns,omitempty"`             // Maximum number of idle connections
+	ConnMaxLifetime   time.Duration `json:"conn_max_lifetime,omitempty" yaml:"conn_max_lifetime,omitempty" toml:"conn_max_lifetime,omitempty"`    // Maximum lifetime of a connection
 }
 
 // Driver returns the name of the database driver to use for this configuration.

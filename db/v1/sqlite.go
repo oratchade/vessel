@@ -25,15 +25,17 @@ import (
 // SQLiteConfig holds configuration for connecting to a SQLITE database.
 //
 // Fields include file path, access mode, and connection pool settings.
+//
+//nolint:revive,tagalign
 type SQLiteConfig struct {
-	FilePath        string        // Path to the SQLITE database file
-	CacheMode       string        // Cache mode (shared, private)
-	Mode            string        // Access mode (ro, rw, rwc, memory)
-	ForeignKeys     bool          // Enable foreign key constraints
-	BusyTimeout     time.Duration // Busy timeout duration
-	MaxOpenConns    int           // Maximum number of open connections
-	MaxIdleConns    int           // Maximum number of idle connections
-	ConnMaxLifetime time.Duration // Maximum lifetime of a connection
+	FilePath        string        `json:"file_path" yaml:"file_path" toml:"file_path"`                                                       // Path to the SQLITE database file
+	CacheMode       string        `json:"cache_mode,omitempty" yaml:"cache_mode,omitempty" toml:"cache_mode,omitempty"`                      // Cache mode (shared, private)
+	Mode            string        `json:"mode,omitempty" yaml:"mode,omitempty" toml:"mode,omitempty"`                                        // Access mode (ro, rw, rwc, memory)
+	ForeignKeys     bool          `json:"foreign_keys,omitempty" yaml:"foreign_keys,omitempty" toml:"foreign_keys,omitempty"`                // Enable foreign key constraints
+	BusyTimeout     time.Duration `json:"busy_timeout,omitempty" yaml:"busy_timeout,omitempty" toml:"busy_timeout,omitempty"`                // Busy timeout duration
+	MaxOpenConns    int           `json:"max_open_conns,omitempty" yaml:"max_open_conns,omitempty" toml:"max_open_conns,omitempty"`          // Maximum number of open connections
+	MaxIdleConns    int           `json:"max_idle_conns,omitempty" yaml:"max_idle_conns,omitempty" toml:"max_idle_conns,omitempty"`          // Maximum number of idle connections
+	ConnMaxLifetime time.Duration `json:"conn_max_lifetime,omitempty" yaml:"conn_max_lifetime,omitempty" toml:"conn_max_lifetime,omitempty"` // Maximum lifetime of a connection
 }
 
 // Driver returns the driver name for SQLITE databases.

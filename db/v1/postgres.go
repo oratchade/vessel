@@ -39,21 +39,23 @@ type pgQuerier interface {
 // PostgresConfig holds configuration options for connecting to a PostgreSQL database.
 //
 // Fields include connection, pooling and application-specific settings.
+//
+//nolint:revive,tagalign
 type PostgresConfig struct {
-	Host            string        // Database server hostname or IP
-	Port            uint16        // Database server port
-	User            string        // Username for authentication
-	Password        string        // Password for authentication
-	Database        string        // Database name
-	SSLMode         string        // SSL mode (disable, require, verify-ca, verify-full)
-	ConnectTimeout  time.Duration // Connection timeout
-	PoolMaxConns    int32         // Maximum number of connections in the pool
-	PoolMinConns    int32         // Minimum number of connections in the pool
-	PoolMaxConnIdle time.Duration // Maximum idle time for a connection
-	PoolMaxConnLife time.Duration // Maximum lifetime of a connection
-	ApplicationName string        // Application name for logging/tracking
-	SearchPath      string        // PostgreSQL schema search path
-	LogLevel        string        // Logging level (debug, info, warn, error)
+	Host            string        `json:"host" yaml:"host" toml:"host"`                                                                         // Database server hostname or IP
+	Port            uint16        `json:"port" yaml:"port" toml:"port"`                                                                         // Database server port
+	User            string        `json:"user" yaml:"user" toml:"user"`                                                                         // Username for authentication
+	Password        string        `json:"password" yaml:"password" toml:"password"`                                                             // Password for authentication
+	Database        string        `json:"database" yaml:"database" toml:"database"`                                                             // Database name
+	SSLMode         string        `json:"ssl_mode,omitempty" yaml:"ssl_mode,omitempty" toml:"ssl_mode,omitempty"`                               // SSL mode (disable, require, verify-ca, verify-full)
+	ConnectTimeout  time.Duration `json:"connect_timeout,omitempty" yaml:"connect_timeout,omitempty" toml:"connect_timeout,omitempty"`          // Connection timeout
+	PoolMaxConns    int32         `json:"pool_max_conns,omitempty" yaml:"pool_max_conns,omitempty" toml:"pool_max_conns,omitempty"`             // Maximum number of connections in the pool
+	PoolMinConns    int32         `json:"pool_min_conns,omitempty" yaml:"pool_min_conns,omitempty" toml:"pool_min_conns,omitempty"`             // Minimum number of connections in the pool
+	PoolMaxConnIdle time.Duration `json:"pool_max_conn_idle,omitempty" yaml:"pool_max_conn_idle,omitempty" toml:"pool_max_conn_idle,omitempty"` // Maximum idle time for a connection
+	PoolMaxConnLife time.Duration `json:"pool_max_conn_life,omitempty" yaml:"pool_max_conn_life,omitempty" toml:"pool_max_conn_life,omitempty"` // Maximum lifetime of a connection
+	ApplicationName string        `json:"application_name,omitempty" yaml:"application_name,omitempty" toml:"application_name,omitempty"`       // Application name for logging/tracking
+	SearchPath      string        `json:"search_path,omitempty" yaml:"search_path,omitempty" toml:"search_path,omitempty"`                      // PostgreSQL schema search path
+	LogLevel        string        `json:"log_level,omitempty" yaml:"log_level,omitempty" toml:"log_level,omitempty"`                            // Logging level (debug, info, warn, error)
 }
 
 // Driver returns the name of the database driver to use for this configuration.

@@ -31,21 +31,23 @@ type sqlQuerier interface {
 // MysqlConfig holds configuration for connecting to a MySQL database.
 //
 // Fields include authentication, network, timeouts and connection pool settings.
+//
+//nolint:revive,tagalign
 type MysqlConfig struct {
-	User            string        // Username for authentication
-	Password        string        // Password for authentication
-	Host            string        // Hostname or IP address
-	Port            uint16        // Port number
-	Database        string        // Database name
-	Charset         string        // Character set (e.g., utf8mb4)
-	ParseTime       bool          // Parse time values to time.Time
-	Loc             string        // Time zone location (e.g., Local, UTC)
-	Timeout         time.Duration // Connection timeout
-	ReadTimeout     time.Duration // Read timeout
-	WriteTimeout    time.Duration // Write timeout
-	MaxOpenConns    int           // Maximum number of open connections
-	MaxIdleConns    int           // Maximum number of idle connections
-	ConnMaxLifetime time.Duration // Maximum lifetime of a connection
+	User            string        `json:"user" yaml:"user" toml:"user"`                                                                      // Username for authentication
+	Password        string        `json:"password" yaml:"password" toml:"password"`                                                          // Password for authentication
+	Host            string        `json:"host" yaml:"host" toml:"host"`                                                                      // Hostname or IP address
+	Port            uint16        `json:"port" yaml:"port" toml:"port"`                                                                      // Port number
+	Database        string        `json:"database" yaml:"database" toml:"database"`                                                          // Database name
+	Charset         string        `json:"charset,omitempty" yaml:"charset,omitempty" toml:"charset,omitempty"`                               // Character set (e.g., utf8mb4)
+	ParseTime       bool          `json:"parse_time,omitempty" yaml:"parse_time,omitempty" toml:"parse_time,omitempty"`                      // Parse time values to time.Time
+	Loc             string        `json:"loc,omitempty" yaml:"loc,omitempty" toml:"loc,omitempty"`                                           // Time zone location (e.g., Local, UTC)
+	Timeout         time.Duration `json:"timeout,omitempty" yaml:"timeout,omitempty" toml:"timeout,omitempty"`                               // Connection timeout
+	ReadTimeout     time.Duration `json:"read_timeout,omitempty" yaml:"read_timeout,omitempty" toml:"read_timeout,omitempty"`                // Read timeout
+	WriteTimeout    time.Duration `json:"write_timeout,omitempty" yaml:"write_timeout,omitempty" toml:"write_timeout,omitempty"`             // Write timeout
+	MaxOpenConns    int           `json:"max_open_conns,omitempty" yaml:"max_open_conns,omitempty" toml:"max_open_conns,omitempty"`          // Maximum number of open connections
+	MaxIdleConns    int           `json:"max_idle_conns,omitempty" yaml:"max_idle_conns,omitempty" toml:"max_idle_conns,omitempty"`          // Maximum number of idle connections
+	ConnMaxLifetime time.Duration `json:"conn_max_lifetime,omitempty" yaml:"conn_max_lifetime,omitempty" toml:"conn_max_lifetime,omitempty"` // Maximum lifetime of a connection
 }
 
 // Driver returns the name of the database driver to use for this configuration.
