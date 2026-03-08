@@ -13,7 +13,7 @@ The db-connector plugin system allows you to register custom database drivers wi
 
 ### Core Concepts
 
-**DriverFactory Interface** (defined in `v1/db/plugin/registry.go`):
+**DriverFactory Interface** (defined in `db/v1/plugin/registry.go`):
 
 ```go
 type DriverFactory interface {
@@ -178,8 +178,8 @@ package myplugin
 import (
     "context"
     "fmt"
-    "tounilab.com/db-connector/v1/db"
-    "tounilab.com/db-connector/v1/db/plugin"
+    "tounilab.com/db-connector/db/v1"
+    "tounilab.com/db-connector/db/v1/plugin"
 )
 
 // Config implements db.DBConfig
@@ -403,5 +403,5 @@ The plugin registry is thread-safe using `sync.RWMutex`:
 ## See Also
 
 - [Plugin System Documentation](../../README.md#plugin-system) in main README
-- [Plugin Registry](../../v1/db/plugin/registry.go) implementation
-- [db.NewDB()](../../v1/db/db.go) integration point
+- [Plugin Registry](../../db/v1/plugin/registry.go) implementation
+- [db.NewDB()](../../db/v1/db.go) integration point

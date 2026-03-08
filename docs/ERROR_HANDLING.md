@@ -13,10 +13,10 @@ db-connector provides structured error handling with:
 
 ## Sentinel Errors
 
-The library defines sentinel errors in `v1/db/dberror` for common database conditions:
+The library defines sentinel errors in `db/db/v1error` for common database conditions:
 
 ```go
-import "github.com/oratchade/db-connector/v1/db/dberror"
+import "github.com/oratchade/db-connector/db/db/v1error"
 ```
 
 ### Common Sentinel Errors
@@ -35,7 +35,7 @@ import "github.com/oratchade/db-connector/v1/db/dberror"
 import (
     "errors"
     "log"
-    "github.com/oratchade/db-connector/v1/db/dberror"
+    "github.com/oratchade/db-connector/db/db/v1error"
 )
 
 result, err := database.Insert(ctx, "users", map[string]any{
@@ -303,7 +303,7 @@ logQuery("insert", "users", err)
 ### Mock Error Scenarios
 
 ```go
-import "github.com/oratchade/db-connector/v1/db/dberror"
+import "github.com/oratchade/db-connector/db/db/v1error"
 
 // In tests, you can inject specific errors via mocks
 mockDB := &MockDB{

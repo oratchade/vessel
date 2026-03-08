@@ -15,13 +15,13 @@ import (
 	"go.opentelemetry.io/otel/codes"
 	semconv "go.opentelemetry.io/otel/semconv/v1.37.0"
 	"go.opentelemetry.io/otel/trace"
+	"tounilab.com/db-connector/db/v1/dberror"
 	builder "tounilab.com/db-connector/internal/pkg/builder"
 	"tounilab.com/db-connector/internal/pkg/otel"
 	sqldialect "tounilab.com/db-connector/internal/pkg/sqldialect"
 	cdt "tounilab.com/db-connector/pkg/query/condition"
 	"tounilab.com/db-connector/pkg/query/definition"
 	"tounilab.com/db-connector/pkg/query/options"
-	"tounilab.com/db-connector/v1/db/dberror"
 )
 
 func fromCommandTag(tag pgconn.CommandTag) *ExecResult {

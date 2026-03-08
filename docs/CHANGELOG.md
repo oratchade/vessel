@@ -105,14 +105,14 @@ For a high-level overview of releases, see [RELEASES.md](./RELEASES.md). For upg
 
 ### Changed
 
-- API stabilized at `v1/db` package (breaking off from v0.9.x)
-- Error types reorganized under `v1/db/dberror`
+- API stabilized at `db/v1` package (breaking off from v0.9.x)
+- Error types reorganized under `db/db/v1error`
 - `RowsAdapter` replaces generic `Row` interface from v0.9
 - `QueryOptions` structure formalized with comprehensive options
 
 ### Breaking Changes (from v0.9.0)
 
-- Moved public API from `db` to `v1/db`
+- Moved public API from `db` to `db/v1`
 - `Row` interface replaced with `RowsAdapter`
 - Error types moved from root to `dberror` subpackage
 - Some error codes changed (see [MIGRATION.md](./MIGRATION.md) for mapping)

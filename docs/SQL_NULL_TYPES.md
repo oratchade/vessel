@@ -6,7 +6,7 @@ This document describes the implementation of `sql.Null*` type support in the db
 
 ## What Was Changed
 
-Enhanced the `setFieldFromValue()` function in [v1/db/row_adapter.go](../v1/db/row_adapter.go) to automatically detect and properly handle Go's nullable SQL types from the `database/sql` package.
+Enhanced the `setFieldFromValue()` function in [db/v1/row_adapter.go](../db/v1/row_adapter.go) to automatically detect and properly handle Go's nullable SQL types from the `database/sql` package.
 
 ## Supported SQL.Null\* Types
 

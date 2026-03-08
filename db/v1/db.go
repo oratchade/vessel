@@ -11,11 +11,11 @@ import (
 
 	"go.opentelemetry.io/otel/codes"
 	"go.opentelemetry.io/otel/trace"
+	"tounilab.com/db-connector/db/v1/plugin"
 	"tounilab.com/db-connector/internal/pkg/otel"
 	cdt "tounilab.com/db-connector/pkg/query/condition"
 	"tounilab.com/db-connector/pkg/query/definition"
 	"tounilab.com/db-connector/pkg/query/options"
-	"tounilab.com/db-connector/v1/db/plugin"
 )
 
 // ExecResult holds metadata returned by mutation statements such as INSERT,

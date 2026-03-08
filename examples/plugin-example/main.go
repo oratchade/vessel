@@ -4,8 +4,8 @@ import (
 	"context"
 	"log"
 
-	"tounilab.com/db-connector/v1/db"
-	"tounilab.com/db-connector/v1/db/plugin"
+	"tounilab.com/db-connector/db/v1"
+	"tounilab.com/db-connector/db/v1/plugin"
 
 	// Blank import registers the CockroachDB plugin via init()
 	"tounilab.com/db-connector/examples/plugin-example/cockroachdb"

@@ -114,7 +114,7 @@ git checkout -b feature/your-feature-name
 make test
 
 # Run tests for specific package
-go test -tags=test ./v1/db/...
+go test -tags=test ./db/v1/...
 
 # Run with verbose output
 go test -v -tags=test ./...
@@ -487,7 +487,7 @@ results, err := db.BatchInsert(ctx, "users", []map[string]any{
 ```
 
 db-connector/
-├── v1/db/ # Public API (stable, versioned)
+├── db/v1/ # Public API (stable, versioned)
 ├── internal/pkg/ # Internal packages (no stability guarantee)
 ├── pkg/query/ # Query building DSL
 └── tests/ # Integration tests
@@ -521,8 +521,8 @@ All public packages, types, and functions must have comments:
 
 ```bash
 # Check documentation coverage
-go doc ./v1/db
-go doc github.com/oratchade/db-connector/v1/db
+go doc ./db/v1
+go doc github.com/oratchade/db-connector/db/v1
 ````
 
 ### User Documentation

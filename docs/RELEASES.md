@@ -65,7 +65,7 @@ See [CHANGELOG.md#breaking-changes-from-v090](./CHANGELOG.md#breaking-changes-fr
 
 **Key Changes:**
 
-- API moved from `db` to `v1/db` package
+- API moved from `db` to `db/v1` package
 - Error types reorganized in `dberror` package
 - `RowsAdapter` replaces generic `Row` interface
 - `QueryOptions` structure changed

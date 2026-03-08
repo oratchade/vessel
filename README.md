@@ -46,6 +46,7 @@ When disabled, all tracing operations are replaced with no-op implementations, p
 ### Captured Operations
 
 Traces include:
+
 - Database operations: `Ping`, `Begin`, `Get`, `GetRaw`, `GetByID`, `Insert`, `Inserts`, `Update`, `Delete`, `Query`, `QueryRaw`, `Exec`, `Explain`
 - Transactions: `Commit`, `Rollback`, `WithTransaction`
 - Row scanning: `ScanRowsTo[T]` with full error context
@@ -55,6 +56,7 @@ Traces include:
 ### Zero Overhead When Disabled
 
 When `OTEL_ENABLED=false`, the library uses OpenTelemetry's no-op tracer provider, resulting in:
+
 - ✅ No performance impact
 - ✅ No memory allocations for tracing
 - ✅ Complete trace API compatibility
@@ -71,7 +73,7 @@ import (
     "context"
     "log"
 
-    "tounilab.com/db-connector/v1/db"
+    "tounilab.com/db-connector/db/v1"
 )
 
 func main() {
@@ -237,7 +239,7 @@ for _, row := range results {
 For advanced use cases, use `ScanRowsTo` to efficiently scan rows into strongly-typed structs:
 
 ```go
-import "tounilab.com/db-connector/v1/db"
+import "tounilab.com/db-connector/db/v1"
 
 // Define your struct matching SELECT columns
 type User struct {
@@ -433,7 +435,7 @@ database, err := db.NewDB(db.MSSQLConfig{
 The library provides structured error handling with database-dialect-specific error mapping. See [ERROR_HANDLING.md](./ERROR_HANDLING.md) for comprehensive guidance on error handling patterns.
 
 ```go
-import "tounilab.com/db-connector/v1/db/dberror"
+import "tounilab.com/db-connector/db/v1/dberror"
 
 result, err := database.Insert(ctx, "users", data, nil)
 if err != nil {
@@ -478,7 +480,7 @@ package mydb
 import (
     "context"
     "fmt"
-    "tounilab.com/db-connector/v1/db/plugin"
+    "tounilab.com/db-connector/db/v1/plugin"
 )
 
 // Config implements db.DBConfig for your custom database
@@ -521,7 +523,7 @@ Simply import the plugin package (with blank import `_`) and use it:
 
 ```go
 import (
-    "tounilab.com/db-connector/v1/db"
+    "tounilab.com/db-connector/db/v1"
     _ "mydb"  // Auto-registers via init()
 )
 

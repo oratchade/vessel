@@ -7,7 +7,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
-	dberror "tounilab.com/db-connector/v1/db/dberror"
+	dberror "tounilab.com/db-connector/db/v1/dberror"
 )
 
 // testErrorMapperCase represents a single test case for error mapping.

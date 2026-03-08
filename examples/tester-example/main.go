@@ -6,7 +6,7 @@ import (
 	"strings"
 	"time"
 
-	"tounilab.com/db-connector/v1/db"
+	"tounilab.com/db-connector/db/v1"
 )
 
 type User struct {
