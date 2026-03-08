@@ -1,5 +1,5 @@
 // Package db provides database abstraction and query execution utilities.
-package db
+package v1
 
 import (
 	"context"

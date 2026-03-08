@@ -1,5 +1,5 @@
-// Package db provides database abstraction interfaces and implementations for multiple database engines.
-package db
+// Package v1 provides database abstraction interfaces and implementations for multiple database engines.
+package v1
 
 import (
 	"context"
@@ -47,7 +47,7 @@ func fromSQLResult(res sql.Result) *ExecResult {
 	}
 }
 
-//go:generate mockgen -source=db.go -destination=db_mocks.go -package=db DBConfig
+//go:generate mockgen -source=db.go -destination=db_mocks.go -package=v1 DBConfig
 
 // DBConfig represents configuration needed to create a DB connection. It
 // exposes the driver name and a DSN builder for connecting to the database.
@@ -94,7 +94,7 @@ func NewDB(cfg DBConfig, logger Logger) (DB, error) {
 	}
 }
 
-//go:generate mockgen -source=db.go -destination=db_mocks.go -package=db DBActions
+//go:generate mockgen -source=db.go -destination=db_mocks.go -package=v1 DBActions
 
 // DBActions defines the core, context-aware data access operations that any
 // database connection or transaction must provide. It is an implementation-
@@ -277,7 +277,7 @@ type DBActions interface {
 	Exec(ctx context.Context, query string, args ...any) (*ExecResult, error)
 }
 
-//go:generate mockgen -source=db.go -destination=db_mocks.go -package=db DBQueries
+//go:generate mockgen -source=db.go -destination=db_mocks.go -package=v1 DBQueries
 
 // DBQueries provides access to the SQL queries that would be executed by mutation and query operations,
 // without actually executing them. This is useful for query introspection, logging, validation,
@@ -418,7 +418,7 @@ type DBQueries interface {
 	) (*RowsAdapter, error)
 }
 
-//go:generate mockgen -source=db.go -destination=db_mocks.go -package=db DB
+//go:generate mockgen -source=db.go -destination=db_mocks.go -package=v1 DB
 
 // DB represents a database connection interface.
 // Each method is documented with its purpose, parameters, and expected return values.
@@ -475,7 +475,7 @@ type DB interface {
 	Close() error
 }
 
-//go:generate mockgen -source=db.go -destination=db_mocks.go -package=db Tx
+//go:generate mockgen -source=db.go -destination=db_mocks.go -package=v1 Tx
 
 // Tx represents a database transaction. All methods accept context so deadlines and cancellations propagate.
 type Tx interface {

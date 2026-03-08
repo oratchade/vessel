@@ -73,7 +73,7 @@ import (
     "context"
     "log"
 
-    "tounilab.com/db-connector/db/v1"
+    db "tounilab.com/db-connector/db/v1"
 )
 
 func main() {
@@ -160,6 +160,7 @@ log.Printf("Inserted %d rows\n", result.RowsAffected)
 
 ```go
 import (
+    db "tounilab.com/db-connector/db/v1"
     cdt "tounilab.com/db-connector/pkg/query/condition"
 )
 
@@ -239,7 +240,7 @@ for _, row := range results {
 For advanced use cases, use `ScanRowsTo` to efficiently scan rows into strongly-typed structs:
 
 ```go
-import "tounilab.com/db-connector/db/v1"
+import db "tounilab.com/db-connector/db/v1"
 
 // Define your struct matching SELECT columns
 type User struct {
@@ -480,6 +481,7 @@ package mydb
 import (
     "context"
     "fmt"
+    db "tounilab.com/db-connector/db/v1"
     "tounilab.com/db-connector/db/v1/plugin"
 )
 

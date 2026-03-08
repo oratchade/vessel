@@ -1,7 +1,7 @@
 // Package db provides database abstraction interfaces and implementations for multiple database engines.
-package db
+package v1
 
-//go:generate mockgen -source=logger.go -destination=logger_mocks.go -package=db Logger
+//go:generate mockgen -source=logger.go -destination=logger_mocks.go -package=v1 Logger
 
 // Logger is a minimal structured logging interface used by DB implementations.
 type Logger interface {

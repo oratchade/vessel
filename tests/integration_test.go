@@ -12,7 +12,7 @@ import (
 	_ "github.com/lib/pq"
 	_ "github.com/mattn/go-sqlite3"
 
-	"tounilab.com/db-connector/db/v1"
+	v1 "tounilab.com/db-connector/db/v1"
 	"tounilab.com/db-connector/pkg/query/condition"
 )
 
@@ -43,7 +43,7 @@ var testDatabases = []TestDB{
 	{
 		name:   "SQLite",
 		driver: "sqlite3",
-		config: db.SQLiteConfig{
+		config: v1.SQLiteConfig{
 			FilePath:        ":memory:",
 			CacheMode:       "shared",
 			Mode:            "memory",
@@ -57,7 +57,7 @@ var testDatabases = []TestDB{
 	{
 		name:   "MySQL",
 		driver: "mysql",
-		config: db.MysqlConfig{
+		config: v1.MysqlConfig{
 			User:            "root",
 			Password:        "root_password",
 			Host:            "localhost",
@@ -78,7 +78,7 @@ var testDatabases = []TestDB{
 	{
 		name:   "PostgreSQL",
 		driver: "postgres",
-		config: db.PostgresConfig{
+		config: v1.PostgresConfig{
 			User:           "test_user",
 			Password:       "test_password",
 			Host:           "localhost",
@@ -94,7 +94,7 @@ var testDatabases = []TestDB{
 	{
 		name:   "MSSQL",
 		driver: "sqlserver",
-		config: db.MSSQLConfig{
+		config: v1.MSSQLConfig{
 			User:            "sa",
 			Password:        "TestPassword123!",
 			Host:            "localhost",
@@ -111,7 +111,7 @@ var testDatabases = []TestDB{
 
 // TestSimpleSQLite tests basic SQLite functionality in isolation
 func TestSimpleSQLite(t *testing.T) {
-	config := db.SQLiteConfig{
+	config := v1.SQLiteConfig{
 		FilePath:     ":memory:",
 		CacheMode:    "shared",
 		Mode:         "memory",
@@ -121,7 +121,7 @@ func TestSimpleSQLite(t *testing.T) {
 	}
 
 	// Create database
-	database, err := db.NewDB(config, nil)
+	database, err := v1.NewDB(config, nil)
 	if err != nil {
 		t.Fatalf("Failed to create SQLite database: %v", err)
 	}
@@ -177,7 +177,7 @@ func TestIntegration_GetAllUsers(t *testing.T) {
 
 	for _, testDB := range testDatabases {
 		t.Run(testDB.name, func(t *testing.T) {
-			database, err := db.NewDB(testDB.config.(db.DBConfig), nil)
+			database, err := v1.NewDB(testDB.config.(v1.DBConfig), nil)
 			if err != nil {
 				t.Skipf("Failed to connect to %s: %v", testDB.name, err)
 			}
@@ -209,7 +209,7 @@ func TestIntegration_GetWithWhere(t *testing.T) {
 
 	for _, testDB := range testDatabases {
 		t.Run(testDB.name, func(t *testing.T) {
-			database, err := db.NewDB(testDB.config.(db.DBConfig), nil)
+			database, err := v1.NewDB(testDB.config.(v1.DBConfig), nil)
 			if err != nil {
 				t.Skipf("Failed to connect to %s: %v", testDB.name, err)
 			}
@@ -260,7 +260,7 @@ func TestIntegration_BulkInsert(t *testing.T) {
 
 	for _, testDB := range testDatabases {
 		t.Run(testDB.name, func(t *testing.T) {
-			database, err := db.NewDB(testDB.config.(db.DBConfig), nil)
+			database, err := v1.NewDB(testDB.config.(v1.DBConfig), nil)
 			if err != nil {
 				t.Skipf("Failed to connect to %s: %v", testDB.name, err)
 			}
@@ -307,7 +307,7 @@ func TestIntegration_Update(t *testing.T) {
 
 	for _, testDB := range testDatabases {
 		t.Run(testDB.name, func(t *testing.T) {
-			database, err := db.NewDB(testDB.config.(db.DBConfig), nil)
+			database, err := v1.NewDB(testDB.config.(v1.DBConfig), nil)
 			if err != nil {
 				t.Skipf("Failed to connect to %s: %v", testDB.name, err)
 			}
@@ -342,7 +342,7 @@ func TestIntegration_MultipleConditions(t *testing.T) {
 
 	for _, testDB := range testDatabases {
 		t.Run(testDB.name, func(t *testing.T) {
-			database, err := db.NewDB(testDB.config.(db.DBConfig), nil)
+			database, err := v1.NewDB(testDB.config.(v1.DBConfig), nil)
 			if err != nil {
 				t.Skipf("Failed to connect to %s: %v", testDB.name, err)
 			}
@@ -397,7 +397,7 @@ func TestIntegration_Delete(t *testing.T) {
 
 	for _, testDB := range testDatabases {
 		t.Run(testDB.name, func(t *testing.T) {
-			database, err := db.NewDB(testDB.config.(db.DBConfig), nil)
+			database, err := v1.NewDB(testDB.config.(v1.DBConfig), nil)
 			if err != nil {
 				t.Skipf("Failed to connect to %s: %v", testDB.name, err)
 			}
@@ -430,7 +430,7 @@ func TestIntegration_TransactionCommit(t *testing.T) {
 
 	for _, testDB := range testDatabases {
 		t.Run(testDB.name, func(t *testing.T) {
-			database, err := db.NewDB(testDB.config.(db.DBConfig), nil)
+			database, err := v1.NewDB(testDB.config.(v1.DBConfig), nil)
 			if err != nil {
 				t.Skipf("Failed to connect to %s: %v", testDB.name, err)
 			}
@@ -440,7 +440,7 @@ func TestIntegration_TransactionCommit(t *testing.T) {
 			testDB.setupFn(t, database)
 
 			ctx := context.Background()
-			err = database.WithTransaction(ctx, func(tx db.Tx) error {
+			err = database.WithTransaction(ctx, func(tx v1.Tx) error {
 				_, err := tx.Insert(ctx, "users", map[string]any{
 					"name":   "Iris Taylor",
 					"email":  "iris@example.com",
@@ -486,7 +486,7 @@ func TestIntegration_GetByID(t *testing.T) {
 
 	for _, testDB := range testDatabases {
 		t.Run(testDB.name, func(t *testing.T) {
-			database, err := db.NewDB(testDB.config.(db.DBConfig), nil)
+			database, err := v1.NewDB(testDB.config.(v1.DBConfig), nil)
 			if err != nil {
 				t.Skipf("Failed to connect to %s: %v", testDB.name, err)
 			}
@@ -518,7 +518,7 @@ func TestIntegration_ConditionalQuery(t *testing.T) {
 
 	for _, testDB := range testDatabases {
 		t.Run(testDB.name, func(t *testing.T) {
-			database, err := db.NewDB(testDB.config.(db.DBConfig), nil)
+			database, err := v1.NewDB(testDB.config.(v1.DBConfig), nil)
 			if err != nil {
 				t.Skipf("Failed to connect to %s: %v", testDB.name, err)
 			}
@@ -561,7 +561,7 @@ func TestIntegration_SingleInsert(t *testing.T) {
 
 	for _, testDB := range testDatabases {
 		t.Run(testDB.name, func(t *testing.T) {
-			database, err := db.NewDB(testDB.config.(db.DBConfig), nil)
+			database, err := v1.NewDB(testDB.config.(v1.DBConfig), nil)
 			if err != nil {
 				t.Skipf("Failed to connect to %s: %v", testDB.name, err)
 			}
@@ -615,7 +615,7 @@ func TestIntegration_TransactionRollback(t *testing.T) {
 
 	for _, testDB := range testDatabases {
 		t.Run(testDB.name, func(t *testing.T) {
-			database, err := db.NewDB(testDB.config.(db.DBConfig), nil)
+			database, err := v1.NewDB(testDB.config.(v1.DBConfig), nil)
 			if err != nil {
 				t.Skipf("Failed to connect to %s: %v", testDB.name, err)
 			}
@@ -634,7 +634,7 @@ func TestIntegration_TransactionRollback(t *testing.T) {
 			initialCount := len(initialUsers)
 
 			// Attempt transaction that will rollback (simulate error)
-			err = database.WithTransaction(ctx, func(tx db.Tx) error {
+			err = database.WithTransaction(ctx, func(tx v1.Tx) error {
 				// Insert a record
 				_, errInsert := tx.Insert(ctx, "users", map[string]any{
 					"name":   "George Taylor",
@@ -677,7 +677,7 @@ func TestIntegration_RawQuery(t *testing.T) {
 
 	for _, testDB := range testDatabases {
 		t.Run(testDB.name, func(t *testing.T) {
-			database, err := db.NewDB(testDB.config.(db.DBConfig), nil)
+			database, err := v1.NewDB(testDB.config.(v1.DBConfig), nil)
 			if err != nil {
 				t.Skipf("Failed to connect to %s: %v", testDB.name, err)
 			}
@@ -726,7 +726,7 @@ func TestIntegration_OrConditions(t *testing.T) {
 
 	for _, testDB := range testDatabases {
 		t.Run(testDB.name, func(t *testing.T) {
-			database, err := db.NewDB(testDB.config.(db.DBConfig), nil)
+			database, err := v1.NewDB(testDB.config.(v1.DBConfig), nil)
 			if err != nil {
 				t.Skipf("Failed to connect to %s: %v", testDB.name, err)
 			}
@@ -775,7 +775,7 @@ func TestIntegration_ComplexNestedConditions(t *testing.T) {
 
 	for _, testDB := range testDatabases {
 		t.Run(testDB.name, func(t *testing.T) {
-			database, err := db.NewDB(testDB.config.(db.DBConfig), nil)
+			database, err := v1.NewDB(testDB.config.(v1.DBConfig), nil)
 			if err != nil {
 				t.Skipf("Failed to connect to %s: %v", testDB.name, err)
 			}
@@ -828,7 +828,7 @@ func TestIntegration_UpdateMultipleRows(t *testing.T) {
 
 	for _, testDB := range testDatabases {
 		t.Run(testDB.name, func(t *testing.T) {
-			database, err := db.NewDB(testDB.config.(db.DBConfig), nil)
+			database, err := v1.NewDB(testDB.config.(v1.DBConfig), nil)
 			if err != nil {
 				t.Skipf("Failed to connect to %s: %v", testDB.name, err)
 			}
@@ -882,7 +882,7 @@ func TestIntegration_DeleteMultipleRows(t *testing.T) {
 
 	for _, testDB := range testDatabases {
 		t.Run(testDB.name, func(t *testing.T) {
-			database, err := db.NewDB(testDB.config.(db.DBConfig), nil)
+			database, err := v1.NewDB(testDB.config.(v1.DBConfig), nil)
 			if err != nil {
 				t.Skipf("Failed to connect to %s: %v", testDB.name, err)
 			}
@@ -931,7 +931,7 @@ func TestIntegration_GetByIDRaw(t *testing.T) {
 
 	for _, testDB := range testDatabases {
 		t.Run(testDB.name, func(t *testing.T) {
-			database, err := db.NewDB(testDB.config.(db.DBConfig), nil)
+			database, err := v1.NewDB(testDB.config.(v1.DBConfig), nil)
 			if err != nil {
 				t.Skipf("Failed to connect to %s: %v", testDB.name, err)
 			}
@@ -947,7 +947,7 @@ func TestIntegration_GetByIDRaw(t *testing.T) {
 			if err != nil {
 				t.Fatalf("GetByIDRaw failed: %v", err)
 			}
-			u, err := db.ScanRowsTo[User](context.Background(), usersRaw)
+			u, err := v1.ScanRowsTo[User](context.Background(), usersRaw)
 			if err != nil {
 				t.Fatalf("ScanRowsTo failed: %v", err)
 			}
@@ -979,7 +979,7 @@ func TestIntegration_NotEqualOperator(t *testing.T) {
 
 	for _, testDB := range testDatabases {
 		t.Run(testDB.name, func(t *testing.T) {
-			database, err := db.NewDB(testDB.config.(db.DBConfig), nil)
+			database, err := v1.NewDB(testDB.config.(v1.DBConfig), nil)
 			if err != nil {
 				t.Skipf("Failed to connect to %s: %v", testDB.name, err)
 			}
@@ -1021,7 +1021,7 @@ func TestIntegration_InOperator(t *testing.T) {
 
 	for _, testDB := range testDatabases {
 		t.Run(testDB.name, func(t *testing.T) {
-			database, err := db.NewDB(testDB.config.(db.DBConfig), nil)
+			database, err := v1.NewDB(testDB.config.(v1.DBConfig), nil)
 			if err != nil {
 				t.Skipf("Failed to connect to %s: %v", testDB.name, err)
 			}
@@ -1068,7 +1068,7 @@ func getInt64(v any) int64 {
 
 // setupSQLiteTestDB creates and seeds SQLite database
 func setupSQLiteTestDB(t *testing.T, database interface{}) {
-	db := database.(db.DB)
+	db := database.(v1.DB)
 	ctx := context.Background()
 
 	// Create tables
@@ -1122,7 +1122,7 @@ func setupSQLiteTestDB(t *testing.T, database interface{}) {
 //
 //nolint:dupl
 func setupMySQLTestDB(t *testing.T, database interface{}) {
-	db := database.(db.DB)
+	db := database.(v1.DB)
 	ctx := context.Background()
 
 	// Drop and create fresh tables
@@ -1180,7 +1180,7 @@ func setupMySQLTestDB(t *testing.T, database interface{}) {
 //
 //nolint:dupl
 func setupPostgresTestDB(t *testing.T, database interface{}) {
-	db := database.(db.DB)
+	db := database.(v1.DB)
 	ctx := context.Background()
 
 	// Drop and create fresh tables
@@ -1238,7 +1238,7 @@ func setupPostgresTestDB(t *testing.T, database interface{}) {
 //
 //nolint:dupl
 func setupMSSQLTestDB(t *testing.T, database interface{}) {
-	db := database.(db.DB)
+	db := database.(v1.DB)
 	ctx := context.Background()
 
 	// Drop and create fresh tables

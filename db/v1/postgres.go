@@ -1,5 +1,5 @@
 // Package db provides database abstraction interfaces and implementations for multiple database engines.
-package db
+package v1
 
 import (
 	"context"
