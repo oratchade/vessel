@@ -5,10 +5,8 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"maps"
 	"os"
 	"path/filepath"
-	"slices"
 	"strings"
 	"time"
 
@@ -184,30 +182,139 @@ func (dm *DBManager) Stop() {
 	}
 }
 
-// readOnlyEntry returns a read-only DBEntry using round-robin selection.
+// readOnlyEntry returns a read-only DBEntry using a hybrid priority + round-robin selection strategy.
+//
+// Selection Strategy:
+//  1. Priority-Based: Selects the entry group with the highest priority value
+//  2. Load Balanced: If multiple entries share the same highest priority, distributes
+//     queries using round-robin within that priority tier
+//
+// Use Cases:
+//   - Single highest priority: Always routes to that entry (e.g., primary database)
+//   - Multiple same-priority: Balances load among them (e.g., replica1 and replica2)
+//   - Priority tiers: Automatically routes to replicas only if primary unavailable
+//
+// Example Configuration:
+//
+//	entries:
+//	  - name: primary-db
+//	    priority: 100        # Always preferred
+//	    type: read-only
+//	  - name: replica-1
+//	    priority: 50         # Fallback tier
+//	    type: read-only
+//	  - name: replica-2
+//	    priority: 50         # Load-balanced with replica-1
+//	    type: read-only
+//
+// Round-Robin Details:
+//   - Uses atomic counter for thread-safe distribution
+//   - No locking required; highly efficient for high-concurrency scenarios
+//   - Order within priority tier is non-deterministic due to map iteration
+//
+// Returns nil if no read-only entries are configured.
 func (dm *DBManager) readOnlyEntry() *DBEntry {
-	names := slices.Collect(maps.Keys(dm.readOnlyEntries))
-	if len(names) == 0 {
+	entries := dm.readOnlyEntries
+	if len(entries) == 0 {
 		return nil
 	}
 
-	idx := dm.readWorkerIdx.Next() % int64(len(names))
-	name := names[idx]
+	if len(entries) == 1 {
+		for _, entry := range entries {
+			return entry
+		}
+	}
 
-	return dm.readOnlyEntries[name]
+	// Find the maximum priority among all entries
+	var maxPriority int
+	for _, entry := range entries {
+		if entry.Priority() > maxPriority {
+			maxPriority = entry.Priority()
+		}
+	}
+
+	// Collect all entries with the maximum priority
+	var priorityEntries []*DBEntry
+	for _, entry := range entries {
+		if entry.Priority() == maxPriority {
+			priorityEntries = append(priorityEntries, entry)
+		}
+	}
+
+	// If only one entry with max priority, return it
+	if len(priorityEntries) == 1 {
+		return priorityEntries[0]
+	}
+
+	// Multiple entries with same max priority: use round-robin among them
+	idx := dm.readWorkerIdx.Next() % int64(len(priorityEntries))
+	return priorityEntries[idx]
 }
 
-// readWriteEntry returns a read-write DBEntry using round-robin selection.
+// readWriteEntry returns a read-write DBEntry using a hybrid priority + round-robin selection strategy.
+//
+// Selection Strategy:
+//  1. Priority-Based: Selects the entry group with the highest priority value
+//  2. Load Balanced: If multiple entries share the same highest priority, distributes
+//     queries using round-robin within that priority tier
+//
+// Use Cases:
+//   - Single highest priority: Always routes to that entry (e.g., primary database)
+//   - Multiple same-priority: Balances write load among them (e.g., writer-1 and writer-2)
+//   - Priority tiers: Automatically routes to secondaries only if primary unavailable
+//
+// Example Configuration:
+//
+//	entries:
+//	  - name: primary-writer
+//	    priority: 100        # Always preferred for writes
+//	    type: read-write
+//	  - name: secondary-writer
+//	    priority: 50         # Fallback for writes
+//	    type: read-write
+//
+// Round-Robin Details:
+//   - Uses atomic counter for thread-safe distribution
+//   - No locking required; highly efficient for high-concurrency scenarios
+//   - Order within priority tier is non-deterministic due to map iteration
+//
+// Returns nil if no read-write entries are configured.
 func (dm *DBManager) readWriteEntry() *DBEntry {
-	names := slices.Collect(maps.Keys(dm.readWriteEntries))
-	if len(names) == 0 {
+	entries := dm.readWriteEntries
+	if len(entries) == 0 {
 		return nil
 	}
 
-	idx := dm.writeWorkerIdx.Next() % int64(len(names))
-	name := names[idx]
+	if len(entries) == 1 {
+		for _, entry := range entries {
+			return entry
+		}
+	}
 
-	return dm.readWriteEntries[name]
+	// Find the maximum priority among all entries
+	var maxPriority int
+	for _, entry := range entries {
+		if entry.Priority() > maxPriority {
+			maxPriority = entry.Priority()
+		}
+	}
+
+	// Collect all entries with the maximum priority
+	var priorityEntries []*DBEntry
+	for _, entry := range entries {
+		if entry.Priority() == maxPriority {
+			priorityEntries = append(priorityEntries, entry)
+		}
+	}
+
+	// If only one entry with max priority, return it
+	if len(priorityEntries) == 1 {
+		return priorityEntries[0]
+	}
+
+	// Multiple entries with same max priority: use round-robin among them
+	idx := dm.writeWorkerIdx.Next() % int64(len(priorityEntries))
+	return priorityEntries[idx]
 }
 
 // Get fetches data from the database based on the specified table, columns, and conditions.
@@ -219,7 +326,7 @@ func (dm *DBManager) Get(
 	joins []condition.Join,
 	cond condition.Condition,
 	opts *options.QueryOptions,
-) chan<- *QueryResponse {
+) <-chan *QueryResponse {
 	q := &Query{
 		Request: ReqGet,
 		Data: &QueryData{
@@ -247,7 +354,7 @@ func (dm *DBManager) GetRaw(
 	joins []condition.Join,
 	cond condition.Condition,
 	opts *options.QueryOptions,
-) chan<- *QueryResponse {
+) <-chan *QueryResponse {
 	q := &Query{
 		Request: ReqGetRaw,
 		Data: &QueryData{
@@ -274,7 +381,7 @@ func (dm *DBManager) GetByID(
 	id any,
 	joins []condition.Join,
 	opts *options.QueryOptions,
-) chan<- *QueryResponse {
+) <-chan *QueryResponse {
 	q := &Query{
 		Request: ReqGetByID,
 		Data: &QueryData{
@@ -300,7 +407,7 @@ func (dm *DBManager) GetByIDRaw(
 	id any,
 	joins []condition.Join,
 	opts *options.QueryOptions,
-) chan<- *QueryResponse {
+) <-chan *QueryResponse {
 	q := &Query{
 		Request: ReqGetByIDRaw,
 		Data: &QueryData{
@@ -325,7 +432,7 @@ func (dm *DBManager) Insert(
 	table string,
 	data map[string]any,
 	opts *options.QueryOptions,
-) chan<- *QueryResponse {
+) <-chan *QueryResponse {
 	q := &Query{
 		Request: ReqInsert,
 		Data: &QueryData{
@@ -349,7 +456,7 @@ func (dm *DBManager) Inserts(
 	table string,
 	data []map[string]any,
 	opts *options.QueryOptions,
-) chan<- *QueryResponse {
+) <-chan *QueryResponse {
 	q := &Query{
 		Request: ReqInserts,
 		Data: &QueryData{
@@ -375,7 +482,7 @@ func (dm *DBManager) Update(
 	cond condition.Condition,
 	joins []condition.Join,
 	opts *options.QueryOptions,
-) chan<- *QueryResponse {
+) <-chan *QueryResponse {
 	q := &Query{
 		Request: ReqUpdate,
 		Data: &QueryData{
@@ -401,7 +508,7 @@ func (dm *DBManager) Delete(
 	cond condition.Condition,
 	joins []condition.Join,
 	opts *options.QueryOptions,
-) chan<- *QueryResponse {
+) <-chan *QueryResponse {
 	q := &Query{
 		Request: ReqDelete,
 		Data: &QueryData{
@@ -419,7 +526,7 @@ func (dm *DBManager) Delete(
 }
 
 // Query executes a raw query against the database and returns the results.
-func (dm *DBManager) Query(ctx context.Context, dbName string, query string, args ...any) chan<- *QueryResponse {
+func (dm *DBManager) Query(ctx context.Context, dbName string, query string, args ...any) <-chan *QueryResponse {
 	q := &Query{
 		Request: ReqQuery,
 		Data: &QueryData{
@@ -436,7 +543,7 @@ func (dm *DBManager) Query(ctx context.Context, dbName string, query string, arg
 }
 
 // Exec executes a raw query against the database and returns the execution result.
-func (dm *DBManager) Exec(ctx context.Context, dbName string, query string, args ...any) chan<- *QueryResponse {
+func (dm *DBManager) Exec(ctx context.Context, dbName string, query string, args ...any) <-chan *QueryResponse {
 	q := &Query{
 		Request: ReqExec,
 		Data: &QueryData{

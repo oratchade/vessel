@@ -26,6 +26,7 @@ type DBEntry struct {
 
 	db db.DB
 
+	healthy        bool
 	healthInterval time.Duration
 	priority       int
 
@@ -76,6 +77,16 @@ func newDBEntry(ctx context.Context, mc *config.ManagerConfig, cfg *config.Confi
 		readWorkerIdx:  *NewAtomicWrapCounter(int64(len(readQueue))),
 	}
 	return dbe, nil
+}
+
+// Priority returns the priority of the DBEntry, which is used for query routing and load balancing decisions.
+func (de *DBEntry) Priority() int {
+	return de.priority
+}
+
+// Health returns the health status of the DBEntry.
+func (de *DBEntry) Health() bool {
+	return de.healthy
 }
 
 // start launches worker goroutines for processing read and write queries.
