@@ -1,0 +1,61 @@
+# DBManager Configuration Example
+# Three-tier setup: Primary for writes, Replicas for reads
+
+# Global defaults for all entries
+writeQueueSize: 1000 # Write operation queue size
+readQueueSize: 2000 # Read operation queue size
+writeWorkers: 4 # Worker goroutines for writes
+readWorkers: 8 # Worker goroutines for reads
+healthInterval: 30s # Health check interval
+
+entries:
+  # Primary database - receives ALL write queries
+  - name: primary-db
+    type: read-write # Accepts reads AND writes
+    priority: 100 # Highest priority = always used
+    database: postgres # Driver type
+
+    # Per-entry configuration overrides (optional)
+    writeWorkers: 2 # Only 2 writers for primary
+
+    # Database-specific connection config
+    config:
+      user: postgres
+      password: secure_password
+      host: localhost
+      port: 5432
+      database: myapp
+      sslmode: disable
+
+  # Read-only replica 1 - Used if primary down
+  - name: replica-1
+    type: read-only # Read queries only
+    priority: 50 # Secondary tier
+    database: postgres
+
+    config:
+      user: postgres
+      password: secure_password
+      host: localhost
+      port: 5433
+      database: myapp
+      sslmode: disable
+
+  # Read-only replica 2 - Load-balanced with replica-1
+  - name: replica-2
+    type: read-only
+    priority: 50 # Same as replica-1 → load-balanced
+    database: postgres
+
+    config:
+      user: postgres
+      password: secure_password
+      host: localhost
+      port: 5434
+      database: myapp
+      sslmode: disable
+
+# Query routing behavior:
+# 1. Write queries (Insert, Update, Delete) → Always goes to primary-db
+# 2. Read queries (Get, GetByID, Query) → Alternates between replica-1 and replica-2
+# 3. If primary-db is down → Read queries still work on replicas

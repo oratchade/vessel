@@ -467,6 +467,20 @@ log.Printf("Wait Count: %d\n", stats.WaitCount)
 log.Printf("Wait Duration: %v\n", stats.WaitDuration)
 ```
 
+## Multi-Database Management
+
+The `DBManager` provides seamless access to multiple database connections with priority-based routing, automatic load-balancing, and async queries. Perfect for scenarios with primary/replica setups, multi-region deployments, or application-level sharding.
+
+**Key Features:**
+
+- 🎯 **Priority-Based Selection** - Route queries to preferred databases
+- ⚖️ **Load Balancing** - Distribute queries among same-priority databases
+- 🔧 **Worker Pools** - Configurable read/write workers per database
+- 📬 **Async Queries** - Channel-based responses for non-blocking operations
+- 🛡️ **Backpressure Handling** - Bounded queues prevent resource exhaustion
+
+For complete guide, configuration examples, and use cases, see [docs/DBManager.md](./docs/DBManager.md). Working examples available in [examples/manager-example/](./examples/manager-example/).
+
 ## Plugin System
 
 The db-connector supports a registry-based plugin system that allows you to register custom database drivers without modifying the core library.
