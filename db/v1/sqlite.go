@@ -13,13 +13,13 @@ import (
 	semconv "go.opentelemetry.io/otel/semconv/v1.37.0"
 	"go.opentelemetry.io/otel/trace"
 
-	"tounilab.com/db-connector/db/v1/dberror"
-	builder "tounilab.com/db-connector/internal/pkg/builder"
-	oh "tounilab.com/db-connector/internal/pkg/otel"
-	"tounilab.com/db-connector/internal/pkg/sqldialect"
-	cdt "tounilab.com/db-connector/pkg/query/condition"
-	"tounilab.com/db-connector/pkg/query/definition"
-	"tounilab.com/db-connector/pkg/query/options"
+	"tounilab.com/fabric/db/v1/dberror"
+	builder "tounilab.com/fabric/internal/pkg/builder"
+	oh "tounilab.com/fabric/internal/pkg/otel"
+	"tounilab.com/fabric/internal/pkg/sqldialect"
+	cdt "tounilab.com/fabric/pkg/query/condition"
+	"tounilab.com/fabric/pkg/query/definition"
+	"tounilab.com/fabric/pkg/query/options"
 )
 
 // SQLiteConfig holds configuration for connecting to a SQLITE database.

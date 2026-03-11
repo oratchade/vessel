@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"time"
 
-	db "tounilab.com/db-connector/db/v1"
+	db "tounilab.com/fabric/db/v1"
 )
 
 type DBType = string

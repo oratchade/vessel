@@ -4,7 +4,7 @@ package helpers
 import (
 	"strings"
 
-	"tounilab.com/db-connector/pkg/query/condition"
+	"tounilab.com/fabric/pkg/query/condition"
 )
 
 // QuoteIdentifierSlice returns a slice of identifiers where each dotted segment

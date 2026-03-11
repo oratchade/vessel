@@ -6,9 +6,9 @@ import (
 
 	"github.com/stretchr/testify/assert"
 
-	"tounilab.com/db-connector/internal/pkg/builder"
-	"tounilab.com/db-connector/internal/pkg/sqldialect"
-	"tounilab.com/db-connector/pkg/query/condition"
+	"tounilab.com/fabric/internal/pkg/builder"
+	"tounilab.com/fabric/internal/pkg/sqldialect"
+	"tounilab.com/fabric/pkg/query/condition"
 )
 
 func convertQuotedExpected(base, left, right string) string {

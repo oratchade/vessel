@@ -258,7 +258,7 @@ package main
 import (
     "context"
     "log"
-    "tounilab.com/db-connector/manager/v1"
+    "tounilab.com/fabric/manager/v1"
 )
 
 func main() {

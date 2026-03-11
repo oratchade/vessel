@@ -5,9 +5,9 @@ import (
 	"context"
 	"fmt"
 
-	builder "tounilab.com/db-connector/internal/pkg/builder"
-	cdt "tounilab.com/db-connector/pkg/query/condition"
-	"tounilab.com/db-connector/pkg/query/options"
+	builder "tounilab.com/fabric/internal/pkg/builder"
+	cdt "tounilab.com/fabric/pkg/query/condition"
+	"tounilab.com/fabric/pkg/query/options"
 )
 
 // dbOpts holds common database operation dependencies used by helper functions.

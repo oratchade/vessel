@@ -6,8 +6,8 @@ import (
 	"os"
 	"time"
 
-	v1 "tounilab.com/db-connector/manager/v1"
-	"tounilab.com/db-connector/pkg/query/condition"
+	v1 "tounilab.com/fabric/manager/v1"
+	"tounilab.com/fabric/pkg/query/condition"
 )
 
 // Example: Basic DBManager Usage

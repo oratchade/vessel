@@ -8,8 +8,8 @@ import (
 	reflect "reflect"
 
 	gomock "github.com/golang/mock/gomock"
-	condition "tounilab.com/db-connector/pkg/query/condition"
-	options "tounilab.com/db-connector/pkg/query/options"
+	condition "tounilab.com/fabric/pkg/query/condition"
+	options "tounilab.com/fabric/pkg/query/options"
 )
 
 // MockQueryBuilder is a mock of QueryBuilder interface.

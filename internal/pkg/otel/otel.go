@@ -30,7 +30,7 @@ var (
 func initTracer() {
 	once.Do(func() {
 		enabled = isOTELEnabled()
-		tracer = otel.Tracer("tounilab.com/db-connector")
+		tracer = otel.Tracer("tounilab.com/fabric")
 		noopTracer = noop.NewTracerProvider().Tracer("noop")
 	})
 }

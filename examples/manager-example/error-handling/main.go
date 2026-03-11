@@ -7,8 +7,8 @@ import (
 	"os"
 	"time"
 
-	"tounilab.com/db-connector/db/v1/dberror"
-	v1 "tounilab.com/db-connector/manager/v1"
+	"tounilab.com/fabric/db/v1/dberror"
+	v1 "tounilab.com/fabric/manager/v1"
 )
 
 // Example: Error Handling with DBManager

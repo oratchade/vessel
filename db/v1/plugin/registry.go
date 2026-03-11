@@ -28,7 +28,7 @@
 // Then users can import your plugin and use it with NewDB:
 //
 //	import (
-//		"tounilab.com/db-connector/db/v1"
+//		"tounilab.com/fabric/db/v1"
 //		_ "mydb"  // Auto-registers via init()
 //	)
 //

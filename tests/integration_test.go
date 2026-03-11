@@ -12,8 +12,8 @@ import (
 	_ "github.com/lib/pq"
 	_ "github.com/mattn/go-sqlite3"
 
-	v1 "tounilab.com/db-connector/db/v1"
-	"tounilab.com/db-connector/pkg/query/condition"
+	v1 "tounilab.com/fabric/db/v1"
+	"tounilab.com/fabric/pkg/query/condition"
 )
 
 const (

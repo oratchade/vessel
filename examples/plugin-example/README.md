@@ -178,8 +178,8 @@ package myplugin
 import (
     "context"
     "fmt"
-    "tounilab.com/db-connector/db/v1"
-    "tounilab.com/db-connector/db/v1/plugin"
+    "tounilab.com/fabric/db/v1"
+    "tounilab.com/fabric/db/v1/plugin"
 )
 
 // Config implements db.DBConfig

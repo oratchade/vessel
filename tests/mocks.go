@@ -3,7 +3,7 @@ package tests
 import (
 	"strings"
 
-	"tounilab.com/db-connector/pkg/query/options"
+	"tounilab.com/fabric/pkg/query/options"
 )
 
 // Mock SQLDialect for testing

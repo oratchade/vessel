@@ -5,8 +5,8 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
-	"tounilab.com/db-connector/pkg/query/condition"
-	"tounilab.com/db-connector/tests"
+	"tounilab.com/fabric/pkg/query/condition"
+	"tounilab.com/fabric/tests"
 )
 
 func TestOr_ToSQL_AllValid(t *testing.T) {

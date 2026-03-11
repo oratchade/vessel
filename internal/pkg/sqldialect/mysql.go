@@ -4,9 +4,9 @@ package sqldialect
 import (
 	"strings"
 
-	"tounilab.com/db-connector/internal/pkg/operator"
-	"tounilab.com/db-connector/pkg/query/definition"
-	"tounilab.com/db-connector/pkg/query/options"
+	"tounilab.com/fabric/internal/pkg/operator"
+	"tounilab.com/fabric/pkg/query/definition"
+	"tounilab.com/fabric/pkg/query/options"
 )
 
 // MySQLDialect implements SQL dialect behavior used by MySQL and SQLite.

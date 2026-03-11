@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"strings"
 
-	"tounilab.com/db-connector/internal/pkg/operator"
+	"tounilab.com/fabric/internal/pkg/operator"
 )
 
 // JoinCdt represents a pair of columns used for JOIN conditions.

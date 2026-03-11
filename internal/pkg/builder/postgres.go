@@ -1,7 +1,7 @@
 package builder
 
 import (
-	cdt "tounilab.com/db-connector/pkg/query/condition"
+	cdt "tounilab.com/fabric/pkg/query/condition"
 )
 
 // PostgresQueryBuilder is an alias of MSSQLQueryBuilder configured for Postgres.

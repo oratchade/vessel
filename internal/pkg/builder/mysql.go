@@ -5,9 +5,9 @@ import (
 	"fmt"
 	"strings"
 
-	"tounilab.com/db-connector/internal/pkg/operator"
-	cdt "tounilab.com/db-connector/pkg/query/condition"
-	"tounilab.com/db-connector/pkg/query/options"
+	"tounilab.com/fabric/internal/pkg/operator"
+	cdt "tounilab.com/fabric/pkg/query/condition"
+	"tounilab.com/fabric/pkg/query/options"
 )
 
 // MySQLQueryBuilder builds SQL queries that are compatible with MySQL dialects.

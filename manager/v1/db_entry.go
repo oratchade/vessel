@@ -6,8 +6,8 @@ import (
 	"fmt"
 	"time"
 
-	db "tounilab.com/db-connector/db/v1"
-	"tounilab.com/db-connector/manager/v1/config"
+	db "tounilab.com/fabric/db/v1"
+	"tounilab.com/fabric/manager/v1/config"
 )
 
 // dbEntryWorker represents a worker that processes queries for a DBEntry. Each worker has its own queue of QueryData.

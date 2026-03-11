@@ -6,9 +6,9 @@ import (
 	"sort"
 	"strings"
 
-	cdt "tounilab.com/db-connector/pkg/query/condition"
-	"tounilab.com/db-connector/pkg/query/definition"
-	"tounilab.com/db-connector/pkg/query/options"
+	cdt "tounilab.com/fabric/pkg/query/condition"
+	"tounilab.com/fabric/pkg/query/definition"
+	"tounilab.com/fabric/pkg/query/options"
 )
 
 //go:generate mockgen -source=builder.go -destination=builder_mocks.go -package=builder QueryBuilder

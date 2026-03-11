@@ -8,8 +8,8 @@ import (
 	reflect "reflect"
 
 	gomock "github.com/golang/mock/gomock"
-	definition "tounilab.com/db-connector/pkg/query/definition"
-	options "tounilab.com/db-connector/pkg/query/options"
+	definition "tounilab.com/fabric/pkg/query/definition"
+	options "tounilab.com/fabric/pkg/query/options"
 )
 
 // MockCondition is a mock of Condition interface.

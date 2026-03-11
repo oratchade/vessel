@@ -13,10 +13,10 @@ import (
 	"github.com/pelletier/go-toml/v2"
 	"gopkg.in/yaml.v3"
 
-	db "tounilab.com/db-connector/db/v1"
-	"tounilab.com/db-connector/manager/v1/config"
-	"tounilab.com/db-connector/pkg/query/condition"
-	"tounilab.com/db-connector/pkg/query/options"
+	db "tounilab.com/fabric/db/v1"
+	"tounilab.com/fabric/manager/v1/config"
+	"tounilab.com/fabric/pkg/query/condition"
+	"tounilab.com/fabric/pkg/query/options"
 )
 
 // setupDBs initializes DBEntry maps for read-only and read-write databases based on the provided configuration.

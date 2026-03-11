@@ -5,11 +5,11 @@ import (
 	"fmt"
 	"strings"
 
-	"tounilab.com/db-connector/internal/pkg/helpers"
-	"tounilab.com/db-connector/internal/pkg/operator"
-	"tounilab.com/db-connector/pkg/query/condition"
-	"tounilab.com/db-connector/pkg/query/definition"
-	"tounilab.com/db-connector/pkg/query/options"
+	"tounilab.com/fabric/internal/pkg/helpers"
+	"tounilab.com/fabric/internal/pkg/operator"
+	"tounilab.com/fabric/pkg/query/condition"
+	"tounilab.com/fabric/pkg/query/definition"
+	"tounilab.com/fabric/pkg/query/options"
 )
 
 // supportedOptions builds SQL fragments for query options like ORDER BY, LIMIT, OFFSET, and RETURNING

@@ -1,4 +1,4 @@
-module tounilab.com/db-connector
+module tounilab.com/fabric
 
 go 1.26.0
 

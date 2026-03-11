@@ -3,8 +3,8 @@
 package condition
 
 import (
-	"tounilab.com/db-connector/pkg/query/definition"
-	"tounilab.com/db-connector/pkg/query/options"
+	"tounilab.com/fabric/pkg/query/definition"
+	"tounilab.com/fabric/pkg/query/options"
 )
 
 //go:generate mockgen -source=condition.go -destination=condition_mocks.go -package=condition Condition

@@ -16,7 +16,7 @@ db-connector provides structured error handling with:
 The library defines sentinel errors in `db/v1/dberror` for common database conditions:
 
 ```go
-import "tounilab.com/db-connector/db/v1/dberror"
+import "tounilab.com/fabric/db/v1/dberror"
 ```
 
 ### Common Sentinel Errors
@@ -35,7 +35,7 @@ import "tounilab.com/db-connector/db/v1/dberror"
 import (
     "errors"
     "log"
-    dberror "tounilab.com/db-connector/db/v1/dberror"
+    dberror "tounilab.com/fabric/db/v1/dberror"
 )
 
 result, err := database.Insert(ctx, "users", map[string]any{
@@ -303,7 +303,7 @@ logQuery("insert", "users", err)
 ### Mock Error Scenarios
 
 ```go
-import dberror "tounilab.com/db-connector/db/v1/dberror"
+import dberror "tounilab.com/fabric/db/v1/dberror"
 
 // In tests, you can inject specific errors via mocks
 mockDB := &MockDB{

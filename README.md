@@ -20,7 +20,7 @@ A lightweight, multi-database SQL abstraction library for Go with support for My
 ## Installation
 
 ```bash
-go get tounilab.com/db-connector
+go get tounilab.com/fabric
 ```
 
 Requires Go 1.26.0 or later.
@@ -73,7 +73,7 @@ import (
     "context"
     "log"
 
-    db "tounilab.com/db-connector/db/v1"
+    db "tounilab.com/fabric/db/v1"
 )
 
 func main() {
@@ -160,8 +160,8 @@ log.Printf("Inserted %d rows\n", result.RowsAffected)
 
 ```go
 import (
-    db "tounilab.com/db-connector/db/v1"
-    cdt "tounilab.com/db-connector/pkg/query/condition"
+    db "tounilab.com/fabric/db/v1"
+    cdt "tounilab.com/fabric/pkg/query/condition"
 )
 
 updates := map[string]any{
@@ -240,7 +240,7 @@ for _, row := range results {
 For advanced use cases, use `ScanRowsTo` to efficiently scan rows into strongly-typed structs:
 
 ```go
-import db "tounilab.com/db-connector/db/v1"
+import db "tounilab.com/fabric/db/v1"
 
 // Define your struct matching SELECT columns
 type User struct {
@@ -436,7 +436,7 @@ database, err := db.NewDB(db.MSSQLConfig{
 The library provides structured error handling with database-dialect-specific error mapping. See [ERROR_HANDLING.md](./ERROR_HANDLING.md) for comprehensive guidance on error handling patterns.
 
 ```go
-import "tounilab.com/db-connector/db/v1/dberror"
+import "tounilab.com/fabric/db/v1/dberror"
 
 result, err := database.Insert(ctx, "users", data, nil)
 if err != nil {
@@ -495,8 +495,8 @@ package mydb
 import (
     "context"
     "fmt"
-    db "tounilab.com/db-connector/db/v1"
-    "tounilab.com/db-connector/db/v1/plugin"
+    db "tounilab.com/fabric/db/v1"
+    "tounilab.com/fabric/db/v1/plugin"
 )
 
 // Config implements db.DBConfig for your custom database
@@ -539,7 +539,7 @@ Simply import the plugin package (with blank import `_`) and use it:
 
 ```go
 import (
-    "tounilab.com/db-connector/db/v1"
+    "tounilab.com/fabric/db/v1"
     _ "mydb"  // Auto-registers via init()
 )
 

@@ -8,7 +8,7 @@ import (
 	"sync/atomic"
 	"time"
 
-	v1 "tounilab.com/db-connector/manager/v1"
+	v1 "tounilab.com/fabric/manager/v1"
 )
 
 // Example: Priority-Based Selection and Async Processing
