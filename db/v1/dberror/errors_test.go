@@ -67,7 +67,7 @@ func TestMySQLErrorMapper(t *testing.T) {
 		{
 			name:        "syntax error",
 			err:         errors.New("Error 1064: syntax error"),
-			expectedErr: dberror.ErrGrammarError,
+			expectedErr: dberror.ErrSyntaxError,
 		},
 		{
 			name:        "unknown error",
@@ -109,7 +109,7 @@ func TestPostgresErrorMapper(t *testing.T) {
 		{
 			name:        "syntax error via SQLSTATE 42601",
 			err:         errors.New("ERROR 42601: syntax error"),
-			expectedErr: dberror.ErrGrammarError,
+			expectedErr: dberror.ErrSyntaxError,
 		},
 		{
 			name:        "unknown error",
@@ -146,7 +146,7 @@ func TestSQLiteErrorMapper(t *testing.T) {
 		{
 			name:        "syntax error",
 			err:         errors.New("syntax error in SELECT statement"),
-			expectedErr: dberror.ErrGrammarError,
+			expectedErr: dberror.ErrSyntaxError,
 		},
 		{
 			name:        "unknown error",
@@ -189,7 +189,7 @@ func TestMSSQLErrorMapper(t *testing.T) {
 		{
 			name:        "syntax error",
 			err:         errors.New("Incorrect syntax near keyword SELECT"),
-			expectedErr: dberror.ErrGrammarError,
+			expectedErr: dberror.ErrSyntaxError,
 		},
 		{
 			name:        "unknown error",
