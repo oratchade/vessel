@@ -1,11 +1,12 @@
 # DBManager - Multi-Database Management
 
-The `DBManager` is an advanced component of db-connector that manages multiple database connections simultaneously with intelligent routing, automatic failover, and async operations.
+The `DBManager` is an advanced component of fabric that manages multiple database connections simultaneously with intelligent routing, automatic failover, and async operations.
 
 ## Table of Contents
 
 - [Overview](#overview)
 - [Architecture](#architecture)
+- [Health Monitoring](#health-monitoring)
 - [Configuration](#configuration)
 - [Priority-Based Selection](#priority-based-selection)
 - [Usage](#usage)
@@ -28,14 +29,15 @@ Use DBManager when you need:
 
 ### Key Concepts
 
-| Concept         | Description                                                               |
-| --------------- | ------------------------------------------------------------------------- |
-| **Entry**       | A single database connection configuration (name, type, priority, config) |
-| **Type**        | Either `read-only` (for read queries) or `read-write` (for read+write)    |
-| **Priority**    | Integer (0-infinite) controlling selection order; higher = preferred      |
-| **Worker Pool** | Goroutines handling database queries for an entry (separate read/write)   |
-| **Queue**       | Bounded channel holding pending queries (backpressure mechanism)          |
-| **Async API**   | Channel-based query responses; non-blocking, fire-and-forget pattern      |
+| Concept         | Description                                                                     |
+| --------------- | ------------------------------------------------------------------------------- |
+| **Entry**       | A single database connection configuration (name, type, priority, config)       |
+| **Type**        | Either `read-only` (for read queries) or `read-write` (for read+write)          |
+| **Priority**    | Integer (0-infinite) controlling selection order; higher = preferred            |
+| **Health**      | Periodic `Ping()` checks; marks database unhealthy after 5 consecutive failures |
+| **Worker Pool** | Goroutines handling database queries for an entry (separate read/write)         |
+| **Queue**       | Bounded channel holding pending queries (backpressure mechanism)                |
+| **Async API**   | Channel-based query responses; non-blocking, fire-and-forget pattern            |
 
 ## Architecture
 
@@ -55,43 +57,63 @@ Built-in Constants (DefaultReadQueueSize = 1000)
 
 ### Selection Strategy
 
+**DBManager uses a health-first selection strategy with intelligent fallback:**
+
 ```
-┌─────────────────────────────────────┐
-│  Incoming Query (Get, Insert, etc)  │
-└──────────────┬──────────────────────┘
-               ↓
-          ┌─────────────────────────────────────┐
-          │ readOnlyEntry() / readWriteEntry()  │
-          │ (Priority-based selection)          │
-          └──────────┬────────────────────────┘
-                     ↓
-            Find maximum priority
-                     ↓
-         Collect all entries with max priority
-                     ↓
+        ┌─────────────────────────────────────┐
+        │  Incoming Query (Get, Insert, etc)  │
+        └──────────────┬──────────────────────┘
+                       ↓
+        ┌─────────────────────────────────────┐
+        │ readOnlyEntry() / readWriteEntry()  │
+        │ (Health-first routing)              │
+        └──────────┬──────────────────────────┘
+                   ↓
+        ┌───────────────────────────────┐
+        │ Try HEALTHY entries with      │
+        │ highest priority              │
+        └───────────┬───────────────────┘
+                    ↓
+        Found healthy entry? YES → Select using round-robin
+                    ↓
+            NO (all unhealthy)
+                    ↓
+        ┌───────────────────────────────┐
+        │ Fallback to ALL entries       │
+        │ by highest priority           │
+        │ (graceful degradation)        │
+        └───────────┬───────────────────┘
+                    ↓
       Single entry:          Multiple entries:
       Return directly    →   Round-robin distribute
                              (atomic counter)
-                     ↓
-          ┌──────────────────────┐
-          │ Select DBEntry       │
-          └──────────┬─────────────┘
-                     ↓
-          ┌──────────────────────┐
-          │ Route to queue       │
-          │ (read or write)      │
-          └──────────┬─────────────┘
-                     ↓
-          ┌──────────────────────┐
-          │ Worker processes     │
-          │ executes query       │
-          └──────────┬─────────────┘
-                     ↓
-          ┌──────────────────────┐
-          │ Send response via    │
-          │ channel             │
-          └──────────────────────┘
+                    ↓
+        ┌──────────────────────┐
+        │ Select DBEntry       │
+        └──────────┬───────────┘
+                   ↓
+        ┌──────────────────────┐
+        │ Route to queue       │
+        │ (read or write)      │
+        └──────────┬───────────┘
+                   ↓
+        ┌──────────────────────┐
+        │ Worker processes     │
+        │ executes query       │
+        └──────────┬───────────┘
+                   ↓
+        ┌──────────────────────┐
+        │ Send response via    │
+        │ channel              │
+        └──────────────────────┘
 ```
+
+**Key Benefits:**
+
+- ✅ Automatically avoids failed databases
+- ✅ Reduces latency by routing to responsive connections
+- ✅ Gracefully degrades when unhealthy databases exist
+- ✅ Transparent to callers (no API changes)
 
 ### Worker Pool Pattern
 
@@ -113,6 +135,76 @@ Database Entry
 - ✅ Backpressure: Bounded queues prevent memory exhaustion
 - ✅ Isolation: Read/write operations don't compete for resources
 - ✅ Scalability: Configurable worker counts per database
+
+## Health Monitoring
+
+### How Health Checking Works
+
+Each database entry runs a periodic health check goroutine that:
+
+1. **Checks connectivity** - Executes `Ping()` at configured interval (default: 30s)
+2. **Tracks failures** - Increments failure counter on errors
+3. **Marks unhealthy** - Database marked unhealthy after 5 consecutive failures
+4. **Recovery** - Resets to healthy immediately on next successful `Ping()`
+
+**Health Status:** Stored with atomic operations (thread-safe, lock-free)
+
+### Health Check Example
+
+Given this configuration:
+
+```yaml
+healthInterval: 30s # Check every 30 seconds
+
+entries:
+  - name: primary
+    priority: 100
+  - name: replica
+    priority: 50
+```
+
+**Scenario:** Primary database becomes unavailable at time T
+
+- **T + 0s:** First failure detected → failureCount = 1
+- **T + 30s:** Second failure → failureCount = 2
+- **T + 60s:** Third failure → failureCount = 3
+- **T + 90s:** Fourth failure → failureCount = 4
+- **T + 120s:** Fifth failure → failureCount = 5 → **Mark UNHEALTHY**
+
+**Routing Before T+120s:** Queries use primary database (highest priority)
+
+**Routing After T+120s:** Queries automatically route to replica (healthy, next priority)
+
+**Recovery:** When primary recovers and `Ping()` succeeds → immediately returns to HEALTHY
+
+### Configuration
+
+Health check interval is configurable globally and per-entry:
+
+```yaml
+# Global default (all entries)
+healthInterval: 30s
+
+entries:
+  - name: primary
+    healthInterval: 10s # More frequent checks for critical database
+
+  - name: replica
+    healthInterval: 60s # Less frequent for non-critical
+```
+
+### Health Status Visibility
+
+Access current health status programmatically:
+
+```go
+entry := dm.readOnlyEntries["primary"]
+if entry.Health() {
+    log.Println("Primary database is healthy")
+} else {
+    log.Println("Primary database is unhealthy")
+}
+```
 
 ## Configuration
 
@@ -191,7 +283,26 @@ Result: Write queries go to primary-writer; if unavailable, alternate between re
 
 ### How Selection Works
 
-**Example 1: Single Priority**
+DBManager selects entries using a **health-aware priority system:**
+
+1. **Health-First:** Filters for healthy entries only (those with successful recent `Ping()`)
+2. **Priority-Based:** Among healthy entries, selects the group with highest priority
+3. **Load-Balanced:** Within same priority, distributes using round-robin with atomic counter
+4. **Graceful Fallback:** If no healthy entries exist, uses all entries ranked by priority
+
+**Selection Hierarchy:**
+
+```
+HEALTHY + HIGHEST PRIORITY + ROUND-ROBIN
+    ↓ (if no healthy with highest priority)
+HEALTHY + NEXT PRIORITY + ROUND-ROBIN
+    ↓ (if no healthy entries at all)
+UNHEALTHY + HIGHEST PRIORITY + ROUND-ROBIN
+    ↓ (last resort)
+nil (no entries available)
+```
+
+### Example 1: Single Priority (Health-Aware Failover)
 
 ```yaml
 entries:
@@ -201,9 +312,25 @@ entries:
     priority: 50
 ```
 
-→ All queries always go to `primary` until it fails
+### Example 1: Single Priority (Health-Aware Failover)
 
-**Example 2: Load Balancing**
+```yaml
+entries:
+  - name: primary
+    priority: 100
+  - name: secondary
+    priority: 50
+```
+
+**Routing Behavior:**
+
+- **While primary is healthy:** All queries → primary (highest priority)
+- **When primary becomes unhealthy:** Automatically route → secondary (highest healthy priority)
+- **When primary recovers:** Automatically resume → primary (highest priority, now healthy)
+
+**No code changes required** - health-aware routing is automatic and transparent.
+
+### Example 2: Load Balancing (Health-Aware)
 
 ```yaml
 entries:
@@ -213,9 +340,25 @@ entries:
     priority: 50
 ```
 
-→ Queries are round-robin distributed between both replicas
+### Example 2: Load Balancing (Health-Aware)
 
-**Example 3: Tiered Failover**
+```yaml
+entries:
+  - name: replica-us-east
+    priority: 50
+  - name: replica-us-west
+    priority: 50
+```
+
+**Routing Behavior:**
+
+- **Both healthy:** Load-balanced round-robin between both replicas
+- **One unhealthy:** All queries → remaining healthy replica
+- **Both unhealthy:** Graceful fallback - queries continue using both (with potential errors logged)
+
+**Benefits:** Automatic handling of replica failures without reconfiguration.
+
+### Example 3: Tiered Failover (Health-Aware)
 
 ```yaml
 entries:
@@ -227,7 +370,26 @@ entries:
     priority: 10
 ```
 
-→ Primary used first → EU replica if primary fails → US replica as last resort
+### Example 3: Tiered Failover (Health-Aware)
+
+```yaml
+entries:
+  - name: primary-eu-central
+    priority: 100
+  - name: replica-eu-west
+    priority: 50
+  - name: replica-us-east
+    priority: 10
+```
+
+**Routing Behavior:**
+
+- **Primary healthy:** Primary receives all queries
+- **Primary unhealthy:** EU replica (priority 50) receives all queries
+- **Primary + EU unhealthy:** US replica (priority 10) receives all queries
+- **All unhealthy:** Fallback to highest priority (primary) - graceful degradation
+
+**Advantages:** Automatic cascading failover based on health status, with smart fallback to ensure service availability.
 
 ### Thread-Safe Round-Robin
 
@@ -659,17 +821,48 @@ entries:
 
 ✅ **DO:**
 
-- Use 0-100+ scale (e.g., 100, 50, 10) for clarity
+- Use hierarchical priority structures (100, 50, 10) for clarity
 - Document your priority strategy in code comments
-- Use consistent priority values across environments
+- Consider geographic proximity or response latency when setting priorities
+- Use health-first selection to avoid unreliable databases automatically
 
 ❌ **DON'T:**
 
-- Use the same priority for primary and replicas
+- Use the same priority for primary and replicas (defeats failover)
 - Change priorities without understanding the impact
 - Use negative priorities
+- Assume unhealthy databases won't receive queries (they will if all healthy are down)
 
-### 3. Resource Allocation
+### 3. Health Monitoring
+
+✅ **DO:**
+
+- Set appropriate health check intervals (30-60s for production, 5-10s for development)
+- Monitor health status via logs or metrics
+- Alert when databases remain unhealthy for extended periods
+- Configure different intervals for critical vs non-critical databases
+
+❌ **DON'T:**
+
+- Set health check interval too low (excessive Ping() overhead)
+- Ignore unhealthy database alerts
+- Assume health checks have zero performance impact (they don't)
+- Disable health checks in production (they catch failures quickly)
+
+**Example: Health-Aware Configuration**
+
+```yaml
+entries:
+  - name: primary
+    priority: 100
+    healthInterval: 10s # Check critical database frequently
+
+  - name: replica
+    priority: 50
+    healthInterval: 30s # Check replica less frequently
+```
+
+### 4. Resource Allocation
 
 ✅ **DO:**
 
@@ -688,42 +881,51 @@ entries:
 ✅ **DO:**
 
 - Always check `resp.Error` before processing `resp.Data`
-- Distinguish between permanent errors (logs) and transient errors (retry)
+- Distinguish between permanent errors (logs) and transient errors (retry/failover)
 - Set timeouts on channel reads to avoid indefinite hangs
+- Monitor and alert on repeated errors from specific databases
 
 ❌ **DON'T:**
 
 - Ignore errors silently
 - Block forever on channel reads
 - Assume queries will always succeed
+- Treat all errors identically (some indicate health issues)
 
 ### 5. Async Operations
 
 ✅ **DO:**
 
 - Use goroutines for I/O-bound processing
-- Implement backoff for retries
-- Use `context.WithTimeout()` for operations
+- Implement backoff for retries on transient failures
+- Use `context.WithTimeout()` for operations with deadlines
+- Configure health check intervals based on acceptable failover time
 
 ❌ **DON'T:**
 
 - Block on every response channel (defeats async benefit)
 - Fire unlimited concurrent queries (will hit backpressure)
 - Ignore context cancellation
+- Rely on health checks alone for error handling (use proper error checks too)
 
 ### 6. Testing
 
 ✅ **DO:**
 
-- Test with multiple database entries
+- Test with multiple database entries at different priorities
 - Test priority selection with entry failures
 - Test queue backpressure scenarios
+- **Test health-aware routing** - verify healthy entries are preferred
+- **Test graceful degradation** - verify fallback to unhealthy when all are down
+- Test automatic recovery when unhealthy entries return to health
 
 ❌ **DON'T:**
 
 - Test only happy path
 - Assume all entries stay up forever
 - Skip load testing before production
+- Forget to test failover scenarios
+- Test only the first entry in configuration (round-robin matters)
 
 ## Troubleshooting
 
@@ -736,6 +938,7 @@ entries:
 1. Queue full (backpressure activated) → increase `writeQueueSize`/`readQueueSize`
 2. Workers overloaded → increase `writeWorkers`/`readWorkers`
 3. Database connection slow → increase `MaxOpenConns` in database config
+4. All databases unhealthy → queries falling back to unhealthy entries (slower, more errors)
 
 **Solution:**
 
@@ -744,57 +947,177 @@ writeQueueSize: 5000 # Increase queue
 readQueueSize: 5000
 writeWorkers: 8 # Add workers
 readWorkers: 16
+healthInterval: 10s # Detect failures faster
 ```
 
-### High Memory Usage
+### Health Check Not Detecting Failures
 
-**Symptom:** Memory grows continuously.
+**Symptom:** Database is down but queries still route to it; takes too long to failover.
 
 **Causes:**
 
-1. Queue sizes too large
-2. Unclosed `RowsAdapter` from `GetRaw()`/`QueryRaw()`
-3. Memory leak in worker goroutines
+1. `healthInterval` is too long (default 30s, takes up to 150s to mark unhealthy)
+2. Database is intermittently failing (needs 5 consecutive failures)
+3. Health check network connectivity different from query path
 
 **Solution:**
 
-- Reduce queue sizes
-- Always `defer rowsAdapter.Close()`
-- Check logs for goroutine leaks
+```yaml
+# For critical databases, use faster health checks
+entries:
+  - name: primary
+    priority: 100
+    healthInterval: 5s # Fail over within 25 seconds (5 failures × 5s)
+
+  - name: replica
+    priority: 50
+    healthInterval: 30s # Non-critical, standard interval
+```
+
+**Example Health Check Timeline:**
+
+With `healthInterval: 5s`:
+
+- **T + 0s:** Network partition, first `Ping()` fails
+- **T + 5s:** Second failure (failureCount = 2)
+- **T + 10s:** Third failure (failureCount = 3)
+- **T + 15s:** Fourth failure (failureCount = 4)
+- **T + 20s:** Fifth failure (failureCount = 5) → **UNHEALTHY**
+- **Queries now route to next priority entry** (happened within 25 seconds)
+
+### Queries Route to Unhealthy Database
+
+**Symptom:** Queries fail even though another database is available and healthy.
+
+**Causes:**
+
+1. The unhealthy database has higher priority - attempting graceful degradation
+2. All databases are unhealthy (no healthy entries available)
+3. Health check shows database as healthy but it's actually slow/failing
+
+**Solution:**
+
+```go
+// Check health status
+if !entry.Health() {
+    log.Printf("Entry %s is unhealthy\n", entry.Name())
+}
+
+// Verify routing logic
+readOnlyEntry := dm.readOnlyEntry()
+log.Printf("Selected entry: %s (healthy: %v)\n", readOnlyEntry.Name(), readOnlyEntry.Health())
+```
+
+**If all databases are unhealthy:**
+
+- This is graceful fallback behavior (prevents complete service loss)
+- All queries route to highest priority entry
+- Investigate why all databases are failing:
+  - Network partition?
+  - All databases down?
+  - Changed credentials?
+  - Resource exhaustion?
 
 ### Queries Always Route to Same Database
 
-**Symptom:** Only one database receives queries.
+**Symptom:** Only one database receives queries despite multiple configured entries.
 
 **Causes:**
 
-1. Multiple entries have different priorities (correct behavior)
-2. High-priority entry is unavailable but health check hasn't detected it yet
+1. Multiple entries have different priorities (correct - highest priority used)
+2. Lower-priority entries are all unhealthy (correct - healthy entries preferred)
+3. All same-priority entries healthy (round-robin should work, but may appear like one)
 
 **Solution:**
 
-- Verify priority configuration
-- Check health check interval is reasonable
-- Look at logs to see which entry is selected
+- Verify all entries are configured with appropriate priorities
+- Check health status with `entry.Health()`:
 
-### Panic: "all databases down"
+  ```go
+  for name, entry := range dm.readOnlyEntries {
+      log.Printf("%s: healthy=%v, priority=%d\n", name, entry.Health(), entry.Priority())
+  }
+  ```
 
-**Symptom:** Panic when no entries are available.
+- Confirm round-robin working by monitoring distribution over time
+- Add metrics to track queries per entry
+
+### All Databases Are Unhealthy
+
+**Symptom:** Repeated error messages; all database connections failing.
 
 **Causes:**
 
-1. Misconfigured entries
-2. All databases are unreachable
-3. Configuration file not found
+1. Real infrastructure failure - all databases actually down
+2. Network partition - queries can't reach any database
+3. Authentication failure - wrong credentials in all entries
+4. Firewall/security group blocking all databases
+
+**Troubleshooting Steps:**
+
+1. **Check health status:**
+
+   ```go
+   for name, entry := range dm.readOnlyEntries {
+       if !entry.Health() {
+           log.Printf("%s is unhealthy\n", name)
+       }
+   }
+   ```
+
+2. **Manual connectivity test:**
+
+   ```bash
+   psql -h primary.example.com -U user -d database
+   psql -h replica.example.com -U user -d database
+   ```
+
+3. **Check logs for specific error:**
+   - Connection refused → database not running
+   - Authentication failed → wrong credentials
+   - Network unreachable → firewall/routing issue
+   - No such host → DNS issue
+
+4. **Verify health check behavior:**
+   - Look for health check error logs
+   - Confirm `healthInterval` is set reasonably
+   - Manual Ping() test from application host
+
+### Panic: "all databases down" or nil entry returned
+
+**Symptom:** Panic or nil pointer error when trying to use returned entry.
+
+**Causes:**
+
+1. No entries configured (empty configuration)
+2. All entries failed to initialize
+3. Configuration file not found or invalid
 
 **Solution:**
 
-- Verify config file syntax: `go run examples/manager-example/*.go`
-- Check database connectivity manually
-- Review logs for specific errors
+```go
+dm, err := v1.NewDBManager("config.yaml")
+if err != nil {
+    log.Fatalf("Failed to create DBManager: %v", err)
+}
+
+if err := dm.Start(ctx); err != nil {
+    log.Fatalf("Failed to start DBManager: %v", err)
+}
+
+// Verify at least one entry is available
+readOnlyEntry := dm.readOnlyEntry()
+if readOnlyEntry == nil {
+    log.Fatal("No read-only entries available")
+}
+```
+
+- Verify config file syntax: `cat config.yaml | yaml lint`
+- Check database connectivity before using DBManager
+- Review logs for initialization errors
 
 ## See Also
 
-- [db-connector README](../README.md)
+- [fabric README](../README.md)
 - [ERROR_HANDLING.md](./ERROR_HANDLING.md)
 - [examples/manager-example/](../examples/manager-example/)

@@ -1,6 +1,6 @@
 # Releases
 
-All notable changes to db-connector are documented in [CHANGELOG.md](./CHANGELOG.md). This page provides release management information, version support, and roadmap.
+All notable changes to fabric are documented in [CHANGELOG.md](./CHANGELOG.md). This page provides release management information, version support, and roadmap.
 
 For detailed technical changes, see the [CHANGELOG](./CHANGELOG.md).
 
@@ -11,7 +11,7 @@ For detailed technical changes, see the [CHANGELOG](./CHANGELOG.md).
 **Release Date:** March 3, 2026  
 **Status:** ✅ Supported
 
-[Download v1.0.0](https://github.com/oratchade/db-connector/releases/tag/v1.0.0) | [View Detailed Changes](./CHANGELOG.md#100---2026-03-03)
+[Download v1.0.0](https://github.com/oratchade/fabric/releases/tag/v1.0.0) | [View Detailed Changes](./CHANGELOG.md#100---2026-03-03)
 
 First production-ready release with comprehensive documentation, 97+ test cases, and support for MySQL, PostgreSQL, SQLite, and MSSQL.
 
@@ -37,20 +37,20 @@ First production-ready release with comprehensive documentation, 97+ test cases,
 ### Latest Stable (v1.0.0)
 
 ```bash
-go get github.com/oratchade/db-connector
+go get github.com/oratchade/fabric
 ```
 
 ### Specific Version
 
 ```bash
-go get github.com/oratchade/db-connector@v1.0.0
-go get github.com/oratchade/db-connector@v0.9.0
+go get github.com/oratchade/fabric@v1.0.0
+go get github.com/oratchade/fabric@v0.9.0
 ```
 
 ### Development Version
 
 ```bash
-go get github.com/oratchade/db-connector@main
+go get github.com/oratchade/fabric@main
 ```
 
 ---
@@ -197,14 +197,14 @@ Email security issues to: `security@example.com`
 
 ### Official Releases
 
-All releases available at [GitHub Releases](https://github.com/oratchade/db-connector/releases)
+All releases available at [GitHub Releases](https://github.com/oratchade/fabric/releases)
 
 ### Checksums
 
 Verify downloads:
 
 ```bash
-sha256sum -c db-connector-v1.0.0.sha256
+sha256sum -c fabric-v1.0.0.sha256
 ```
 
 ---
@@ -224,8 +224,8 @@ See [CHANGELOG.md](./CHANGELOG.md) for complete deprecation list and migration p
 ## Getting Help
 
 - 📖 [README.md](../README.md) - Quick start and examples
-- 🐛 [Issue Tracker](https://github.com/oratchade/db-connector/issues) - Bug reports
-- 💬 [Discussions](https://github.com/oratchade/db-connector/discussions) - Questions
+- 🐛 [Issue Tracker](https://github.com/oratchade/fabric/issues) - Bug reports
+- 💬 [Discussions](https://github.com/oratchade/fabric/discussions) - Questions
 - 📝 [CHANGELOG.md](./CHANGELOG.md) - Detailed changes
 - 🤝 [CONTRIBUTING.md](../CONTRIBUTING.md) - Developer guide
 
@@ -235,7 +235,7 @@ See [CHANGELOG.md](./CHANGELOG.md) for complete deprecation list and migration p
 
 ### Watch for Releases
 
-[Watch the repository](https://github.com/oratchade/db-connector/subscription) on GitHub for notifications
+[Watch the repository](https://github.com/oratchade/fabric/subscription) on GitHub for notifications
 
 ### Subscribe to Releases
 
@@ -244,14 +244,14 @@ Enable "Releases only" notifications in GitHub
 ### Check Periodically
 
 ```bash
-go list -u -m github.com/oratchade/db-connector
+go list -u -m github.com/oratchade/fabric
 ```
 
 ---
 
 ## License
 
-db-connector is licensed under the MIT License. See [../LICENSE.md](../LICENSE.md) for details.
+fabric is licensed under the MIT License. See [../LICENSE.md](../LICENSE.md) for details.
 
 Changes are tracked in [CHANGELOG.md](./CHANGELOG.md).
 

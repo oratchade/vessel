@@ -37,14 +37,14 @@ This project adheres to the Contributor Covenant Code of Conduct. By participati
 2. Clone your fork locally:
 
    ```bash
-   git clone https://github.com/YOUR_USERNAME/db-connector.git
-   cd db-connector
+   git clone https://github.com/YOUR_USERNAME/fabric.git
+   cd fabric
    ```
 
 3. Add upstream remote:
 
    ```bash
-   git remote add upstream https://github.com/oratchade/db-connector.git
+   git remote add upstream https://github.com/oratchade/fabric.git
    ```
 
 ## Development Setup
@@ -415,7 +415,7 @@ Include:
 
 **Go Version:** go 1.26.0
 **Database:** PostgreSQL 15.2
-**db-connector Version:** v1.0.0
+**fabric Version:** v1.0.0
 
 ### Description
 
@@ -486,7 +486,7 @@ results, err := db.BatchInsert(ctx, "users", []map[string]any{
 
 ```
 
-db-connector/
+fabric/
 ├── db/v1/ # Public API (stable, versioned)
 ├── internal/pkg/ # Internal packages (no stability guarantee)
 ├── pkg/query/ # Query building DSL
@@ -522,7 +522,7 @@ All public packages, types, and functions must have comments:
 ```bash
 # Check documentation coverage
 go doc ./db/v1
-go doc github.com/oratchade/db-connector/db/v1
+go doc github.com/oratchade/fabric/db/v1
 ````
 
 ### User Documentation
@@ -597,6 +597,6 @@ Contributors are recognized in:
 
 ---
 
-Thank you for contributing to db-connector! Your efforts help make this library better for everyone.
+Thank you for contributing to fabric! Your efforts help make this library better for everyone.
 
 **Happy contributing! 🎉**

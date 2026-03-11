@@ -350,7 +350,7 @@ When adding new tests:
 
 ## Related Documentation
 
-- [db-connector README](../README.md)
+- [fabric README](../README.md)
 - [Builder Documentation](../internal/pkg/builder/)
 - [Query Documentation](../pkg/query/)
 - [SQL Dialect Documentation](../internal/pkg/sqldialect/)

@@ -1,6 +1,6 @@
 # Changelog
 
-All notable changes to db-connector are documented in this file. This project adheres to [Semantic Versioning](https://semver.org/) and follows the [Keep a Changelog](https://keepachangelog.com/) format.
+All notable changes to fabric are documented in this file. This project adheres to [Semantic Versioning](https://semver.org/) and follows the [Keep a Changelog](https://keepachangelog.com/) format.
 
 For a high-level overview of releases, see [RELEASES.md](./RELEASES.md). For upgrade instructions between major versions, see [MIGRATION.md](./MIGRATION.md).
 
@@ -318,10 +318,10 @@ All removals have documented migration paths in [MIGRATION.md](./MIGRATION.md).
 
 ## External References
 
-- [GitHub Releases](https://github.com/oratchade/db-connector/releases)
-- [Commit History](https://github.com/oratchade/db-connector/commits/main)
-- [Pull Requests](https://github.com/oratchade/db-connector/pulls)
-- [Issues](https://github.com/oratchade/db-connector/issues)
+- [GitHub Releases](https://github.com/oratchade/fabric/releases)
+- [Commit History](https://github.com/oratchade/fabric/commits/main)
+- [Pull Requests](https://github.com/oratchade/fabric/pulls)
+- [Issues](https://github.com/oratchade/fabric/issues)
 
 ---
 

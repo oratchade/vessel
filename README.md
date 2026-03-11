@@ -483,7 +483,7 @@ For complete guide, configuration examples, and use cases, see [docs/DBManager.m
 
 ## Plugin System
 
-The db-connector supports a registry-based plugin system that allows you to register custom database drivers without modifying the core library.
+The fabric supports a registry-based plugin system that allows you to register custom database drivers without modifying the core library.
 
 ### Creating a Custom Driver
 

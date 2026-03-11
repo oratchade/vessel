@@ -1,10 +1,10 @@
 # Error Handling Guide
 
-This guide explains how to properly handle errors in db-connector applications.
+This guide explains how to properly handle errors in fabric applications.
 
 ## Overview
 
-db-connector provides structured error handling with:
+fabric provides structured error handling with:
 
 1. **Sentinel Errors** - Specific error types for common database errors
 2. **Error Mapping** - Dialect-specific error translation (MySQL, PostgreSQL, SQLite, MSSQL)
@@ -114,7 +114,7 @@ Each database dialect maps its native errors to sentinel errors:
 
 ## Error Wrapping and Context
 
-All errors from db-connector include context through error wrapping:
+All errors from fabric include context through error wrapping:
 
 ```go
 import "errors"
@@ -406,7 +406,7 @@ func (cb *CircuitBreaker) Call(fn func() error) error {
 
 ## Migration Guide: Error Handling Updates
 
-When upgrading db-connector, check the changelog for error handling changes:
+When upgrading fabric, check the changelog for error handling changes:
 
 1. **New Sentinel Errors** - May add new sentinel error types
 2. **Error Message Changes** - Error messages may change between versions

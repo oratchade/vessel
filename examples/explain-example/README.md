@@ -105,6 +105,7 @@ go run ./examples/explain-example
 ```
 
 The example outputs:
+
 - Code snippets showing how to use `Explain()`
 - Expected outputs from different database backends
 - Benefits and use cases for each scenario
@@ -112,6 +113,7 @@ The example outputs:
 ## Database-Specific Outputs
 
 ### PostgreSQL
+
 ```
 Seq Scan on users  (cost=0.00..35.50 rows=333 width=32)
   Filter: (age > 25)
@@ -120,17 +122,20 @@ Execution Time: 0.451 ms
 ```
 
 ### MySQL
+
 ```
 id  select_type  table  partitions  type   possible_keys  key   key_len  ref   rows  filtered  Extra
 1   SIMPLE       users  NULL        ALL    idx_age        NULL  NULL     NULL  1000  50.00     Using where
 ```
 
 ### SQLite
+
 ```
 SCAN users WHERE age > ?
 ```
 
 ### MSSQL
+
 ```
   |--Clustered Index Scan(OBJECT:([db].[dbo].[users]))
        WHERE:[age] > (25)
@@ -143,7 +148,7 @@ SCAN users WHERE age > ?
 ✓ **Portable**: Works across PostgreSQL, MySQL, SQLite, and MSSQL  
 ✓ **Debuggable**: Verify generated SQL matches expectations  
 ✓ **Auditable**: Log all queries without side effects  
-✓ **Optimizable**: Identify missing indexes and optimization opportunities  
+✓ **Optimizable**: Identify missing indexes and optimization opportunities
 
 ## Related Documentation
 

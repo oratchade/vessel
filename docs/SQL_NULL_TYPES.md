@@ -2,7 +2,7 @@
 
 ## Overview
 
-This document describes the implementation of `sql.Null*` type support in the db-connector library's scanning mechanism.
+This document describes the implementation of `sql.Null*` type support in the fabric library's scanning mechanism.
 
 ## What Was Changed
 

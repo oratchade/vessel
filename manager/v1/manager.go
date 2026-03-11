@@ -182,35 +182,33 @@ func (dm *DBManager) Stop() {
 	}
 }
 
-// readOnlyEntry returns a read-only DBEntry using a hybrid priority + round-robin selection strategy.
+// readOnlyEntry returns a read-only DBEntry using a hybrid priority + health + round-robin selection strategy.
 //
 // Selection Strategy:
-//  1. Priority-Based: Selects the entry group with the highest priority value
-//  2. Load Balanced: If multiple entries share the same highest priority, distributes
+//  1. Health-First: Prioritizes healthy entries (determined by health check)
+//  2. Priority-Based: Among healthy entries, selects the entry group with the highest priority
+//  3. Load Balanced: If multiple healthy entries share the same highest priority, distributes
 //     queries using round-robin within that priority tier
+//  4. Fallback: If no healthy entries exist, falls back to unhealthy entries by priority
 //
 // Use Cases:
-//   - Single highest priority: Always routes to that entry (e.g., primary database)
-//   - Multiple same-priority: Balances load among them (e.g., replica1 and replica2)
-//   - Priority tiers: Automatically routes to replicas only if primary unavailable
+//   - Primary healthy: Always routes to primary database
+//   - Primary unhealthy: Automatically routes to healthy replicas
+//   - All unhealthy: Routes to highest priority entry (monitoring can alert)
+//   - Multiple same-priority: Balances load among healthy replicas
 //
 // Example Configuration:
 //
 //	entries:
 //	  - name: primary-db
-//	    priority: 100        # Always preferred
+//	    priority: 100        # Always preferred if healthy
 //	    type: read-only
 //	  - name: replica-1
-//	    priority: 50         # Fallback tier
+//	    priority: 50         # Used if primary is unhealthy
 //	    type: read-only
 //	  - name: replica-2
-//	    priority: 50         # Load-balanced with replica-1
+//	    priority: 50         # Load-balanced with replica-1 if healthy
 //	    type: read-only
-//
-// Round-Robin Details:
-//   - Uses atomic counter for thread-safe distribution
-//   - No locking required; highly efficient for high-concurrency scenarios
-//   - Order within priority tier is non-deterministic due to map iteration
 //
 // Returns nil if no read-only entries are configured.
 func (dm *DBManager) readOnlyEntry() *DBEntry {
@@ -225,58 +223,40 @@ func (dm *DBManager) readOnlyEntry() *DBEntry {
 		}
 	}
 
-	// Find the maximum priority among all entries
-	var maxPriority int
-	for _, entry := range entries {
-		if entry.Priority() > maxPriority {
-			maxPriority = entry.Priority()
-		}
+	// First, try to select from healthy entries
+	selected := dm.selectHealthyEntry(entries)
+	if selected != nil {
+		return selected
 	}
 
-	// Collect all entries with the maximum priority
-	var priorityEntries []*DBEntry
-	for _, entry := range entries {
-		if entry.Priority() == maxPriority {
-			priorityEntries = append(priorityEntries, entry)
-		}
-	}
-
-	// If only one entry with max priority, return it
-	if len(priorityEntries) == 1 {
-		return priorityEntries[0]
-	}
-
-	// Multiple entries with same max priority: use round-robin among them
-	idx := dm.readWorkerIdx.Next() % int64(len(priorityEntries))
-	return priorityEntries[idx]
+	// Fallback: select from all entries if no healthy ones available
+	return dm.selectByPriorityAndRoundRobin(entries, &dm.readWorkerIdx)
 }
 
-// readWriteEntry returns a read-write DBEntry using a hybrid priority + round-robin selection strategy.
+// readWriteEntry returns a read-write DBEntry using a hybrid priority + health + round-robin selection strategy.
 //
 // Selection Strategy:
-//  1. Priority-Based: Selects the entry group with the highest priority value
-//  2. Load Balanced: If multiple entries share the same highest priority, distributes
+//  1. Health-First: Prioritizes healthy entries (determined by health check)
+//  2. Priority-Based: Among healthy entries, selects the entry group with the highest priority
+//  3. Load Balanced: If multiple healthy entries share the same highest priority, distributes
 //     queries using round-robin within that priority tier
+//  4. Fallback: If no healthy entries exist, falls back to unhealthy entries by priority
 //
 // Use Cases:
-//   - Single highest priority: Always routes to that entry (e.g., primary database)
-//   - Multiple same-priority: Balances write load among them (e.g., writer-1 and writer-2)
-//   - Priority tiers: Automatically routes to secondaries only if primary unavailable
+//   - Primary healthy: Always routes writes to primary database
+//   - Primary unhealthy: Automatically routes writes to healthy secondaries
+//   - All unhealthy: Routes to highest priority entry (monitoring can alert)
+//   - Multiple same-priority: Balances write load among healthy entries
 //
 // Example Configuration:
 //
 //	entries:
 //	  - name: primary-writer
-//	    priority: 100        # Always preferred for writes
+//	    priority: 100        # Always preferred if healthy
 //	    type: read-write
 //	  - name: secondary-writer
-//	    priority: 50         # Fallback for writes
+//	    priority: 50         # Used if primary is unhealthy
 //	    type: read-write
-//
-// Round-Robin Details:
-//   - Uses atomic counter for thread-safe distribution
-//   - No locking required; highly efficient for high-concurrency scenarios
-//   - Order within priority tier is non-deterministic due to map iteration
 //
 // Returns nil if no read-write entries are configured.
 func (dm *DBManager) readWriteEntry() *DBEntry {
@@ -291,9 +271,87 @@ func (dm *DBManager) readWriteEntry() *DBEntry {
 		}
 	}
 
+	// First, try to select from healthy entries
+	selected := dm.selectHealthyEntry(entries)
+	if selected != nil {
+		return selected
+	}
+
+	// Fallback: select from all entries if no healthy ones available
+	return dm.selectByPriorityAndRoundRobin(entries, &dm.writeWorkerIdx)
+}
+
+// selectHealthyEntry selects an entry from the provided map using priority and round-robin,
+// considering only healthy entries. Returns nil if no healthy entries are available.
+func (dm *DBManager) selectHealthyEntry(entries map[string]*DBEntry) *DBEntry {
+	if len(entries) == 0 {
+		return nil
+	}
+
+	// Collect healthy entries only
+	var healthyEntries []*DBEntry
+	for _, entry := range entries {
+		if entry.Health() {
+			healthyEntries = append(healthyEntries, entry)
+		}
+	}
+
+	if len(healthyEntries) == 0 {
+		return nil // No healthy entries available
+	}
+
+	if len(healthyEntries) == 1 {
+		return healthyEntries[0]
+	}
+
+	// Find the maximum priority among healthy entries
+	var maxPriority int
+	for _, entry := range healthyEntries {
+		if entry.Priority() > maxPriority {
+			maxPriority = entry.Priority()
+		}
+	}
+
+	// Collect all healthy entries with the maximum priority
+	var priorityEntries []*DBEntry
+	for _, entry := range healthyEntries {
+		if entry.Priority() == maxPriority {
+			priorityEntries = append(priorityEntries, entry)
+		}
+	}
+
+	if len(priorityEntries) == 1 {
+		return priorityEntries[0]
+	}
+
+	// Multiple healthy entries with same max priority: use round-robin
+	// Note: This uses a simple approach; in production, separate counters per entry type might be better
+	idx := dm.readWorkerIdx.Next() % int64(len(priorityEntries))
+	return priorityEntries[idx]
+}
+
+// selectByPriorityAndRoundRobin selects an entry from the provided map using priority and round-robin,
+// without considering health status. Used as a fallback when no healthy entries are available.
+func (dm *DBManager) selectByPriorityAndRoundRobin(entries map[string]*DBEntry, counter *AtomicWrapCounter) *DBEntry {
+	if len(entries) == 0 {
+		return nil
+	}
+
+	if len(entries) == 1 {
+		for _, entry := range entries {
+			return entry
+		}
+	}
+
+	// Convert map to slice to work with entries
+	var entriesList []*DBEntry
+	for _, entry := range entries {
+		entriesList = append(entriesList, entry)
+	}
+
 	// Find the maximum priority among all entries
 	var maxPriority int
-	for _, entry := range entries {
+	for _, entry := range entriesList {
 		if entry.Priority() > maxPriority {
 			maxPriority = entry.Priority()
 		}
@@ -301,19 +359,18 @@ func (dm *DBManager) readWriteEntry() *DBEntry {
 
 	// Collect all entries with the maximum priority
 	var priorityEntries []*DBEntry
-	for _, entry := range entries {
+	for _, entry := range entriesList {
 		if entry.Priority() == maxPriority {
 			priorityEntries = append(priorityEntries, entry)
 		}
 	}
 
-	// If only one entry with max priority, return it
 	if len(priorityEntries) == 1 {
 		return priorityEntries[0]
 	}
 
-	// Multiple entries with same max priority: use round-robin among them
-	idx := dm.writeWorkerIdx.Next() % int64(len(priorityEntries))
+	// Multiple entries with same max priority: use round-robin
+	idx := counter.Next() % int64(len(priorityEntries))
 	return priorityEntries[idx]
 }
 

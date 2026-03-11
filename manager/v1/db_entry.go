@@ -4,6 +4,7 @@ package v1
 import (
 	"context"
 	"fmt"
+	"sync/atomic"
 	"time"
 
 	db "tounilab.com/fabric/db/v1"
@@ -26,7 +27,7 @@ type DBEntry struct {
 
 	db db.DB
 
-	healthy        bool
+	healthy        atomic.Bool
 	healthInterval time.Duration
 	priority       int
 
@@ -86,7 +87,7 @@ func (de *DBEntry) Priority() int {
 
 // Health returns the health status of the DBEntry.
 func (de *DBEntry) Health() bool {
-	return de.healthy
+	return de.healthy.Load()
 }
 
 // start launches worker goroutines for processing read and write queries.
@@ -97,6 +98,8 @@ func (de *DBEntry) start(ctx context.Context) {
 	for i := range de.readQueue {
 		go de.readWorker(ctx, de.readQueue[i])
 	}
+
+	go de.healthCheck(ctx)
 }
 
 // stop closes all worker goroutines and closes the database connection.
@@ -110,6 +113,35 @@ func (de *DBEntry) stop() {
 
 	_ = de.db.Close()
 	de.cancel()
+}
+
+// healthCheck periodically checks the health status of the database connection.
+func (de *DBEntry) healthCheck(ctx context.Context) {
+	ticker := time.NewTicker(de.healthInterval)
+	defer ticker.Stop()
+
+	failureCount := 0
+	const maxFailures = 5 // Mark unhealthy after 5 consecutive failures
+
+	for {
+		select {
+		case <-ticker.C:
+			err := de.db.Ping(ctx)
+			if err != nil {
+				failureCount++
+				if failureCount >= maxFailures {
+					de.healthy.Store(false)
+				}
+
+				continue
+			}
+			// Success: reset failure count and mark healthy
+			failureCount = 0
+			de.healthy.Store(true)
+		case <-ctx.Done():
+			return
+		}
+	}
 }
 
 // writeWorker processes write queries from its queue and executes them against the database.
