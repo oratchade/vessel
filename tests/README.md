@@ -1,6 +1,6 @@
-# Integration Tests for db-connector
+# Integration Tests for fabric
 
-This directory contains comprehensive integration tests for the db-connector library, testing support for SQLite, MySQL, PostgreSQL, and MSSQL databases.
+This directory contains comprehensive integration tests for the fabric library, testing support for SQLite, MySQL, PostgreSQL, and MSSQL databases.
 
 ## Overview
 

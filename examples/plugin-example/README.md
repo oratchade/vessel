@@ -1,10 +1,10 @@
 # Plugin System Example
 
-This directory demonstrates how to implement custom database drivers using the **db-connector plugin system**.
+This directory demonstrates how to implement custom database drivers using the **fabric plugin system**.
 
 ## Overview
 
-The db-connector plugin system allows you to register custom database drivers without modifying the core library. This example shows:
+The fabric plugin system allows you to register custom database drivers without modifying the core library. This example shows:
 
 1. **CockroachDB Plugin** - A complete driver implementation wrapping PostgreSQL (since CockroachDB is wire-compatible)
 2. **Main Example** - How to use custom plugins in your application
@@ -144,7 +144,7 @@ defer database.Close()
 
 ### 3. Use the Database
 
-All standard db-connector operations work:
+All standard fabric operations work:
 
 ```go
 // Insert

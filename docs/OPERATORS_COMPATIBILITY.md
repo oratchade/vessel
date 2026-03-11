@@ -1,6 +1,6 @@
 # SQL Operator Compatibility Matrix
 
-This document defines which query operators are supported by each database dialect in db-connector.
+This document defines which query operators are supported by each database dialect in fabric.
 
 ## Operator Support by Database
 

@@ -1,6 +1,6 @@
-# Contributing to db-connector
+# Contributing to fabric
 
-Thank you for your interest in contributing to db-connector! This document provides guidelines and instructions for contributing to the project.
+Thank you for your interest in contributing to fabric! This document provides guidelines and instructions for contributing to the project.
 
 ## Table of Contents
 

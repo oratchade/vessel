@@ -1,9 +1,9 @@
-# db-connector
+# fabric
 
 A lightweight, multi-database SQL abstraction library for Go with support for MySQL, PostgreSQL, SQLite, and MSSQL.
 
-[![GoDoc](https://godoc.org/github.com/oratchade/db-connector?status.svg)](https://godoc.org/github.com/oratchade/db-connector)
-[![Go Report Card](https://goreportcard.com/badge/github.com/oratchade/db-connector)](https://goreportcard.com/report/github.com/oratchade/db-connector)
+[![GoDoc](https://godoc.org/github.com/oratchade/fabric?status.svg)](https://godoc.org/github.com/oratchade/fabric)
+[![Go Report Card](https://goreportcard.com/badge/github.com/oratchade/fabric)](https://goreportcard.com/report/github.com/oratchade/fabric)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
 ## Features
@@ -659,8 +659,8 @@ MIT License - see [LICENSE.md](./LICENSE.md)
 ## Support
 
 - 📖 [Full API Documentation](./docs)
-- 🐛 [Issue Tracker](https://github.com/oratchade/db-connector/issues)
-- 💬 [Discussions](https://github.com/oratchade/db-connector/discussions)
+- 🐛 [Issue Tracker](https://github.com/oratchade/fabric/issues)
+- 💬 [Discussions](https://github.com/oratchade/fabric/discussions)
 
 ## Changelog
 

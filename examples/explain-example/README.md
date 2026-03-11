@@ -97,8 +97,8 @@ plan, _ := database.Explain(ctx, query, args...)
 ## Running the Example
 
 ```bash
-# Navigate to the db-connector directory
-cd db-connector
+# Navigate to the fabric directory
+cd fabric
 
 # Run the example (this outputs expected results and explanations)
 go run ./examples/explain-example
@@ -147,9 +147,9 @@ SCAN users WHERE age > ?
 
 ## Related Documentation
 
-- [Query Introspection Guide](https://github.com/oratchade/db-connector#query-introspection-and-performance-analysis) in README.md
-- [DBQueries Interface](https://github.com/oratchade/db-connector/docs/CODE_REVIEW.md#dbqueries-interface) in CODE_REVIEW.md
-- [Operators Compatibility](https://github.com/oratchade/db-connector/docs/OPERATORS_COMPATIBILITY.md)
+- [Query Introspection Guide](https://github.com/oratchade/fabric#query-introspection-and-performance-analysis) in README.md
+- [DBQueries Interface](https://github.com/oratchade/fabric/docs/CODE_REVIEW.md#dbqueries-interface) in CODE_REVIEW.md
+- [Operators Compatibility](https://github.com/oratchade/fabric/docs/OPERATORS_COMPATIBILITY.md)
 
 ## Common Use Cases
 

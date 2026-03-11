@@ -308,5 +308,5 @@ for i := 0; i < 1000; i++ {
 ## See Also
 
 - [DBManager Documentation](../../docs/DBManager.md) - Complete guide
-- [db-connector README](../../README.md) - Library overview
-- [examples/](../) - Other db-connector examples
+- [fabric README](../../README.md) - Library overview
+- [examples/](../) - Other fabric examples
