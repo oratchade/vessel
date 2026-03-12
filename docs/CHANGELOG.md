@@ -2,7 +2,7 @@
 
 All notable changes to fabric are documented in this file. This project adheres to [Semantic Versioning](https://semver.org/) and follows the [Keep a Changelog](https://keepachangelog.com/) format.
 
-For a high-level overview of releases, see [RELEASES.md](./RELEASES.md). For upgrade instructions between major versions, see [MIGRATION.md](./MIGRATION.md).
+For a high-level overview of releases, see [RELEASES.md](./RELEASES.md).
 
 ## [Unreleased]
 
@@ -11,9 +11,8 @@ For a high-level overview of releases, see [RELEASES.md](./RELEASES.md). For upg
 #### Added
 
 - Extended type support (time.Time, UUID, custom JSON types)
-- Batch insert/upsert operations
+- Batch upsert operations
 - Query result caching layer
-- OpenTelemetry integration (optional)
 - Performance benchmarks suite
 - Query builder chaining enhancements
 
@@ -66,28 +65,45 @@ For a high-level overview of releases, see [RELEASES.md](./RELEASES.md). For upg
   - SQL Null types: `sql.NullString`, `sql.NullInt64`, `sql.NullFloat64`, `sql.NullBool`, `sql.NullTime`
   - Automatic type coercion in row scanning
 
+- **DBManager** - Multi-database management system with:
+  - Health-first routing with intelligent fallback
+  - Separate read-only and read-write database pools
+  - Priority-based database selection
+  - Worker pool pattern for concurrent query handling
+  - Async query operations via channel-based API
+  - Automatic health checking with configurable intervals
+  - Load balancing via round-robin distribution
+  - Configuration via JSON, YAML, or TOML files
+  - Support for application-level sharding and geographic distribution
+
+- **OpenTelemetry Integration** - Distributed tracing and observability
+  - Automatic instrumentation of all database operations
+  - Span tracking for queries, transactions, and row scanning
+  - Configurable via `OTEL_ENABLED` environment variable
+  - Zero overhead when disabled (no-op tracer provider)
+
 #### Documentation
 
-- **README.md** - Comprehensive feature overview with 7+ code examples
-- **ERROR_HANDLING.md** - Complete error handling guide with patterns and recovery strategies
-- **CONTRIBUTING.md** - Developer guidelines with:
-  - Development setup instructions
-  - Code style and comment standards
-  - Testing guidelines
-  - Pull request process with GitHub template
-  - Issue reporting templates
+- **README.md** - Comprehensive feature overview with 10+ code examples covering basic connections, queries, inserts, bulk operations, and transactions
+- **ERROR_HANDLING.md** - Complete error handling guide with patterns and recovery strategies for all dialects
+- **CONTRIBUTING.md** - Developer guidelines with setup instructions, code style, testing guidelines, and PR process
+- **DBManager.md** - Comprehensive guide to multi-database management with architecture, configuration, and best practices
 - **RELEASES.md** - Version history, roadmap, and release management
-- **OPERATORS_COMPATIBILITY.md** - Operator support matrix per dialect
-- **SQL_NULL_TYPES.md** - NULL type handling guide
+- **OPERATORS_COMPATIBILITY.md** - Detailed operator support matrix per database dialect
+- **SQL_NULL_TYPES.md** - Guide to handling nullable SQL types in Go structs
+- **INTEGRATION_TESTING.md** - Setup and execution guide for integration tests across all databases
+- **LOAD_HANDLING_ROADMAP.md** - Planned performance and load handling features
 - **Code Comments** - 100% compliance with Go effective comment standards (all packages, types, exported functions documented)
 
 #### Testing
 
-- 97+ comprehensive test cases across 4 test suites
-- Unit tests for all core functionality
+- 260+ comprehensive test cases (241 unit tests + 20 integration tests)
+- Unit tests for all core functionality with 100% pass rate
+- Integration tests across all supported databases (MySQL, PostgreSQL, SQLite, MSSQL)
 - Mock generation via `go:generate` for testability
 - Error mapping tests for all dialects
 - Test build tags for proper test isolation
+- Zero test failures
 
 #### Quality Assurance
 
@@ -155,10 +171,10 @@ For a high-level overview of releases, see [RELEASES.md](./RELEASES.md). For upg
 ### Known Issues
 
 - Integration tests require Docker for full database testing
-- `ScanRowsTo()` does not support `time.Time` (use string parsing)
-- Batch operations require manual transaction wrapping
 - Window functions have limited support on SQLite and MSSQL
 - No built-in migration framework
+- Planned: Batch insert/update operations (planned for v1.1.0)
+- Planned: Extended type support for time.Time and UUID (planned for v1.1.0)
 
 ### Tested Against
 
@@ -167,75 +183,6 @@ For a high-level overview of releases, see [RELEASES.md](./RELEASES.md). For upg
 - PostgreSQL 15.2
 - SQLite 3.44.0
 - MSSQL 2022 (21.0)
-
----
-
-## [0.9.0] - 2026-01-15
-
-### Added
-
-#### Core Features
-
-- Basic CRUD operations (Get, Insert, Update, Delete)
-- Simple query builder for basic SQL construction
-- Transaction support with Begin/Commit/Rollback
-- Connection pooling configuration
-- Error handling framework (pre-sentinel error design)
-- Support for MySQL, PostgreSQL, SQLite, MSSQL (experimental)
-
-#### Documentation
-
-- Basic README with feature overview
-- Initial error handling documentation
-- OPERATORS_COMPATIBILITY matrix
-
-#### Testing
-
-- Basic unit tests for core functionality
-- 50+ test cases
-- Mock framework setup
-
-### Changed
-
-- Initial release structure
-
-### Known Issues
-
-- Incomplete error mapping across dialects
-- Limited documentation
-- No contribution guidelines
-- Pre-release stability
-- Error types not properly categorized
-
-### Deprecations
-
-The following features are deprecated and will be removed in v1.0.0:
-
-- `Row` interface (replaced by `RowsAdapter`)
-- Old `QueryOptions` struct (replaced by `options.QueryOptions`)
-- `LegacyErrorHandler` (replaced by `dberror` sentinel errors)
-
-### Support Status
-
-- ⚠️ **Maintenance Mode** - Only critical bug fixes
-- No new features accepted
-- Upgrade to v1.0.0 recommended for all new projects
-
----
-
-## Version Comparison
-
-### v0.9.0 → v1.0.0 Improvements
-
-| Aspect              | v0.9.0       | v1.0.0          |
-| ------------------- | ------------ | --------------- |
-| Test Cases          | 50+          | 97+             |
-| Comment Coverage    | Partial      | 100%            |
-| Documentation Pages | 2            | 7+              |
-| Error Types         | Unstructured | Sentinel errors |
-| Type Support        | Basic        | Extended        |
-| Code Quality        | Good         | Excellent       |
-| Production Ready    | No           | Yes             |
 
 ---
 
@@ -297,22 +244,6 @@ The following changes are proposed for the next release:
 3. Update RELEASES.md with new release entry
 4. Tag with semver format: `v1.0.0`
 5. Create GitHub release with changelog excerpt
-
----
-
-## Historical Reference
-
-### Removed in v1.0.0
-
-The following were removed from v0.9.0:
-
-- `db.Row` interface (use `db.RowsAdapter`)
-- `db.LegacyErrorHandler` type
-- `db.OldQueryOptions` struct
-- `builder.LegacyBuilder` interface
-- Deprecated error types from root package
-
-All removals have documented migration paths in [MIGRATION.md](./MIGRATION.md).
 
 ---
 

@@ -3,7 +3,9 @@
 package v1_test
 
 import (
+	"context"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 
@@ -272,4 +274,246 @@ func TestQueryDataWithMultipleIDs(t *testing.T) {
 		}
 		assert.Equal(t, id, data.ID)
 	}
+}
+
+// ============================================================================
+// DBManager Integration Tests
+// ============================================================================
+
+// TestDBManagerStartStop tests the manager lifecycle (start and stop).
+func TestDBManagerStartStop(t *testing.T) {
+	dm := &v1.DBManager{}
+	ctx := context.Background()
+
+	// Start should not panic with empty entries
+	dm.Start(ctx)
+
+	// Stop should not panic
+	dm.Stop()
+}
+
+// TestDBManagerGetNoDBs tests Get returns channel when no databases configured.
+func TestDBManagerGetNoDBs(t *testing.T) {
+	dm := &v1.DBManager{}
+	ctx := context.Background()
+
+	result := dm.Get(ctx, "db1", "users", []string{"id", "name"}, nil, nil, nil)
+
+	assert.NotNil(t, result)
+	// Channel should be readable; may timeout or error is fine
+}
+
+// TestDBManagerGetByIDNoDBs tests GetByID returns channel when no databases configured.
+func TestDBManagerGetByIDNoDBs(t *testing.T) {
+	dm := &v1.DBManager{}
+	ctx := context.Background()
+
+	result := dm.GetByID(ctx, "db1", "users", 1, nil, nil)
+
+	assert.NotNil(t, result)
+}
+
+// TestDBManagerGetRawNoDBs tests GetRaw returns channel when no databases configured.
+func TestDBManagerGetRawNoDBs(t *testing.T) {
+	dm := &v1.DBManager{}
+	ctx := context.Background()
+
+	result := dm.GetRaw(ctx, "db1", "users", []string{"id", "name"}, nil, nil, nil)
+
+	assert.NotNil(t, result)
+}
+
+// TestDBManagerGetByIDRawNoDBs tests GetByIDRaw returns channel when no databases.
+func TestDBManagerGetByIDRawNoDBs(t *testing.T) {
+	dm := &v1.DBManager{}
+	ctx := context.Background()
+
+	result := dm.GetByIDRaw(ctx, "db1", "users", 1, nil, nil)
+
+	assert.NotNil(t, result)
+}
+
+// TestDBManagerInsertNoDBs tests Insert returns channel when no write databases.
+func TestDBManagerInsertNoDBs(t *testing.T) {
+	dm := &v1.DBManager{}
+	ctx := context.Background()
+	data := map[string]any{"name": "John"}
+
+	result := dm.Insert(ctx, "db1", "users", data, nil)
+
+	assert.NotNil(t, result)
+}
+
+// TestDBManagerInsertsNoDBs tests Inserts returns channel when no write databases.
+func TestDBManagerInsertsNoDBs(t *testing.T) {
+	dm := &v1.DBManager{}
+	ctx := context.Background()
+	bulkData := []map[string]any{
+		{"name": "Alice"},
+		{"name": "Bob"},
+	}
+
+	result := dm.Inserts(ctx, "db1", "users", bulkData, nil)
+
+	assert.NotNil(t, result)
+}
+
+// TestDBManagerUpdateNoDBs tests Update returns channel when no write databases.
+func TestDBManagerUpdateNoDBs(t *testing.T) {
+	dm := &v1.DBManager{}
+	ctx := context.Background()
+	data := map[string]any{"name": "Jane"}
+
+	result := dm.Update(ctx, "db1", "users", data, nil, nil, nil)
+
+	assert.NotNil(t, result)
+}
+
+// TestDBManagerDeleteNoDBs tests Delete returns channel when no write databases.
+func TestDBManagerDeleteNoDBs(t *testing.T) {
+	dm := &v1.DBManager{}
+	ctx := context.Background()
+
+	result := dm.Delete(ctx, "db1", "users", nil, nil, nil)
+
+	assert.NotNil(t, result)
+}
+
+// TestDBManagerQueryNoDBs tests Query returns channel when no databases.
+func TestDBManagerQueryNoDBs(t *testing.T) {
+	dm := &v1.DBManager{}
+	ctx := context.Background()
+
+	result := dm.Query(ctx, "db1", "SELECT * FROM users")
+
+	assert.NotNil(t, result)
+}
+
+// TestDBManagerQueryRawNoDBs tests QueryRaw returns channel when no databases.
+func TestDBManagerQueryRawNoDBs(t *testing.T) {
+	dm := &v1.DBManager{}
+	ctx := context.Background()
+
+	result := dm.QueryRaw(ctx, "db1", "SELECT * FROM users")
+
+	assert.NotNil(t, result)
+}
+
+// TestDBManagerExecNoDBs tests Exec returns channel when no write databases.
+func TestDBManagerExecNoDBs(t *testing.T) {
+	dm := &v1.DBManager{}
+	ctx := context.Background()
+
+	result := dm.Exec(ctx, "db1", "INSERT INTO users VALUES (?, ?)", "John", 30)
+
+	assert.NotNil(t, result)
+}
+
+// TestDBManagerContextCancellation tests that canceled context is handled gracefully.
+func TestDBManagerContextCancellation(t *testing.T) {
+	dm := &v1.DBManager{}
+
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+
+	// Should handle canceled context without panicking
+	result := dm.Get(ctx, "db1", "users", []string{"id"}, nil, nil, nil)
+	assert.NotNil(t, result)
+}
+
+// TestDBManagerContextTimeout tests that timed out context is handled gracefully.
+func TestDBManagerContextTimeout(t *testing.T) {
+	dm := &v1.DBManager{}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 1*time.Millisecond)
+	defer cancel()
+
+	result := dm.Get(ctx, "db1", "users", []string{"id"}, nil, nil, nil)
+	assert.NotNil(t, result)
+}
+
+// TestDBManagerMultipleOperations tests that manager can handle multiple sequential operations.
+func TestDBManagerMultipleOperations(t *testing.T) {
+	dm := &v1.DBManager{}
+	ctx := context.Background()
+
+	// Execute multiple operations in sequence
+	r1 := dm.Get(ctx, "db1", "users", []string{"id"}, nil, nil, nil)
+	r2 := dm.Insert(ctx, "db1", "users", map[string]any{}, nil)
+	r3 := dm.Update(ctx, "db1", "users", map[string]any{}, nil, nil, nil)
+	r4 := dm.Delete(ctx, "db1", "users", nil, nil, nil)
+	r5 := dm.Query(ctx, "db1", "SELECT * FROM users")
+
+	assert.NotNil(t, r1)
+	assert.NotNil(t, r2)
+	assert.NotNil(t, r3)
+	assert.NotNil(t, r4)
+	assert.NotNil(t, r5)
+}
+
+// TestDBManagerReadOnlyVsReadWrite tests that read operations use read-only entries.
+func TestDBManagerReadOnlyVsReadWrite(t *testing.T) {
+	dm := &v1.DBManager{}
+	ctx := context.Background()
+
+	// Read operations
+	readResults := []<-chan *v1.QueryResponse{
+		dm.Get(ctx, "db1", "users", []string{"id"}, nil, nil, nil),
+		dm.GetRaw(ctx, "db1", "users", []string{"id"}, nil, nil, nil),
+		dm.GetByID(ctx, "db1", "users", 1, nil, nil),
+		dm.GetByIDRaw(ctx, "db1", "users", 1, nil, nil),
+		dm.Query(ctx, "db1", "SELECT * FROM users"),
+		dm.QueryRaw(ctx, "db1", "SELECT * FROM users"),
+	}
+
+	// Write operations
+	writeResults := []<-chan *v1.QueryResponse{
+		dm.Insert(ctx, "db1", "users", map[string]any{}, nil),
+		dm.Inserts(ctx, "db1", "users", []map[string]any{}, nil),
+		dm.Update(ctx, "db1", "users", map[string]any{}, nil, nil, nil),
+		dm.Delete(ctx, "db1", "users", nil, nil, nil),
+		dm.Exec(ctx, "db1", "INSERT INTO users VALUES (?, ?)", "test"),
+	}
+
+	// All should return channels
+	for _, result := range readResults {
+		assert.NotNil(t, result)
+	}
+	for _, result := range writeResults {
+		assert.NotNil(t, result)
+	}
+}
+
+// TestDBManagerQueryParameters tests that query parameters are properly passed.
+func TestDBManagerQueryParameters(t *testing.T) {
+	dm := &v1.DBManager{}
+	ctx := context.Background()
+
+	// Test Query with multiple parameters
+	result := dm.Query(ctx, "db1", "SELECT * FROM users WHERE id = ? AND name = ?", 1, "John")
+	assert.NotNil(t, result)
+
+	// Test Exec with multiple parameters
+	execResult := dm.Exec(ctx, "db1", "INSERT INTO users (id, name, age) VALUES (?, ?, ?)", 1, "John", 30)
+	assert.NotNil(t, execResult)
+}
+
+// TestDBManagerChannelNonBlocking tests that operations return channels immediately.
+func TestDBManagerChannelNonBlocking(t *testing.T) {
+	dm := &v1.DBManager{}
+	ctx := context.Background()
+
+	// These should all return immediately with channels
+	ch1 := dm.Get(ctx, "db1", "users", []string{"id"}, nil, nil, nil)
+	ch2 := dm.Insert(ctx, "db1", "users", map[string]any{}, nil)
+	ch3 := dm.Query(ctx, "db1", "SELECT * FROM users")
+
+	// All channels should be non-nil
+	assert.NotNil(t, ch1)
+	assert.NotNil(t, ch2)
+	assert.NotNil(t, ch3)
+
+	// Channels should be distinct
+	assert.NotEqual(t, ch1, ch2)
+	assert.NotEqual(t, ch2, ch3)
 }

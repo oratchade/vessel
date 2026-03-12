@@ -110,14 +110,14 @@ git checkout -b feature/your-feature-name
 ### Running Tests
 
 ```bash
-# Run all tests with build tags
+# Run all unit tests
 make test
 
-# Run tests for specific package
-go test -tags=test ./db/v1/...
+# Run integration tests (requires Docker with databases)
+go test -v -tags=integration -run TestIntegration ./tests
 
-# Run with verbose output
-go test -v -tags=test ./...
+# Run unit tests for specific package
+go test -v ./db/v1/...
 
 # Run with coverage
 make coverage

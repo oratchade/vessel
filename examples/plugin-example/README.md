@@ -349,7 +349,7 @@ plugin.Clear()
 
 ### Prerequisites
 
-- Go 1.21+
+- Go 1.26.0+
 - CockroachDB running on `localhost:26257` (or update config in main.go)
 - Go module set up for your workspace
 

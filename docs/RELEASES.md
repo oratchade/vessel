@@ -13,16 +13,15 @@ For detailed technical changes, see the [CHANGELOG](./CHANGELOG.md).
 
 [Download v1.0.0](https://github.com/oratchade/fabric/releases/tag/v1.0.0) | [View Detailed Changes](./CHANGELOG.md#100---2026-03-03)
 
-First production-ready release with comprehensive documentation, 97+ test cases, and support for MySQL, PostgreSQL, SQLite, and MSSQL.
+First production-ready release with comprehensive documentation, 99+ test cases, and support for MySQL, PostgreSQL, SQLite, and MSSQL.
 
 ---
 
 ## Version Support Matrix
 
-| Version | Release Date | Go Version | MySQL | PostgreSQL | SQLite | MSSQL | Status         | Support Ends |
-| ------- | ------------ | ---------- | ----- | ---------- | ------ | ----- | -------------- | ------------ |
-| 1.0.x   | Mar 3, 2026  | 1.26+      | 8.0+  | 15+        | ✅     | 2022+ | ✅ Supported   | Mar 2027     |
-| 0.9.x   | Jan 15, 2026 | 1.25+      | 8.0+  | 15+        | ✅     | 2022+ | 🔄 Maintenance | Jun 2026     |
+| Version | Release Date | Go Version | MySQL | PostgreSQL | SQLite | MSSQL | Status       | Support Ends |
+| ------- | ------------ | ---------- | ----- | ---------- | ------ | ----- | ------------ | ------------ |
+| 1.0.x   | Mar 3, 2026  | 1.26+      | 8.0+  | 15+        | ✅     | 2022+ | ✅ Supported | Mar 2027     |
 
 **Status Definitions:**
 
@@ -55,27 +54,6 @@ go get github.com/oratchade/fabric@main
 
 ---
 
-## Upgrade Guides
-
-### v0.9 → v1.0 Migration
-
-**Status:** Breaking changes - migration required
-
-See [CHANGELOG.md#breaking-changes-from-v090](./CHANGELOG.md#breaking-changes-from-v090) for detailed migration instructions.
-
-**Key Changes:**
-
-- API moved from `db` to `db/v1` package
-- Error types reorganized in `dberror` package
-- `RowsAdapter` replaces generic `Row` interface
-- `QueryOptions` structure changed
-
-**Migration Time:** 1-2 hours for typical applications
-
-**Support:** See [../CONTRIBUTING.md](../CONTRIBUTING.md) for help
-
----
-
 ## Roadmap
 
 ### v1.1.0 - Q2 2026 (May/June)
@@ -87,13 +65,17 @@ See [CHANGELOG.md#breaking-changes-from-v090](./CHANGELOG.md#breaking-changes-fr
 - [ ] Extended type support (time.Time, UUID, custom JSON types)
 - [ ] Batch insert/upsert operations
 - [ ] Query result caching layer
-- [ ] OpenTelemetry integration (optional)
 - [ ] Performance benchmarks suite
+- [ ] Query builder chaining enhancements
 
 #### Estimated Effort
 
 - 6-8 weeks development
 - Target: June 2026
+
+#### Note
+
+OpenTelemetry integration is already included in v1.0.0.
 
 ---
 
@@ -108,6 +90,7 @@ See [CHANGELOG.md#breaking-changes-from-v090](./CHANGELOG.md#breaking-changes-fr
 - [ ] Query plan analysis helpers
 - [ ] Migration integration hints
 - [ ] Extended operator support
+- [ ] DBManager enhancement with circuit breaker patterns
 
 #### Estimated Effort
 
@@ -206,28 +189,6 @@ Verify downloads:
 ```bash
 sha256sum -c fabric-v1.0.0.sha256
 ```
-
----
-
-## Deprecation Timeline
-
-### v0.9.0 Features (Removed in v1.0.0)
-
-- ❌ `Row` interface → Use `RowsAdapter`
-- ❌ `OldQueryOptions` → Use `options.QueryOptions`
-- ❌ Legacy error types → Use `dberror` sentinels
-
-See [CHANGELOG.md](./CHANGELOG.md) for complete deprecation list and migration paths.
-
----
-
-## Getting Help
-
-- 📖 [README.md](../README.md) - Quick start and examples
-- 🐛 [Issue Tracker](https://github.com/oratchade/fabric/issues) - Bug reports
-- 💬 [Discussions](https://github.com/oratchade/fabric/discussions) - Questions
-- 📝 [CHANGELOG.md](./CHANGELOG.md) - Detailed changes
-- 🤝 [CONTRIBUTING.md](../CONTRIBUTING.md) - Developer guide
 
 ---
 

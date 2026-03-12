@@ -405,6 +405,13 @@ func (dm *DBManager) Get(
 	}
 
 	dbEntry := dm.readOnlyEntry()
+	if dbEntry == nil {
+		go func() {
+			q.ResponseCh <- &QueryResponse{Error: fmt.Errorf("no read-only database entries available")}
+			close(q.ResponseCh)
+		}()
+		return q.ResponseCh
+	}
 	_ = dbEntry.roundRobinQueueRead(ctx, q)
 
 	return q.ResponseCh
@@ -433,6 +440,13 @@ func (dm *DBManager) GetRaw(
 	}
 
 	dbEntry := dm.readOnlyEntry()
+	if dbEntry == nil {
+		go func() {
+			q.ResponseCh <- &QueryResponse{Error: fmt.Errorf("no read-only database entries available")}
+			close(q.ResponseCh)
+		}()
+		return q.ResponseCh
+	}
 	_ = dbEntry.roundRobinQueueRead(ctx, q)
 
 	return q.ResponseCh
@@ -459,6 +473,13 @@ func (dm *DBManager) GetByID(
 	}
 
 	dbEntry := dm.readOnlyEntry()
+	if dbEntry == nil {
+		go func() {
+			q.ResponseCh <- &QueryResponse{Error: fmt.Errorf("no read-only database entries available")}
+			close(q.ResponseCh)
+		}()
+		return q.ResponseCh
+	}
 	_ = dbEntry.roundRobinQueueRead(ctx, q)
 
 	return q.ResponseCh
@@ -485,6 +506,13 @@ func (dm *DBManager) GetByIDRaw(
 	}
 
 	dbEntry := dm.readOnlyEntry()
+	if dbEntry == nil {
+		go func() {
+			q.ResponseCh <- &QueryResponse{Error: fmt.Errorf("no read-only database entries available")}
+			close(q.ResponseCh)
+		}()
+		return q.ResponseCh
+	}
 	_ = dbEntry.roundRobinQueueRead(ctx, q)
 
 	return q.ResponseCh
@@ -509,6 +537,13 @@ func (dm *DBManager) Insert(
 	}
 
 	dbEntry := dm.readWriteEntry()
+	if dbEntry == nil {
+		go func() {
+			q.ResponseCh <- &QueryResponse{Error: fmt.Errorf("no read-write database entries available")}
+			close(q.ResponseCh)
+		}()
+		return q.ResponseCh
+	}
 	_ = dbEntry.roundRobinQueueWrite(ctx, q)
 
 	return q.ResponseCh
@@ -533,6 +568,13 @@ func (dm *DBManager) Inserts(
 	}
 
 	dbEntry := dm.readWriteEntry()
+	if dbEntry == nil {
+		go func() {
+			q.ResponseCh <- &QueryResponse{Error: fmt.Errorf("no read-write database entries available")}
+			close(q.ResponseCh)
+		}()
+		return q.ResponseCh
+	}
 	_ = dbEntry.roundRobinQueueWrite(ctx, q)
 
 	return q.ResponseCh
@@ -560,6 +602,13 @@ func (dm *DBManager) Update(
 	}
 
 	dbEntry := dm.readWriteEntry()
+	if dbEntry == nil {
+		go func() {
+			q.ResponseCh <- &QueryResponse{Error: fmt.Errorf("no read-write database entries available")}
+			close(q.ResponseCh)
+		}()
+		return q.ResponseCh
+	}
 	_ = dbEntry.roundRobinQueueWrite(ctx, q)
 
 	return q.ResponseCh
@@ -585,6 +634,13 @@ func (dm *DBManager) Delete(
 	}
 
 	dbEntry := dm.readWriteEntry()
+	if dbEntry == nil {
+		go func() {
+			q.ResponseCh <- &QueryResponse{Error: fmt.Errorf("no read-write database entries available")}
+			close(q.ResponseCh)
+		}()
+		return q.ResponseCh
+	}
 	_ = dbEntry.roundRobinQueueWrite(ctx, q)
 
 	return q.ResponseCh
@@ -602,12 +658,19 @@ func (dm *DBManager) Query(ctx context.Context, dbName string, query string, arg
 	}
 
 	dbEntry := dm.readOnlyEntry()
+	if dbEntry == nil {
+		go func() {
+			q.ResponseCh <- &QueryResponse{Error: fmt.Errorf("no read-only database entries available")}
+			close(q.ResponseCh)
+		}()
+		return q.ResponseCh
+	}
 	_ = dbEntry.roundRobinQueueRead(ctx, q)
 
 	return q.ResponseCh
 }
 
-// Query executes a raw query against the database and returns the results.
+// QueryRaw executes a raw query against the database and returns the results.
 func (dm *DBManager) QueryRaw(ctx context.Context, dbName string, query string, args ...any) <-chan *QueryResponse {
 	q := &Query{
 		Request: ReqQueryRaw,
@@ -619,6 +682,13 @@ func (dm *DBManager) QueryRaw(ctx context.Context, dbName string, query string, 
 	}
 
 	dbEntry := dm.readOnlyEntry()
+	if dbEntry == nil {
+		go func() {
+			q.ResponseCh <- &QueryResponse{Error: fmt.Errorf("no read-only database entries available")}
+			close(q.ResponseCh)
+		}()
+		return q.ResponseCh
+	}
 	_ = dbEntry.roundRobinQueueRead(ctx, q)
 
 	return q.ResponseCh
@@ -636,6 +706,13 @@ func (dm *DBManager) Exec(ctx context.Context, dbName string, query string, args
 	}
 
 	dbEntry := dm.readWriteEntry()
+	if dbEntry == nil {
+		go func() {
+			q.ResponseCh <- &QueryResponse{Error: fmt.Errorf("no read-write database entries available")}
+			close(q.ResponseCh)
+		}()
+		return q.ResponseCh
+	}
 	_ = dbEntry.roundRobinQueueWrite(ctx, q)
 
 	return q.ResponseCh

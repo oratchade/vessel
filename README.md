@@ -15,7 +15,7 @@ A lightweight, multi-database SQL abstraction library for Go with support for My
 - 📊 **Connection Pooling** - Per-dialect statistics and configuration
 - ✨ **Zero-Copy Row Scanning** - Efficient field mapping to Go types
 - 📡 **OpenTelemetry Tracing** - Distributed tracing for all database operations
-- 🧪 **Comprehensive Testing** - 97+ test cases with 100% pass rate
+- 🧪 **Comprehensive Testing** - 99+ test cases with 100% pass rate
 
 ## Installation
 
@@ -621,14 +621,13 @@ func Clear()
 
 See the [examples](./examples) directory for complete working examples:
 
-- `basic_crud.go` - Insert, Get, Update, Delete operations
-- `bulk_insert.go` - Efficient multi-row insertion (Inserts method)
-- `query_builder.go` - Dynamic query construction with the builder DSL
-- `transactions.go` - Multi-step transactions with automatic rollback
-- `error_handling.go` - Comprehensive error handling patterns
-- `pool_stats.go` - Connection pool monitoring
-- `raw_sql.go` - Custom SQL execution
-- [`plugin-example/`](./examples/plugin-example/) - Plugin system with CockroachDB example (register custom database drivers)
+- [`explain-example/`](./examples/explain-example/) - Query introspection with EXPLAIN analysis
+- [`manager-example/`](./examples/manager-example/) - Multi-database management:
+  - `basic/` - Basic DBManager usage patterns
+  - `error-handling/` - Comprehensive error handling
+  - `priority-selection/` - Priority-based database selection and routing
+- [`plugin-example/`](./examples/plugin-example/) - Custom database driver plugin system with CockroachDB example
+- [`tester-example/`](./examples/tester-example/) - Tester utility and test helpers
 
 ## Type Support
 
@@ -666,7 +665,7 @@ MIT License - see [LICENSE.md](./LICENSE.md)
 
 See [RELEASES.md](./RELEASES.md) for version history and release notes.
 
-For detailed changes between versions, see [CHANGELOG.md](./CHANGELOG.md) (Keep a Changelog format). For migration guides, see [MIGRATION.md](./MIGRATION.md).
+For detailed changes between versions, see [CHANGELOG.md](./CHANGELOG.md) (Keep a Changelog format).
 
 ---
 
