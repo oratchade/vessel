@@ -281,9 +281,8 @@ func (dm *DBManager) readWriteEntry() *DBEntry {
 	return dm.selectByPriorityAndRoundRobin(entries, &dm.writeWorkerIdx)
 }
 
-// selectHealthyEntry selects an entry from the provided map using priority and round-robin,
-// considering only healthy entries. Returns nil if no healthy entries are available.
-func (dm *DBManager) selectHealthyEntry(entries map[string]*DBEntry) *DBEntry {
+// healthOnly filters the provided entries map and returns a slice of only the healthy entries.
+func (dm *DBManager) healthyOnly(entries map[string]*DBEntry) []*DBEntry {
 	if len(entries) == 0 {
 		return nil
 	}
@@ -295,6 +294,15 @@ func (dm *DBManager) selectHealthyEntry(entries map[string]*DBEntry) *DBEntry {
 			healthyEntries = append(healthyEntries, entry)
 		}
 	}
+
+	return healthyEntries
+}
+
+// selectHealthyEntry selects an entry from the provided map using priority and round-robin,
+// considering only healthy entries. Returns nil if no healthy entries are available.
+func (dm *DBManager) selectHealthyEntry(entries map[string]*DBEntry) *DBEntry {
+	// Collect healthy entries only
+	healthyEntries := dm.healthyOnly(entries)
 
 	if len(healthyEntries) == 0 {
 		return nil // No healthy entries available
