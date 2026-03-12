@@ -70,6 +70,11 @@ test:
 	@mkdir -p $(OUT_JUNIT_DIR)
 	CGO_ENABLED=$(CGO_ENABLED) gotestsum --format=short-verbose --junitfile $(JUNIT_FILE) -- $(GOFLAGS) $(TEST_PKGS)
 
+test-integration: GOFLAGS = -tags=integration
+test-integration:
+	@mkdir -p $(OUT_JUNIT_DIR)
+	CGO_ENABLED=$(CGO_ENABLED) gotestsum --format=short-verbose --junitfile $(JUNIT_FILE) -- $(GOFLAGS) $(TEST_PKGS)
+
 coverage:
 	@mkdir -p $(OUT_COVER_DIR) $(OUT_JUNIT_DIR)
 	CGO_ENABLED=$(CGO_ENABLED) gotestsum --format=short-verbose --junitfile $(JUNIT_FILE) -- $(GOFLAGS) $(TEST_FLAGS) $(TEST_PKGS)

@@ -607,6 +607,23 @@ func (dm *DBManager) Query(ctx context.Context, dbName string, query string, arg
 	return q.ResponseCh
 }
 
+// Query executes a raw query against the database and returns the results.
+func (dm *DBManager) QueryRaw(ctx context.Context, dbName string, query string, args ...any) <-chan *QueryResponse {
+	q := &Query{
+		Request: ReqQueryRaw,
+		Data: &QueryData{
+			Query:  query,
+			Params: args,
+		},
+		ResponseCh: make(chan *QueryResponse),
+	}
+
+	dbEntry := dm.readOnlyEntry()
+	_ = dbEntry.roundRobinQueueRead(ctx, q)
+
+	return q.ResponseCh
+}
+
 // Exec executes a raw query against the database and returns the execution result.
 func (dm *DBManager) Exec(ctx context.Context, dbName string, query string, args ...any) <-chan *QueryResponse {
 	q := &Query{
