@@ -15,9 +15,9 @@ import (
 //
 // This example demonstrates:
 // - How priority-based selection routes queries
-// - Async fire-and-forget pattern
+// - Synchronous API for simple operations
 // - Handling multiple concurrent queries
-// - Response aggregation
+// - Response aggregation with error handling
 //
 // Query routing with example config:
 // - Priority 100 (primary): Gets all writes
@@ -69,33 +69,29 @@ func main() {
 }
 
 // concurrentReadExample fires multiple read queries concurrently
-// and aggregates results asynchronously
+// and handles results synchronously with error checking
 func concurrentReadExample(ctx context.Context, dm *v1.DBManager) {
 	var wg sync.WaitGroup
 	successCount := atomic.Int32{}
 	errorCount := atomic.Int32{}
 
-	// Fire 10 queries without waiting for responses
-	responseChs := make([]<-chan *v1.QueryResponse, 10)
+	// Fire 10 queries concurrently
 	for i := 0; i < 10; i++ {
-		respCh := dm.Get(ctx, "", "users", []string{"id", "name"}, nil, nil, nil)
-		responseChs[i] = respCh
-
 		wg.Add(1)
-		// Handle response asynchronously
-		go func(idx int, ch <-chan *v1.QueryResponse) {
+		// Handle query synchronously
+		go func(idx int) {
 			defer wg.Done()
 
-			resp := <-ch
-			if resp.Error != nil {
-				log.Printf("   Query %d: ERROR - %v\n", idx+1, resp.Error)
+			data, err := dm.Get(ctx, "users", []string{"id", "name"}, nil, nil, nil)
+			if err != nil {
+				log.Printf("   Query %d: ERROR - %v\n", idx+1, err)
 				errorCount.Add(1)
 			} else {
 				//nolint:gosec
-				log.Printf("   Query %d: OK - found %d rows\n", idx+1, len(resp.Data))
+				log.Printf("   Query %d: OK - found %d rows\n", idx+1, len(data))
 				successCount.Add(1)
 			}
-		}(i, respCh)
+		}(i)
 	}
 
 	// Wait for all queries to complete
@@ -115,17 +111,16 @@ func mixedOperationsExample(ctx context.Context, dm *v1.DBManager) {
 		defer wg.Done()
 
 		log.Println("   Sending INSERT to primary-db (priority:100)...")
-		respCh := dm.Insert(ctx, "", "users", map[string]interface{}{
+		result, err := dm.Insert(ctx, "users", map[string]interface{}{
 			"name":  "Bob",
 			"email": "bob@example.com",
 		}, nil)
 
-		resp := <-respCh
-		if resp.Error != nil {
-			log.Printf("   INSERT error: %v\n", resp.Error)
+		if err != nil {
+			log.Printf("   INSERT error: %v\n", err)
 		} else {
 			//nolint:gosec
-			log.Printf("   INSERT OK: ID=%v\n", resp.ExecData.LastInsertID)
+			log.Printf("   INSERT OK: ID=%v\n", result.LastInsertID)
 		}
 	}()
 
@@ -137,14 +132,13 @@ func mixedOperationsExample(ctx context.Context, dm *v1.DBManager) {
 
 			time.Sleep(time.Duration(num*50) * time.Millisecond)
 			log.Printf("   Sending GET #%d (routed via load-balancer to replica-1 or replica-2)...\n", num+1)
-			respCh := dm.Get(ctx, "", "users", []string{"id", "name"}, nil, nil, nil)
+			data, err := dm.Get(ctx, "users", []string{"id", "name"}, nil, nil, nil)
 
-			resp := <-respCh
-			if resp.Error != nil {
-				log.Printf("   GET #%d error: %v\n", num+1, resp.Error)
+			if err != nil {
+				log.Printf("   GET #%d error: %v\n", num+1, err)
 			} else {
 				//nolint:gosec
-				log.Printf("   GET #%d OK: found %d rows\n", num+1, len(resp.Data))
+				log.Printf("   GET #%d OK: found %d rows\n", num+1, len(data))
 			}
 		}(i)
 	}
@@ -161,7 +155,7 @@ func mixedOperationsExample(ctx context.Context, dm *v1.DBManager) {
 /*
 func trackQueryRouting(ctx context.Context, dm *manager.DBManager) {
 	for i := 0; i < 5; i++ {
-		respCh := dm.Get(ctx, "", "users", []string{"id"}, nil, nil, nil)
+		respCh := dm.Get(ctx, "users", []string{"id"}, nil, nil, nil)
 
 		resp := <-respCh
 		if resp.Error != nil {

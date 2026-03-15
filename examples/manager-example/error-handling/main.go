@@ -63,44 +63,42 @@ func main() {
 // detectErrorTypesExample shows how to identify specific database errors
 func detectErrorTypesExample(ctx context.Context, dm *v1.DBManager) {
 	// Try to insert duplicate key (will fail if email already exists)
-	respCh := dm.Insert(ctx, "", "users", map[string]interface{}{
+	_, err := dm.Insert(ctx, "users", map[string]interface{}{
 		"name":  "Test User",
 		"email": "duplicate@example.com",
 	}, nil)
 
-	resp := <-respCh
-
-	// Always check resp.Error first
-	if resp.Error == nil {
+	// Always check error first
+	if err == nil {
 		log.Println("✓ Insert succeeded")
 		return
 	}
 
 	// Check for specific error types
 	switch {
-	case errors.Is(resp.Error, dberror.ErrDuplicateKey):
+	case errors.Is(err, dberror.ErrDuplicateKey):
 		// DUPLICATE KEY error - email already exists
 		log.Println("⚠ Duplicate key error: Email already exists")
 		log.Println("  Action: Use different email or update existing record")
 
-	case errors.Is(resp.Error, dberror.ErrConnectionFailed):
+	case errors.Is(err, dberror.ErrConnectionFailed):
 		// CONNECTION FAILED - database is unreachable
 		log.Println("⚠ Connection error: Database unreachable")
 		log.Println("  Action: Check database connectivity, retry with backoff")
 
-	case errors.Is(resp.Error, dberror.ErrQueryTimeout):
+	case errors.Is(err, dberror.ErrQueryTimeout):
 		// TIMEOUT - query took too long
 		log.Println("⚠ Timeout error: Query took too long")
 		log.Println("  Action: Optimize query or increase timeout")
 
-	case errors.Is(resp.Error, dberror.ErrSyntaxError):
+	case errors.Is(err, dberror.ErrSyntaxError):
 		// SYNTAX ERROR - malformed query
 		log.Println("⚠ Syntax error: Invalid SQL")
 		log.Println("  Action: Review SQL syntax")
 
 	default:
 		// Other errors
-		log.Printf("✗ Unknown error: %v (type: %T)\n", resp.Error, resp.Error)
+		log.Printf("✗ Unknown error: %v (type: %T)\n", err, err)
 	}
 }
 
@@ -112,39 +110,30 @@ func retryExample(ctx context.Context, dm *v1.DBManager) {
 	for attempt := 1; attempt <= maxRetries; attempt++ {
 		log.Printf("Attempt %d: ", attempt)
 
-		respCh := dm.Get(ctx, "", "users", []string{"id", "name"}, nil, nil, nil)
+		data, err := dm.Get(ctx, "users", []string{"id", "name"}, nil, nil, nil)
 
-		// Timeout protection
-		select {
-		case resp := <-respCh:
-			if resp.Error == nil {
-				log.Printf("✓ Success on attempt %d\n", attempt)
-				if len(resp.Data) > 0 {
-					log.Printf("  Found %d users\n", len(resp.Data))
-				}
+		if err == nil {
+			log.Printf("✓ Success on attempt %d\n", attempt)
+			if len(data) > 0 {
+				log.Printf("  Found %d users\n", len(data))
+			}
+			return
+		}
+
+		// Decide if we should retry
+		log.Printf("Error: %v\n", err)
+
+		if attempt < maxRetries {
+			// Check if this is a retryable error
+			if isRetryable(err) {
+				log.Printf("  Retrying after %v...\n", backoff)
+				time.Sleep(backoff)
+				backoff *= 2 // Exponential backoff
+				continue
+			} else {
+				log.Println("  Non-retryable error, giving up")
 				return
 			}
-
-			// Decide if we should retry
-			log.Printf("Error: %v\n", resp.Error)
-
-			if attempt < maxRetries {
-				// Check if this is a retryable error
-				if isRetryable(resp.Error) {
-					log.Printf("  Retrying after %v...\n", backoff)
-					time.Sleep(backoff)
-					backoff *= 2 // Exponential backoff
-					continue
-				} else {
-					log.Println("  Non-retryable error, giving up")
-					return
-				}
-			}
-
-		case <-time.After(5 * time.Second):
-			// Response channel didn't send in time
-			log.Println("Timeout waiting for response")
-			return
 		}
 	}
 
@@ -158,20 +147,12 @@ func timeoutExample(ctx context.Context, dm *v1.DBManager) {
 	defer cancel()
 
 	log.Println("Sending query with 1-second timeout...")
-	respCh := dm.Get(ctx, "", "users", []string{"id"}, nil, nil, nil)
+	data, err := dm.Get(ctx, "users", []string{"id"}, nil, nil, nil)
 
-	select {
-	case resp := <-respCh:
-		if resp.Error != nil {
-			log.Printf("✗ Query error: %v\n", resp.Error)
-		} else {
-			log.Printf("✓ Query succeeded: %d rows\n", len(resp.Data))
-		}
-
-	case <-ctx.Done():
-		// Context canceled (timeout)
-		log.Println("⏱ Query timeout: Context deadline exceeded")
-		log.Println("  Query took longer than 1 second")
+	if err != nil {
+		log.Printf("✗ Query error: %v\n", err)
+	} else {
+		log.Printf("✓ Query succeeded: %d rows\n", len(data))
 	}
 }
 

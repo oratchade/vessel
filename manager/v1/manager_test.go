@@ -297,7 +297,7 @@ func TestDBManagerGetNoDBs(t *testing.T) {
 	dm := &v1.DBManager{}
 	ctx := context.Background()
 
-	result := dm.Get(ctx, "db1", "users", []string{"id", "name"}, nil, nil, nil)
+	result := dm.GetAsync(ctx, "users", []string{"id", "name"}, nil, nil, nil)
 
 	assert.NotNil(t, result)
 	// Channel should be readable; may timeout or error is fine
@@ -308,7 +308,7 @@ func TestDBManagerGetByIDNoDBs(t *testing.T) {
 	dm := &v1.DBManager{}
 	ctx := context.Background()
 
-	result := dm.GetByID(ctx, "db1", "users", 1, nil, nil)
+	result := dm.GetByIDAsync(ctx, "users", 1, nil, nil)
 
 	assert.NotNil(t, result)
 }
@@ -318,7 +318,7 @@ func TestDBManagerGetRawNoDBs(t *testing.T) {
 	dm := &v1.DBManager{}
 	ctx := context.Background()
 
-	result := dm.GetRaw(ctx, "db1", "users", []string{"id", "name"}, nil, nil, nil)
+	result := dm.GetRawAsync(ctx, "users", []string{"id", "name"}, nil, nil, nil)
 
 	assert.NotNil(t, result)
 }
@@ -328,7 +328,7 @@ func TestDBManagerGetByIDRawNoDBs(t *testing.T) {
 	dm := &v1.DBManager{}
 	ctx := context.Background()
 
-	result := dm.GetByIDRaw(ctx, "db1", "users", 1, nil, nil)
+	result := dm.GetByIDRawAsync(ctx, "users", 1, nil, nil)
 
 	assert.NotNil(t, result)
 }
@@ -339,7 +339,7 @@ func TestDBManagerInsertNoDBs(t *testing.T) {
 	ctx := context.Background()
 	data := map[string]any{"name": "John"}
 
-	result := dm.Insert(ctx, "db1", "users", data, nil)
+	result := dm.InsertAsync(ctx, "users", data, nil)
 
 	assert.NotNil(t, result)
 }
@@ -353,7 +353,7 @@ func TestDBManagerInsertsNoDBs(t *testing.T) {
 		{"name": "Bob"},
 	}
 
-	result := dm.Inserts(ctx, "db1", "users", bulkData, nil)
+	result := dm.InsertsAsync(ctx, "users", bulkData, nil)
 
 	assert.NotNil(t, result)
 }
@@ -364,7 +364,7 @@ func TestDBManagerUpdateNoDBs(t *testing.T) {
 	ctx := context.Background()
 	data := map[string]any{"name": "Jane"}
 
-	result := dm.Update(ctx, "db1", "users", data, nil, nil, nil)
+	result := dm.UpdateAsync(ctx, "users", data, nil, nil, nil)
 
 	assert.NotNil(t, result)
 }
@@ -374,7 +374,7 @@ func TestDBManagerDeleteNoDBs(t *testing.T) {
 	dm := &v1.DBManager{}
 	ctx := context.Background()
 
-	result := dm.Delete(ctx, "db1", "users", nil, nil, nil)
+	result := dm.DeleteAsync(ctx, "users", nil, nil, nil)
 
 	assert.NotNil(t, result)
 }
@@ -384,7 +384,7 @@ func TestDBManagerQueryNoDBs(t *testing.T) {
 	dm := &v1.DBManager{}
 	ctx := context.Background()
 
-	result := dm.Query(ctx, "db1", "SELECT * FROM users")
+	result := dm.QueryAsync(ctx, "SELECT * FROM users")
 
 	assert.NotNil(t, result)
 }
@@ -394,7 +394,7 @@ func TestDBManagerQueryRawNoDBs(t *testing.T) {
 	dm := &v1.DBManager{}
 	ctx := context.Background()
 
-	result := dm.QueryRaw(ctx, "db1", "SELECT * FROM users")
+	result := dm.QueryRawAsync(ctx, "SELECT * FROM users")
 
 	assert.NotNil(t, result)
 }
@@ -404,7 +404,7 @@ func TestDBManagerExecNoDBs(t *testing.T) {
 	dm := &v1.DBManager{}
 	ctx := context.Background()
 
-	result := dm.Exec(ctx, "db1", "INSERT INTO users VALUES (?, ?)", "John", 30)
+	result := dm.ExecAsync(ctx, "INSERT INTO users VALUES (?, ?)", "John", 30)
 
 	assert.NotNil(t, result)
 }
@@ -417,7 +417,7 @@ func TestDBManagerContextCancellation(t *testing.T) {
 	cancel()
 
 	// Should handle canceled context without panicking
-	result := dm.Get(ctx, "db1", "users", []string{"id"}, nil, nil, nil)
+	result := dm.GetAsync(ctx, "users", []string{"id"}, nil, nil, nil)
 	assert.NotNil(t, result)
 }
 
@@ -428,7 +428,7 @@ func TestDBManagerContextTimeout(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 1*time.Millisecond)
 	defer cancel()
 
-	result := dm.Get(ctx, "db1", "users", []string{"id"}, nil, nil, nil)
+	result := dm.GetAsync(ctx, "users", []string{"id"}, nil, nil, nil)
 	assert.NotNil(t, result)
 }
 
@@ -438,11 +438,11 @@ func TestDBManagerMultipleOperations(t *testing.T) {
 	ctx := context.Background()
 
 	// Execute multiple operations in sequence
-	r1 := dm.Get(ctx, "db1", "users", []string{"id"}, nil, nil, nil)
-	r2 := dm.Insert(ctx, "db1", "users", map[string]any{}, nil)
-	r3 := dm.Update(ctx, "db1", "users", map[string]any{}, nil, nil, nil)
-	r4 := dm.Delete(ctx, "db1", "users", nil, nil, nil)
-	r5 := dm.Query(ctx, "db1", "SELECT * FROM users")
+	r1 := dm.GetAsync(ctx, "users", []string{"id"}, nil, nil, nil)
+	r2 := dm.InsertAsync(ctx, "users", map[string]any{}, nil)
+	r3 := dm.UpdateAsync(ctx, "users", map[string]any{}, nil, nil, nil)
+	r4 := dm.DeleteAsync(ctx, "users", nil, nil, nil)
+	r5 := dm.QueryAsync(ctx, "SELECT * FROM users")
 
 	assert.NotNil(t, r1)
 	assert.NotNil(t, r2)
@@ -458,21 +458,21 @@ func TestDBManagerReadOnlyVsReadWrite(t *testing.T) {
 
 	// Read operations
 	readResults := []<-chan *v1.QueryResponse{
-		dm.Get(ctx, "db1", "users", []string{"id"}, nil, nil, nil),
-		dm.GetRaw(ctx, "db1", "users", []string{"id"}, nil, nil, nil),
-		dm.GetByID(ctx, "db1", "users", 1, nil, nil),
-		dm.GetByIDRaw(ctx, "db1", "users", 1, nil, nil),
-		dm.Query(ctx, "db1", "SELECT * FROM users"),
-		dm.QueryRaw(ctx, "db1", "SELECT * FROM users"),
+		dm.GetAsync(ctx, "users", []string{"id"}, nil, nil, nil),
+		dm.GetRawAsync(ctx, "users", []string{"id"}, nil, nil, nil),
+		dm.GetByIDAsync(ctx, "users", 1, nil, nil),
+		dm.GetByIDRawAsync(ctx, "users", 1, nil, nil),
+		dm.QueryAsync(ctx, "SELECT * FROM users"),
+		dm.QueryRawAsync(ctx, "SELECT * FROM users"),
 	}
 
 	// Write operations
 	writeResults := []<-chan *v1.QueryResponse{
-		dm.Insert(ctx, "db1", "users", map[string]any{}, nil),
-		dm.Inserts(ctx, "db1", "users", []map[string]any{}, nil),
-		dm.Update(ctx, "db1", "users", map[string]any{}, nil, nil, nil),
-		dm.Delete(ctx, "db1", "users", nil, nil, nil),
-		dm.Exec(ctx, "db1", "INSERT INTO users VALUES (?, ?)", "test"),
+		dm.InsertAsync(ctx, "users", map[string]any{}, nil),
+		dm.InsertsAsync(ctx, "users", []map[string]any{}, nil),
+		dm.UpdateAsync(ctx, "users", map[string]any{}, nil, nil, nil),
+		dm.DeleteAsync(ctx, "users", nil, nil, nil),
+		dm.ExecAsync(ctx, "INSERT INTO users VALUES (?, ?)", "test"),
 	}
 
 	// All should return channels
@@ -490,11 +490,11 @@ func TestDBManagerQueryParameters(t *testing.T) {
 	ctx := context.Background()
 
 	// Test Query with multiple parameters
-	result := dm.Query(ctx, "db1", "SELECT * FROM users WHERE id = ? AND name = ?", 1, "John")
+	result := dm.QueryAsync(ctx, "SELECT * FROM users WHERE id = ? AND name = ?", 1, "John")
 	assert.NotNil(t, result)
 
 	// Test Exec with multiple parameters
-	execResult := dm.Exec(ctx, "db1", "INSERT INTO users (id, name, age) VALUES (?, ?, ?)", 1, "John", 30)
+	execResult := dm.ExecAsync(ctx, "INSERT INTO users (id, name, age) VALUES (?, ?, ?)", 1, "John", 30)
 	assert.NotNil(t, execResult)
 }
 
@@ -504,9 +504,9 @@ func TestDBManagerChannelNonBlocking(t *testing.T) {
 	ctx := context.Background()
 
 	// These should all return immediately with channels
-	ch1 := dm.Get(ctx, "db1", "users", []string{"id"}, nil, nil, nil)
-	ch2 := dm.Insert(ctx, "db1", "users", map[string]any{}, nil)
-	ch3 := dm.Query(ctx, "db1", "SELECT * FROM users")
+	ch1 := dm.GetAsync(ctx, "users", []string{"id"}, nil, nil, nil)
+	ch2 := dm.InsertAsync(ctx, "users", map[string]any{}, nil)
+	ch3 := dm.QueryAsync(ctx, "SELECT * FROM users")
 
 	// All channels should be non-nil
 	assert.NotNil(t, ch1)

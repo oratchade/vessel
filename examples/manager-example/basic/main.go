@@ -15,8 +15,8 @@ import (
 // This example demonstrates:
 // - Loading configuration from YAML file
 // - Starting manager and worker pools
-// - Executing async queries
-// - Handling responses and errors
+// - Executing synchronous queries using the primary API (Get, Insert, Update, Delete)
+// - Handling errors with direct error return values
 // - Graceful shutdown
 //
 // Prerequisites:
@@ -72,94 +72,84 @@ func main() {
 	log.Println("\n=== Example Complete ===")
 }
 
-// insertExample demonstrates inserting a single row
+// insertExample demonstrates inserting a single row synchronously
 func insertExample(ctx context.Context, dm *v1.DBManager) {
-	// Fire async insert query
-	respCh := dm.Insert(ctx, "", "users", map[string]interface{}{
+	// Execute synchronous insert query
+	result, err := dm.Insert(ctx, "users", map[string]interface{}{
 		"name":  "Alice",
 		"email": "alice@example.com",
 	}, nil)
 
-	// Receive response
-	resp := <-respCh
-
-	if resp.Error != nil {
-		log.Printf("Insert error: %v\n", resp.Error)
+	// Check error first
+	if err != nil {
+		log.Printf("Insert error: %v\n", err)
 		return
 	}
 
-	if resp.ExecData != nil {
-		//nolint:gosec
-		log.Printf("✓ Inserted: ID=%v, Rows=%d\n", resp.ExecData.LastInsertID, resp.ExecData.RowsAffected)
-	}
+	// Use result directly
+	//nolint:gosec
+	log.Printf("✓ Inserted: ID=%v, Rows=%d\n", result.LastInsertID, result.RowsAffected)
 }
 
-// getExample demonstrates fetching multiple rows
+// getExample demonstrates fetching multiple rows synchronously
 func getExample(ctx context.Context, dm *v1.DBManager) {
 	// Build condition: WHERE age IS NOT NULL (or just all users)
 	var cond condition.Condition
 
-	// Fire async get query
-	respCh := dm.Get(ctx, "", "users", []string{"id", "name", "email"}, nil, cond, nil)
+	// Execute synchronous get query
+	data, err := dm.Get(ctx, "users", []string{"id", "name", "email"}, nil, cond, nil)
 
-	// Receive response
-	resp := <-respCh
-
-	if resp.Error != nil {
-		log.Printf("Get error: %v\n", resp.Error)
+	// Check error first
+	if err != nil {
+		log.Printf("Get error: %v\n", err)
 		return
 	}
 
+	// Use data directly
 	//nolint:gosec
-	log.Printf("✓ Found %d users:\n", len(resp.Data))
-	for _, row := range resp.Data {
+	log.Printf("✓ Found %d users:\n", len(data))
+	for _, row := range data {
 		//nolint:gosec
 		log.Printf("  - ID: %v, Name: %v, Email: %v\n", row["id"], row["name"], row["email"])
 	}
 }
 
-// updateExample demonstrates updating rows
+// updateExample demonstrates updating rows synchronously
 func updateExample(ctx context.Context, dm *v1.DBManager) {
 	// Build condition: WHERE id = 1
 	cond := condition.NewExpr().Column("id").Op("=").Value(1)
 
-	// Fire async update query
-	respCh := dm.Update(ctx, "", "users", map[string]interface{}{
+	// Execute synchronous update query
+	result, err := dm.Update(ctx, "users", map[string]interface{}{
 		"email": "alice.updated@example.com",
 	}, cond, nil, nil)
 
-	// Receive response
-	resp := <-respCh
-
-	if resp.Error != nil {
-		log.Printf("Update error: %v\n", resp.Error)
+	// Check error first
+	if err != nil {
+		log.Printf("Update error: %v\n", err)
 		return
 	}
 
-	if resp.ExecData != nil {
-		//nolint:gosec
-		log.Printf("✓ Updated %d rows\n", resp.ExecData.RowsAffected)
-	}
+	// Use result directly
+	//nolint:gosec
+	log.Printf("✓ Updated %d rows\n", result.RowsAffected)
 }
 
-// deleteExample demonstrates deleting rows
+// deleteExample demonstrates deleting rows synchronously
 func deleteExample(ctx context.Context, dm *v1.DBManager) {
 	// Build condition: WHERE name = 'Alice'
 	cond := condition.NewExpr().Column("name").Op("=").Value("Alice")
 
-	// Fire async delete query
-	respCh := dm.Delete(ctx, "", "users", cond, nil, nil)
+	// Execute synchronous delete query
+	result, err := dm.Delete(ctx, "users", cond, nil, nil)
 
-	// Receive response
-	resp := <-respCh
-
-	if resp.Error != nil {
-		log.Printf("Delete error: %v\n", resp.Error)
+	// Check error first
+	if err != nil {
+		log.Printf("Delete error: %v\n", err)
 		return
 	}
 
-	if resp.ExecData != nil {
-		//nolint:gosec
-		log.Printf("✓ Deleted %d rows\n", resp.ExecData.RowsAffected)
-	}
+	// Use result directly
+	//nolint:gosec
+	log.Printf("✓ Deleted %d rows\n", result.RowsAffected)
 }

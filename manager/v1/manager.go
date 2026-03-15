@@ -382,10 +382,11 @@ func (dm *DBManager) selectByPriorityAndRoundRobin(entries map[string]*DBEntry, 
 	return priorityEntries[idx]
 }
 
-// Get fetches data from the database based on the specified table, columns, and conditions.
-func (dm *DBManager) Get(
+// GetAsync fetches data from the database asynchronously based on the specified table, columns, and conditions.
+// This method returns a channel that will receive the result.
+// For synchronous access, use Get() instead.
+func (dm *DBManager) GetAsync(
 	ctx context.Context,
-	dbName string,
 	table string,
 	columns []string,
 	joins []condition.Join,
@@ -417,10 +418,11 @@ func (dm *DBManager) Get(
 	return q.ResponseCh
 }
 
-// GetRaw fetches raw data from the database based on the specified table, columns, and conditions.
-func (dm *DBManager) GetRaw(
+// GetRawAsync fetches raw data from the database asynchronously based on the specified table, columns, and conditions.
+// This method returns a channel that will receive the result.
+// For synchronous access, use GetRaw() instead.
+func (dm *DBManager) GetRawAsync(
 	ctx context.Context,
-	dbName string,
 	table string,
 	columns []string,
 	joins []condition.Join,
@@ -452,10 +454,11 @@ func (dm *DBManager) GetRaw(
 	return q.ResponseCh
 }
 
-// GetByID fetches a single record from the database based on the specified table and ID.
-func (dm *DBManager) GetByID(
+// GetByIDAsync fetches a single record from the database asynchronously based on the specified table and ID.
+// This method returns a channel that will receive the result.
+// For synchronous access, use GetByID() instead.
+func (dm *DBManager) GetByIDAsync(
 	ctx context.Context,
-	dbName string,
 	table string,
 	id any,
 	joins []condition.Join,
@@ -485,10 +488,11 @@ func (dm *DBManager) GetByID(
 	return q.ResponseCh
 }
 
-// GetByIDRaw fetches a single record from the database based on the specified table and ID.
-func (dm *DBManager) GetByIDRaw(
+// GetByIDRawAsync fetches a single record from the database asynchronously based on the specified table and ID.
+// This method returns a channel that will receive the result.
+// For synchronous access, use GetByIDRaw() instead.
+func (dm *DBManager) GetByIDRawAsync(
 	ctx context.Context,
-	dbName string,
 	table string,
 	id any,
 	joins []condition.Join,
@@ -518,10 +522,11 @@ func (dm *DBManager) GetByIDRaw(
 	return q.ResponseCh
 }
 
-// Insert adds a new record to the specified table in the database.
-func (dm *DBManager) Insert(
+// InsertAsync adds a new record to the specified table in the database asynchronously.
+// This method returns a channel that will receive the result.
+// For synchronous access, use Insert() instead.
+func (dm *DBManager) InsertAsync(
 	ctx context.Context,
-	dbName string,
 	table string,
 	data map[string]any,
 	opts *options.QueryOptions,
@@ -549,10 +554,11 @@ func (dm *DBManager) Insert(
 	return q.ResponseCh
 }
 
-// Inserts adds multiple new records to the specified table in the database.
-func (dm *DBManager) Inserts(
+// InsertsAsync adds multiple new records to the specified table in the database asynchronously.
+// This method returns a channel that will receive the result.
+// For synchronous access, use Inserts() instead.
+func (dm *DBManager) InsertsAsync(
 	ctx context.Context,
-	dbName string,
 	table string,
 	data []map[string]any,
 	opts *options.QueryOptions,
@@ -580,10 +586,11 @@ func (dm *DBManager) Inserts(
 	return q.ResponseCh
 }
 
-// Update updates an existing record in the database based on the specified table, data, and conditions.
-func (dm *DBManager) Update(
+// UpdateAsync updates an existing record in the database asynchronously based on the specified table, data, and conditions.
+// This method returns a channel that will receive the result.
+// For synchronous access, use Update() instead.
+func (dm *DBManager) UpdateAsync(
 	ctx context.Context,
-	dbName string,
 	table string,
 	data map[string]any,
 	cond condition.Condition,
@@ -614,10 +621,11 @@ func (dm *DBManager) Update(
 	return q.ResponseCh
 }
 
-// Delete removes records from the database based on the specified table and conditions.
-func (dm *DBManager) Delete(
+// DeleteAsync removes records from the database asynchronously based on the specified table and conditions.
+// This method returns a channel that will receive the result.
+// For synchronous access, use Delete() instead.
+func (dm *DBManager) DeleteAsync(
 	ctx context.Context,
-	dbName string,
 	table string,
 	cond condition.Condition,
 	joins []condition.Join,
@@ -646,8 +654,10 @@ func (dm *DBManager) Delete(
 	return q.ResponseCh
 }
 
-// Query executes a raw query against the database and returns the results.
-func (dm *DBManager) Query(ctx context.Context, dbName string, query string, args ...any) <-chan *QueryResponse {
+// QueryAsync executes a raw query against the database asynchronously and returns the results.
+// This method returns a channel that will receive the result.
+// For synchronous access, use Query() instead.
+func (dm *DBManager) QueryAsync(ctx context.Context, query string, args ...any) <-chan *QueryResponse {
 	q := &Query{
 		Request: ReqQuery,
 		Data: &QueryData{
@@ -670,8 +680,10 @@ func (dm *DBManager) Query(ctx context.Context, dbName string, query string, arg
 	return q.ResponseCh
 }
 
-// QueryRaw executes a raw query against the database and returns the results.
-func (dm *DBManager) QueryRaw(ctx context.Context, dbName string, query string, args ...any) <-chan *QueryResponse {
+// QueryRawAsync executes a raw query against the database asynchronously and returns the results.
+// This method returns a channel that will receive the result.
+// For synchronous access, use QueryRaw() instead.
+func (dm *DBManager) QueryRawAsync(ctx context.Context, query string, args ...any) <-chan *QueryResponse {
 	q := &Query{
 		Request: ReqQueryRaw,
 		Data: &QueryData{
@@ -694,8 +706,10 @@ func (dm *DBManager) QueryRaw(ctx context.Context, dbName string, query string, 
 	return q.ResponseCh
 }
 
-// Exec executes a raw query against the database and returns the execution result.
-func (dm *DBManager) Exec(ctx context.Context, dbName string, query string, args ...any) <-chan *QueryResponse {
+// ExecAsync executes a raw query against the database asynchronously and returns the execution result.
+// This method returns a channel that will receive the result.
+// For synchronous access, use Exec() instead.
+func (dm *DBManager) ExecAsync(ctx context.Context, query string, args ...any) <-chan *QueryResponse {
 	q := &Query{
 		Request: ReqExec,
 		Data: &QueryData{
@@ -716,4 +730,13 @@ func (dm *DBManager) Exec(ctx context.Context, dbName string, query string, args
 	_ = dbEntry.roundRobinQueueWrite(ctx, q)
 
 	return q.ResponseCh
+}
+
+// Ping checks the database connection synchronously.
+func (dm *DBManager) Ping(ctx context.Context) error {
+	entry := dm.readOnlyEntry()
+	if entry == nil {
+		return fmt.Errorf("no read-only database entries configured")
+	}
+	return entry.db.Ping(ctx)
 }
