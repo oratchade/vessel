@@ -15,11 +15,19 @@ For a high-level overview of releases, see [RELEASES.md](./RELEASES.md).
 - Query result caching layer
 - Performance benchmarks suite
 - Query builder chaining enhancements
+- **OrderBy Struct Redesign** - Type-safe ordering with structured `OrderBy` type
+  - New `OrderBy` struct with `Column` and `Direction` fields
+  - Improved type safety and discoverability
+  - Automatic direction normalization (lowercase → uppercase)
+  - Default direction handling (empty → "ASC")
+  - Backward compatible with FluentDB API
+  - Comprehensive documentation in `ORDERBY_CHANGES.md`
 
 #### Changed
 
 - Improved error messages with additional context
 - Enhanced connection pool statistics
+- **QueryOptions.OrderBy** - Changed from `[]string` to `[]OrderBy` struct type for better type safety and clarity
 
 #### Fixed
 

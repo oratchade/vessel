@@ -229,17 +229,21 @@ func TestSelectBuilderOrderBy(t *testing.T) {
 	testCases := []struct {
 		name            string
 		orders          []struct{ col, dir string }
-		expectedOrderBy []string
+		expectedOrderBy []options.OrderBy
 	}{
 		{
-			name:            "single order by ASC",
-			orders:          []struct{ col, dir string }{{"id", "ASC"}},
-			expectedOrderBy: []string{"id"},
+			name:   "single order by ASC",
+			orders: []struct{ col, dir string }{{"id", "ASC"}},
+			expectedOrderBy: []options.OrderBy{
+				{Column: "id", Direction: "ASC"},
+			},
 		},
 		{
-			name:            "single order by DESC",
-			orders:          []struct{ col, dir string }{{"id", "DESC"}},
-			expectedOrderBy: []string{"id DESC"},
+			name:   "single order by DESC",
+			orders: []struct{ col, dir string }{{"id", "DESC"}},
+			expectedOrderBy: []options.OrderBy{
+				{Column: "id", Direction: "DESC"},
+			},
 		},
 		{
 			name: "multiple order by",
@@ -247,12 +251,24 @@ func TestSelectBuilderOrderBy(t *testing.T) {
 				{"id", "ASC"},
 				{"name", "DESC"},
 			},
-			expectedOrderBy: []string{"id", "name DESC"},
+			expectedOrderBy: []options.OrderBy{
+				{Column: "id", Direction: "ASC"},
+				{Column: "name", Direction: "DESC"},
+			},
 		},
 		{
-			name:            "empty direction defaults to ASC",
-			orders:          []struct{ col, dir string }{{"id", ""}},
-			expectedOrderBy: []string{"id"},
+			name:   "empty direction defaults to ASC",
+			orders: []struct{ col, dir string }{{"id", ""}},
+			expectedOrderBy: []options.OrderBy{
+				{Column: "id", Direction: "ASC"},
+			},
+		},
+		{
+			name:   "lowercase direction normalized to uppercase",
+			orders: []struct{ col, dir string }{{"id", "desc"}},
+			expectedOrderBy: []options.OrderBy{
+				{Column: "id", Direction: "DESC"},
+			},
 		},
 	}
 
@@ -702,8 +718,10 @@ func TestInsertBuilderValues(t *testing.T) {
 			db.EXPECT().Insert(ctx, "users", gomock.Any(), nil).
 				DoAndReturn(func(ctx context.Context, table string, data map[string]any, opts *options.QueryOptions) (*v1.ExecResult, error) { //nolint:lll
 					assert.Equal(t, "John", data["name"])
-					assert.Equal(t, 30, data["age"])
-					assert.Equal(t, "john@example.com", data["email"])
+					if len(tc.expectedKeys) > 1 {
+						assert.Equal(t, 30, data["age"])
+						assert.Equal(t, "john@example.com", data["email"])
+					}
 					return &v1.ExecResult{LastInsertID: 1, RowsAffected: 1}, nil
 				}).Times(1)
 

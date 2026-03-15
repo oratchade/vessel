@@ -29,9 +29,9 @@ func TestSupportedOptions_SelectLimitOffsetOrderBy(t *testing.T) {
 			opts: &options.QueryOptions{
 				Limit:   intPtr(10),
 				Offset:  intPtr(5),
-				OrderBy: []string{"name"},
+				OrderBy: []options.OrderBy{{Column: "name", Direction: "ASC"}},
 			},
-			wantFrag: "ORDER BY `name` LIMIT ? OFFSET ?",
+			wantFrag: "ORDER BY `name` ASC LIMIT ? OFFSET ?",
 			wantArgs: []any{10, 5},
 		},
 		{
@@ -40,9 +40,9 @@ func TestSupportedOptions_SelectLimitOffsetOrderBy(t *testing.T) {
 			opts: &options.QueryOptions{
 				Limit:   intPtr(20),
 				Offset:  intPtr(7),
-				OrderBy: []string{"username"},
+				OrderBy: []options.OrderBy{{Column: "username", Direction: "ASC"}},
 			},
-			wantFrag: "ORDER BY \"username\" LIMIT $1 OFFSET $2",
+			wantFrag: "ORDER BY \"username\" ASC LIMIT $1 OFFSET $2",
 			wantArgs: []any{20, 7},
 		},
 		{
@@ -51,9 +51,9 @@ func TestSupportedOptions_SelectLimitOffsetOrderBy(t *testing.T) {
 			opts: &options.QueryOptions{
 				Limit:   intPtr(3),
 				Offset:  intPtr(2),
-				OrderBy: []string{"id"},
+				OrderBy: []options.OrderBy{{Column: "id", Direction: "ASC"}},
 			},
-			wantFrag: "ORDER BY [id] OFFSET @p1 ROWS FETCH NEXT @p2 ROWS ONLY",
+			wantFrag: "ORDER BY [id] ASC OFFSET @p1 ROWS FETCH NEXT @p2 ROWS ONLY",
 			wantArgs: []any{2, 3},
 		},
 	}
@@ -129,9 +129,12 @@ func TestSupportedOptions_GroupByHavingAndMultipleOrderBy(t *testing.T) {
 			opts: &options.QueryOptions{
 				GroupBy: []string{"country", "city"},
 				Having:  func() *string { return &count }(),
-				OrderBy: []string{"country", "city"},
+				OrderBy: []options.OrderBy{
+					{Column: "country", Direction: "ASC"},
+					{Column: "city", Direction: "ASC"},
+				},
 			},
-			wantFrag: "GROUP BY `country`, `city` HAVING `count>10` ORDER BY `country`, `city`",
+			wantFrag: "GROUP BY `country`, `city` HAVING `count>10` ORDER BY `country` ASC, `city` ASC",
 		},
 		{
 			name:    "postgres-groupby-having-orderby",
@@ -139,9 +142,12 @@ func TestSupportedOptions_GroupByHavingAndMultipleOrderBy(t *testing.T) {
 			opts: &options.QueryOptions{
 				GroupBy: []string{"country", "city"},
 				Having:  func() *string { return &count }(),
-				OrderBy: []string{"country", "city"},
+				OrderBy: []options.OrderBy{
+					{Column: "country", Direction: "ASC"},
+					{Column: "city", Direction: "ASC"},
+				},
 			},
-			wantFrag: "GROUP BY \"country\", \"city\" HAVING \"count>10\" ORDER BY \"country\", \"city\"",
+			wantFrag: "GROUP BY \"country\", \"city\" HAVING \"count>10\" ORDER BY \"country\" ASC, \"city\" ASC",
 		},
 		{
 			name:    "mssql-groupby-having-orderby",
@@ -149,9 +155,12 @@ func TestSupportedOptions_GroupByHavingAndMultipleOrderBy(t *testing.T) {
 			opts: &options.QueryOptions{
 				GroupBy: []string{"country", "city"},
 				Having:  func() *string { return &count }(),
-				OrderBy: []string{"country", "city"},
+				OrderBy: []options.OrderBy{
+					{Column: "country", Direction: "ASC"},
+					{Column: "city", Direction: "ASC"},
+				},
 			},
-			wantFrag: "GROUP BY [country], [city] HAVING [count>10] ORDER BY [country], [city]",
+			wantFrag: "GROUP BY [country], [city] HAVING [count>10] ORDER BY [country] ASC, [city] ASC",
 		},
 	}
 
@@ -189,7 +198,7 @@ func TestMSSQLOffsetRequiresOrderBy(t *testing.T) {
 			name: "OFFSET with ORDER BY - should succeed",
 			opts: &options.QueryOptions{
 				Offset:  intPtr(10),
-				OrderBy: []string{"id"},
+				OrderBy: []options.OrderBy{{Column: "id", Direction: "ASC"}},
 			},
 			expectErr: false,
 		},
@@ -203,7 +212,7 @@ func TestMSSQLOffsetRequiresOrderBy(t *testing.T) {
 		{
 			name: "ORDER BY without OFFSET - should succeed",
 			opts: &options.QueryOptions{
-				OrderBy: []string{"id"},
+				OrderBy: []options.OrderBy{{Column: "id", Direction: "ASC"}},
 			},
 			expectErr: false,
 		},

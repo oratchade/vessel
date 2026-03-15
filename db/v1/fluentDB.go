@@ -4,6 +4,7 @@ package v1
 import (
 	"context"
 	"fmt"
+	"strings"
 
 	cdt "tounilab.com/fabric/pkg/query/condition"
 	"tounilab.com/fabric/pkg/query/options"
@@ -231,7 +232,7 @@ func (s *SelectBuilder) Joins(joins []cdt.Join) *SelectBuilder {
 // Parameters:
 //
 //	column: The column name to order by.
-//	direction: The sort direction ("ASC" or "DESC").
+//	direction: The sort direction ("ASC" or "DESC"). Defaults to "ASC" if empty.
 //
 // Returns:
 //
@@ -241,13 +242,19 @@ func (s *SelectBuilder) OrderBy(column, direction string) *SelectBuilder {
 		s.opts = &options.QueryOptions{}
 	}
 	if s.opts.OrderBy == nil {
-		s.opts.OrderBy = make([]string, 0)
+		s.opts.OrderBy = make([]options.OrderBy, 0)
 	}
-	orderStr := column
-	if direction != "" && direction != ascDirection {
-		orderStr = fmt.Sprintf("%s %s", column, direction)
+	// Normalize direction to uppercase, default to ASC if empty
+	dir := direction
+	if dir == "" {
+		dir = ascDirection
+	} else {
+		dir = strings.ToUpper(dir)
 	}
-	s.opts.OrderBy = append(s.opts.OrderBy, orderStr)
+	s.opts.OrderBy = append(s.opts.OrderBy, options.OrderBy{
+		Column:    column,
+		Direction: dir,
+	})
 	return s
 }
 
@@ -711,7 +718,7 @@ func (u *UpdateBuilder) Joins(joins []cdt.Join) *UpdateBuilder {
 // Parameters:
 //
 //	column: The column name to order by.
-//	direction: The sort direction ("ASC" or "DESC").
+//	direction: The sort direction ("ASC" or "DESC"). Defaults to "ASC" if empty.
 //
 // Returns:
 //
@@ -721,13 +728,19 @@ func (u *UpdateBuilder) OrderBy(column, direction string) *UpdateBuilder {
 		u.opts = &options.QueryOptions{}
 	}
 	if u.opts.OrderBy == nil {
-		u.opts.OrderBy = make([]string, 0)
+		u.opts.OrderBy = make([]options.OrderBy, 0)
 	}
-	orderStr := column
-	if direction != "" && direction != "ASC" {
-		orderStr = fmt.Sprintf("%s %s", column, direction)
+	// Normalize direction to uppercase, default to ASC if empty
+	dir := direction
+	if dir == "" {
+		dir = ascDirection
+	} else {
+		dir = strings.ToUpper(dir)
 	}
-	u.opts.OrderBy = append(u.opts.OrderBy, orderStr)
+	u.opts.OrderBy = append(u.opts.OrderBy, options.OrderBy{
+		Column:    column,
+		Direction: dir,
+	})
 	return u
 }
 
@@ -891,7 +904,7 @@ func (d *DeleteBuilder) Joins(joins []cdt.Join) *DeleteBuilder {
 // Parameters:
 //
 //	column: The column name to order by.
-//	direction: The sort direction ("ASC" or "DESC").
+//	direction: The sort direction ("ASC" or "DESC"). Defaults to "ASC" if empty.
 //
 // Returns:
 //
@@ -901,13 +914,19 @@ func (d *DeleteBuilder) OrderBy(column, direction string) *DeleteBuilder {
 		d.opts = &options.QueryOptions{}
 	}
 	if d.opts.OrderBy == nil {
-		d.opts.OrderBy = make([]string, 0)
+		d.opts.OrderBy = make([]options.OrderBy, 0)
 	}
-	orderStr := column
-	if direction != "" && direction != "ASC" {
-		orderStr = fmt.Sprintf("%s %s", column, direction)
+	// Normalize direction to uppercase, default to ASC if empty
+	dir := direction
+	if dir == "" {
+		dir = ascDirection
+	} else {
+		dir = strings.ToUpper(dir)
 	}
-	d.opts.OrderBy = append(d.opts.OrderBy, orderStr)
+	d.opts.OrderBy = append(d.opts.OrderBy, options.OrderBy{
+		Column:    column,
+		Direction: dir,
+	})
 	return d
 }
 

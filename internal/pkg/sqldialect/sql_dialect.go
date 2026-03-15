@@ -50,10 +50,11 @@ func supportedOptions(
 		}
 
 		if len(opts.OrderBy) > 0 {
+			orderByFragments := getOrderByFragment(dialect, opts.OrderBy)
 			parts = append(parts, fmt.Sprintf(
 				"%s %s",
 				dialect.Operator(operator.OrderBy),
-				strings.Join(helpers.QuoteIdentifierSlice(dialect, opts.OrderBy, ""), ", "),
+				strings.Join(orderByFragments, ", "),
 			))
 		}
 
@@ -96,6 +97,20 @@ func supportedOptions(
 	}
 
 	return strings.Join(parts, " "), args, nil
+}
+
+func getOrderByFragment(dialect condition.SQLDialect, orderBy []options.OrderBy) []string {
+	orderByFragments := make([]string, 0, len(orderBy))
+	for _, order := range orderBy {
+		direction := order.Direction
+		if direction == "" {
+			direction = "ASC"
+		}
+		orderByFragments = append(orderByFragments,
+			fmt.Sprintf("%s %s", dialect.QuoteIdentifier(order.Column), direction),
+		)
+	}
+	return orderByFragments
 }
 
 // getPrefix returns the prefix to use for column names in RETURNING/OUTPUT clauses

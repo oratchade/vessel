@@ -162,7 +162,10 @@ func TestMysqlSelectWithOrderBy(t *testing.T) {
 	qb := builder.NewMySQLQueryBuilder(dialect)
 
 	opts := &options.QueryOptions{
-		OrderBy: []string{"`id` DESC", "`name` ASC"},
+		OrderBy: []options.OrderBy{
+			{Column: "id", Direction: "DESC"},
+			{Column: "name", Direction: "ASC"},
+		},
 	}
 
 	query, _, err := qb.Select("users", []string{"id", "name"}, nil, opts, nil)
