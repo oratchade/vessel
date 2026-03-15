@@ -64,6 +64,11 @@ linters:
     rules:
       - path: (.+)\.go$
         text: error return value not checked.*(Close|Log|Print).*
+      - path: examples/
+        linters: [forbidigo]
+      - path: _test\.go$
+        linters: [revive]
+        text: line-length-limit
     paths:
       - third_party$
       - builtin$

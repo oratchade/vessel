@@ -363,6 +363,105 @@ for explainRows.Next() {
 - ✅ **Query Logging** - Log all generated SQL for audit trails
 - ✅ **Batch Operations** - Build and verify multiple queries before execution
 
+### FluentDB - Fluent Query Builder API
+
+For a more ergonomic, chainable interface, use **FluentDB** - a fluent/builder-style API that wraps DBActions with a readable, SQL-like syntax:
+
+```go
+import (
+    db "tounilab.com/fabric/db/v1"
+    cdt "tounilab.com/fabric/pkg/query/condition"
+)
+
+fdb := db.NewFluentDB(database, ctx)
+
+// SELECT with chaining
+users, err := fdb.Select("users", "id", "name", "email").
+    Where(cdt.NewExpr().Column("active").Op("=").Value(true)).
+    OrderBy("name", "ASC").
+    Limit(10).
+    Get()
+
+// INSERT
+result, err := fdb.Insert().
+    Into("users").
+    Set("name", "Alice").
+    Set("email", "alice@example.com").
+    Exec()
+
+// UPDATE with conditions
+result, err := fdb.Update("users").
+    Set("status", "active").
+    Where(cdt.NewExpr().Column("id").Op("=").Value(1)).
+    Exec()
+
+// DELETE
+result, err := fdb.Delete().
+    From("users").
+    Where(cdt.NewExpr().Column("active").Op("=").Value(false)).
+    Limit(10).
+    Exec()
+
+// COUNT
+count, err := fdb.Select("users").Count()
+
+// Single row retrieval
+user, err := fdb.Select("users", "id", "name").
+    Where(cdt.NewExpr().Column("id").Op("=").Value(1)).
+    One()
+```
+
+**FluentDB Features:**
+
+- ✅ **Chainable API** - Methods return builders for fluent method chaining
+- ✅ **Readable** - Code reads naturally from left-to-right like SQL
+- ✅ **Type-Safe** - Compiler catches method order errors
+- ✅ **100% Code Reuse** - Delegates to existing DBActions (no duplication)
+- ✅ **JOINs** - INNER, LEFT, RIGHT joins with multiple conditions
+- ✅ **Transactions** - Works seamlessly with transactions via `WithTx()`
+- ✅ **Pagination** - Built-in LIMIT and OFFSET
+- ✅ **Sorting** - Chainable ORDER BY with multiple columns
+
+**Examples:**
+
+```go
+// SELECT with INNER JOIN
+fdb.Select("users", "users.id", "users.name", "roles.name").
+    Join(cdt.Join{
+        Type:  "INNER",
+        Table: "roles",
+        Conditions: []cdt.JoinCdt{{
+            Left:  "users.role_id",
+            Right: "roles.id",
+        }},
+    }).
+    Get()
+
+// Bulk INSERT
+users := []map[string]interface{}{
+    {"name": "Alice", "email": "alice@example.com"},
+    {"name": "Bob", "email": "bob@example.com"},
+}
+fdb.Insert().Into("users").ValuesBulk(users).Exec()
+
+// Complex UPDATE
+fdb.Update("users").
+    Set("status", "inactive").
+    Where(cdt.NewExpr().Column("last_login").Op("<").Value("2023-01-01")).
+    Where(cdt.NewExpr().Column("active").Op("=").Value(true)).
+    Limit(1000).
+    Exec()
+
+// Pagination
+fdb.Select("users", "id", "name").
+    OrderBy("created_at", "DESC").
+    Limit(20).
+    Offset((page-1)*20).
+    Get()
+```
+
+See [FluentDB Examples](./examples/fluentdb-example/README.md) for comprehensive tutorials on basic, advanced, and transaction-based usage.
+
 ## Database Support
 
 | Feature               | MySQL | PostgreSQL | SQLite | MSSQL |

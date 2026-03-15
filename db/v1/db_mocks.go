@@ -88,18 +88,18 @@ func (m *MockDBActions) EXPECT() *MockDBActionsMockRecorder {
 }
 
 // Delete mocks base method.
-func (m *MockDBActions) Delete(ctx context.Context, table string, conditions condition.Condition, opts *options.QueryOptions) (*ExecResult, error) {
+func (m *MockDBActions) Delete(ctx context.Context, table string, joins []condition.Join, conditions condition.Condition, opts *options.QueryOptions) (*ExecResult, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "Delete", ctx, table, conditions, opts)
+	ret := m.ctrl.Call(m, "Delete", ctx, table, joins, conditions, opts)
 	ret0, _ := ret[0].(*ExecResult)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
 // Delete indicates an expected call of Delete.
-func (mr *MockDBActionsMockRecorder) Delete(ctx, table, conditions, opts interface{}) *gomock.Call {
+func (mr *MockDBActionsMockRecorder) Delete(ctx, table, joins, conditions, opts interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Delete", reflect.TypeOf((*MockDBActions)(nil).Delete), ctx, table, conditions, opts)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Delete", reflect.TypeOf((*MockDBActions)(nil).Delete), ctx, table, joins, conditions, opts)
 }
 
 // Exec mocks base method.
@@ -253,18 +253,18 @@ func (mr *MockDBActionsMockRecorder) QueryRaw(ctx, query interface{}, args ...in
 }
 
 // Update mocks base method.
-func (m *MockDBActions) Update(ctx context.Context, table string, data map[string]any, conditions condition.Condition, opts *options.QueryOptions) (*ExecResult, error) {
+func (m *MockDBActions) Update(ctx context.Context, table string, data map[string]any, joins []condition.Join, conditions condition.Condition, opts *options.QueryOptions) (*ExecResult, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "Update", ctx, table, data, conditions, opts)
+	ret := m.ctrl.Call(m, "Update", ctx, table, data, joins, conditions, opts)
 	ret0, _ := ret[0].(*ExecResult)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
 // Update indicates an expected call of Update.
-func (mr *MockDBActionsMockRecorder) Update(ctx, table, data, conditions, opts interface{}) *gomock.Call {
+func (mr *MockDBActionsMockRecorder) Update(ctx, table, data, joins, conditions, opts interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Update", reflect.TypeOf((*MockDBActions)(nil).Update), ctx, table, data, conditions, opts)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Update", reflect.TypeOf((*MockDBActions)(nil).Update), ctx, table, data, joins, conditions, opts)
 }
 
 // MockDBQueries is a mock of DBQueries interface.
@@ -291,9 +291,9 @@ func (m *MockDBQueries) EXPECT() *MockDBQueriesMockRecorder {
 }
 
 // DeleteQuery mocks base method.
-func (m *MockDBQueries) DeleteQuery(table string, conditions condition.Condition, opts *options.QueryOptions) (string, []any, error) {
+func (m *MockDBQueries) DeleteQuery(table string, joins []condition.Join, conditions condition.Condition, opts *options.QueryOptions) (string, []any, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "DeleteQuery", table, conditions, opts)
+	ret := m.ctrl.Call(m, "DeleteQuery", table, joins, conditions, opts)
 	ret0, _ := ret[0].(string)
 	ret1, _ := ret[1].([]any)
 	ret2, _ := ret[2].(error)
@@ -301,9 +301,9 @@ func (m *MockDBQueries) DeleteQuery(table string, conditions condition.Condition
 }
 
 // DeleteQuery indicates an expected call of DeleteQuery.
-func (mr *MockDBQueriesMockRecorder) DeleteQuery(table, conditions, opts interface{}) *gomock.Call {
+func (mr *MockDBQueriesMockRecorder) DeleteQuery(table, joins, conditions, opts interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DeleteQuery", reflect.TypeOf((*MockDBQueries)(nil).DeleteQuery), table, conditions, opts)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DeleteQuery", reflect.TypeOf((*MockDBQueries)(nil).DeleteQuery), table, joins, conditions, opts)
 }
 
 // Explain mocks base method.
@@ -391,9 +391,9 @@ func (mr *MockDBQueriesMockRecorder) InsertsQuery(table, data, opts interface{})
 }
 
 // UpdateQuery mocks base method.
-func (m *MockDBQueries) UpdateQuery(table string, data map[string]any, conditions condition.Condition, opts *options.QueryOptions) (string, []any, error) {
+func (m *MockDBQueries) UpdateQuery(table string, data map[string]any, joins []condition.Join, conditions condition.Condition, opts *options.QueryOptions) (string, []any, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "UpdateQuery", table, data, conditions, opts)
+	ret := m.ctrl.Call(m, "UpdateQuery", table, data, joins, conditions, opts)
 	ret0, _ := ret[0].(string)
 	ret1, _ := ret[1].([]any)
 	ret2, _ := ret[2].(error)
@@ -401,9 +401,9 @@ func (m *MockDBQueries) UpdateQuery(table string, data map[string]any, condition
 }
 
 // UpdateQuery indicates an expected call of UpdateQuery.
-func (mr *MockDBQueriesMockRecorder) UpdateQuery(table, data, conditions, opts interface{}) *gomock.Call {
+func (mr *MockDBQueriesMockRecorder) UpdateQuery(table, data, joins, conditions, opts interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "UpdateQuery", reflect.TypeOf((*MockDBQueries)(nil).UpdateQuery), table, data, conditions, opts)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "UpdateQuery", reflect.TypeOf((*MockDBQueries)(nil).UpdateQuery), table, data, joins, conditions, opts)
 }
 
 // MockDB is a mock of DB interface.
@@ -459,24 +459,24 @@ func (mr *MockDBMockRecorder) Close() *gomock.Call {
 }
 
 // Delete mocks base method.
-func (m *MockDB) Delete(ctx context.Context, table string, conditions condition.Condition, opts *options.QueryOptions) (*ExecResult, error) {
+func (m *MockDB) Delete(ctx context.Context, table string, joins []condition.Join, conditions condition.Condition, opts *options.QueryOptions) (*ExecResult, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "Delete", ctx, table, conditions, opts)
+	ret := m.ctrl.Call(m, "Delete", ctx, table, joins, conditions, opts)
 	ret0, _ := ret[0].(*ExecResult)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
 // Delete indicates an expected call of Delete.
-func (mr *MockDBMockRecorder) Delete(ctx, table, conditions, opts interface{}) *gomock.Call {
+func (mr *MockDBMockRecorder) Delete(ctx, table, joins, conditions, opts interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Delete", reflect.TypeOf((*MockDB)(nil).Delete), ctx, table, conditions, opts)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Delete", reflect.TypeOf((*MockDB)(nil).Delete), ctx, table, joins, conditions, opts)
 }
 
 // DeleteQuery mocks base method.
-func (m *MockDB) DeleteQuery(table string, conditions condition.Condition, opts *options.QueryOptions) (string, []any, error) {
+func (m *MockDB) DeleteQuery(table string, joins []condition.Join, conditions condition.Condition, opts *options.QueryOptions) (string, []any, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "DeleteQuery", table, conditions, opts)
+	ret := m.ctrl.Call(m, "DeleteQuery", table, joins, conditions, opts)
 	ret0, _ := ret[0].(string)
 	ret1, _ := ret[1].([]any)
 	ret2, _ := ret[2].(error)
@@ -484,9 +484,9 @@ func (m *MockDB) DeleteQuery(table string, conditions condition.Condition, opts 
 }
 
 // DeleteQuery indicates an expected call of DeleteQuery.
-func (mr *MockDBMockRecorder) DeleteQuery(table, conditions, opts interface{}) *gomock.Call {
+func (mr *MockDBMockRecorder) DeleteQuery(table, joins, conditions, opts interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DeleteQuery", reflect.TypeOf((*MockDB)(nil).DeleteQuery), table, conditions, opts)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DeleteQuery", reflect.TypeOf((*MockDB)(nil).DeleteQuery), table, joins, conditions, opts)
 }
 
 // Exec mocks base method.
@@ -753,24 +753,24 @@ func (mr *MockDBMockRecorder) QueryRaw(ctx, query interface{}, args ...interface
 }
 
 // Update mocks base method.
-func (m *MockDB) Update(ctx context.Context, table string, data map[string]any, conditions condition.Condition, opts *options.QueryOptions) (*ExecResult, error) {
+func (m *MockDB) Update(ctx context.Context, table string, data map[string]any, joins []condition.Join, conditions condition.Condition, opts *options.QueryOptions) (*ExecResult, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "Update", ctx, table, data, conditions, opts)
+	ret := m.ctrl.Call(m, "Update", ctx, table, data, joins, conditions, opts)
 	ret0, _ := ret[0].(*ExecResult)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
 // Update indicates an expected call of Update.
-func (mr *MockDBMockRecorder) Update(ctx, table, data, conditions, opts interface{}) *gomock.Call {
+func (mr *MockDBMockRecorder) Update(ctx, table, data, joins, conditions, opts interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Update", reflect.TypeOf((*MockDB)(nil).Update), ctx, table, data, conditions, opts)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Update", reflect.TypeOf((*MockDB)(nil).Update), ctx, table, data, joins, conditions, opts)
 }
 
 // UpdateQuery mocks base method.
-func (m *MockDB) UpdateQuery(table string, data map[string]any, conditions condition.Condition, opts *options.QueryOptions) (string, []any, error) {
+func (m *MockDB) UpdateQuery(table string, data map[string]any, joins []condition.Join, conditions condition.Condition, opts *options.QueryOptions) (string, []any, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "UpdateQuery", table, data, conditions, opts)
+	ret := m.ctrl.Call(m, "UpdateQuery", table, data, joins, conditions, opts)
 	ret0, _ := ret[0].(string)
 	ret1, _ := ret[1].([]any)
 	ret2, _ := ret[2].(error)
@@ -778,9 +778,9 @@ func (m *MockDB) UpdateQuery(table string, data map[string]any, conditions condi
 }
 
 // UpdateQuery indicates an expected call of UpdateQuery.
-func (mr *MockDBMockRecorder) UpdateQuery(table, data, conditions, opts interface{}) *gomock.Call {
+func (mr *MockDBMockRecorder) UpdateQuery(table, data, joins, conditions, opts interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "UpdateQuery", reflect.TypeOf((*MockDB)(nil).UpdateQuery), table, data, conditions, opts)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "UpdateQuery", reflect.TypeOf((*MockDB)(nil).UpdateQuery), table, data, joins, conditions, opts)
 }
 
 // WithTransaction mocks base method.
@@ -835,24 +835,24 @@ func (mr *MockTxMockRecorder) Commit(ctx interface{}) *gomock.Call {
 }
 
 // Delete mocks base method.
-func (m *MockTx) Delete(ctx context.Context, table string, conditions condition.Condition, opts *options.QueryOptions) (*ExecResult, error) {
+func (m *MockTx) Delete(ctx context.Context, table string, joins []condition.Join, conditions condition.Condition, opts *options.QueryOptions) (*ExecResult, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "Delete", ctx, table, conditions, opts)
+	ret := m.ctrl.Call(m, "Delete", ctx, table, joins, conditions, opts)
 	ret0, _ := ret[0].(*ExecResult)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
 // Delete indicates an expected call of Delete.
-func (mr *MockTxMockRecorder) Delete(ctx, table, conditions, opts interface{}) *gomock.Call {
+func (mr *MockTxMockRecorder) Delete(ctx, table, joins, conditions, opts interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Delete", reflect.TypeOf((*MockTx)(nil).Delete), ctx, table, conditions, opts)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Delete", reflect.TypeOf((*MockTx)(nil).Delete), ctx, table, joins, conditions, opts)
 }
 
 // DeleteQuery mocks base method.
-func (m *MockTx) DeleteQuery(table string, conditions condition.Condition, opts *options.QueryOptions) (string, []any, error) {
+func (m *MockTx) DeleteQuery(table string, joins []condition.Join, conditions condition.Condition, opts *options.QueryOptions) (string, []any, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "DeleteQuery", table, conditions, opts)
+	ret := m.ctrl.Call(m, "DeleteQuery", table, joins, conditions, opts)
 	ret0, _ := ret[0].(string)
 	ret1, _ := ret[1].([]any)
 	ret2, _ := ret[2].(error)
@@ -860,9 +860,9 @@ func (m *MockTx) DeleteQuery(table string, conditions condition.Condition, opts 
 }
 
 // DeleteQuery indicates an expected call of DeleteQuery.
-func (mr *MockTxMockRecorder) DeleteQuery(table, conditions, opts interface{}) *gomock.Call {
+func (mr *MockTxMockRecorder) DeleteQuery(table, joins, conditions, opts interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DeleteQuery", reflect.TypeOf((*MockTx)(nil).DeleteQuery), table, conditions, opts)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DeleteQuery", reflect.TypeOf((*MockTx)(nil).DeleteQuery), table, joins, conditions, opts)
 }
 
 // Exec mocks base method.
@@ -1114,24 +1114,24 @@ func (mr *MockTxMockRecorder) Rollback(ctx interface{}) *gomock.Call {
 }
 
 // Update mocks base method.
-func (m *MockTx) Update(ctx context.Context, table string, data map[string]any, conditions condition.Condition, opts *options.QueryOptions) (*ExecResult, error) {
+func (m *MockTx) Update(ctx context.Context, table string, data map[string]any, joins []condition.Join, conditions condition.Condition, opts *options.QueryOptions) (*ExecResult, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "Update", ctx, table, data, conditions, opts)
+	ret := m.ctrl.Call(m, "Update", ctx, table, data, joins, conditions, opts)
 	ret0, _ := ret[0].(*ExecResult)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
 // Update indicates an expected call of Update.
-func (mr *MockTxMockRecorder) Update(ctx, table, data, conditions, opts interface{}) *gomock.Call {
+func (mr *MockTxMockRecorder) Update(ctx, table, data, joins, conditions, opts interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Update", reflect.TypeOf((*MockTx)(nil).Update), ctx, table, data, conditions, opts)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Update", reflect.TypeOf((*MockTx)(nil).Update), ctx, table, data, joins, conditions, opts)
 }
 
 // UpdateQuery mocks base method.
-func (m *MockTx) UpdateQuery(table string, data map[string]any, conditions condition.Condition, opts *options.QueryOptions) (string, []any, error) {
+func (m *MockTx) UpdateQuery(table string, data map[string]any, joins []condition.Join, conditions condition.Condition, opts *options.QueryOptions) (string, []any, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "UpdateQuery", table, data, conditions, opts)
+	ret := m.ctrl.Call(m, "UpdateQuery", table, data, joins, conditions, opts)
 	ret0, _ := ret[0].(string)
 	ret1, _ := ret[1].([]any)
 	ret2, _ := ret[2].(error)
@@ -1139,7 +1139,7 @@ func (m *MockTx) UpdateQuery(table string, data map[string]any, conditions condi
 }
 
 // UpdateQuery indicates an expected call of UpdateQuery.
-func (mr *MockTxMockRecorder) UpdateQuery(table, data, conditions, opts interface{}) *gomock.Call {
+func (mr *MockTxMockRecorder) UpdateQuery(table, data, joins, conditions, opts interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "UpdateQuery", reflect.TypeOf((*MockTx)(nil).UpdateQuery), table, data, conditions, opts)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "UpdateQuery", reflect.TypeOf((*MockTx)(nil).UpdateQuery), table, data, joins, conditions, opts)
 }

@@ -17,7 +17,7 @@ type User struct {
 	Status string
 }
 
-//nolint:forbidigo,cyclop
+//nolint:cyclop
 func main() {
 	cfgs := []db.DBConfig{
 		db.PostgresConfig{
