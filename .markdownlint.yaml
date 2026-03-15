@@ -1,0 +1,31 @@
+# Markdownlint Configuration
+# Practical markdown linting for documentation projects
+# Purpose: Check for basic markdown integrity while avoiding over-strict formatting requirements
+
+# Rules documented at: https://github.com/DavidAnson/markdownlint/blob/main/doc/Rules.md
+
+# Core formatting rules (enabled)
+MD003:
+  style: consistent
+MD004:
+  style: consistent
+MD005: true
+MD007:
+  indent: 2
+
+# Rules disabled (too strict for documentation)
+MD013: false # Line length (documentation naturally has long lines for readability)
+MD022: false # Blank lines around headings (too restrictive)
+MD024: false # Duplicate headings (acceptable in multi-section docs)
+MD025: false # Multiple H1 headings
+MD026: false # Trailing punctuation in headings
+MD031: false # Fenced code blocks surrounded by blank lines
+MD032: false # Lists surrounded by blank lines
+MD033: false # Inline HTML (allowed for special formatting)
+MD034: true # Bare URLs (should be proper markdown links)
+MD035:
+  style: consistent
+MD036: false # Emphasis as heading
+MD040: false # Fenced code block language (comment these blocks as best as possible, but not mandatory)
+MD051: false # Link fragment validity
+MD060: false # Table column style

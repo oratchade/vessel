@@ -1,0 +1,50 @@
+---
+name: Project
+description: Project-specific vocabulary and technical terms
+action:
+  name: accept
+
+terms:
+  # Project names
+  - fabric
+  - DBActions
+  - DBQueries
+  - PoolStatistics
+  - RowsAdapter
+  - QueryBuilder
+  - SQLDialect
+  - DriverFactory
+
+  # Database terms
+  - PostgreSQL
+  - SQLite
+  - MSSQL
+  - MySQL
+  - CockroachDB
+  - parameterized
+  - SQL injection
+
+  # Go terminology
+  - GoLang
+  - golangci
+  - goroutine
+  - interface
+  - struct
+  - method
+  - defer
+
+  # API/Architecture terms
+  - API
+  - DSL
+  - CRUD
+  - OTEL
+  - OpenTelemetry
+  - REST
+
+  # Other technical terms
+  - plugin
+  - registry
+  - transaction
+  - mutex
+  - schema
+  - identifier

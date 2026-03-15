@@ -1,0 +1,46 @@
+# Vale Configuration
+# See https://vale.sh/docs for documentation
+
+# Define the style guide
+StylesPath: .vale/styles
+MinAlertLevel: warning
+
+# Project vocabulary (custom terms)
+Vocab: Project
+
+# Files to check
+FileAssociations:
+  - "\.md$"
+  - "\.txt$"
+
+# Ignore patterns
+BlockIgnores:
+  - |
+    ```.*
+    .*
+    ```
+  - "<!-- vale"
+  - "<!-- /vale"
+
+# Core rules
+[*.md]
+# Syntax and structure
+vale.Spelling = YES
+vale.Repetition = YES
+
+# Style and clarity (you can customize these)
+vale.Hedging = warning
+vale.Simplicity = warning
+
+# Avoid common mistakes
+vale.DontUseHeadlines = warning
+vale.GrammarCheck = warning
+
+# Documentation standards
+[README.md]
+vale.Spelling = error
+vale.Simplicity = error
+
+[docs/*.md]
+vale.Spelling = error
+vale.Simplicity = warning

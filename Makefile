@@ -1,4 +1,4 @@
-.PHONY: test coverage cobertura cover-html cover-func tools fmt fmt-check lint deps-install deps-validate check all mocks integration-test integration-test-sqlite integration-test-mysql integration-test-postgres integration-test-mssql integration-test-all
+.PHONY: test coverage cobertura cover-html cover-func tools fmt fmt-check lint lint-markdown lint-docs check all mocks integration-test integration-test-sqlite integration-test-mysql integration-test-postgres integration-test-mssql integration-test-all deps-install deps-validate clean
 
 TEST_PKGS ?= ./...
 
@@ -53,18 +53,35 @@ else
 MOCKGEN_INSTALL = github.com/golang/mock/mockgen@$(MOCKGEN_VERSION)
 endif
 
-# Build/test flags
+# Markdown linting tools
+MARKDOWNLINT_VERSION ?=
+VALE_VERSION ?=
+
+ifeq ($(MARKDOWNLINT_VERSION),)
+MARKDOWNLINT_INSTALL = markdownlint-cli2@latest
+else
+MARKDOWNLINT_INSTALL = markdownlint-cli2@$(MARKDOWNLINT_VERSION)
+endif
+
+ifeq ($(VALE_VERSION),)
+VALE_INSTALL = github.com/errata-ai/vale/v3@latest
+else
+VALE_INSTALL = github.com/errata-ai/vale/v3@$(VALE_VERSION)
+endif
 GOFLAGS ?= -tags=test
 CGO_ENABLED ?= 1
 TEST_FLAGS ?= -covermode=atomic -coverpkg=./... -coverprofile=$(COVER_FILE)
 
 tools:
-	@echo "Installing: $(GOTESTSUM_INSTALL) $(GOCOVER_INSTALL) $(GOFUMPT_INSTALL) $(GOLANGCI_INSTALL) $(MOCKGEN_INSTALL)"
+	@echo "Installing: $(GOTESTSUM_INSTALL) $(GOCOVER_INSTALL) $(GOFUMPT_INSTALL) $(GOLANGCI_INSTALL) $(MOCKGEN_INSTALL) $(MARKDOWNLINT_INSTALL) $(VALE_INSTALL)"
 	@GOBIN=$(GOBIN) CGO_ENABLED=$(CGO_ENABLED) go install $(GOTESTSUM_INSTALL)
 	@GOBIN=$(GOBIN) CGO_ENABLED=$(CGO_ENABLED) go install $(GOCOVER_INSTALL)
 	@GOBIN=$(GOBIN) CGO_ENABLED=$(CGO_ENABLED) go install $(GOFUMPT_INSTALL)
 	@GOBIN=$(GOBIN) CGO_ENABLED=$(CGO_ENABLED) go install $(GOLANGCI_INSTALL)
 	@GOBIN=$(GOBIN) CGO_ENABLED=$(CGO_ENABLED) go install $(MOCKGEN_INSTALL)
+	@echo "Installing markdownlint-cli2..."
+	@npm install -g markdownlint-cli2 2>/dev/null || echo "Note: markdownlint-cli2 requires Node.js/npm"
+	@GOBIN=$(GOBIN) go install $(VALE_INSTALL)
 
 test:
 	@mkdir -p $(OUT_JUNIT_DIR)
@@ -153,6 +170,24 @@ lint:
 	@echo "Running golangci-lint using .golangci.yml"
 	@golangci-lint run --config .golangci.yml ./...
 
+# Markdown linting with markdownlint
+lint-markdown:
+	@echo "Running markdownlint-cli2 using .markdownlint.yaml"
+	@if command -v markdownlint-cli2 >/dev/null 2>&1; then \
+		markdownlint-cli2 "**/*.md" "#node_modules" "#vendor" "#.git" "#out"; \
+	else \
+		echo "markdownlint-cli2 not found. Install with: npm install -g markdownlint-cli2"; exit 1; \
+	fi
+
+# Documentation linting with Vale
+lint-docs:
+	@echo "Running Vale for documentation quality check"
+	@if command -v vale >/dev/null 2>&1; then \
+		vale --config .vale.yaml ./docs ./README.md *.md 2>/dev/null || true; \
+	else \
+		echo "Vale not found. Install with: go install github.com/errata-ai/vale/v3@latest"; exit 1; \
+	fi
+
 # Mock generation
 mocks:
 	@echo "Generating mocks using go generate..."
@@ -178,8 +213,8 @@ deps-validate:
 		echo 'go.mod or go.sum changed; run `go mod tidy` and commit'; exit 1; \
 	fi
 
-# CI check: formatting, deps validation, lint, mocks generation, and tests
-check: fmt-check deps-validate lint mocks coverage
+# CI check: formatting, deps validation, lint, markdown linting, mocks generation, and tests
+check: fmt-check deps-validate lint lint-markdown lint-docs mocks coverage
 	@echo "All checks passed."
 
 all: tools fmt lint deps-install deps-validate mocks check test coverage cobertura cover-html cover-func

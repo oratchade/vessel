@@ -1,0 +1,19 @@
+{
+  "extends": "markdownlint/style/prettier",
+  "line_length": 120,
+  "no-hard-tabs": false,
+  "code-block-language": true,
+  "code-blocks": {
+    "line_length": 120
+  },
+  "no-multiple-blanks": {
+    "maximum": 1
+  },
+  "list-indentation": {
+    "indent": 2
+  },
+  "no-multiple-spaces": {
+    "markers": true,
+    "exceptions": []
+  }
+}
