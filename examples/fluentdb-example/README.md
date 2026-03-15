@@ -88,6 +88,7 @@ psql -d myapp -U postgres -c "
 ### 1. `basic/main.go` - Basic CRUD Operations
 
 **What it demonstrates:**
+
 - SELECT queries with WHERE, ORDER BY, LIMIT
 - INSERT single row and bulk operations
 - UPDATE with filters
@@ -141,6 +142,7 @@ row, err := fdb.Select("users", "id", "name").
 ### 2. `advanced/main.go` - Advanced Queries with JOINs
 
 **What it demonstrates:**
+
 - SELECT with INNER JOIN
 - SELECT with LEFT JOIN
 - UPDATE with JOINs
@@ -194,6 +196,7 @@ rows, err := fdb.Select("users", "id", "name").
 ### 3. `transactions/main.go` - Transaction Handling
 
 **What it demonstrates:**
+
 - Starting and committing transactions
 - Using FluentDB within transactions
 - Error handling and rollback
@@ -253,8 +256,8 @@ tx.Commit(ctx)
 **Raw DBActions:**
 
 ```go
-rows, err := db.Get(ctx, "", "users", []string{"id", "name"}, nil, 
-    cdt.NewExpr().Column("active").Op("=").Value(true), 
+rows, err := db.Get(ctx, "", "users", []string{"id", "name"}, nil,
+    cdt.NewExpr().Column("active").Op("=").Value(true),
     &options.QueryOptions{Limit: 10})
 ```
 
@@ -326,7 +329,7 @@ rows, _ := txFdb.Select("users", "id").Get()
 
 ```go
 // Bulk INSERT
-users := []map[string]interface{}{
+users := []map[string]any{
     {"name": "Alice", "email": "alice@example.com"},
     {"name": "Bob", "email": "bob@example.com"},
 }

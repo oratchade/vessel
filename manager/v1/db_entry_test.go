@@ -24,10 +24,10 @@ func (m *MockDB) Get(
 	ctx context.Context,
 	table string,
 	columns []string,
-	joins []interface{},
-	conditions interface{},
-	opts interface{},
-) ([]map[string]interface{}, error) {
+	joins []any,
+	conditions any,
+	opts any,
+) ([]map[string]any, error) {
 	return nil, nil
 }
 
@@ -35,38 +35,38 @@ func (m *MockDB) GetRaw(
 	ctx context.Context,
 	table string,
 	columns []string,
-	joins []interface{},
-	conditions interface{},
-	opts interface{},
-) (interface{}, error) {
+	joins []any,
+	conditions any,
+	opts any,
+) (any, error) {
 	return nil, nil
 }
 
 func (m *MockDB) GetByID(
 	ctx context.Context,
 	table string,
-	id interface{},
-	joins []interface{},
-	opts interface{},
-) ([]map[string]interface{}, error) {
+	id any,
+	joins []any,
+	opts any,
+) ([]map[string]any, error) {
 	return nil, nil
 }
 
 func (m *MockDB) GetByIDRaw(
 	ctx context.Context,
 	table string,
-	id interface{},
-	joins []interface{},
-	opts interface{},
-) (interface{}, error) {
+	id any,
+	joins []any,
+	opts any,
+) (any, error) {
 	return nil, nil
 }
 
 func (m *MockDB) Insert(
 	ctx context.Context,
 	table string,
-	data map[string]interface{},
-	opts interface{},
+	data map[string]any,
+	opts any,
 ) (*db.ExecResult, error) {
 	return &db.ExecResult{RowsAffected: 1}, nil
 }
@@ -74,8 +74,8 @@ func (m *MockDB) Insert(
 func (m *MockDB) Inserts(
 	ctx context.Context,
 	table string,
-	data []map[string]interface{},
-	opts interface{},
+	data []map[string]any,
+	opts any,
 ) (*db.ExecResult, error) {
 	return &db.ExecResult{RowsAffected: int64(len(data))}, nil
 }
@@ -83,9 +83,9 @@ func (m *MockDB) Inserts(
 func (m *MockDB) Update(
 	ctx context.Context,
 	table string,
-	data map[string]interface{},
-	conditions interface{},
-	opts interface{},
+	data map[string]any,
+	conditions any,
+	opts any,
 ) (*db.ExecResult, error) {
 	return &db.ExecResult{RowsAffected: 1}, nil
 }
@@ -93,8 +93,8 @@ func (m *MockDB) Update(
 func (m *MockDB) Delete(
 	ctx context.Context,
 	table string,
-	conditions interface{},
-	opts interface{},
+	conditions any,
+	opts any,
 ) (*db.ExecResult, error) {
 	return &db.ExecResult{RowsAffected: 1}, nil
 }
@@ -102,23 +102,23 @@ func (m *MockDB) Delete(
 func (m *MockDB) Query(
 	ctx context.Context,
 	query string,
-	args ...interface{},
-) ([]map[string]interface{}, error) {
+	args ...any,
+) ([]map[string]any, error) {
 	return nil, nil
 }
 
 func (m *MockDB) QueryRaw(
 	ctx context.Context,
 	query string,
-	args ...interface{},
-) (interface{}, error) {
+	args ...any,
+) (any, error) {
 	return nil, nil
 }
 
 func (m *MockDB) Exec(
 	ctx context.Context,
 	query string,
-	args ...interface{},
+	args ...any,
 ) (*db.ExecResult, error) {
 	return &db.ExecResult{RowsAffected: 1}, nil
 }

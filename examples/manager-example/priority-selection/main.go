@@ -111,7 +111,7 @@ func mixedOperationsExample(ctx context.Context, dm *v1.DBManager) {
 		defer wg.Done()
 
 		log.Println("   Sending INSERT to primary-db (priority:100)...")
-		result, err := dm.Insert(ctx, "users", map[string]interface{}{
+		result, err := dm.Insert(ctx, "users", map[string]any{
 			"name":  "Bob",
 			"email": "bob@example.com",
 		}, nil)

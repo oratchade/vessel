@@ -36,7 +36,7 @@ func (m mockDialect) SupportedOptions(
 	queryType definition.QueryType,
 	opts *options.QueryOptions,
 	paramBase int,
-) (string, []interface{}, error) {
+) (string, []any, error) {
 	return "", nil, nil
 }
 

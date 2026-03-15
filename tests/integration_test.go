@@ -25,9 +25,9 @@ const (
 
 type TestDB struct {
 	name    string
-	config  interface{}
+	config  any
 	driver  string
-	setupFn func(*testing.T, interface{}) // Function to setup DB-specific schema
+	setupFn func(*testing.T, any) // Function to setup DB-specific schema
 }
 
 type User struct {
@@ -1069,7 +1069,7 @@ func getInt64(v any) int64 {
 // Setup functions for each database
 
 // setupSQLiteTestDB creates and seeds SQLite database
-func setupSQLiteTestDB(t *testing.T, database interface{}) {
+func setupSQLiteTestDB(t *testing.T, database any) {
 	db := database.(v1.DB)
 	ctx := context.Background()
 
@@ -1123,7 +1123,7 @@ func setupSQLiteTestDB(t *testing.T, database interface{}) {
 // setupMySQLTestDB creates and seeds MySQL database
 //
 //nolint:dupl
-func setupMySQLTestDB(t *testing.T, database interface{}) {
+func setupMySQLTestDB(t *testing.T, database any) {
 	db := database.(v1.DB)
 	ctx := context.Background()
 
@@ -1181,7 +1181,7 @@ func setupMySQLTestDB(t *testing.T, database interface{}) {
 // setupPostgresTestDB creates and seeds PostgreSQL database
 //
 //nolint:dupl
-func setupPostgresTestDB(t *testing.T, database interface{}) {
+func setupPostgresTestDB(t *testing.T, database any) {
 	db := database.(v1.DB)
 	ctx := context.Background()
 
@@ -1239,7 +1239,7 @@ func setupPostgresTestDB(t *testing.T, database interface{}) {
 // setupMSSQLTestDB creates and seeds MSSQL database
 //
 //nolint:dupl
-func setupMSSQLTestDB(t *testing.T, database interface{}) {
+func setupMSSQLTestDB(t *testing.T, database any) {
 	db := database.(v1.DB)
 	ctx := context.Background()
 

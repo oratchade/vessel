@@ -135,7 +135,7 @@ func insertExample(conn db.DB, ctx context.Context) {
 	// INSERT with map
 	fmt.Println("\n2. Insert user using SetMap:")
 	fdb = db.NewFluentDB(conn, ctx)
-	userData := map[string]interface{}{
+	userData := map[string]any{
 		"name":   "Jane Smith",
 		"email":  "jane@example.com",
 		"role":   "admin",
@@ -154,7 +154,7 @@ func insertExample(conn db.DB, ctx context.Context) {
 	// BULK INSERT: Add multiple users at once
 	fmt.Println("\n3. Bulk insert multiple users:")
 	fdb = db.NewFluentDB(conn, ctx)
-	users := []map[string]interface{}{
+	users := []map[string]any{
 		{"name": "Alice", "email": "alice@example.com", "role": "user", "active": true},
 		{"name": "Bob", "email": "bob@example.com", "role": "user", "active": true},
 		{"name": "Charlie", "email": "charlie@example.com", "role": "moderator", "active": false},
@@ -187,7 +187,7 @@ func updateExample(conn db.DB, ctx context.Context) {
 	// UPDATE multiple fields with SetMap
 	fmt.Println("\n2. Update multiple fields using SetMap:")
 	fdb = db.NewFluentDB(conn, ctx)
-	updates := map[string]interface{}{
+	updates := map[string]any{
 		"name":   "Jane Smith Updated",
 		"role":   "super_admin",
 		"active": false,

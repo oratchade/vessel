@@ -13,7 +13,7 @@
 //		return "mydb"
 //	}
 //
-//	func (f *MyDBFactory) Create(ctx context.Context, cfg interface{}) (interface{}, error) {
+//	func (f *MyDBFactory) Create(ctx context.Context, cfg any) (any, error) {
 //		mydbCfg, ok := cfg.(*MyDBConfig)
 //		if !ok {
 //			return nil, fmt.Errorf("expected *MyDBConfig, got %T", cfg)
@@ -54,7 +54,7 @@ import (
 //		return "mydb"
 //	}
 //
-//	func (f *MyDBFactory) Create(ctx context.Context, cfg interface{}) (interface{}, error) {
+//	func (f *MyDBFactory) Create(ctx context.Context, cfg any) (any, error) {
 //		// Type assertion and validation
 //		mydbCfg, ok := cfg.(*MyDBConfig)
 //		if !ok {
@@ -79,9 +79,9 @@ type DriverFactory interface {
 	//   cfg: Database configuration (must match factory's expected type)
 	//
 	// Returns:
-	//   A connected database instance (as interface{})
+	//   A connected database instance (as any)
 	//   error: Non-nil if validation or connection fails
-	Create(ctx context.Context, cfg interface{}) (interface{}, error)
+	Create(ctx context.Context, cfg any) (any, error)
 }
 
 // driverRegistry maps driver names to their factory implementations.

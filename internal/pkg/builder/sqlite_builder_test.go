@@ -53,7 +53,7 @@ func TestSQLiteMySQLInsert(t *testing.T) {
 	dialect := &sqldialect.MySQLDialect{}
 	qb := builder.NewMySQLQueryBuilder(dialect)
 
-	data := map[string]interface{}{
+	data := map[string]any{
 		"id":    1,
 		"name":  "John",
 		"email": "john@example.com",
@@ -72,7 +72,7 @@ func TestSQLiteMySQLUpdate(t *testing.T) {
 	dialect := &sqldialect.MySQLDialect{}
 	qb := builder.NewMySQLQueryBuilder(dialect)
 
-	data := map[string]interface{}{
+	data := map[string]any{
 		"name":  "Jane",
 		"email": "jane@example.com",
 	}

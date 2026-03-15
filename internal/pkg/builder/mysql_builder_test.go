@@ -54,7 +54,7 @@ func TestMysqlInsert(t *testing.T) {
 	dialect := &sqldialect.MySQLDialect{}
 	qb := builder.NewMySQLQueryBuilder(dialect)
 
-	data := map[string]interface{}{
+	data := map[string]any{
 		"id":    1,
 		"name":  "John",
 		"email": "john@example.com",
@@ -73,7 +73,7 @@ func TestMysqlUpdate(t *testing.T) {
 	dialect := &sqldialect.MySQLDialect{}
 	qb := builder.NewMySQLQueryBuilder(dialect)
 
-	data := map[string]interface{}{
+	data := map[string]any{
 		"name":  "Jane",
 		"email": "jane@example.com",
 	}
@@ -216,7 +216,7 @@ func TestMysqlUpdateWithoutJoin(t *testing.T) {
 	dialect := &sqldialect.MySQLDialect{}
 	qb := builder.NewMySQLQueryBuilder(dialect)
 
-	data := map[string]interface{}{
+	data := map[string]any{
 		"status": "inactive",
 	}
 	condition := cdt.NewExpr().Column("id").Op("=").Value(1)
@@ -235,7 +235,7 @@ func TestMysqlUpdateWithSingleJoin(t *testing.T) {
 	dialect := &sqldialect.MySQLDialect{}
 	qb := builder.NewMySQLQueryBuilder(dialect)
 
-	data := map[string]interface{}{
+	data := map[string]any{
 		"status": "active",
 	}
 	joins := []cdt.Join{
@@ -264,7 +264,7 @@ func TestMysqlUpdateWithMultipleJoins(t *testing.T) {
 	dialect := &sqldialect.MySQLDialect{}
 	qb := builder.NewMySQLQueryBuilder(dialect)
 
-	data := map[string]interface{}{
+	data := map[string]any{
 		"level": "premium",
 	}
 	joins := []cdt.Join{

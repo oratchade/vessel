@@ -438,7 +438,7 @@ fdb.Select("users", "users.id", "users.name", "roles.name").
     Get()
 
 // Bulk INSERT
-users := []map[string]interface{}{
+users := []map[string]any{
     {"name": "Alice", "email": "alice@example.com"},
     {"name": "Bob", "email": "bob@example.com"},
 }
@@ -617,7 +617,7 @@ func (f *Factory) Name() string {
     return "mydb"
 }
 
-func (f *Factory) Create(ctx context.Context, cfg interface{}) (interface{}, error) {
+func (f *Factory) Create(ctx context.Context, cfg any) (any, error) {
     mydbCfg, ok := cfg.(*Config)
     if !ok {
         return nil, fmt.Errorf("expected *Config, got %T", cfg)
@@ -667,7 +667,7 @@ Plugin authors can reuse built-in driver implementations:
 
 ```go
 // If your database is compatible with PostgreSQL wire protocol
-func (f *Factory) Create(ctx context.Context, cfg interface{}) (interface{}, error) {
+func (f *Factory) Create(ctx context.Context, cfg any) (any, error) {
     customCfg, _ := cfg.(*Config)
 
     // Convert to PostgreSQL config and reuse the implementation

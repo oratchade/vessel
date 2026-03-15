@@ -18,7 +18,7 @@ The fabric plugin system allows you to register custom database drivers without 
 ```go
 type DriverFactory interface {
     Name() string
-    Create(ctx context.Context, cfg interface{}) (interface{}, error)
+    Create(ctx context.Context, cfg any) (any, error)
 }
 ```
 
@@ -35,7 +35,7 @@ Each plugin must:
        return "cockroachdb"
    }
 
-   func (f *Factory) Create(ctx context.Context, cfg interface{}) (interface{}, error) {
+   func (f *Factory) Create(ctx context.Context, cfg any) (any, error) {
        // Convert config and create driver
        return db.PostgresCfgToDB(pgConfig)
    }
@@ -88,13 +88,13 @@ func (c *Config) DSN() string    { /* PostgreSQL-compatible DSN */ }
 
 The factory's `Create()` method:
 
-1. Receives the config as `interface{}`
+1. Receives the config as `any`
 2. Type asserts to `*Config`
 3. Converts CockroachDB config to PostgreSQL config
 4. Calls `db.PostgresCfgToDB()` to reuse the built-in PostgreSQL driver
 
 ```go
-func (f *Factory) Create(ctx context.Context, cfg interface{}) (interface{}, error) {
+func (f *Factory) Create(ctx context.Context, cfg any) (any, error) {
     crdbCfg := cfg.(*Config)
     pgCfg := &db.PostgresConfig{
         Host:     crdbCfg.Host,
@@ -203,7 +203,7 @@ func (f *Factory) Name() string {
     return "myplugin"
 }
 
-func (f *Factory) Create(ctx context.Context, cfg interface{}) (interface{}, error) {
+func (f *Factory) Create(ctx context.Context, cfg any) (any, error) {
     myCfg, ok := cfg.(*Config)
     if !ok {
         return nil, fmt.Errorf("expected *Config, got %T", cfg)
@@ -230,7 +230,7 @@ func init() {
 
 ```go
 // Use PostgreSQL driver for wire-compatible databases (CockroachDB, Postgres-compatible services)
-func (f *Factory) Create(ctx context.Context, cfg interface{}) (interface{}, error) {
+func (f *Factory) Create(ctx context.Context, cfg any) (any, error) {
     myCfg := cfg.(*Config)
     pgCfg := convertToPostgresConfig(myCfg)
     return db.PostgresCfgToDB(pgCfg)

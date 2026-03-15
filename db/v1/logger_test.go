@@ -116,23 +116,23 @@ type CustomTestLogger struct {
 	calls map[string]int
 }
 
-func (c *CustomTestLogger) Debug(msg string, args ...interface{}) {
+func (c *CustomTestLogger) Debug(msg string, args ...any) {
 	c.calls["Debug"]++
 }
 
-func (c *CustomTestLogger) Info(msg string, args ...interface{}) {
+func (c *CustomTestLogger) Info(msg string, args ...any) {
 	c.calls["Info"]++
 }
 
-func (c *CustomTestLogger) Warn(msg string, args ...interface{}) {
+func (c *CustomTestLogger) Warn(msg string, args ...any) {
 	c.calls["Warn"]++
 }
 
-func (c *CustomTestLogger) Error(msg string, args ...interface{}) {
+func (c *CustomTestLogger) Error(msg string, args ...any) {
 	c.calls["Error"]++
 }
 
-func (c *CustomTestLogger) With(fields ...interface{}) v1.Logger {
+func (c *CustomTestLogger) With(fields ...any) v1.Logger {
 	return c
 }
 

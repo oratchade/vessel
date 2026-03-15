@@ -41,7 +41,7 @@ func (f *Factory) Name() string {
 
 // Create creates a new CockroachDB driver instance.
 // It converts the CockroachDB config to PostgreSQL config and reuses the built-in PostgreSQL driver.
-func (f *Factory) Create(ctx context.Context, cfg interface{}) (interface{}, error) {
+func (f *Factory) Create(ctx context.Context, cfg any) (any, error) {
 	crdbCfg, ok := cfg.(*Config)
 	if !ok {
 		return nil, fmt.Errorf("expected *cockroachdb.Config, got %T", cfg)

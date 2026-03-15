@@ -263,7 +263,7 @@ func TestMysqlUpdateWithJoinAndCondition(t *testing.T) {
 	dialect := &sqldialect.MySQLDialect{}
 	qb := builder.NewMySQLQueryBuilder(dialect)
 
-	data := map[string]interface{}{
+	data := map[string]any{
 		"status": "active",
 	}
 	joins := []cdt.Join{
@@ -319,7 +319,7 @@ func TestPostgresUpdateWithJoin(t *testing.T) {
 	dialect := &sqldialect.PostgresDialect{}
 	qb := builder.NewPostgresQueryBuilder(dialect)
 
-	data := map[string]interface{}{
+	data := map[string]any{
 		"status": "verified",
 	}
 	joins := []cdt.Join{
@@ -375,7 +375,7 @@ func TestMSSQLUpdateWithJoin(t *testing.T) {
 	dialect := &sqldialect.MSSQLDialect{}
 	qb := builder.NewMSSQLQueryBuilder(dialect)
 
-	data := map[string]interface{}{
+	data := map[string]any{
 		"department": "Sales",
 	}
 	joins := []cdt.Join{
@@ -431,7 +431,7 @@ func TestSQLiteUpdateWithJoin(t *testing.T) {
 	dialect := &sqldialect.MySQLDialect{}
 	qb := builder.NewSQLiteQueryBuilder(dialect)
 
-	data := map[string]interface{}{
+	data := map[string]any{
 		"active": 1,
 	}
 	joins := []cdt.Join{
@@ -501,7 +501,7 @@ func TestUpdateBackwardsCompatibilityWithNilJoins(t *testing.T) {
 	dialect := &sqldialect.MySQLDialect{}
 	qb := builder.NewMySQLQueryBuilder(dialect)
 
-	data := map[string]interface{}{
+	data := map[string]any{
 		"email": "new@example.com",
 	}
 	condition := cdt.NewExpr().Column("id").Op("=").Value(42)

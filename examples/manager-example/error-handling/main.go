@@ -63,7 +63,7 @@ func main() {
 // detectErrorTypesExample shows how to identify specific database errors
 func detectErrorTypesExample(ctx context.Context, dm *v1.DBManager) {
 	// Try to insert duplicate key (will fail if email already exists)
-	_, err := dm.Insert(ctx, "users", map[string]interface{}{
+	_, err := dm.Insert(ctx, "users", map[string]any{
 		"name":  "Test User",
 		"email": "duplicate@example.com",
 	}, nil)

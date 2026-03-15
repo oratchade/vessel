@@ -12,7 +12,7 @@ import (
 func TestSQLNullStringConversion(t *testing.T) {
 	testCases := []struct {
 		name     string
-		input    interface{}
+		input    any
 		expected bool
 	}{
 		{"nil value", nil, false},
@@ -38,7 +38,7 @@ func TestSQLNullStringConversion(t *testing.T) {
 func TestSQLNullInt64Conversion(t *testing.T) {
 	testCases := []struct {
 		name     string
-		input    interface{}
+		input    any
 		expected bool
 	}{
 		{"nil value", nil, false},
@@ -80,7 +80,7 @@ func TestSQLNullBoolConversion(t *testing.T) {
 func TestSQLNullByteConversion(t *testing.T) {
 	testCases := []struct {
 		name     string
-		input    interface{}
+		input    any
 		expected bool
 	}{
 		{"single byte", byte('a'), true},
@@ -104,7 +104,7 @@ func TestSQLNullByteConversion(t *testing.T) {
 func TestSQLNullFloat64Conversion(t *testing.T) {
 	testCases := []struct {
 		name     string
-		input    interface{}
+		input    any
 		expected bool
 	}{
 		{"valid float", "3.14", true},

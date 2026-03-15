@@ -75,7 +75,7 @@ func main() {
 // insertExample demonstrates inserting a single row synchronously
 func insertExample(ctx context.Context, dm *v1.DBManager) {
 	// Execute synchronous insert query
-	result, err := dm.Insert(ctx, "users", map[string]interface{}{
+	result, err := dm.Insert(ctx, "users", map[string]any{
 		"name":  "Alice",
 		"email": "alice@example.com",
 	}, nil)
@@ -120,7 +120,7 @@ func updateExample(ctx context.Context, dm *v1.DBManager) {
 	cond := condition.NewExpr().Column("id").Op("=").Value(1)
 
 	// Execute synchronous update query
-	result, err := dm.Update(ctx, "users", map[string]interface{}{
+	result, err := dm.Update(ctx, "users", map[string]any{
 		"email": "alice.updated@example.com",
 	}, nil, cond, nil)
 
