@@ -21,7 +21,7 @@ First production-ready release with comprehensive documentation, 99+ test cases,
 
 | Version | Release Date | Go Version | MySQL | PostgreSQL | SQLite | MSSQL | Status       | Support Ends |
 | ------- | ------------ | ---------- | ----- | ---------- | ------ | ----- | ------------ | ------------ |
-| 1.0.x   | Mar 3, 2026  | 1.26+      | 8.0+  | 15+        | ✅     | 2022+ | ✅ Supported | Mar 2027     |
+| 1.0.x   | Mar 15, 2026 | 1.26+      | 8.0+  | 15+        | ✅     | 2022+ | ✅ Supported | Mar 2027     |
 
 **Status Definitions:**
 

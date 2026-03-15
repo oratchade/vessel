@@ -14,14 +14,6 @@ For a high-level overview of releases, see [RELEASES.md](./RELEASES.md).
 - Batch upsert operations
 - Query result caching layer
 - Performance benchmarks suite
-- Query builder chaining enhancements
-- **OrderBy Struct Redesign** - Type-safe ordering with structured `OrderBy` type
-  - New `OrderBy` struct with `Column` and `Direction` fields
-  - Improved type safety and discoverability
-  - Automatic direction normalization (lowercase → uppercase)
-  - Default direction handling (empty → "ASC")
-  - Backward compatible with FluentDB API
-  - Comprehensive documentation in `ORDERBY_CHANGES.md`
 
 #### Changed
 
@@ -35,7 +27,7 @@ For a high-level overview of releases, see [RELEASES.md](./RELEASES.md).
 
 ---
 
-## [1.0.0] - 2026-03-03
+## [1.0.0] - 2026-03-15
 
 ### Added
 
@@ -90,6 +82,15 @@ For a high-level overview of releases, see [RELEASES.md](./RELEASES.md).
   - Configurable via `OTEL_ENABLED` environment variable
   - Zero overhead when disabled (no-op tracer provider)
 
+- Query builder chaining enhancements
+- **OrderBy Struct Redesign** - Type-safe ordering with structured `OrderBy` type
+  - New `OrderBy` struct with `Column` and `Direction` fields
+  - Improved type safety and discoverability
+  - Automatic direction normalization (lowercase → uppercase)
+  - Default direction handling (empty → "ASC")
+  - Backward compatible with FluentDB API
+  - Comprehensive documentation in `ORDERBY_CHANGES.md`
+
 #### Documentation
 
 - **README.md** - Comprehensive feature overview with 10+ code examples covering basic connections, queries, inserts, bulk operations, and transactions
@@ -99,9 +100,6 @@ For a high-level overview of releases, see [RELEASES.md](./RELEASES.md).
 - **RELEASES.md** - Version history, roadmap, and release management
 - **OPERATORS_COMPATIBILITY.md** - Detailed operator support matrix per database dialect
 - **SQL_NULL_TYPES.md** - Guide to handling nullable SQL types in Go structs
-- **INTEGRATION_TESTING.md** - Setup and execution guide for integration tests across all databases
-- **LOAD_HANDLING_ROADMAP.md** - Planned performance and load handling features
-- **Code Comments** - 100% compliance with Go effective comment standards (all packages, types, exported functions documented)
 
 #### Testing
 

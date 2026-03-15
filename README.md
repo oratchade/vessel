@@ -762,9 +762,9 @@ MIT License - see [LICENSE.md](./LICENSE.md)
 
 ## Changelog
 
-See [RELEASES.md](./RELEASES.md) for version history and release notes.
+See [RELEASES.md](./docs/RELEASES.md) for version history and release notes.
 
-For detailed changes between versions, see [CHANGELOG.md](./CHANGELOG.md) (Keep a Changelog format).
+For detailed changes between versions, see [CHANGELOG.md](./docs/CHANGELOG.md) (Keep a Changelog format).
 
 ---
 
