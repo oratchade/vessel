@@ -79,7 +79,7 @@ func TestMysqlUpdate(t *testing.T) {
 	}
 	condition := cdt.NewExpr().Column("id").Op("=").Value(1)
 
-	query, args, err := qb.Update("users", data, condition)
+	query, args, err := qb.Update("users", data, nil, condition)
 
 	require.NoError(t, err)
 	assert.Contains(t, query, "UPDATE `users`")
@@ -95,7 +95,7 @@ func TestMysqlDelete(t *testing.T) {
 
 	condition := cdt.NewExpr().Column("id").Op("=").Value(1)
 
-	query, args, err := qb.Delete("users", condition)
+	query, args, err := qb.Delete("users", nil, condition)
 
 	require.NoError(t, err)
 	assert.Contains(t, query, "DELETE FROM `users`")
@@ -206,4 +206,157 @@ func TestMysqlInCondition(t *testing.T) {
 	require.NoError(t, err)
 	assert.Contains(t, query, "IN")
 	assert.Len(t, args, 3)
+}
+
+// TestMysqlUpdateWithoutJoin tests UPDATE without JOINs (backwards compatibility)
+func TestMysqlUpdateWithoutJoin(t *testing.T) {
+	dialect := &sqldialect.MySQLDialect{}
+	qb := builder.NewMySQLQueryBuilder(dialect)
+
+	data := map[string]interface{}{
+		"status": "inactive",
+	}
+	condition := cdt.NewExpr().Column("id").Op("=").Value(1)
+
+	query, args, err := qb.Update("users", data, nil, condition)
+
+	require.NoError(t, err)
+	assert.Contains(t, query, "UPDATE `users`")
+	assert.Contains(t, query, "SET `status` = ?")
+	assert.Contains(t, query, "WHERE")
+	assert.Len(t, args, 2)
+}
+
+// TestMysqlUpdateWithSingleJoin tests UPDATE with single JOIN
+func TestMysqlUpdateWithSingleJoin(t *testing.T) {
+	dialect := &sqldialect.MySQLDialect{}
+	qb := builder.NewMySQLQueryBuilder(dialect)
+
+	data := map[string]interface{}{
+		"status": "active",
+	}
+	joins := []cdt.Join{
+		{
+			Type:  "INNER",
+			Table: "orders",
+			Conditions: cdt.JoinCdts{
+				{Left: "id", Right: "user_id"},
+			},
+		},
+	}
+	condition := cdt.NewExpr().Column("orders.status").Op("=").Value("completed")
+
+	query, args, err := qb.Update("users", data, joins, condition)
+
+	require.NoError(t, err)
+	assert.Contains(t, query, "UPDATE `users`")
+	assert.Contains(t, query, "SET")
+	assert.Contains(t, query, "INNER JOIN")
+	assert.Contains(t, query, "WHERE")
+	assert.Len(t, args, 2) // 1 from SET, 1 from WHERE
+}
+
+// TestMysqlUpdateWithMultipleJoins tests UPDATE with multiple JOINs
+func TestMysqlUpdateWithMultipleJoins(t *testing.T) {
+	dialect := &sqldialect.MySQLDialect{}
+	qb := builder.NewMySQLQueryBuilder(dialect)
+
+	data := map[string]interface{}{
+		"level": "premium",
+	}
+	joins := []cdt.Join{
+		{
+			Type:  "INNER",
+			Table: "orders",
+			Conditions: cdt.JoinCdts{
+				{Left: "id", Right: "user_id"},
+			},
+		},
+		{
+			Type:  "LEFT",
+			Table: "payments",
+			Conditions: cdt.JoinCdts{
+				{Left: "id", Right: "user_id"},
+			},
+		},
+	}
+	condition := cdt.NewExpr().Column("orders.total").Op(">").Value(1000)
+
+	query, args, err := qb.Update("users", data, joins, condition)
+
+	require.NoError(t, err)
+	assert.Contains(t, query, "INNER JOIN `orders`")
+	assert.Contains(t, query, "LEFT JOIN `payments`")
+	assert.Len(t, args, 2)
+}
+
+// TestMysqlDeleteWithoutJoin tests DELETE without JOINs (backwards compatibility)
+func TestMysqlDeleteWithoutJoin(t *testing.T) {
+	dialect := &sqldialect.MySQLDialect{}
+	qb := builder.NewMySQLQueryBuilder(dialect)
+
+	condition := cdt.NewExpr().Column("status").Op("=").Value("deleted")
+
+	query, args, err := qb.Delete("users", nil, condition)
+
+	require.NoError(t, err)
+	assert.Contains(t, query, "DELETE FROM `users`")
+	assert.Contains(t, query, "WHERE")
+	assert.Len(t, args, 1)
+}
+
+// TestMysqlDeleteWithSingleJoin tests DELETE with single JOIN
+func TestMysqlDeleteWithSingleJoin(t *testing.T) {
+	dialect := &sqldialect.MySQLDialect{}
+	qb := builder.NewMySQLQueryBuilder(dialect)
+
+	joins := []cdt.Join{
+		{
+			Type:  "INNER",
+			Table: "orders",
+			Conditions: cdt.JoinCdts{
+				{Left: "id", Right: "user_id"},
+			},
+		},
+	}
+	condition := cdt.NewExpr().Column("orders.status").Op("=").Value("canceled")
+
+	query, args, err := qb.Delete("users", joins, condition)
+
+	require.NoError(t, err)
+	assert.Contains(t, query, "DELETE FROM `users`")
+	assert.Contains(t, query, "INNER JOIN")
+	assert.Contains(t, query, "WHERE")
+	assert.Len(t, args, 1)
+}
+
+// TestMysqlDeleteWithMultipleJoins tests DELETE with multiple JOINs
+func TestMysqlDeleteWithMultipleJoins(t *testing.T) {
+	dialect := &sqldialect.MySQLDialect{}
+	qb := builder.NewMySQLQueryBuilder(dialect)
+
+	joins := []cdt.Join{
+		{
+			Type:  "INNER",
+			Table: "orders",
+			Conditions: cdt.JoinCdts{
+				{Left: "id", Right: "user_id"},
+			},
+		},
+		{
+			Type:  "LEFT",
+			Table: "accounts",
+			Conditions: cdt.JoinCdts{
+				{Left: "id", Right: "user_id"},
+			},
+		},
+	}
+	condition := cdt.NewExpr().Column("orders.status").Op("=").Value("refunded")
+
+	query, args, err := qb.Delete("users", joins, condition)
+
+	require.NoError(t, err)
+	assert.Contains(t, query, "INNER JOIN `orders`")
+	assert.Contains(t, query, "LEFT JOIN `accounts`")
+	assert.Len(t, args, 1)
 }

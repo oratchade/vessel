@@ -554,10 +554,11 @@ func (pg *Postgres) Inserts(
 func (pg *Postgres) UpdateQuery(
 	table string,
 	data map[string]any,
+	joins []cdt.Join,
 	conditions cdt.Condition,
 	opts *options.QueryOptions,
 ) (string, []any, error) {
-	query, args, err := pg.queryBuilder.Update(table, data, conditions)
+	query, args, err := pg.queryBuilder.Update(table, data, joins, conditions)
 	if err != nil {
 		return "", nil, fmt.Errorf("postgres.Update: failed to build update query: %w", err)
 	}
@@ -569,6 +570,7 @@ func (pg *Postgres) Update(
 	ctx context.Context,
 	table string,
 	data map[string]any,
+	joins []cdt.Join,
 	conditions cdt.Condition,
 	opts *options.QueryOptions,
 ) (*ExecResult, error) {
@@ -580,7 +582,7 @@ func (pg *Postgres) Update(
 			semconv.DBCollectionName(table),
 		))
 	defer span.End()
-	query, args, err := pg.queryBuilder.Update(table, data, conditions)
+	query, args, err := pg.queryBuilder.Update(table, data, joins, conditions)
 	if err != nil {
 		err := fmt.Errorf("postgres.Update: failed to build update query: %w", err)
 		span.RecordError(err)
@@ -601,10 +603,11 @@ func (pg *Postgres) Update(
 
 func (pg *Postgres) DeleteQuery(
 	table string,
+	joins []cdt.Join,
 	conditions cdt.Condition,
 	opts *options.QueryOptions,
 ) (string, []any, error) {
-	query, args, err := pg.queryBuilder.Delete(table, conditions)
+	query, args, err := pg.queryBuilder.Delete(table, joins, conditions)
 	if err != nil {
 		return "", nil, fmt.Errorf("postgres.Delete: failed to build delete query: %w", err)
 	}
@@ -615,6 +618,7 @@ func (pg *Postgres) DeleteQuery(
 func (pg *Postgres) Delete(
 	ctx context.Context,
 	table string,
+	joins []cdt.Join,
 	conditions cdt.Condition,
 	opts *options.QueryOptions,
 ) (*ExecResult, error) {
@@ -626,7 +630,7 @@ func (pg *Postgres) Delete(
 			semconv.DBCollectionName(table),
 		))
 	defer span.End()
-	query, args, err := pg.queryBuilder.Delete(table, conditions)
+	query, args, err := pg.queryBuilder.Delete(table, joins, conditions)
 	if err != nil {
 		err := fmt.Errorf("postgres.Delete: failed to build delete query: %w", err)
 		span.RecordError(err)

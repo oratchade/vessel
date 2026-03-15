@@ -255,11 +255,12 @@ func update(
 	ctx context.Context,
 	table string,
 	data map[string]any,
+	joins []cdt.Join,
 	conditions cdt.Condition,
 	opts *options.QueryOptions,
 	dbOpts dbOpts,
 ) (*ExecResult, error) {
-	query, args, err := updateQuery(table, data, conditions, opts, dbOpts)
+	query, args, err := updateQuery(table, data, joins, conditions, opts, dbOpts)
 	if err != nil {
 		return nil, fmt.Errorf("failed to build update query: %w", err)
 	}
@@ -274,11 +275,12 @@ func update(
 func updateQuery(
 	table string,
 	data map[string]any,
+	joins []cdt.Join,
 	conditions cdt.Condition,
 	_ *options.QueryOptions,
 	dbOpts dbOpts,
 ) (string, []any, error) {
-	query, args, err := dbOpts.builder.Update(table, data, conditions)
+	query, args, err := dbOpts.builder.Update(table, data, joins, conditions)
 	if err != nil {
 		return "", nil, fmt.Errorf("failed to build update query: %w", err)
 	}
@@ -290,11 +292,12 @@ func updateQuery(
 func delete(
 	ctx context.Context,
 	table string,
+	joins []cdt.Join,
 	conditions cdt.Condition,
 	opts *options.QueryOptions,
 	dbOpts dbOpts,
 ) (*ExecResult, error) {
-	query, args, err := deleteQuery(table, conditions, opts, dbOpts)
+	query, args, err := deleteQuery(table, joins, conditions, opts, dbOpts)
 	if err != nil {
 		return nil, fmt.Errorf("failed to build delete query: %w", err)
 	}
@@ -308,11 +311,12 @@ func delete(
 
 func deleteQuery(
 	table string,
+	joins []cdt.Join,
 	conditions cdt.Condition,
 	_ *options.QueryOptions,
 	dbOpts dbOpts,
 ) (string, []any, error) {
-	query, args, err := dbOpts.builder.Delete(table, conditions)
+	query, args, err := dbOpts.builder.Delete(table, joins, conditions)
 	if err != nil {
 		return "", nil, fmt.Errorf("failed to build delete query: %w", err)
 	}

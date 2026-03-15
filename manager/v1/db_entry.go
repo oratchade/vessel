@@ -171,6 +171,7 @@ func (de *DBEntry) writeWorker(ctx context.Context, w *dbEntryWorker) {
 					ctx,
 					qd.Data.Table,
 					qd.Data.Data,
+					qd.Data.Joins,
 					qd.Data.Conditions,
 					qd.Data.Opts,
 				)
@@ -179,6 +180,7 @@ func (de *DBEntry) writeWorker(ctx context.Context, w *dbEntryWorker) {
 				resp, err := de.db.Delete(
 					ctx,
 					qd.Data.Table,
+					qd.Data.Joins,
 					qd.Data.Conditions,
 					qd.Data.Opts,
 				)

@@ -322,7 +322,7 @@ func TestIntegration_Update(t *testing.T) {
 			cond := condition.NewExpr().Column("name").Op("=").Value("Alice Johnson")
 			result, err := database.Update(ctx, "users", map[string]any{
 				"age": 29,
-			}, cond, nil)
+			}, nil, cond, nil)
 			if err != nil {
 				t.Fatalf("Update failed: %v", err)
 			}
@@ -410,7 +410,7 @@ func TestIntegration_Delete(t *testing.T) {
 
 			ctx := context.Background()
 			cond := condition.NewExpr().Column("status").Op("=").Value(inactiveStatus)
-			result, err := database.Delete(ctx, "users", cond, nil)
+			result, err := database.Delete(ctx, "users", nil, cond, nil)
 			if err != nil {
 				t.Fatalf("Delete failed: %v", err)
 			}
@@ -845,7 +845,7 @@ func TestIntegration_UpdateMultipleRows(t *testing.T) {
 			cond := condition.NewExpr().Column("age").Op(">").Value(30)
 			result, err := database.Update(ctx, "users", map[string]any{
 				"status": "senior",
-			}, cond, nil)
+			}, nil, cond, nil)
 			if err != nil {
 				t.Fatalf("Update failed: %v", err)
 			}
@@ -904,7 +904,7 @@ func TestIntegration_DeleteMultipleRows(t *testing.T) {
 
 			// Delete all users with age > 40
 			cond := condition.NewExpr().Column("age").Op(">").Value(40)
-			result, err := database.Delete(ctx, "users", cond, nil)
+			result, err := database.Delete(ctx, "users", nil, cond, nil)
 			if err != nil {
 				t.Fatalf("Delete failed: %v", err)
 			}

@@ -61,30 +61,36 @@ type QueryBuilder interface {
 	//   error: Error if query building fails.
 	Inserts(table string, data []map[string]any) (string, []any, error)
 
-	// Update builds an UPDATE query for the given table, data, and conditions.
+	// Update builds an UPDATE query for the given table, data, joins, and conditions.
 	//
 	// Parameters:
 	//   table: Name of the table to update.
 	//   data: Map of column names to new values.
+	//   joins: Slice of Join structs describing SQL JOIN clauses (optional, may be nil or empty).
 	//   cond: Query conditions to select rows to update.
 	//
 	// Returns:
 	//   string: The generated SQL query.
 	//   []any: Arguments for parameterized query.
 	//   error: Error if query building fails.
-	Update(table string, data map[string]any, cond cdt.Condition) (string, []any, error)
+	//
+	// Note: JOIN support varies by database driver. SQLite UPDATE with JOINs is supported,
+	// but not all complex join patterns may be supported across all drivers.
+	Update(table string, data map[string]any, joins []cdt.Join, cond cdt.Condition) (string, []any, error)
 
-	// Delete builds a DELETE query for the given table and conditions.
+	// Delete builds a DELETE query for the given table, joins, and conditions.
 	//
 	// Parameters:
 	//   table: Name of the table to delete from.
+	//   joins: Slice of Join structs describing SQL JOIN clauses (optional, may be nil or empty).
+	//          Note: SQLite does not support DELETE with JOINs and will return an error if joins are provided.
 	//   cond: Query conditions to select rows to delete.
 	//
 	// Returns:
 	//   string: The generated SQL query.
 	//   []any: Arguments for parameterized query.
-	//   error: Error if query building fails.
-	Delete(table string, cond cdt.Condition) (string, []any, error)
+	//   error: Error if query building fails, or if DELETE with JOINs is attempted on unsupported databases.
+	Delete(table string, joins []cdt.Join, cond cdt.Condition) (string, []any, error)
 }
 
 // selectQ builds a SELECT query with support for columns, joins, conditions, and options.
@@ -276,14 +282,51 @@ func rowValues(dialect cdt.SQLDialect, row map[string]any, columns []string, ind
 	return index, rowValues, values
 }
 
-// update builds an UPDATE query for the given table, data, and conditions.
+// buildJoinClause builds the JOIN clause string for UPDATE queries based on dialect.
+// For PostgreSQL, JOINs go in FROM clause.
+// For MySQL/MSSQL, JOINs go directly after SET clause.
+func buildJoinClause(dialect cdt.SQLDialect, joinParts []string) string {
+	if len(joinParts) == 0 {
+		return ""
+	}
+
+	dialectName := fmt.Sprintf("%T", dialect)
+	if strings.Contains(dialectName, "Postgres") {
+		// PostgreSQL: UPDATE ... SET ... FROM joins WHERE ...
+		return " FROM " + strings.Join(joinParts, " ")
+	}
+	// MySQL/MSSQL: UPDATE ... SET ... JOIN ... WHERE ...
+	return " " + strings.Join(joinParts, " ")
+}
+
+// buildDeleteJoinClause builds the JOIN clause string for DELETE queries based on dialect.
+// For PostgreSQL, JOINs go in USING clause.
+// For MySQL/MSSQL, JOINs go directly after DELETE FROM clause.
+func buildDeleteJoinClause(dialect cdt.SQLDialect, joinParts []string) string {
+	if len(joinParts) == 0 {
+		return ""
+	}
+
+	dialectName := fmt.Sprintf("%T", dialect)
+	if strings.Contains(dialectName, "Postgres") {
+		// PostgreSQL: DELETE FROM table USING joins WHERE ...
+		return " USING " + strings.Join(joinParts, " ")
+	}
+	// MySQL/MSSQL: DELETE FROM table JOIN ... WHERE ...
+	return " " + strings.Join(joinParts, " ")
+}
+
+// update builds an UPDATE query for the given table, data, joins, and conditions.
+// The joins parameter is optional and may be nil or empty.
 //
 //nolint:prealloc
 func update(
 	dialect cdt.SQLDialect,
 	table string,
 	data map[string]any,
+	joins []cdt.Join,
 	cond cdt.Condition,
+	joinFn func(table string, join *cdt.Join) string,
 ) (string, []any, error) {
 	// Extract and sort column names for deterministic ordering
 	columns := make([]string, 0, len(data))
@@ -302,29 +345,96 @@ func update(
 	}
 
 	sql := fmt.Sprintf("UPDATE %s SET %s", dialect.QuoteIdentifier(table), strings.Join(sets, ", "))
-	if cond == nil {
-		return fmt.Sprintf("%s;", sql), values, nil
+
+	// Build JOIN clauses if provided
+	var joinParts []string
+	if len(joins) > 0 {
+		for _, j := range joins {
+			joinParts = append(joinParts, joinFn(table, &j))
+		}
 	}
 
-	where, condValues, err := cond.ToSQL(dialect, index)
-	if err != nil {
-		return "", nil, fmt.Errorf("builder.update: %w", err)
+	// Build the WHERE clause and its arguments
+	var whereClause string
+	if cond != nil {
+		where, condValues, err := cond.ToSQL(dialect, index)
+		if err != nil {
+			return "", nil, fmt.Errorf("builder.update: %w", err)
+		}
+		whereClause = where
+		values = append(values, condValues...)
 	}
-	values = append(values, condValues...)
 
-	return fmt.Sprintf("%s WHERE %s;", sql, where), values, nil
+	// Assemble the final query
+	var b strings.Builder
+	b.WriteString(sql)
+
+	// Add JOIN clause if provided (dialect-specific handling)
+	b.WriteString(buildJoinClause(dialect, joinParts))
+
+	if whereClause != "" {
+		b.WriteString(" WHERE ")
+		b.WriteString(whereClause)
+	}
+
+	b.WriteString(";")
+
+	return b.String(), values, nil
 }
 
-// delete builds a DELETE query for the given table and conditions.
-func delete(dialect cdt.SQLDialect, table string, cond cdt.Condition) (string, []any, error) {
-	if cond == nil {
-		return fmt.Sprintf("DELETE FROM %s;", dialect.QuoteIdentifier(table)), nil, nil
+// delete builds a DELETE query for the given table, joins, and conditions.
+// The joins parameter is optional and may be nil or empty.
+// Note: SQLite does not support DELETE with JOINs and will return an error.
+func delete(
+	dialect cdt.SQLDialect,
+	table string,
+	joins []cdt.Join,
+	cond cdt.Condition,
+	joinFn func(table string, join *cdt.Join) string,
+) (string, []any, error) {
+	// Check if SQLite is trying to use DELETE with JOINs
+	if len(joins) > 0 {
+		if dialectName := fmt.Sprintf("%T", dialect); strings.Contains(dialectName, "SQLite") {
+			return "", nil, fmt.Errorf("DELETE with JOINs is not supported in SQLite")
+		}
 	}
 
-	where, values, err := cond.ToSQL(dialect, 1)
-	if err != nil {
-		return "", nil, fmt.Errorf("builder.delete: %w", err)
+	sql := fmt.Sprintf("DELETE FROM %s", dialect.QuoteIdentifier(table))
+
+	// Build JOIN clauses if provided
+	var joinParts []string
+	if len(joins) > 0 {
+		for _, j := range joins {
+			joinParts = append(joinParts, joinFn(table, &j))
+		}
 	}
 
-	return fmt.Sprintf("DELETE FROM %s WHERE %s;", dialect.QuoteIdentifier(table), where), values, nil
+	var values []any
+	var whereClause string
+
+	// Build the WHERE clause and its arguments
+	if cond != nil {
+		where, condValues, err := cond.ToSQL(dialect, 1)
+		if err != nil {
+			return "", nil, fmt.Errorf("builder.delete: %w", err)
+		}
+		whereClause = where
+		values = condValues
+	}
+
+	// Assemble the final query
+	var b strings.Builder
+	b.WriteString(sql)
+
+	// Add JOIN clause if provided (dialect-specific handling)
+	b.WriteString(buildDeleteJoinClause(dialect, joinParts))
+
+	if whereClause != "" {
+		b.WriteString(" WHERE ")
+		b.WriteString(whereClause)
+	}
+
+	b.WriteString(";")
+
+	return b.String(), values, nil
 }

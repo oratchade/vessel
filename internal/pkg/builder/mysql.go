@@ -56,8 +56,13 @@ func (m *MySQLQueryBuilder) Inserts(table string, data []map[string]any) (string
 }
 
 // Update implements the QueryBuilder interface for MySQL.
-func (m *MySQLQueryBuilder) Update(table string, data map[string]any, cond cdt.Condition) (string, []any, error) {
-	q, v, err := update(m.dialect, table, data, cond)
+func (m *MySQLQueryBuilder) Update(
+	table string,
+	data map[string]any,
+	joins []cdt.Join,
+	cond cdt.Condition,
+) (string, []any, error) {
+	q, v, err := update(m.dialect, table, data, joins, cond, m.join)
 	if err != nil {
 		return "", nil, fmt.Errorf("update mysqlSQL Builder: error building update query: %w", err)
 	}
@@ -65,8 +70,8 @@ func (m *MySQLQueryBuilder) Update(table string, data map[string]any, cond cdt.C
 }
 
 // Delete implements the QueryBuilder interface for MySQL.
-func (m *MySQLQueryBuilder) Delete(table string, cond cdt.Condition) (string, []any, error) {
-	q, v, err := delete(m.dialect, table, cond)
+func (m *MySQLQueryBuilder) Delete(table string, joins []cdt.Join, cond cdt.Condition) (string, []any, error) {
+	q, v, err := delete(m.dialect, table, joins, cond, m.join)
 	if err != nil {
 		return "", nil, fmt.Errorf("delete mysqlSQL Builder: error building delete query: %w", err)
 	}

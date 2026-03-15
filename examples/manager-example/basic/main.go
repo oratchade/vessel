@@ -122,7 +122,7 @@ func updateExample(ctx context.Context, dm *v1.DBManager) {
 	// Execute synchronous update query
 	result, err := dm.Update(ctx, "users", map[string]interface{}{
 		"email": "alice.updated@example.com",
-	}, cond, nil, nil)
+	}, nil, cond, nil)
 
 	// Check error first
 	if err != nil {
@@ -141,7 +141,7 @@ func deleteExample(ctx context.Context, dm *v1.DBManager) {
 	cond := condition.NewExpr().Column("name").Op("=").Value("Alice")
 
 	// Execute synchronous delete query
-	result, err := dm.Delete(ctx, "users", cond, nil, nil)
+	result, err := dm.Delete(ctx, "users", nil, cond, nil)
 
 	// Check error first
 	if err != nil {

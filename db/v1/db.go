@@ -206,38 +206,50 @@ type DBActions interface {
 	//   error: Error if the insert fails.
 	Inserts(ctx context.Context, table string, data []map[string]any, opts *options.QueryOptions) (*ExecResult, error)
 
-	// Update modifies existing rows in the specified table, with optional query options.
+	// Update modifies existing rows in the specified table, with optional SQL joins and query options.
 	//
 	// Parameters:
 	//   ctx: Context for cancellation and deadlines.
 	//   table: Name of the table to update.
 	//   data: Map of column names to new values.
+	//   joins: Slice of Join structs describing SQL JOIN clauses (optional, may be nil or empty).
 	//   conditions: Query conditions to select rows to update.
 	//   opts: Optional query parameters (limit, order, etc.).
 	//
 	// Returns:
 	//   ExecResult: Result of the update operation.
-	//   error: Error if the update fails.
+	//   error: Error if the update fails or unsupported operation is attempted
+	//          (e.g., UPDATE with JOINs on certain databases).
 	Update(
 		ctx context.Context,
 		table string,
 		data map[string]any,
+		joins []cdt.Join,
 		conditions cdt.Condition,
 		opts *options.QueryOptions,
 	) (*ExecResult, error)
 
-	// Delete removes rows from the specified table, with optional query options.
+	// Delete removes rows from the specified table, with optional SQL joins and query options.
 	//
 	// Parameters:
 	//   ctx: Context for cancellation and deadlines.
 	//   table: Name of the table to delete from.
+	//   joins: Slice of Join structs describing SQL JOIN clauses (optional, may be nil or empty).
+	//          Note: SQLite does not support DELETE with JOINs and will return an error if joins are provided.
 	//   conditions: Query conditions to select rows to delete.
 	//   opts: Optional query parameters (limit, order, etc.).
 	//
 	// Returns:
 	//   ExecResult: Result of the delete operation.
-	//   error: Error if the delete fails.
-	Delete(ctx context.Context, table string, conditions cdt.Condition, opts *options.QueryOptions) (*ExecResult, error)
+	//   error: Error if the delete fails, or if DELETE with JOINs is attempted on
+	//          unsupported databases like SQLite.
+	Delete(
+		ctx context.Context,
+		table string,
+		joins []cdt.Join,
+		conditions cdt.Condition,
+		opts *options.QueryOptions,
+	) (*ExecResult, error)
 
 	// Query executes a raw SQL query and returns multiple rows, with optional query options.
 	//
@@ -367,6 +379,7 @@ type DBQueries interface {
 	// Parameters:
 	//   table: Name of the table to update.
 	//   data: Map of column names to new values.
+	//   joins: Slice of Join structs describing SQL JOIN clauses (optional, may be nil or empty).
 	//   conditions: Query conditions to select rows to update.
 	//   opts: Optional query parameters (limit, order, etc.).
 	//
@@ -377,6 +390,7 @@ type DBQueries interface {
 	UpdateQuery(
 		table string,
 		data map[string]any,
+		joins []cdt.Join,
 		conditions cdt.Condition,
 		opts *options.QueryOptions,
 	) (string, []any, error)
@@ -386,15 +400,18 @@ type DBQueries interface {
 	//
 	// Parameters:
 	//   table: Name of the table to delete from.
+	//   joins: Slice of Join structs describing SQL JOIN clauses (optional, may be nil or empty).
+	//          Note: SQLite does not support DELETE with JOINs and will return an error if joins are provided.
 	//   conditions: Query conditions to select rows to delete.
 	//   opts: Optional query parameters (limit, order, etc.).
 	//
 	// Returns:
 	//   string: The SQL query string.
 	//   []any: The query arguments/parameters.
-	//   error: Error if the query cannot be built.
+	//   error: Error if the query cannot be built, or if an unsupported operation is attempted.
 	DeleteQuery(
 		table string,
+		joins []cdt.Join,
 		conditions cdt.Condition,
 		opts *options.QueryOptions,
 	) (string, []any, error)

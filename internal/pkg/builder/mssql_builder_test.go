@@ -79,7 +79,7 @@ func TestMSSQLUpdate(t *testing.T) {
 	}
 	condition := cdt.NewExpr().Column("id").Op("=").Value(1)
 
-	query, args, err := qb.Update("users", data, condition)
+	query, args, err := qb.Update("users", data, nil, condition)
 
 	require.NoError(t, err)
 	assert.Contains(t, query, "UPDATE [users]")
@@ -95,7 +95,7 @@ func TestMSSQLDelete(t *testing.T) {
 
 	condition := cdt.NewExpr().Column("id").Op("=").Value(1)
 
-	query, args, err := qb.Delete("users", condition)
+	query, args, err := qb.Delete("users", nil, condition)
 
 	require.NoError(t, err)
 	assert.Contains(t, query, "DELETE FROM [users]")

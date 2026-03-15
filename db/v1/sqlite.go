@@ -430,6 +430,7 @@ func (m *SQLITE) Inserts(
 func (m *SQLITE) UpdateQuery(
 	table string,
 	data map[string]any,
+	joins []cdt.Join,
 	conditions cdt.Condition,
 	opts *options.QueryOptions,
 ) (string, []any, error) {
@@ -438,13 +439,14 @@ func (m *SQLITE) UpdateQuery(
 		querier: m.querier,
 		logger:  m.logger,
 	}
-	return updateQuery(table, data, conditions, opts, o)
+	return updateQuery(table, data, joins, conditions, opts, o)
 }
 
 func (m *SQLITE) Update(
 	ctx context.Context,
 	table string,
 	data map[string]any,
+	joins []cdt.Join,
 	conditions cdt.Condition,
 	opts *options.QueryOptions,
 ) (*ExecResult, error) {
@@ -461,7 +463,7 @@ func (m *SQLITE) Update(
 		querier: m.querier,
 		logger:  m.logger,
 	}
-	result, err := update(c, table, data, conditions, opts, o)
+	result, err := update(c, table, data, joins, conditions, opts, o)
 	if err != nil {
 		span.RecordError(err)
 		span.SetStatus(codes.Error, err.Error())
@@ -474,6 +476,7 @@ func (m *SQLITE) Update(
 // DeleteQuery builds the DELETE query without executing it.
 func (m *SQLITE) DeleteQuery(
 	table string,
+	joins []cdt.Join,
 	conditions cdt.Condition,
 	opts *options.QueryOptions,
 ) (string, []any, error) {
@@ -482,12 +485,13 @@ func (m *SQLITE) DeleteQuery(
 		querier: m.querier,
 		logger:  m.logger,
 	}
-	return deleteQuery(table, conditions, opts, o)
+	return deleteQuery(table, joins, conditions, opts, o)
 }
 
 func (m *SQLITE) Delete(
 	ctx context.Context,
 	table string,
+	joins []cdt.Join,
 	conditions cdt.Condition,
 	opts *options.QueryOptions,
 ) (*ExecResult, error) {
@@ -504,7 +508,7 @@ func (m *SQLITE) Delete(
 		querier: m.querier,
 		logger:  m.logger,
 	}
-	result, err := delete(c, table, conditions, opts, o)
+	result, err := delete(c, table, joins, conditions, opts, o)
 	if err != nil {
 		span.RecordError(err)
 		span.SetStatus(codes.Error, err.Error())

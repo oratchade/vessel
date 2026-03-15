@@ -157,9 +157,16 @@ func (dm *DBManager) loadConfig(path string) (*config.ManagerConfig, error) {
 
 	case ".toml":
 		err = toml.Unmarshal(data, cfg)
+
+	default:
+		return nil, fmt.Errorf("loadConfig: unsupported file extension: %s", ext)
 	}
 
-	return cfg, fmt.Errorf("loadConfig: failed to load configuration provided: %w", err)
+	if err != nil {
+		return nil, fmt.Errorf("loadConfig: failed to load configuration: %w", err)
+	}
+
+	return cfg, nil
 }
 
 // Start initializes the database entries and starts their worker routines.
@@ -586,15 +593,16 @@ func (dm *DBManager) InsertsAsync(
 	return q.ResponseCh
 }
 
-// UpdateAsync updates an existing record in the database asynchronously based on the specified table, data, and conditions.
+// UpdateAsync updates an existing record in the database asynchronously.
+// Updates are based on the specified table, data, and conditions.
 // This method returns a channel that will receive the result.
 // For synchronous access, use Update() instead.
 func (dm *DBManager) UpdateAsync(
 	ctx context.Context,
 	table string,
 	data map[string]any,
-	cond condition.Condition,
 	joins []condition.Join,
+	cond condition.Condition,
 	opts *options.QueryOptions,
 ) <-chan *QueryResponse {
 	q := &Query{
@@ -602,6 +610,7 @@ func (dm *DBManager) UpdateAsync(
 		Data: &QueryData{
 			Table:      table,
 			Data:       data,
+			Joins:      joins,
 			Conditions: cond,
 			Opts:       opts,
 		},
@@ -627,14 +636,15 @@ func (dm *DBManager) UpdateAsync(
 func (dm *DBManager) DeleteAsync(
 	ctx context.Context,
 	table string,
-	cond condition.Condition,
 	joins []condition.Join,
+	cond condition.Condition,
 	opts *options.QueryOptions,
 ) <-chan *QueryResponse {
 	q := &Query{
 		Request: ReqDelete,
 		Data: &QueryData{
 			Table:      table,
+			Joins:      joins,
 			Conditions: cond,
 			Opts:       opts,
 		},
@@ -738,5 +748,8 @@ func (dm *DBManager) Ping(ctx context.Context) error {
 	if entry == nil {
 		return fmt.Errorf("no read-only database entries configured")
 	}
-	return entry.db.Ping(ctx)
+	if err := entry.db.Ping(ctx); err != nil {
+		return fmt.Errorf("failed to ping database: %w", err)
+	}
+	return nil
 }

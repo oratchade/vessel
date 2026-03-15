@@ -27,13 +27,13 @@ const (
 // Returns:
 //
 //	*QueryResponse: The response from the channel if successful.
-//	error: context.Err() if context cancelled/deadline exceeded, or channel error.
+//	error: context.Err() if context canceled/deadline exceeded, or channel error.
 //
 // Behavior:
 //   - If context has a deadline, uses that deadline
 //   - If context has no deadline, creates a child context with defaultTimeout
 //   - If channel receives response, returns it immediately
-//   - If context cancelled, returns context.Err() (context.Canceled or context.DeadlineExceeded)
+//   - If context canceled, returns context.Err() (context.Canceled or context.DeadlineExceeded)
 //   - If channel closed without response, returns error
 func waitForResponse(ctx context.Context, responseCh <-chan *QueryResponse) (*QueryResponse, error) {
 	// Check if context already has a deadline
@@ -54,7 +54,7 @@ func waitForResponse(ctx context.Context, responseCh <-chan *QueryResponse) (*Qu
 		}
 		return resp, nil
 	case <-ctx.Done():
-		return nil, ctx.Err()
+		return nil, fmt.Errorf("context error: %w", ctx.Err())
 	}
 }
 
@@ -422,11 +422,11 @@ func (dm *DBManager) Update(
 	ctx context.Context,
 	table string,
 	data map[string]any,
-	cond condition.Condition,
 	joins []condition.Join,
+	cond condition.Condition,
 	opts *options.QueryOptions,
 ) (*db.ExecResult, error) {
-	responseCh := dm.UpdateAsync(ctx, table, data, cond, joins, opts)
+	responseCh := dm.UpdateAsync(ctx, table, data, joins, cond, opts)
 	resp, err := waitForResponse(ctx, responseCh)
 	if err != nil {
 		return nil, err
@@ -460,11 +460,11 @@ func (dm *DBManager) Update(
 func (dm *DBManager) Delete(
 	ctx context.Context,
 	table string,
-	cond condition.Condition,
 	joins []condition.Join,
+	cond condition.Condition,
 	opts *options.QueryOptions,
 ) (*db.ExecResult, error) {
-	responseCh := dm.DeleteAsync(ctx, table, cond, joins, opts)
+	responseCh := dm.DeleteAsync(ctx, table, joins, cond, opts)
 	resp, err := waitForResponse(ctx, responseCh)
 	if err != nil {
 		return nil, err
@@ -527,5 +527,8 @@ func (dm *DBManager) PingAsync(ctx context.Context) error {
 	if entry == nil {
 		return fmt.Errorf("no read-only database entries configured")
 	}
-	return entry.db.Ping(ctx)
+	if err := entry.db.Ping(ctx); err != nil {
+		return fmt.Errorf("failed to ping database: %w", err)
+	}
+	return nil
 }

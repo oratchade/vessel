@@ -440,6 +440,7 @@ func (m *MSSQL) Inserts(
 func (m *MSSQL) UpdateQuery(
 	table string,
 	data map[string]any,
+	joins []cdt.Join,
 	conditions cdt.Condition,
 	opts *options.QueryOptions,
 ) (string, []any, error) {
@@ -448,13 +449,14 @@ func (m *MSSQL) UpdateQuery(
 		querier: m.querier,
 		logger:  m.logger,
 	}
-	return updateQuery(table, data, conditions, opts, o)
+	return updateQuery(table, data, joins, conditions, opts, o)
 }
 
 func (m *MSSQL) Update(
 	ctx context.Context,
 	table string,
 	data map[string]any,
+	joins []cdt.Join,
 	conditions cdt.Condition,
 	opts *options.QueryOptions,
 ) (*ExecResult, error) {
@@ -471,7 +473,7 @@ func (m *MSSQL) Update(
 		querier: m.querier,
 		logger:  m.logger,
 	}
-	result, err := update(c, table, data, conditions, opts, o)
+	result, err := update(c, table, data, joins, conditions, opts, o)
 	if err != nil {
 		span.RecordError(err)
 		span.SetStatus(codes.Error, err.Error())
@@ -483,6 +485,7 @@ func (m *MSSQL) Update(
 
 func (m *MSSQL) DeleteQuery(
 	table string,
+	joins []cdt.Join,
 	conditions cdt.Condition,
 	opts *options.QueryOptions,
 ) (string, []any, error) {
@@ -491,12 +494,13 @@ func (m *MSSQL) DeleteQuery(
 		querier: m.querier,
 		logger:  m.logger,
 	}
-	return deleteQuery(table, conditions, opts, o)
+	return deleteQuery(table, joins, conditions, opts, o)
 }
 
 func (m *MSSQL) Delete(
 	ctx context.Context,
 	table string,
+	joins []cdt.Join,
 	conditions cdt.Condition,
 	opts *options.QueryOptions,
 ) (*ExecResult, error) {
@@ -513,7 +517,7 @@ func (m *MSSQL) Delete(
 		querier: m.querier,
 		logger:  m.logger,
 	}
-	result, err := delete(c, table, conditions, opts, o)
+	result, err := delete(c, table, joins, conditions, opts, o)
 	if err != nil {
 		span.RecordError(err)
 		span.SetStatus(codes.Error, err.Error())

@@ -476,6 +476,7 @@ func (m *MySQL) Inserts(
 func (m *MySQL) UpdateQuery(
 	table string,
 	data map[string]any,
+	joins []cdt.Join,
 	conditions cdt.Condition,
 	opts *options.QueryOptions,
 ) (string, []any, error) {
@@ -484,7 +485,7 @@ func (m *MySQL) UpdateQuery(
 		querier: m.querier,
 		logger:  m.logger,
 	}
-	return updateQuery(table, data, conditions, opts, o)
+	return updateQuery(table, data, joins, conditions, opts, o)
 }
 
 // Update implements the DBActions interface method to update existing rows.
@@ -492,6 +493,7 @@ func (m *MySQL) Update(
 	ctx context.Context,
 	table string,
 	data map[string]any,
+	joins []cdt.Join,
 	conditions cdt.Condition,
 	opts *options.QueryOptions,
 ) (*ExecResult, error) {
@@ -508,7 +510,7 @@ func (m *MySQL) Update(
 		querier: m.querier,
 		logger:  m.logger,
 	}
-	result, err := update(c, table, data, conditions, opts, o)
+	result, err := update(c, table, data, joins, conditions, opts, o)
 	if err != nil {
 		span.RecordError(err)
 		span.SetStatus(codes.Error, err.Error())
@@ -521,6 +523,7 @@ func (m *MySQL) Update(
 // DeleteQuery builds the DELETE query without executing it.
 func (m *MySQL) DeleteQuery(
 	table string,
+	joins []cdt.Join,
 	conditions cdt.Condition,
 	opts *options.QueryOptions,
 ) (string, []any, error) {
@@ -529,13 +532,14 @@ func (m *MySQL) DeleteQuery(
 		querier: m.querier,
 		logger:  m.logger,
 	}
-	return deleteQuery(table, conditions, opts, o)
+	return deleteQuery(table, joins, conditions, opts, o)
 }
 
 // Delete implements the DBActions interface method to delete rows.
 func (m *MySQL) Delete(
 	ctx context.Context,
 	table string,
+	joins []cdt.Join,
 	conditions cdt.Condition,
 	opts *options.QueryOptions,
 ) (*ExecResult, error) {
@@ -552,7 +556,7 @@ func (m *MySQL) Delete(
 		querier: m.querier,
 		logger:  m.logger,
 	}
-	result, err := delete(c, table, conditions, opts, o)
+	result, err := delete(c, table, joins, conditions, opts, o)
 	if err != nil {
 		span.RecordError(err)
 		span.SetStatus(codes.Error, err.Error())

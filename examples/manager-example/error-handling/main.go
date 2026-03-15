@@ -115,6 +115,7 @@ func retryExample(ctx context.Context, dm *v1.DBManager) {
 		if err == nil {
 			log.Printf("✓ Success on attempt %d\n", attempt)
 			if len(data) > 0 {
+				//nolint:gosec
 				log.Printf("  Found %d users\n", len(data))
 			}
 			return
@@ -152,6 +153,7 @@ func timeoutExample(ctx context.Context, dm *v1.DBManager) {
 	if err != nil {
 		log.Printf("✗ Query error: %v\n", err)
 	} else {
+		//nolint:gosec
 		log.Printf("✓ Query succeeded: %d rows\n", len(data))
 	}
 }
