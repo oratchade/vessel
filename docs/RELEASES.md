@@ -36,20 +36,19 @@ First production-ready release with comprehensive documentation, 99+ test cases,
 ### Latest Stable (v1.0.0)
 
 ```bash
-go get github.com/oratchade/fabric
+go get tounilab.com/fabric
 ```
 
 ### Specific Version
 
 ```bash
-go get github.com/oratchade/fabric@v1.0.0
-go get github.com/oratchade/fabric@v0.9.0
+go get tounilab.com/fabric@v1.0.0
 ```
 
 ### Development Version
 
 ```bash
-go get github.com/oratchade/fabric@main
+go get tounilab.com/fabric@main
 ```
 
 ---
@@ -196,7 +195,7 @@ sha256sum -c fabric-v1.0.0.sha256
 
 ### Watch for Releases
 
-[Watch the repository](https://github.com/oratchade/fabric/subscription) on GitHub for notifications
+[Watch the repository](https://github.com/oratchade/fabric) on GitHub for notifications
 
 ### Subscribe to Releases
 
@@ -205,7 +204,7 @@ Enable "Releases only" notifications in GitHub
 ### Check Periodically
 
 ```bash
-go list -u -m github.com/oratchade/fabric
+go list -u -m tounilab.com/fabric
 ```
 
 ---

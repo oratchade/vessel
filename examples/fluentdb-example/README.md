@@ -99,7 +99,7 @@ psql -d myapp -U postgres -c "
 **Run:**
 
 ```bash
-go run fabric/examples/fluentdb-example/basic/main.go
+go run ./basic/main.go
 ```
 
 **Key Features:**
@@ -153,7 +153,7 @@ row, err := fdb.Select("users", "id", "name").
 **Run:**
 
 ```bash
-go run fabric/examples/fluentdb-example/advanced/main.go
+go run ./advanced/main.go
 ```
 
 **Key Features:**
@@ -206,7 +206,7 @@ rows, err := fdb.Select("users", "id", "name").
 **Run:**
 
 ```bash
-go run fabric/examples/fluentdb-example/transactions/main.go
+go run ./transactions/main.go
 ```
 
 **Key Features:**
@@ -423,7 +423,7 @@ if err != nil {
 
 ## See Also
 
-- [FluentDB Implementation](/fabric/db/v1/fluentDB.go) - Source code
-- [Condition Package](/fabric/pkg/query/condition) - Building conditions
-- [fabric README](/fabric/README.md) - Library overview
-- [DBManager Examples](/fabric/examples/manager-example) - Multi-database routing
+- [FluentDB Implementation](../../../db/v1/fluentDB.go) - Source code
+- [Condition Package](../../../pkg/query/condition) - Building conditions
+- [fabric README](../../README.md) - Library overview
+- [DBManager Examples](../manager-example) - Multi-database routing

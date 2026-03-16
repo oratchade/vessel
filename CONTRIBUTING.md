@@ -522,7 +522,7 @@ All public packages, types, and functions must have comments:
 ```bash
 # Check documentation coverage
 go doc ./db/v1
-go doc github.com/oratchade/fabric/db/v1
+go doc tounilab.com/fabric/db/v1
 ````
 
 ### User Documentation

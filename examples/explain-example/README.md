@@ -153,8 +153,8 @@ SCAN users WHERE age > ?
 ## Related Documentation
 
 - [Query Introspection Guide](https://github.com/oratchade/fabric#query-introspection-and-performance-analysis) in README.md
-- [DBQueries Interface](https://github.com/oratchade/fabric/docs/CODE_REVIEW.md#dbqueries-interface) in CODE_REVIEW.md
-- [Operators Compatibility](https://github.com/oratchade/fabric/docs/OPERATORS_COMPATIBILITY.md)
+- [DBQueries Interface](https://github.com/oratchade/fabric/blob/main/docs/CODE_REVIEW.md#dbqueries-interface) in CODE_REVIEW.md
+- [Operators Compatibility](https://github.com/oratchade/fabric/blob/main/docs/OPERATORS_COMPATIBILITY.md)
 
 ## Common Use Cases
 

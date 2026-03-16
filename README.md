@@ -2,8 +2,8 @@
 
 A lightweight, multi-database SQL abstraction library for Go with support for MySQL, PostgreSQL, SQLite, and MSSQL.
 
-[![GoDoc](https://godoc.org/github.com/oratchade/fabric?status.svg)](https://godoc.org/github.com/oratchade/fabric)
-[![Go Report Card](https://goreportcard.com/badge/github.com/oratchade/fabric)](https://goreportcard.com/report/github.com/oratchade/fabric)
+[![GoDoc](https://godoc.org/tounilab.com/fabric?status.svg)](https://godoc.org/tounilab.com/fabric)
+[![Go Report Card](https://goreportcard.com/badge/tounilab.com/fabric)](https://goreportcard.com/report/tounilab.com/fabric)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
 ## Features
