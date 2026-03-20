@@ -690,8 +690,13 @@ func TestIntegration_RawQuery(t *testing.T) {
 
 			ctx := context.Background()
 
+			rawQuery := "SELECT id, name FROM users LIMIT 1"
+			if testDB.driver == "sqlserver" {
+				rawQuery = "SELECT TOP 1 id, name FROM users"
+			}
+
 			// Test raw query execution (basic)
-			rows, err := database.QueryRaw(ctx, "SELECT id, name FROM users LIMIT 1")
+			rows, err := database.QueryRaw(ctx, rawQuery)
 			if err != nil {
 				t.Fatalf("QueryRaw failed: %v", err)
 			}

@@ -11,50 +11,49 @@ BEGIN
 END;
 GO
 
+-- Switch to test_db
 USE test_db;
 GO
 
+-- Drop tables if they exist (in reverse order due to foreign keys)
+IF OBJECT_ID('dbo.comments', 'U') IS NOT NULL DROP TABLE dbo.comments;
+IF OBJECT_ID('dbo.posts', 'U') IS NOT NULL DROP TABLE dbo.posts;
+IF OBJECT_ID('dbo.users', 'U') IS NOT NULL DROP TABLE dbo.users;
+GO
+
 -- Create users table
-IF OBJECT_ID(N'dbo.users', N'U') IS NULL
-BEGIN
-    CREATE TABLE dbo.users (
-        id INT IDENTITY(1,1) PRIMARY KEY,
-        name VARCHAR(255) NOT NULL,
-        email VARCHAR(255) NOT NULL UNIQUE,
-        age INT,
-        status VARCHAR(50) DEFAULT 'active',
-        created_at DATETIME DEFAULT GETDATE(),
-        updated_at DATETIME DEFAULT GETDATE()
-    );
-END;
+CREATE TABLE users (
+    id INT PRIMARY KEY IDENTITY(1,1),
+    name NVARCHAR(100) NOT NULL,
+    email NVARCHAR(100) UNIQUE NOT NULL,
+    age INT,
+    status NVARCHAR(50) DEFAULT 'active',
+    created_at DATETIME DEFAULT GETDATE()
+);
 GO
 
 -- Create posts table
-IF OBJECT_ID(N'dbo.posts', N'U') IS NULL
-BEGIN
-    CREATE TABLE dbo.posts (
-        id INT IDENTITY(1,1) PRIMARY KEY,
-        user_id INT NOT NULL REFERENCES dbo.users(id) ON DELETE CASCADE,
-        title VARCHAR(255) NOT NULL,
-        content TEXT,
-        published BIT DEFAULT 0,
-        created_at DATETIME DEFAULT GETDATE(),
-        updated_at DATETIME DEFAULT GETDATE()
-    );
-END;
+CREATE TABLE posts (
+    id INT PRIMARY KEY IDENTITY(1,1),
+    user_id INT NOT NULL,
+    title NVARCHAR(255) NOT NULL,
+    content NVARCHAR(MAX),
+    published BIT DEFAULT 0,
+    created_at DATETIME DEFAULT GETDATE(),
+    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE NO ACTION ON UPDATE NO ACTION
+);
 GO
 
 -- Create comments table
-IF OBJECT_ID(N'dbo.comments', N'U') IS NULL
-BEGIN
-    CREATE TABLE dbo.comments (
-        id INT IDENTITY(1,1) PRIMARY KEY,
-        post_id INT NOT NULL REFERENCES dbo.posts(id) ON DELETE CASCADE,
-        user_id INT NOT NULL REFERENCES dbo.users(id) ON DELETE CASCADE,
-        content TEXT NOT NULL,
-        created_at DATETIME DEFAULT GETDATE()
-    );
-END;
+CREATE TABLE comments (
+    id INT PRIMARY KEY IDENTITY(1,1),
+    post_id INT NOT NULL,
+    user_id INT NOT NULL,
+    content NVARCHAR(MAX) NOT NULL,
+    created_at DATETIME DEFAULT GETDATE(),
+    FOREIGN KEY (post_id) REFERENCES posts(id) ON DELETE NO ACTION ON UPDATE NO ACTION,
+    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE NO ACTION ON UPDATE NO ACTION
+);
 GO
 
 -- Create indexes for common queries
