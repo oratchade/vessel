@@ -25,7 +25,8 @@ type DBEntry struct {
 	name   string
 	dbType config.DBType
 
-	db db.DB
+	db     db.DB
+	logger db.Logger
 
 	healthy        atomic.Bool
 	healthInterval time.Duration
@@ -39,7 +40,18 @@ type DBEntry struct {
 
 // newDBEntry creates a new DBEntry instance.
 // It initializes the database connection, worker queues, and other settings based on the provided configuration.
-func newDBEntry(ctx context.Context, mc *config.ManagerConfig, cfg *config.ConfigEntry) (*DBEntry, error) {
+func newDBEntry(ctx context.Context, mc *config.ManagerConfig, cfg *config.ConfigEntry, logger db.Logger) (*DBEntry, error) {
+	// Ensure logger is never nil - use a no-op logger if not provided
+	if logger == nil {
+		logger = &noOpLogger{}
+	}
+
+	logger.Info("Creating database entry",
+		"name", cfg.Name,
+		"type", cfg.Type,
+		"priority", mc.EntryPriority(cfg),
+	)
+
 	writeQueue := make([]*dbEntryWorker, mc.EntryWriteWorkers(cfg))
 	for i := range writeQueue {
 		writeQueue[i] = &dbEntryWorker{
@@ -54,14 +66,36 @@ func newDBEntry(ctx context.Context, mc *config.ManagerConfig, cfg *config.Confi
 		}
 	}
 
+	logger.Debug("Initialized worker queues",
+		"name", cfg.Name,
+		"write_workers", len(writeQueue),
+		"read_workers", len(readQueue),
+		"write_queue_size", mc.EntryWriteQueueSize(cfg),
+		"read_queue_size", mc.EntryReadQueueSize(cfg),
+	)
+
 	//nolint:contextcheck
-	db, err := db.NewDB(cfg.Config(), nil)
+	dbInstance, err := db.NewDB(cfg.Config(), nil)
 	if err != nil {
+		logger.Error("Failed to create database instance",
+			"name", cfg.Name,
+			"error", err.Error(),
+		)
 		return nil, fmt.Errorf("newDBEntry: failed to create DB instance: %w", err)
 	}
-	if err := db.Ping(ctx); err != nil {
+
+	if err := dbInstance.Ping(ctx); err != nil {
+		logger.Error("Failed to ping database",
+			"name", cfg.Name,
+			"error", err.Error(),
+		)
 		return nil, fmt.Errorf("newDBEntry: failed to ping DB: %w", err)
 	}
+
+	logger.Info("Database entry created and ping successful",
+		"name", cfg.Name,
+		"health_interval_ms", mc.EntryHealthInterval(cfg).Milliseconds(),
+	)
 
 	c, cancel := context.WithCancel(ctx)
 	dbe := &DBEntry{
@@ -69,7 +103,8 @@ func newDBEntry(ctx context.Context, mc *config.ManagerConfig, cfg *config.Confi
 		cancel:         cancel,
 		name:           cfg.Name,
 		dbType:         cfg.Type,
-		db:             db,
+		db:             dbInstance,
+		logger:         logger,
 		healthInterval: mc.EntryHealthInterval(cfg),
 		priority:       mc.EntryPriority(cfg),
 		writeQueue:     writeQueue,
@@ -92,6 +127,12 @@ func (de *DBEntry) Health() bool {
 
 // start launches worker goroutines for processing read and write queries.
 func (de *DBEntry) start(ctx context.Context) {
+	de.logger.Info("Starting database entry workers",
+		"name", de.name,
+		"write_workers", len(de.writeQueue),
+		"read_workers", len(de.readQueue),
+	)
+
 	for i := range de.writeQueue {
 		go de.writeWorker(ctx, de.writeQueue[i])
 	}
@@ -100,10 +141,18 @@ func (de *DBEntry) start(ctx context.Context) {
 	}
 
 	go de.healthCheck(ctx)
+
+	de.logger.Debug("Database entry workers started and health check initiated",
+		"name", de.name,
+	)
 }
 
 // stop closes all worker goroutines and closes the database connection.
 func (de *DBEntry) stop() {
+	de.logger.Info("Stopping database entry",
+		"name", de.name,
+	)
+
 	for i := range de.writeQueue {
 		close(de.writeQueue[i].queue)
 	}
@@ -113,6 +162,10 @@ func (de *DBEntry) stop() {
 
 	_ = de.db.Close()
 	de.cancel()
+
+	de.logger.Debug("Database entry stopped",
+		"name", de.name,
+	)
 }
 
 // healthCheck periodically checks the health status of the database connection.
@@ -123,22 +176,78 @@ func (de *DBEntry) healthCheck(ctx context.Context) {
 	failureCount := 0
 	const maxFailures = 5 // Mark unhealthy after 5 consecutive failures
 
+	de.logger.Info("Health check started",
+		"name", de.name,
+		"interval_ms", de.healthInterval.Milliseconds(),
+		"max_failures", maxFailures,
+	)
+
 	for {
 		select {
 		case <-ticker.C:
 			err := de.db.Ping(ctx)
 			if err != nil {
 				failureCount++
-				if failureCount >= maxFailures {
+				wasHealthy := de.healthy.Load()
+
+				// Classify the error for appropriate logging
+				errorType, logLevel := db.ClassifyError(err)
+
+				// Log at appropriate level based on error classification
+				switch logLevel {
+				case db.LogLevelError:
+					de.logger.Error("Health check failed",
+						"name", de.name,
+						"failure_count", failureCount,
+						"error_type", errorType,
+						"error", err.Error(),
+					)
+				case db.LogLevelWarn:
+					de.logger.Warn("Health check failed",
+						"name", de.name,
+						"failure_count", failureCount,
+						"error_type", errorType,
+						"error", err.Error(),
+					)
+				default:
+					de.logger.Debug("Health check failed",
+						"name", de.name,
+						"failure_count", failureCount,
+						"error_type", errorType,
+						"error", err.Error(),
+					)
+				}
+
+				if failureCount >= maxFailures && wasHealthy {
 					de.healthy.Store(false)
+					de.logger.Warn("Database entry marked unhealthy",
+						"name", de.name,
+						"consecutive_failures", failureCount,
+						"priority", de.priority,
+					)
 				}
 
 				continue
 			}
 			// Success: reset failure count and mark healthy
+			wasUnhealthy := !de.healthy.Load()
 			failureCount = 0
 			de.healthy.Store(true)
+
+			if wasUnhealthy {
+				de.logger.Info("Database entry recovered and marked healthy",
+					"name", de.name,
+					"priority", de.priority,
+				)
+			} else {
+				de.logger.Debug("Health check passed",
+					"name", de.name,
+				)
+			}
 		case <-ctx.Done():
+			de.logger.Debug("Health check stopped",
+				"name", de.name,
+			)
 			return
 		}
 	}
@@ -288,4 +397,25 @@ func (de *DBEntry) roundRobinQueueRead(ctx context.Context, qd *Query) error {
 	case <-ctx.Done():
 		return fmt.Errorf("roundRobinQueueRead: context done: %w", ctx.Err())
 	}
+}
+
+// noOpLogger is a minimal logger that does nothing, used when no logger is provided.
+// This satisfies the db.Logger interface without any output.
+type noOpLogger struct{}
+
+// Debug does nothing.
+func (nol *noOpLogger) Debug(msg string, args ...any) {}
+
+// Info does nothing.
+func (nol *noOpLogger) Info(msg string, args ...any) {}
+
+// Warn does nothing.
+func (nol *noOpLogger) Warn(msg string, args ...any) {}
+
+// Error does nothing.
+func (nol *noOpLogger) Error(msg string, args ...any) {}
+
+// With returns itself, satisfying the Logger interface.
+func (nol *noOpLogger) With(fields ...any) db.Logger {
+	return nol
 }

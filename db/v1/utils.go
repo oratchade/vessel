@@ -14,7 +14,6 @@ import (
 type dbOpts struct {
 	builder builder.QueryBuilder
 	querier sqlQuerier
-	logger  Logger
 }
 
 // get executes a SELECT query and returns results as a slice of maps.
@@ -37,9 +36,7 @@ func get(
 		return nil, fmt.Errorf("failed to execute query: %w", err)
 	}
 	defer func() {
-		if err := rows.Close(); err != nil && dbOpts.logger != nil {
-			dbOpts.logger.Error("failed to close rows", "error", err)
-		}
+		_ = rows.Close()
 	}()
 
 	cols, err := rows.Columns()
@@ -119,9 +116,7 @@ func getByID(
 		return nil, fmt.Errorf("failed to execute query: %w", err)
 	}
 	defer func() {
-		if err := rows.Close(); err != nil && dbOpts.logger != nil {
-			dbOpts.logger.Error("failed to close rows", "error", err)
-		}
+		_ = rows.Close()
 	}()
 
 	cols, err := rows.Columns()
@@ -199,7 +194,10 @@ func insert(
 	if err != nil {
 		return nil, fmt.Errorf("failed to execute insert query: %w", err)
 	}
-	return fromSQLResult(result), nil
+
+	execResult := fromSQLResult(result)
+
+	return execResult, nil
 }
 
 func insertQuery(
@@ -233,7 +231,10 @@ func inserts(
 	if err != nil {
 		return nil, fmt.Errorf("failed to execute insert query: %w", err)
 	}
-	return fromSQLResult(result), nil
+
+	execResult := fromSQLResult(result)
+
+	return execResult, nil
 }
 
 func insertsQuery(
@@ -269,7 +270,10 @@ func update(
 	if err != nil {
 		return nil, fmt.Errorf("failed to execute update query: %w", err)
 	}
-	return fromSQLResult(result), nil
+
+	execResult := fromSQLResult(result)
+
+	return execResult, nil
 }
 
 func updateQuery(
@@ -306,7 +310,10 @@ func delete(
 	if err != nil {
 		return nil, fmt.Errorf("failed to execute delete query: %w", err)
 	}
-	return fromSQLResult(result), nil
+
+	execResult := fromSQLResult(result)
+
+	return execResult, nil
 }
 
 func deleteQuery(

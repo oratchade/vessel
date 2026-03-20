@@ -20,27 +20,48 @@ import (
 )
 
 // setupDBs initializes DBEntry maps for read-only and read-write databases based on the provided configuration.
-func setupDBs(ctx context.Context, cfg *config.ManagerConfig) (map[string]*DBEntry, map[string]*DBEntry, error) {
+func setupDBs(ctx context.Context, cfg *config.ManagerConfig, logger db.Logger) (map[string]*DBEntry, map[string]*DBEntry, error) {
 	var err error
 	readOnly := make(map[string]*DBEntry)
 	readWrite := make(map[string]*DBEntry)
+
+	if logger == nil {
+		logger = &noOpLogger{}
+	}
+
+	logger.Info("Setting up database entries",
+		"total_entries", len(cfg.Entries),
+	)
 
 	c := context.WithoutCancel(ctx)
 
 	for _, entry := range cfg.Entries {
 		switch entry.Type {
 		case config.ReadOnly:
-			readOnly[entry.Name], err = newDBEntry(c, cfg, &entry)
+			readOnly[entry.Name], err = newDBEntry(c, cfg, &entry, logger)
 			if err != nil {
+				logger.Error("Failed to create read-only database entry",
+					"entry_name", entry.Name,
+					"error", err.Error(),
+				)
 				return nil, nil, fmt.Errorf("failed to create read-only DB entry: %w", err)
 			}
 		case config.ReadWrite:
-			readWrite[entry.Name], err = newDBEntry(c, cfg, &entry)
+			readWrite[entry.Name], err = newDBEntry(c, cfg, &entry, logger)
 			if err != nil {
+				logger.Error("Failed to create read-write database entry",
+					"entry_name", entry.Name,
+					"error", err.Error(),
+				)
 				return nil, nil, fmt.Errorf("failed to create read-write DB entry: %w", err)
 			}
 		}
 	}
+
+	logger.Info("Database entries setup completed",
+		"read_only_count", len(readOnly),
+		"read_write_count", len(readWrite),
+	)
 
 	return readOnly, readWrite, nil
 }
@@ -100,6 +121,8 @@ type DBManager struct {
 	readOnlyEntries  map[string]*DBEntry
 	readWriteEntries map[string]*DBEntry
 
+	logger db.Logger
+
 	writeWorkerIdx AtomicWrapCounter
 	readWorkerIdx  AtomicWrapCounter
 }
@@ -118,18 +141,33 @@ func NewDBManager(ctx context.Context, configPath string) (*DBManager, error) {
 		return nil, fmt.Errorf("failed to validate config: %w", err)
 	}
 
-	readOnly, readWrite, err := setupDBs(ctx, cfg)
+	// Use a no-op logger if none is provided
+	logger := &noOpLogger{}
+
+	readOnly, readWrite, err := setupDBs(ctx, cfg, logger)
 	if err != nil {
+		logger.Error("Failed to setup database entries",
+			"error", err.Error(),
+		)
 		return nil, fmt.Errorf("failed to setup DB entries: %w", err)
 	}
 
-	return &DBManager{
+	dm := &DBManager{
 		HealthInterval:   cfg.HealthInterval,
 		readOnlyEntries:  readOnly,
 		readWriteEntries: readWrite,
+		logger:           logger,
 		writeWorkerIdx:   *NewAtomicWrapCounter(int64(len(readWrite))),
 		readWorkerIdx:    *NewAtomicWrapCounter(int64(len(readOnly))),
-	}, nil
+	}
+
+	logger.Info("Database manager created successfully",
+		"read_only_entries", len(readOnly),
+		"read_write_entries", len(readWrite),
+		"health_interval_ms", cfg.HealthInterval.Milliseconds(),
+	)
+
+	return dm, nil
 }
 
 // loadConfig loads the configuration from the specified path.
@@ -169,23 +207,88 @@ func (dm *DBManager) loadConfig(path string) (*config.ManagerConfig, error) {
 	return cfg, nil
 }
 
-// Start initializes the database entries and starts their worker routines.
-func (dm *DBManager) Start(ctx context.Context) {
+// SetLogger sets the logger for the database manager and all its entries.
+// This should be called after NewDBManager and before Start().
+func (dm *DBManager) SetLogger(logger db.Logger) {
+	if logger == nil {
+		logger = &noOpLogger{}
+	}
+	dm.logger = logger
 	for _, entry := range dm.readOnlyEntries {
-		entry.start(ctx)
+		entry.logger = logger
 	}
 	for _, entry := range dm.readWriteEntries {
+		entry.logger = logger
+	}
+
+	if dm.logger != nil {
+		dm.logger.Debug("Logger configured for database manager and all entries")
+	}
+}
+
+// Start initializes the database entries and starts their worker routines.
+func (dm *DBManager) Start(ctx context.Context) {
+	if dm.logger != nil {
+		dm.logger.Info("Starting database manager",
+			"read_only_entries", len(dm.readOnlyEntries),
+			"read_write_entries", len(dm.readWriteEntries),
+		)
+	}
+
+	for name, entry := range dm.readOnlyEntries {
+		if dm.logger != nil {
+			dm.logger.Debug("Starting read-only entry",
+				"entry_name", name,
+				"priority", entry.Priority(),
+			)
+		}
 		entry.start(ctx)
+	}
+	for name, entry := range dm.readWriteEntries {
+		if dm.logger != nil {
+			dm.logger.Debug("Starting read-write entry",
+				"entry_name", name,
+				"priority", entry.Priority(),
+			)
+		}
+		entry.start(ctx)
+	}
+
+	if dm.logger != nil {
+		dm.logger.Info("Database manager started successfully",
+			"total_entries", len(dm.readOnlyEntries)+len(dm.readWriteEntries),
+		)
 	}
 }
 
 // Stop gracefully shuts down all database entries and their worker routines.
 func (dm *DBManager) Stop() {
-	for _, entry := range dm.readOnlyEntries {
+	if dm.logger != nil {
+		dm.logger.Info("Stopping database manager",
+			"read_only_entries", len(dm.readOnlyEntries),
+			"read_write_entries", len(dm.readWriteEntries),
+		)
+	}
+
+	for name, entry := range dm.readOnlyEntries {
+		if dm.logger != nil {
+			dm.logger.Debug("Stopping read-only entry",
+				"entry_name", name,
+			)
+		}
 		entry.stop()
 	}
-	for _, entry := range dm.readWriteEntries {
+	for name, entry := range dm.readWriteEntries {
+		if dm.logger != nil {
+			dm.logger.Debug("Stopping read-write entry",
+				"entry_name", name,
+			)
+		}
 		entry.stop()
+	}
+
+	if dm.logger != nil {
+		dm.logger.Info("Database manager stopped successfully")
 	}
 }
 
@@ -221,11 +324,20 @@ func (dm *DBManager) Stop() {
 func (dm *DBManager) readOnlyEntry() *DBEntry {
 	entries := dm.readOnlyEntries
 	if len(entries) == 0 {
+		if dm.logger != nil {
+			dm.logger.Debug("No read-only entries available")
+		}
 		return nil
 	}
 
 	if len(entries) == 1 {
 		for _, entry := range entries {
+			if dm.logger != nil {
+				dm.logger.Debug("Selected read-only entry",
+					"entry_name", entry.name,
+					"reason", "only_entry",
+				)
+			}
 			return entry
 		}
 	}
@@ -233,11 +345,30 @@ func (dm *DBManager) readOnlyEntry() *DBEntry {
 	// First, try to select from healthy entries
 	selected := dm.selectHealthyEntry(entries)
 	if selected != nil {
+		if dm.logger != nil {
+			dm.logger.Debug("Selected read-only entry from healthy entries",
+				"entry_name", selected.name,
+				"priority", selected.Priority(),
+				"healthy", true,
+			)
+		}
 		return selected
 	}
 
 	// Fallback: select from all entries if no healthy ones available
-	return dm.selectByPriorityAndRoundRobin(entries, &dm.readWorkerIdx)
+	fallback := dm.selectByPriorityAndRoundRobin(entries, &dm.readWorkerIdx)
+	if dm.logger != nil {
+		dm.logger.Warn("No healthy read-only entries available, selecting from unhealthy entries",
+			"selected_entry", func() string {
+				if fallback == nil {
+					return "none"
+				}
+				return fallback.name
+			}(),
+			"reason", "all_unhealthy",
+		)
+	}
+	return fallback
 }
 
 // readWriteEntry returns a read-write DBEntry using a hybrid priority + health + round-robin selection strategy.
@@ -269,11 +400,20 @@ func (dm *DBManager) readOnlyEntry() *DBEntry {
 func (dm *DBManager) readWriteEntry() *DBEntry {
 	entries := dm.readWriteEntries
 	if len(entries) == 0 {
+		if dm.logger != nil {
+			dm.logger.Debug("No read-write entries available")
+		}
 		return nil
 	}
 
 	if len(entries) == 1 {
 		for _, entry := range entries {
+			if dm.logger != nil {
+				dm.logger.Debug("Selected read-write entry",
+					"entry_name", entry.name,
+					"reason", "only_entry",
+				)
+			}
 			return entry
 		}
 	}
@@ -281,11 +421,30 @@ func (dm *DBManager) readWriteEntry() *DBEntry {
 	// First, try to select from healthy entries
 	selected := dm.selectHealthyEntry(entries)
 	if selected != nil {
+		if dm.logger != nil {
+			dm.logger.Debug("Selected read-write entry from healthy entries",
+				"entry_name", selected.name,
+				"priority", selected.Priority(),
+				"healthy", true,
+			)
+		}
 		return selected
 	}
 
 	// Fallback: select from all entries if no healthy ones available
-	return dm.selectByPriorityAndRoundRobin(entries, &dm.writeWorkerIdx)
+	fallback := dm.selectByPriorityAndRoundRobin(entries, &dm.writeWorkerIdx)
+	if dm.logger != nil {
+		dm.logger.Warn("No healthy read-write entries available, selecting from unhealthy entries",
+			"selected_entry", func() string {
+				if fallback == nil {
+					return "none"
+				}
+				return fallback.name
+			}(),
+			"reason", "all_unhealthy",
+		)
+	}
+	return fallback
 }
 
 // healthOnly filters the provided entries map and returns a slice of only the healthy entries.

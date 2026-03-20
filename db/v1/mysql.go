@@ -99,12 +99,12 @@ type MySQL struct {
 	querier sqlQuerier // Underlying sql.DB connection pool
 
 	queryBuilder builder.QueryBuilder // Query builder for constructing SQL queries
-	logger       Logger               // Logger for logging database operations
+	safeLogger   *SafeLogger          // Nil-safe logger wrapper (created once, reused)
 	errorMapper  dberror.ErrorMapper  // Error mapper for standardizing database errors
 }
 
 // newMySQL initializes a new MySQL connection using the provided config.
-func newMySQL(cfg MysqlConfig) (*MySQL, error) {
+func newMySQL(cfg MysqlConfig, logger Logger) (*MySQL, error) {
 	dsn := cfg.DSN()
 
 	db, err := sql.Open("mysql", dsn)
@@ -116,7 +116,6 @@ func newMySQL(cfg MysqlConfig) (*MySQL, error) {
 	db.SetMaxIdleConns(cfg.MaxIdleConns)
 	db.SetConnMaxLifetime(cfg.ConnMaxLifetime)
 
-	// Optional: Ping to verify connection
 	if err := db.Ping(); err != nil {
 		return nil, fmt.Errorf("failed to ping MySQL: %w", err)
 	}
@@ -125,16 +124,17 @@ func newMySQL(cfg MysqlConfig) (*MySQL, error) {
 		querier:      db,
 		queryBuilder: builder.NewMySQLQueryBuilder(sqldialect.MySQLDialect{}),
 		errorMapper:  dberror.GetMapper(definition.DriverMySQL),
+		safeLogger:   NewSafeLogger(logger),
 	}, nil
 }
 
 // mysqlCfgToDB converts a DBConfig to a MySQL instance.
-func mysqlCfgToDB(cfg DBConfig) (*MySQL, error) {
+func mysqlCfgToDB(cfg DBConfig, logger Logger) (*MySQL, error) {
 	switch c := cfg.(type) {
 	case MysqlConfig:
-		return newMySQL(c)
+		return newMySQL(c, logger)
 	case *MysqlConfig:
-		return newMySQL(*c)
+		return newMySQL(*c, logger)
 	default:
 		return nil, fmt.Errorf("unsupported mysql config type: %T", cfg)
 	}
@@ -143,8 +143,8 @@ func mysqlCfgToDB(cfg DBConfig) (*MySQL, error) {
 // MySQLCfgToDB is an exported version of mysqlCfgToDB for use by plugin implementations.
 // Plugin authors can use this to reuse the MySQL driver implementation.
 // The config type must be MysqlConfig or *MysqlConfig.
-func MySQLCfgToDB(cfg DBConfig) (DB, error) {
-	return mysqlCfgToDB(cfg)
+func MySQLCfgToDB(cfg DBConfig, logger Logger) (DB, error) {
+	return mysqlCfgToDB(cfg, logger)
 }
 
 // PoolStats implements the DB interface method for retrieving connection pool statistics.
@@ -169,6 +169,8 @@ func (m *MySQL) PoolStats() (*PoolStatistics, error) {
 }
 
 // Ping implements the DB interface method to verify the database connection.
+//
+//nolint:dupl
 func (m *MySQL) Ping(ctx context.Context) error {
 	c, span := oh.UseTracer(ctx, "mysql.Ping",
 		trace.WithSpanKind(trace.SpanKindClient),
@@ -189,6 +191,7 @@ func (m *MySQL) Ping(ctx context.Context) error {
 		err = fmt.Errorf("mysql.Ping: failed to ping database: %w", err)
 		span.RecordError(err)
 		span.SetStatus(codes.Error, err.Error())
+		m.safeLogger.Error(fmt.Errorf("mysql.Ping: failed to ping database: %w", err))
 		return err
 	}
 	span.SetStatus(codes.Ok, "ping successful")
@@ -209,6 +212,7 @@ func (m *MySQL) Begin(ctx context.Context) (Tx, error) {
 		err := fmt.Errorf("mysql.Begin: underlying db is not *sql.DB")
 		span.RecordError(err)
 		span.SetStatus(codes.Error, err.Error())
+		m.safeLogger.QueryError(ctx, "mysql", "begin", "", 0, err)
 		return nil, err
 	}
 	t, err := sqlDB.BeginTx(c, nil)
@@ -216,14 +220,17 @@ func (m *MySQL) Begin(ctx context.Context) (Tx, error) {
 		err := fmt.Errorf("mysql.Begin: failed to begin transaction: %w", err)
 		span.RecordError(err)
 		span.SetStatus(codes.Error, err.Error())
+		m.safeLogger.QueryError(ctx, "mysql", "begin", "", 0, err)
 		return nil, err
 	}
+
 	span.SetStatus(codes.Ok, "transaction begun")
+	m.safeLogger.TransactionSuccess(ctx, "mysql", "begin")
 	return &MySQL{
 		querier: t,
 
 		queryBuilder: m.queryBuilder,
-		logger:       m.logger,
+		safeLogger:   m.safeLogger,
 	}, nil
 }
 
@@ -238,7 +245,6 @@ func (m *MySQL) GetQuery(
 	o := dbOpts{
 		builder: m.queryBuilder,
 		querier: m.querier,
-		logger:  m.logger,
 	}
 	return getQuery(table, columns, joins, conditions, opts, o)
 }
@@ -252,6 +258,7 @@ func (m *MySQL) Get(
 	conditions cdt.Condition,
 	opts *options.QueryOptions,
 ) ([]map[string]any, error) {
+	startTime := time.Now()
 	c, span := oh.UseTracer(ctx, "mysql.Get",
 		trace.WithSpanKind(trace.SpanKindClient),
 		trace.WithAttributes(
@@ -263,15 +270,19 @@ func (m *MySQL) Get(
 	o := dbOpts{
 		builder: m.queryBuilder,
 		querier: m.querier,
-		logger:  m.logger,
 	}
 	results, err := get(c, table, columns, joins, conditions, opts, o)
+	duration := time.Since(startTime)
+
 	if err != nil {
 		span.RecordError(err)
 		span.SetStatus(codes.Error, err.Error())
+		m.safeLogger.QueryError(c, "mysql", "select", table, duration, err)
 		return results, err
 	}
+
 	span.SetStatus(codes.Ok, "get successful")
+	m.safeLogger.QuerySuccess(c, "mysql", "select", table, duration, len(results))
 	return results, nil
 }
 
@@ -284,6 +295,7 @@ func (m *MySQL) GetRaw(
 	conditions cdt.Condition,
 	opts *options.QueryOptions,
 ) (*RowsAdapter, error) {
+	startTime := time.Now()
 	c, span := oh.UseTracer(ctx, "mysql.GetRaw",
 		trace.WithSpanKind(trace.SpanKindClient),
 		trace.WithAttributes(
@@ -295,15 +307,19 @@ func (m *MySQL) GetRaw(
 	o := dbOpts{
 		builder: m.queryBuilder,
 		querier: m.querier,
-		logger:  m.logger,
 	}
 	results, err := getRaw(c, table, columns, joins, conditions, opts, o)
+	duration := time.Since(startTime)
+
 	if err != nil {
 		span.RecordError(err)
 		span.SetStatus(codes.Error, err.Error())
+		m.safeLogger.QueryError(c, "mysql", "select", table, duration, err)
 		return results, err
 	}
+
 	span.SetStatus(codes.Ok, "getRaw successful")
+	m.safeLogger.QuerySuccess(c, "mysql", "select", table, duration, -1)
 	return results, nil
 }
 
@@ -317,12 +333,13 @@ func (m *MySQL) GetByIDQuery(
 	o := dbOpts{
 		builder: m.queryBuilder,
 		querier: m.querier,
-		logger:  m.logger,
 	}
 	return getByIDQuery(table, id, joins, opts, o)
 }
 
 // GetByID implements the DBActions interface method to retrieve a row by primary key.
+//
+//nolint:dupl
 func (m *MySQL) GetByID(
 	ctx context.Context,
 	table string,
@@ -330,6 +347,7 @@ func (m *MySQL) GetByID(
 	joins []cdt.Join,
 	opts *options.QueryOptions,
 ) ([]map[string]any, error) {
+	startTime := time.Now()
 	c, span := oh.UseTracer(ctx, "mysql.GetByID",
 		trace.WithSpanKind(trace.SpanKindClient),
 		trace.WithAttributes(
@@ -341,15 +359,19 @@ func (m *MySQL) GetByID(
 	o := dbOpts{
 		builder: m.queryBuilder,
 		querier: m.querier,
-		logger:  m.logger,
 	}
 	results, err := getByID(c, table, id, joins, opts, o)
+	duration := time.Since(startTime)
+
 	if err != nil {
 		span.RecordError(err)
 		span.SetStatus(codes.Error, err.Error())
+		m.safeLogger.QueryError(c, "mysql", "select", table, duration, err)
 		return results, err
 	}
+
 	span.SetStatus(codes.Ok, "getByID successful")
+	m.safeLogger.QuerySuccess(c, "mysql", "select", table, duration, len(results))
 	return results, nil
 }
 
@@ -361,6 +383,7 @@ func (m *MySQL) GetByIDRaw(
 	joins []cdt.Join,
 	opts *options.QueryOptions,
 ) (*RowsAdapter, error) {
+	startTime := time.Now()
 	c, span := oh.UseTracer(ctx, "mysql.GetByIDRaw",
 		trace.WithSpanKind(trace.SpanKindClient),
 		trace.WithAttributes(
@@ -372,15 +395,18 @@ func (m *MySQL) GetByIDRaw(
 	o := dbOpts{
 		builder: m.queryBuilder,
 		querier: m.querier,
-		logger:  m.logger,
 	}
 	results, err := getByIDRaw(c, table, id, joins, opts, o)
+	duration := time.Since(startTime)
 	if err != nil {
 		span.RecordError(err)
 		span.SetStatus(codes.Error, err.Error())
+		m.safeLogger.QueryError(c, "mysql", "select", table, duration, err)
 		return results, err
 	}
+
 	span.SetStatus(codes.Ok, "getByIDRaw successful")
+	m.safeLogger.QuerySuccess(c, "mysql", "select", table, duration, -1)
 	return results, nil
 }
 
@@ -393,18 +419,20 @@ func (m *MySQL) InsertQuery(
 	o := dbOpts{
 		builder: m.queryBuilder,
 		querier: m.querier,
-		logger:  m.logger,
 	}
 	return insertQuery(table, data, opts, o)
 }
 
 // Insert implements the DBActions interface method to insert a new row.
+//
+//nolint:dupl
 func (m *MySQL) Insert(
 	ctx context.Context,
 	table string,
 	data map[string]any,
 	opts *options.QueryOptions,
 ) (*ExecResult, error) {
+	startTime := time.Now()
 	c, span := oh.UseTracer(ctx, "mysql.Insert",
 		trace.WithSpanKind(trace.SpanKindClient),
 		trace.WithAttributes(
@@ -416,15 +444,24 @@ func (m *MySQL) Insert(
 	o := dbOpts{
 		builder: m.queryBuilder,
 		querier: m.querier,
-		logger:  m.logger,
 	}
 	result, err := insert(c, table, data, opts, o)
+	duration := time.Since(startTime)
+
 	if err != nil {
 		span.RecordError(err)
 		span.SetStatus(codes.Error, err.Error())
+		m.safeLogger.QueryError(c, "mysql", "insert", table, duration, err)
 		return result, err
 	}
+
 	span.SetStatus(codes.Ok, "insert successful")
+
+	rowsReturned := 0
+	if result != nil {
+		rowsReturned = int(result.RowsAffected)
+	}
+	m.safeLogger.QuerySuccess(c, "mysql", "insert", table, duration, rowsReturned)
 	return result, nil
 }
 
@@ -437,18 +474,20 @@ func (m *MySQL) InsertsQuery(
 	o := dbOpts{
 		builder: m.queryBuilder,
 		querier: m.querier,
-		logger:  m.logger,
 	}
 	return insertsQuery(table, data, opts, o)
 }
 
 // Inserts implements the DBActions interface method to insert multiple new rows.
+//
+//nolint:dupl
 func (m *MySQL) Inserts(
 	ctx context.Context,
 	table string,
 	data []map[string]any,
 	opts *options.QueryOptions,
 ) (*ExecResult, error) {
+	startTime := time.Now()
 	c, span := oh.UseTracer(ctx, "mysql.Inserts",
 		trace.WithSpanKind(trace.SpanKindClient),
 		trace.WithAttributes(
@@ -460,15 +499,24 @@ func (m *MySQL) Inserts(
 	o := dbOpts{
 		builder: m.queryBuilder,
 		querier: m.querier,
-		logger:  m.logger,
 	}
 	result, err := inserts(c, table, data, opts, o)
+	duration := time.Since(startTime)
+
 	if err != nil {
 		span.RecordError(err)
 		span.SetStatus(codes.Error, err.Error())
+		m.safeLogger.QueryError(c, "mysql", "insert", table, duration, err)
 		return result, err
 	}
+
 	span.SetStatus(codes.Ok, "inserts successful")
+
+	rowsReturned := 0
+	if result != nil {
+		rowsReturned = int(result.RowsAffected)
+	}
+	m.safeLogger.QuerySuccess(c, "mysql", "insert", table, duration, rowsReturned)
 	return result, nil
 }
 
@@ -483,7 +531,6 @@ func (m *MySQL) UpdateQuery(
 	o := dbOpts{
 		builder: m.queryBuilder,
 		querier: m.querier,
-		logger:  m.logger,
 	}
 	return updateQuery(table, data, joins, conditions, opts, o)
 }
@@ -497,6 +544,7 @@ func (m *MySQL) Update(
 	conditions cdt.Condition,
 	opts *options.QueryOptions,
 ) (*ExecResult, error) {
+	startTime := time.Now()
 	c, span := oh.UseTracer(ctx, "mysql.Update",
 		trace.WithSpanKind(trace.SpanKindClient),
 		trace.WithAttributes(
@@ -508,15 +556,24 @@ func (m *MySQL) Update(
 	o := dbOpts{
 		builder: m.queryBuilder,
 		querier: m.querier,
-		logger:  m.logger,
 	}
 	result, err := update(c, table, data, joins, conditions, opts, o)
+	duration := time.Since(startTime)
+
 	if err != nil {
 		span.RecordError(err)
 		span.SetStatus(codes.Error, err.Error())
+		m.safeLogger.QueryError(c, "mysql", "update", table, duration, err)
 		return result, err
 	}
+
 	span.SetStatus(codes.Ok, "update successful")
+
+	rowsReturned := 0
+	if result != nil {
+		rowsReturned = int(result.RowsAffected)
+	}
+	m.safeLogger.QuerySuccess(c, "mysql", "update", table, duration, rowsReturned)
 	return result, nil
 }
 
@@ -530,7 +587,6 @@ func (m *MySQL) DeleteQuery(
 	o := dbOpts{
 		builder: m.queryBuilder,
 		querier: m.querier,
-		logger:  m.logger,
 	}
 	return deleteQuery(table, joins, conditions, opts, o)
 }
@@ -543,6 +599,7 @@ func (m *MySQL) Delete(
 	conditions cdt.Condition,
 	opts *options.QueryOptions,
 ) (*ExecResult, error) {
+	startTime := time.Now()
 	c, span := oh.UseTracer(ctx, "mysql.Delete",
 		trace.WithSpanKind(trace.SpanKindClient),
 		trace.WithAttributes(
@@ -554,15 +611,24 @@ func (m *MySQL) Delete(
 	o := dbOpts{
 		builder: m.queryBuilder,
 		querier: m.querier,
-		logger:  m.logger,
 	}
 	result, err := delete(c, table, joins, conditions, opts, o)
+	duration := time.Since(startTime)
+
 	if err != nil {
 		span.RecordError(err)
 		span.SetStatus(codes.Error, err.Error())
+		m.safeLogger.QueryError(c, "mysql", "delete", table, duration, err)
 		return result, err
 	}
+
 	span.SetStatus(codes.Ok, "delete successful")
+
+	rowsReturned := 0
+	if result != nil {
+		rowsReturned = int(result.RowsAffected)
+	}
+	m.safeLogger.QuerySuccess(c, "mysql", "delete", table, duration, rowsReturned)
 	return result, nil
 }
 
@@ -574,6 +640,7 @@ func (m *MySQL) Query(
 	query string,
 	args ...any,
 ) ([]map[string]any, error) {
+	startTime := time.Now()
 	c, span := oh.UseTracer(ctx, "mysql.Query",
 		trace.WithSpanKind(trace.SpanKindClient),
 		trace.WithAttributes(
@@ -586,13 +653,12 @@ func (m *MySQL) Query(
 		err := fmt.Errorf("mysql.Query: failed to execute query: %w", m.errorMapper.MapError(err))
 		span.RecordError(err)
 		span.SetStatus(codes.Error, err.Error())
+		m.safeLogger.Error(fmt.Errorf("mysql.Query: failed to execute query: %w", err))
 		return nil, err
 	}
 	defer func() {
 		if err := rows.Close(); err != nil {
-			if m.logger != nil {
-				m.logger.Error("mysql.Query: failed to close rows", "error", err)
-			}
+			m.safeLogger.Error(fmt.Errorf("mysql.Query: failed to close rows: %w", err))
 		}
 	}()
 
@@ -601,6 +667,7 @@ func (m *MySQL) Query(
 		err := fmt.Errorf("mysql.Query: failed to get columns: %w", err)
 		span.RecordError(err)
 		span.SetStatus(codes.Error, err.Error())
+		m.safeLogger.Error(fmt.Errorf("mysql.Query: failed to get columns: %w", err))
 		return nil, err
 	}
 
@@ -608,14 +675,22 @@ func (m *MySQL) Query(
 	if err != nil {
 		span.RecordError(err)
 		span.SetStatus(codes.Error, err.Error())
+
+		m.safeLogger.Error(fmt.Errorf("mysql.Query: failed to scan rows: %w", err))
 		return results, err
 	}
+
+	duration := time.Since(startTime)
 	span.SetStatus(codes.Ok, "query executed")
+	m.safeLogger.QuerySuccess(c, "mysql", "query", "", duration, len(results))
 	return results, nil
 }
 
 // QueryRaw implements the DBActions interface method to execute a raw query and return a RowsAdapter.
+//
+//nolint:dupl
 func (m *MySQL) QueryRaw(ctx context.Context, query string, args ...any) (*RowsAdapter, error) {
+	startTime := time.Now()
 	c, span := oh.UseTracer(ctx, "mysql.QueryRaw",
 		trace.WithSpanKind(trace.SpanKindClient),
 		trace.WithAttributes(
@@ -628,24 +703,22 @@ func (m *MySQL) QueryRaw(ctx context.Context, query string, args ...any) (*RowsA
 		err := fmt.Errorf("mysql.QueryRaw: failed to execute query: %w", m.errorMapper.MapError(err))
 		span.RecordError(err)
 		span.SetStatus(codes.Error, err.Error())
+		m.safeLogger.Error(fmt.Errorf("mysql.QueryRaw: failed to execute query: %w", err))
 		return nil, err
 	}
-	defer func() {
-		if err := rows.Close(); err != nil {
-			if m.logger != nil {
-				m.logger.Error("mysql.QueryRaw: failed to close rows", "error", err)
-			}
-		}
-	}()
 
 	ra, err := newRowsAdapter(rows)
 	if err != nil {
 		err := fmt.Errorf("mysql.QueryRaw: failed to create RowsAdapter: %w", err)
 		span.RecordError(err)
 		span.SetStatus(codes.Error, err.Error())
+		m.safeLogger.Error(fmt.Errorf("mysql.QueryRaw: failed to create rows adapter: %w", err))
 		return nil, err
 	}
+
+	duration := time.Since(startTime)
 	span.SetStatus(codes.Ok, "query executed")
+	m.safeLogger.QuerySuccess(c, "mysql", "query", "", duration, -1)
 	return ra, nil
 }
 
@@ -655,6 +728,7 @@ func (m *MySQL) Exec(
 	query string,
 	values ...any,
 ) (*ExecResult, error) {
+	startTime := time.Now()
 	c, span := oh.UseTracer(ctx, "mysql.Exec",
 		trace.WithSpanKind(trace.SpanKindClient),
 		trace.WithAttributes(
@@ -667,10 +741,20 @@ func (m *MySQL) Exec(
 		err := fmt.Errorf("mysql.Exec: failed to execute query: %w", m.errorMapper.MapError(err))
 		span.RecordError(err)
 		span.SetStatus(codes.Error, err.Error())
+		m.safeLogger.Error(fmt.Errorf("mysql.Exec: failed to execute query: %w", err))
 		return nil, err
 	}
+
+	execResult := fromSQLResult(result)
+	duration := time.Since(startTime)
+
 	span.SetStatus(codes.Ok, "exec completed")
-	return fromSQLResult(result), nil
+	rowsAffected := int(0)
+	if execResult != nil {
+		rowsAffected = int(execResult.RowsAffected)
+	}
+	m.safeLogger.QuerySuccess(c, "mysql", "exec", "", duration, rowsAffected)
+	return execResult, nil
 }
 
 func (m *MySQL) Explain(
@@ -691,9 +775,12 @@ func (m *MySQL) Explain(
 		err := fmt.Errorf("mysql.Explain: failed to execute explain query: %w", err)
 		span.RecordError(err)
 		span.SetStatus(codes.Error, err.Error())
+		m.safeLogger.Error(fmt.Errorf("mysql.Explain: failed to execute explain query: %w", err))
 		return nil, err
 	}
+
 	span.SetStatus(codes.Ok, "explain executed")
+	m.safeLogger.Debug("mysql.Explain: explain query executed successfully")
 	return rows, nil
 }
 
@@ -720,13 +807,12 @@ func (m *MySQL) WithTransaction(ctx context.Context, fn func(tx Tx) error) error
 		var e error
 		if p := recover(); p != nil {
 			e = tx.Rollback(c)
-			if m.logger != nil {
-				m.logger.Error("mysql.WithTransaction: panic in transaction, rolled back", "panic", p, "error", e)
-			}
 			span.RecordError(fmt.Errorf("panic in transaction: %v", p))
 			span.SetStatus(codes.Error, "panic occurred in transaction")
+			//nolint:errorlint
+			m.safeLogger.Error(fmt.Errorf("mysql.WithTransaction: panic occurred: %v, rollback error: %v", p, e))
 		} else if err != nil {
-			e = tx.Rollback(c) // err is non-nil; don't change it
+			e = tx.Rollback(c)
 			if e != nil {
 				err = fmt.Errorf(
 					"mysql.WithTransaction: execution failed with error: %w, transaction rollback: %w",
@@ -737,7 +823,7 @@ func (m *MySQL) WithTransaction(ctx context.Context, fn func(tx Tx) error) error
 			span.RecordError(err)
 			span.SetStatus(codes.Error, err.Error())
 		} else {
-			err = tx.Commit(c) // err is nil; if Commit returns error update err
+			err = tx.Commit(c)
 			if err != nil {
 				err = fmt.Errorf("mysql.WithTransaction: failed to commit transaction: %w", err)
 				span.RecordError(err)
@@ -770,7 +856,10 @@ func (m *MySQL) Close() error {
 }
 
 // Commit implements the Tx interface method to commit the transaction.
+//
+//nolint:dupl
 func (m *MySQL) Commit(ctx context.Context) error {
+	startTime := time.Now()
 	_, span := oh.UseTracer(ctx, "mysql.Commit",
 		trace.WithSpanKind(trace.SpanKindClient),
 		trace.WithAttributes(
@@ -783,20 +872,28 @@ func (m *MySQL) Commit(ctx context.Context) error {
 		err := fmt.Errorf("mysql.Commit: underlying db is not *sql.Tx")
 		span.RecordError(err)
 		span.SetStatus(codes.Error, err.Error())
+		m.safeLogger.QueryError(ctx, "mysql", "commit", "", 0, err)
 		return err
 	}
 	if err := sqlTX.Commit(); err != nil {
+		duration := time.Since(startTime)
 		err := fmt.Errorf("mysql.Commit: failed to commit transaction: %w", err)
 		span.RecordError(err)
 		span.SetStatus(codes.Error, err.Error())
+		m.safeLogger.QueryError(ctx, "mysql", "commit", "", duration, err)
 		return err
 	}
+
 	span.SetStatus(codes.Ok, "transaction committed")
+	m.safeLogger.TransactionSuccess(ctx, "mysql", "commit")
 	return nil
 }
 
 // Rollback implements the Tx interface method to rollback the transaction.
+//
+//nolint:dupl
 func (m *MySQL) Rollback(ctx context.Context) error {
+	startTime := time.Now()
 	_, span := oh.UseTracer(ctx, "mysql.Rollback",
 		trace.WithSpanKind(trace.SpanKindClient),
 		trace.WithAttributes(
@@ -809,14 +906,19 @@ func (m *MySQL) Rollback(ctx context.Context) error {
 		err := fmt.Errorf("mysql.Rollback: underlying db is not *sql.Tx")
 		span.RecordError(err)
 		span.SetStatus(codes.Error, err.Error())
+		m.safeLogger.QueryError(ctx, "mysql", "rollback", "", 0, err)
 		return err
 	}
 	if err := sqlTX.Rollback(); err != nil {
+		duration := time.Since(startTime)
 		err := fmt.Errorf("mysql.Rollback: failed to rollback transaction: %w", err)
 		span.RecordError(err)
 		span.SetStatus(codes.Error, err.Error())
+		m.safeLogger.QueryError(ctx, "mysql", "rollback", "", duration, err)
 		return err
 	}
+
 	span.SetStatus(codes.Ok, "transaction rolled back")
+	m.safeLogger.TransactionSuccess(ctx, "mysql", "rollback")
 	return nil
 }

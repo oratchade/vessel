@@ -65,7 +65,7 @@ func (f *Factory) Create(ctx context.Context, cfg any) (any, error) {
 
 	// Reuse the PostgreSQL driver
 	//nolint:contextcheck
-	db, err := db.PostgresCfgToDB(pgCfg)
+	db, err := db.PostgresCfgToDB(pgCfg, nil)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create PostgreSQL driver for CockroachDB: %w", err)
 	}

@@ -82,13 +82,13 @@ func NewDB(cfg DBConfig, logger Logger) (DB, error) {
 	// Fall back to built-in drivers
 	switch driverName {
 	case definition.DriverMySQL:
-		return mysqlCfgToDB(cfg)
+		return mysqlCfgToDB(cfg, logger)
 	case definition.DriverPostgres, definition.DriverPostgresAlias:
-		return postgresCfgToDB(cfg)
+		return postgresCfgToDB(cfg, logger)
 	case definition.DriverSQLLite, definition.DriverSQLiteAlias:
-		return sqliteCfgToDB(cfg)
+		return sqliteCfgToDB(cfg, logger)
 	case definition.DriverMSSQL, definition.DriverMSSQLAlias:
-		return mssqlCfgToDB(cfg)
+		return mssqlCfgToDB(cfg, logger)
 	default:
 		return nil, fmt.Errorf("unsupported driver: %s", driverName)
 	}

@@ -12,6 +12,35 @@ This file documents agent instructions and workflows for working with the Fabric
 
 ---
 
+## Agent Purpose
+
+**Role:** Database Library Developer  
+**Responsibility:** Build and maintain a clean, maintainable database abstraction layer that handles SQL generation and query building without overcomplicating. Keep the API fluent and intuitive, support multiple database dialects, and ensure all code is well-tested.
+
+**Key Focus Areas:**
+
+- Implementing fluent query builders (SELECT, INSERT, UPDATE, DELETE)
+- Supporting multiple SQL dialects (MySQL, PostgreSQL, SQLite, MSSQL)
+- Generating correct SQL for each database type
+- Writing comprehensive unit and integration tests
+- Maintaining clean interfaces and extensible architecture
+- Optimizing performance in hot paths
+- Optimizing for maintainability and readability
+- Ensuring high code quality with 0 linting issues
+- Documenting all features and changes clearly
+- Handling errors gracefully and consistently
+- Providing a seamless developer experience with type safety and clear APIs
+- Ensuring plugin architecture is robust and easy to extend
+
+**What You Don't Need to Handle:**
+
+- Frontend or backend business logic
+- Application-level API design
+- Server infrastructure
+- Driver installation or system setup
+
+---
+
 ## Project Structure
 
 ```
@@ -59,6 +88,7 @@ fabric/
 **Scope:** MySQL, PostgreSQL, SQLite, MSSQL only (established pattern)
 
 **Steps:**
+
 1. Create driver config in `db/v1/{dialect}.go`
 2. Implement `SQLDialect` interface in `internal/pkg/sqldialect/{dialect}.go`
 3. Implement `QueryBuilder` interface in `internal/pkg/builder/{dialect}.go`
@@ -67,11 +97,13 @@ fabric/
 6. Update docs in `README.md` and `OPERATORS_COMPATIBILITY.md`
 
 **Key Files to Modify:**
+
 - `db/v1/{dialect}.go` - Driver configuration
 - `internal/pkg/sqldialect/{dialect}.go` - SQL generation
 - `internal/pkg/builder/{dialect}.go` - Query building
 
 **Testing Requirements:**
+
 - ✅ Unit tests must pass (use `-tags=test` flag)
 - ✅ Integration tests required for real database
 - ✅ All tests pass in CI/CD
@@ -81,6 +113,7 @@ fabric/
 ### 2. **Bug Fixes**
 
 **Process:**
+
 1. Identify the affected module (db/v1, builder, sqldialect, etc.)
 2. Write a failing test first (TDD approach)
 3. Fix the bug in the implementation
@@ -89,6 +122,7 @@ fabric/
 6. Update relevant documentation if behavior changed
 
 **Key Test Files:**
+
 - `db/v1/fluentDB_test.go` - Builder API tests
 - `internal/pkg/builder/builder_test.go` - Builder tests
 - `internal/pkg/sqldialect/sql_dialect_test.go` - SQL generation tests
@@ -102,6 +136,7 @@ fabric/
 **Example: Adding LIMIT/OFFSET support**
 
 **Process:**
+
 1. **Define:** Add feature to `QueryOptions` struct in `pkg/query/options/options.go`
 2. **Builder:** Add builder method to `SelectBuilder`/`UpdateBuilder`/`DeleteBuilder` in `db/v1/fluentDB.go`
 3. **SQL Generation:** Update SQL generation in `internal/pkg/sqldialect/sql_dialect.go`
@@ -110,6 +145,7 @@ fabric/
 6. **Document:** Update `README.md` and migration guide
 
 **Key Pattern:**
+
 ```go
 // 1. Add to options
 type QueryOptions struct {
@@ -139,6 +175,7 @@ if opts.NewFeature != nil {
 **Location:** `internal/pkg/sqldialect/sql_dialect.go`
 
 **Process:**
+
 1. Understand the `supportedOptions()` function (handles LIMIT, OFFSET, ORDER BY, etc.)
 2. Check dialect-specific implementations in `{dialect}.go`
 3. Verify `QuoteIdentifier()` is used for all column/table names
@@ -149,11 +186,13 @@ if opts.NewFeature != nil {
    - NULL handling in HAVING clauses
 
 **Common Issues:**
+
 - ✗ Not quoting identifiers → SQL injection risks
 - ✗ Wrong operator syntax → Database errors
 - ✗ Dialect-specific syntax → MSSQL OFFSET/FETCH instead of LIMIT/OFFSET
 
 **Test Pattern:**
+
 ```go
 testCases := []struct {
     name       string
@@ -175,11 +214,13 @@ testCases := []struct {
 **Profile Before:** Use `go test -bench=.` if benchmarks exist
 
 **Areas to Focus:**
+
 1. **Row Scanning** (`db/v1/row_adapter.go`) - Hot path for data retrieval
 2. **SQL Building** (`internal/pkg/builder/`) - Path for every query
 3. **Connection Pooling** - Database pooling configuration
 
 **Important Constraints:**
+
 - No breaking changes to public API
 - All tests must pass
 - Benchmarks must show improvement or equal performance
@@ -190,19 +231,20 @@ testCases := []struct {
 
 **Documentation Files:**
 
-| File | Purpose |
-|------|---------|
-| `README.md` | Feature overview, quick start, examples |
-| `MIGRATION_FLUENTDB.md` | Migration guide from DBActions to FluentDB |
-| `ORDERBY_CHANGES.md` | OrderBy struct redesign documentation |
-| `docs/CHANGELOG.md` | Version history and changes |
-| `docs/CODE_REVIEW.md` | Architecture documentation |
-| `docs/ERROR_HANDLING.md` | Error handling guide |
-| `docs/OPERATORS_COMPATIBILITY.md` | Operator support matrix |
-| `docs/SQL_NULL_TYPES.md` | Nullable type handling |
-| `docs/CONTRIBUTING.md` | Contribution guidelines |
+| File                              | Purpose                                    |
+| --------------------------------- | ------------------------------------------ |
+| `README.md`                       | Feature overview, quick start, examples    |
+| `MIGRATION_FLUENTDB.md`           | Migration guide from DBActions to FluentDB |
+| `ORDERBY_CHANGES.md`              | OrderBy struct redesign documentation      |
+| `docs/CHANGELOG.md`               | Version history and changes                |
+| `docs/CODE_REVIEW.md`             | Architecture documentation                 |
+| `docs/ERROR_HANDLING.md`          | Error handling guide                       |
+| `docs/OPERATORS_COMPATIBILITY.md` | Operator support matrix                    |
+| `docs/SQL_NULL_TYPES.md`          | Nullable type handling                     |
+| `docs/CONTRIBUTING.md`            | Contribution guidelines                    |
 
 **When to Update Documentation:**
+
 - ✅ New features added
 - ✅ API changes made
 - ✅ Bug fixes that change behavior
@@ -210,6 +252,7 @@ testCases := []struct {
 - ✅ Performance improvements documented
 
 **Format Requirements:**
+
 - Use GitHub-flavored markdown
 - Code examples must be correct and tested
 - Cross-reference related documentation
@@ -220,6 +263,7 @@ testCases := []struct {
 ### 7. **Testing Requirements**
 
 **Test Execution:**
+
 ```bash
 # Unit tests only
 go test -tags=test ./db/v1 ./internal/pkg/builder ./internal/pkg/sqldialect
@@ -238,12 +282,14 @@ make test
 ```
 
 **Test Coverage Expectations:**
+
 - ✅ New code: Minimum 80% coverage
 - ✅ Bug fixes: New tests for the bug
 - ✅ Features: Integration tests for real databases
 - ✅ All dialects tested (MySQL, PostgreSQL, SQLite, MSSQL)
 
 **Test Naming Convention:**
+
 ```go
 func Test{Feature}_{Scenario}(t *testing.T) {
     // Example: TestSelectBuilderOrderBy
@@ -259,11 +305,13 @@ func TestSelectBuilderOrderBy_SingleColumn(t *testing.T) {
 ### 8. **Code Quality Standards**
 
 **Linting (40+ enabled linters):**
+
 ```bash
 make lint  # Run golangci-lint
 ```
 
 **Code Style:**
+
 - ✅ Follow Go effective comments (100% documented)
 - ✅ Use interfaces for abstraction
 - ✅ Proper error handling with context
@@ -271,12 +319,14 @@ make lint  # Run golangci-lint
 - ✅ Immutable where possible
 
 **Error Handling:**
+
 - Use sentinel errors from `db/v1/dberror/errors.go`
 - Wrap errors with context using `fmt.Errorf`
 - Map database-specific errors to Fabric errors
 - Never ignore errors silently
 
 **Example:**
+
 ```go
 if err != nil {
     return fmt.Errorf("failed to scan row: %w", err)
@@ -304,12 +354,14 @@ rows, err := fdb.Select("users", "id", "name").
 ```
 
 **Builder Characteristics:**
+
 - ✅ Methods return `*Builder` for chaining
 - ✅ Order of method calls doesn't matter
 - ✅ Each method modifies builder state
 - ✅ Terminal methods (Get, Exec) execute the query
 
 **Key Builders:**
+
 - `SelectBuilder` - For SELECT queries
 - `UpdateBuilder` - For UPDATE queries
 - `DeleteBuilder` - For DELETE queries
@@ -320,12 +372,14 @@ rows, err := fdb.Select("users", "id", "name").
 ### 10. **Database Configuration**
 
 **Config Types** (in `db/v1/config_*.go`):
+
 - `MysqlConfig` - MySQL connection config
 - `PostgresConfig` - PostgreSQL connection config
 - `SQLiteConfig` - SQLite connection config
 - `MSSQLConfig` - MSSQL connection config
 
 **Creation Pattern:**
+
 ```go
 db, err := db.NewDB(db.MysqlConfig{
     User:     "user",
@@ -337,6 +391,7 @@ db, err := db.NewDB(db.MysqlConfig{
 ```
 
 **Important:**
+
 - Each config type validates settings
 - Connection pooling configured per database
 - OpenTelemetry can be disabled via `OTEL_ENABLED` env var
@@ -374,17 +429,21 @@ db, err := db.NewDB(db.MysqlConfig{
 ## Testing Best Practices
 
 ### Unit Tests
+
 - Test single feature in isolation
 - Use table-driven tests for multiple cases
 - Mock external dependencies
 
 ### Integration Tests
+
 - Use real database instances
 - Clean up data after tests
 - Test multi-dialect compatibility
 
 ### Test Helpers
+
 Located in `internal/pkg/builder/test_helpers.go`:
+
 - `intPtr()` - Helper for int pointers
 - Other utilities for test setup
 
@@ -393,11 +452,13 @@ Located in `internal/pkg/builder/test_helpers.go`:
 ## Performance Considerations
 
 **Critical Paths:**
+
 1. **Row Scanning** - Optimize in `db/v1/row_adapter.go`
 2. **Query Building** - Optimize in builder implementations
 3. **Connection Pooling** - Monitor with `PoolStats()`
 
 **OpenTelemetry Impact:**
+
 - Minimal when enabled (built-in instrumentation)
 - Zero overhead when disabled (`OTEL_ENABLED=false`)
 
@@ -432,21 +493,25 @@ Before releasing a new version:
 ## Important Notes
 
 ### ⚠️ Breaking Changes
+
 - Require documentation, migration guide, and changelog entry
 - Should be bundled into major version release
 - Example: OrderBy struct redesign → v1.1.0
 
 ### ⚠️ Code Style
+
 - 100% comment compliance required
 - No global state except plugin registry
 - Prefer composition over inheritance
 
 ### ⚠️ Error Handling
+
 - Always wrap errors with context
 - Use sentinel errors from dberror package
 - Log errors with proper context
 
 ### ⚠️ Database Support
+
 - All new features must work on all 4 dialects
 - Test on real database instances
 - Handle dialect-specific syntax carefully
@@ -476,6 +541,7 @@ Before releasing a new version:
 ## Summary
 
 Fabric is a well-engineered database abstraction library with:
+
 - ✅ Multi-database support (MySQL, PostgreSQL, SQLite, MSSQL)
 - ✅ Type-safe fluent query builder
 - ✅ Comprehensive testing (100+ tests)
@@ -484,6 +550,7 @@ Fabric is a well-engineered database abstraction library with:
 - ✅ Production-ready code quality
 
 When working with Fabric, prioritize:
+
 1. Maintaining backward compatibility
 2. Testing across all dialects
 3. Clear documentation

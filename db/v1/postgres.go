@@ -107,14 +107,15 @@ func (cfg PostgresConfig) DSN() string {
 
 // Postgres is a DB implementation for PostgreSQL using pgx.
 type Postgres struct {
-	querier      pgQuerier            // PostgreSQL connection pool
+	querier pgQuerier // PostgreSQL connection pool
+
 	queryBuilder builder.QueryBuilder // Query builder for constructing SQL queries
-	logger       Logger               // Logger for logging database operations
 	errorMapper  dberror.ErrorMapper  // Error mapper for standardizing database errors
+	safeLogger   *SafeLogger          // Nil-safe logger wrapper (created once, reused)
 }
 
 // newPostgres initializes a new Postgres connection pool using the provided config.
-func newPostgres(cfg PostgresConfig) (*Postgres, error) {
+func newPostgres(cfg PostgresConfig, logger Logger) (*Postgres, error) {
 	dsn := cfg.DSN()
 
 	ctx, cancel := context.WithTimeout(context.Background(), cfg.ConnectTimeout)
@@ -139,15 +140,16 @@ func newPostgres(cfg PostgresConfig) (*Postgres, error) {
 		querier:      pool,
 		queryBuilder: builder.NewPostgresQueryBuilder(sqldialect.PostgresDialect{}),
 		errorMapper:  dberror.GetMapper(definition.DriverPostgres),
+		safeLogger:   NewSafeLogger(logger),
 	}, nil
 }
 
-func postgresCfgToDB(cfg DBConfig) (*Postgres, error) {
+func postgresCfgToDB(cfg DBConfig, logger Logger) (*Postgres, error) {
 	switch c := cfg.(type) {
 	case PostgresConfig:
-		return newPostgres(c)
+		return newPostgres(c, logger)
 	case *PostgresConfig:
-		return newPostgres(*c)
+		return newPostgres(*c, logger)
 	default:
 		return nil, fmt.Errorf("unsupported postgres config type: %T", cfg)
 	}
@@ -156,8 +158,8 @@ func postgresCfgToDB(cfg DBConfig) (*Postgres, error) {
 // PostgresCfgToDB is an exported version of postgresCfgToDB for use by plugin implementations.
 // Plugin authors can use this to reuse the PostgreSQL driver implementation.
 // The config type must be PostgresConfig or *PostgresConfig.
-func PostgresCfgToDB(cfg DBConfig) (DB, error) {
-	return postgresCfgToDB(cfg)
+func PostgresCfgToDB(cfg DBConfig, logger Logger) (DB, error) {
+	return postgresCfgToDB(cfg, logger)
 }
 
 func (pg *Postgres) PoolStats() (*PoolStatistics, error) {
@@ -177,6 +179,7 @@ func (pg *Postgres) PoolStats() (*PoolStatistics, error) {
 	}, nil
 }
 
+//nolint:dupl
 func (pg *Postgres) Ping(ctx context.Context) error {
 	c, span := otel.UseTracer(ctx, "postgres.Ping",
 		trace.WithSpanKind(trace.SpanKindClient),
@@ -198,6 +201,7 @@ func (pg *Postgres) Ping(ctx context.Context) error {
 		err := fmt.Errorf("postgres.Ping: failed to ping database: %w", err)
 		span.RecordError(err)
 		span.SetStatus(codes.Error, err.Error())
+		pg.safeLogger.Error(fmt.Errorf("postgres.Ping: failed to ping database: %w", err))
 		return err
 	}
 	span.SetStatus(codes.Ok, "ping successful")
@@ -217,6 +221,7 @@ func (pg *Postgres) Begin(ctx context.Context) (Tx, error) {
 		err := fmt.Errorf("postgres.Begin: invalid querier type, expected *pgxpool.Pool")
 		span.RecordError(err)
 		span.SetStatus(codes.Error, err.Error())
+		pg.safeLogger.QueryError(c, "postgres", "begin", "", 0, err)
 		return nil, err
 	}
 	t, err := pgPool.Begin(c)
@@ -224,14 +229,16 @@ func (pg *Postgres) Begin(ctx context.Context) (Tx, error) {
 		err := fmt.Errorf("postgres.Begin: failed to begin transaction: %w", err)
 		span.RecordError(err)
 		span.SetStatus(codes.Error, err.Error())
+		pg.safeLogger.QueryError(c, "postgres", "begin", "", 0, err)
 		return nil, err
 	}
 
 	span.SetStatus(codes.Ok, "transaction begun")
+	pg.safeLogger.TransactionSuccess(c, "postgres", "begin")
 	return &Postgres{
 		querier:      t,
 		queryBuilder: pg.queryBuilder,
-		logger:       pg.logger,
+		safeLogger:   pg.safeLogger,
 	}, nil
 }
 
@@ -246,7 +253,6 @@ func (pg *Postgres) GetQuery(
 	if err != nil {
 		return "", nil, fmt.Errorf("postgres.Get: failed to build select query: %w", err)
 	}
-
 	return query, args, nil
 }
 
@@ -258,6 +264,7 @@ func (pg *Postgres) Get(
 	conditions cdt.Condition,
 	opts *options.QueryOptions,
 ) ([]map[string]any, error) {
+	startTime := time.Now()
 	c, span := otel.UseTracer(ctx, "postgres.Get",
 		trace.WithSpanKind(trace.SpanKindClient),
 		trace.WithAttributes(
@@ -271,6 +278,7 @@ func (pg *Postgres) Get(
 		err := fmt.Errorf("postgres.Get: failed to build select query: %w", err)
 		span.RecordError(err)
 		span.SetStatus(codes.Error, err.Error())
+		pg.safeLogger.QueryError(c, "postgres", "select", table, 0, err)
 		return nil, err
 	}
 
@@ -279,6 +287,7 @@ func (pg *Postgres) Get(
 		err := fmt.Errorf("postgres.Get: failed to execute query (%s): %w", query, err)
 		span.RecordError(err)
 		span.SetStatus(codes.Error, err.Error())
+		pg.safeLogger.QueryError(c, "postgres", "select", table, 0, err)
 		return nil, err
 	}
 	defer rows.Close()
@@ -290,12 +299,17 @@ func (pg *Postgres) Get(
 	}
 
 	results, err := scanRows(rows, cols)
+	duration := time.Since(startTime)
+
 	if err != nil {
 		span.RecordError(err)
 		span.SetStatus(codes.Error, err.Error())
+		pg.safeLogger.QueryError(c, "postgres", "select", table, duration, err)
 		return results, err
 	}
+
 	span.SetStatus(codes.Ok, "get successful")
+	pg.safeLogger.QuerySuccess(c, "postgres", "select", table, duration, len(results))
 	return results, nil
 }
 
@@ -308,6 +322,7 @@ func (pg *Postgres) GetRaw(
 	conditions cdt.Condition,
 	opts *options.QueryOptions,
 ) (*RowsAdapter, error) {
+	startTime := time.Now()
 	c, span := otel.UseTracer(ctx, "postgres.GetRaw",
 		trace.WithSpanKind(trace.SpanKindClient),
 		trace.WithAttributes(
@@ -321,6 +336,7 @@ func (pg *Postgres) GetRaw(
 		err := fmt.Errorf("postgres.GetRaw: failed to build select query: %w", err)
 		span.RecordError(err)
 		span.SetStatus(codes.Error, err.Error())
+		pg.safeLogger.QueryError(c, "postgres", "select", table, 0, err)
 		return nil, err
 	}
 
@@ -329,18 +345,23 @@ func (pg *Postgres) GetRaw(
 		err := fmt.Errorf("postgres.GetRaw: failed to execute query (%s): %w", query, err)
 		span.RecordError(err)
 		span.SetStatus(codes.Error, err.Error())
+		duration := time.Since(startTime)
+		pg.safeLogger.QueryError(c, "postgres", "select", table, duration, err)
 		return nil, err
 	}
 
 	ra, err := newRowsAdapter(rows)
+	duration := time.Since(startTime)
 	if err != nil {
 		err := fmt.Errorf("postgres.GetRaw: failed to create rows adapter: %w", err)
 		span.RecordError(err)
 		span.SetStatus(codes.Error, err.Error())
+		pg.safeLogger.QueryError(c, "postgres", "select", table, duration, err)
 		return nil, err
 	}
 
 	span.SetStatus(codes.Ok, "getRaw successful")
+	pg.safeLogger.QuerySuccess(c, "postgres", "select", table, duration, -1)
 	return ra, nil
 }
 
@@ -368,6 +389,7 @@ func (pg *Postgres) GetByID(
 	joins []cdt.Join,
 	opts *options.QueryOptions,
 ) ([]map[string]any, error) {
+	startTime := time.Now()
 	c, span := otel.UseTracer(ctx, "postgres.GetByID",
 		trace.WithSpanKind(trace.SpanKindClient),
 		trace.WithAttributes(
@@ -384,6 +406,7 @@ func (pg *Postgres) GetByID(
 		err := fmt.Errorf("postgres.GetByID: failed to build select query: %w", err)
 		span.RecordError(err)
 		span.SetStatus(codes.Error, err.Error())
+		pg.safeLogger.QueryError(c, "postgres", "select", table, 0, err)
 		return nil, err
 	}
 
@@ -392,6 +415,8 @@ func (pg *Postgres) GetByID(
 		err := fmt.Errorf("postgres.GetByID: failed to execute query: %w", err)
 		span.RecordError(err)
 		span.SetStatus(codes.Error, err.Error())
+		duration := time.Since(startTime)
+		pg.safeLogger.QueryError(c, "postgres", "select", table, duration, err)
 		return nil, err
 	}
 	defer rows.Close()
@@ -403,12 +428,17 @@ func (pg *Postgres) GetByID(
 	}
 
 	results, err := scanRows(rows, cols)
+	duration := time.Since(startTime)
+
 	if err != nil {
 		span.RecordError(err)
 		span.SetStatus(codes.Error, err.Error())
+		pg.safeLogger.QueryError(c, "postgres", "select", table, duration, err)
 		return results, err
 	}
+
 	span.SetStatus(codes.Ok, "getByID successful")
+	pg.safeLogger.QuerySuccess(c, "postgres", "select", table, duration, len(results))
 	return results, nil
 }
 
@@ -420,6 +450,7 @@ func (pg *Postgres) GetByIDRaw(
 	joins []cdt.Join,
 	opts *options.QueryOptions,
 ) (*RowsAdapter, error) {
+	startTime := time.Now()
 	c, span := otel.UseTracer(ctx, "postgres.GetByIDRaw",
 		trace.WithSpanKind(trace.SpanKindClient),
 		trace.WithAttributes(
@@ -436,6 +467,7 @@ func (pg *Postgres) GetByIDRaw(
 		err := fmt.Errorf("postgres.GetByIDRaw: failed to build select query: %w", err)
 		span.RecordError(err)
 		span.SetStatus(codes.Error, err.Error())
+		pg.safeLogger.QueryError(c, "postgres", "select", table, 0, err)
 		return nil, err
 	}
 
@@ -444,6 +476,8 @@ func (pg *Postgres) GetByIDRaw(
 		err := fmt.Errorf("postgres.GetByIDRaw: failed to execute query: %w", err)
 		span.RecordError(err)
 		span.SetStatus(codes.Error, err.Error())
+		duration := time.Since(startTime)
+		pg.safeLogger.QueryError(c, "postgres", "select", table, duration, err)
 		return nil, err
 	}
 
@@ -452,10 +486,14 @@ func (pg *Postgres) GetByIDRaw(
 		err := fmt.Errorf("postgres.GetByIDRaw: failed to create rows adapter: %w", err)
 		span.RecordError(err)
 		span.SetStatus(codes.Error, err.Error())
+		duration := time.Since(startTime)
+		pg.safeLogger.QueryError(c, "postgres", "select", table, duration, err)
 		return nil, err
 	}
 
+	duration := time.Since(startTime)
 	span.SetStatus(codes.Ok, "getByIDRaw successful")
+	pg.safeLogger.QuerySuccess(c, "postgres", "select", table, duration, -1)
 	return ra, nil
 }
 
@@ -478,6 +516,7 @@ func (pg *Postgres) Insert(
 	data map[string]any,
 	opts *options.QueryOptions,
 ) (*ExecResult, error) {
+	startTime := time.Now()
 	c, span := otel.UseTracer(ctx, "postgres.Insert",
 		trace.WithSpanKind(trace.SpanKindClient),
 		trace.WithAttributes(
@@ -491,6 +530,7 @@ func (pg *Postgres) Insert(
 		err := fmt.Errorf("postgres.Insert: failed to build insert query: %w", err)
 		span.RecordError(err)
 		span.SetStatus(codes.Error, err.Error())
+		pg.safeLogger.QueryError(c, "postgres", "insert", table, 0, err)
 		return nil, err
 	}
 
@@ -499,10 +539,21 @@ func (pg *Postgres) Insert(
 		err := fmt.Errorf("postgres.Insert: failed to execute insert query: %w", err)
 		span.RecordError(err)
 		span.SetStatus(codes.Error, err.Error())
+		duration := time.Since(startTime)
+		pg.safeLogger.QueryError(c, "postgres", "insert", table, duration, err)
 		return nil, err
 	}
+
+	duration := time.Since(startTime)
+	execResult := fromCommandTag(result)
+
 	span.SetStatus(codes.Ok, "insert successful")
-	return fromCommandTag(result), nil
+	rowsReturned := 0
+	if execResult != nil {
+		rowsReturned = int(execResult.RowsAffected)
+	}
+	pg.safeLogger.QuerySuccess(c, "postgres", "insert", table, duration, rowsReturned)
+	return execResult, nil
 }
 
 func (pg *Postgres) InsertsQuery(
@@ -524,6 +575,7 @@ func (pg *Postgres) Inserts(
 	data []map[string]any,
 	opts *options.QueryOptions,
 ) (*ExecResult, error) {
+	startTime := time.Now()
 	c, span := otel.UseTracer(ctx, "postgres.Inserts",
 		trace.WithSpanKind(trace.SpanKindClient),
 		trace.WithAttributes(
@@ -537,18 +589,29 @@ func (pg *Postgres) Inserts(
 		err := fmt.Errorf("postgres.Inserts: failed to build insert query: %w", err)
 		span.RecordError(err)
 		span.SetStatus(codes.Error, err.Error())
+		pg.safeLogger.QueryError(c, "postgres", "insert", table, 0, err)
 		return nil, err
 	}
 
 	result, err := pg.querier.Exec(c, query, args...)
+	duration := time.Since(startTime)
+
 	if err != nil {
 		err := fmt.Errorf("postgres.Inserts: failed to execute insert query: %w", err)
 		span.RecordError(err)
 		span.SetStatus(codes.Error, err.Error())
+		pg.safeLogger.QueryError(c, "postgres", "insert", table, duration, err)
 		return nil, err
 	}
+
 	span.SetStatus(codes.Ok, "inserts successful")
-	return fromCommandTag(result), nil
+	execResult := fromCommandTag(result)
+	rowsReturned := 0
+	if execResult != nil {
+		rowsReturned = int(execResult.RowsAffected)
+	}
+	pg.safeLogger.QuerySuccess(c, "postgres", "insert", table, duration, rowsReturned)
+	return execResult, nil
 }
 
 func (pg *Postgres) UpdateQuery(
@@ -574,6 +637,7 @@ func (pg *Postgres) Update(
 	conditions cdt.Condition,
 	opts *options.QueryOptions,
 ) (*ExecResult, error) {
+	startTime := time.Now()
 	c, span := otel.UseTracer(ctx, "postgres.Update",
 		trace.WithSpanKind(trace.SpanKindClient),
 		trace.WithAttributes(
@@ -587,6 +651,7 @@ func (pg *Postgres) Update(
 		err := fmt.Errorf("postgres.Update: failed to build update query: %w", err)
 		span.RecordError(err)
 		span.SetStatus(codes.Error, err.Error())
+		pg.safeLogger.QueryError(c, "postgres", "update", table, 0, err)
 		return nil, err
 	}
 
@@ -595,10 +660,20 @@ func (pg *Postgres) Update(
 		err := fmt.Errorf("postgres.Update: failed to execute update query: %w", err)
 		span.RecordError(err)
 		span.SetStatus(codes.Error, err.Error())
+		duration := time.Since(startTime)
+		pg.safeLogger.QueryError(c, "postgres", "update", table, duration, err)
 		return nil, err
 	}
+	duration := time.Since(startTime)
+	execResult := fromCommandTag(result)
+
 	span.SetStatus(codes.Ok, "update successful")
-	return fromCommandTag(result), nil
+	rowsReturned := 0
+	if execResult != nil {
+		rowsReturned = int(execResult.RowsAffected)
+	}
+	pg.safeLogger.QuerySuccess(c, "postgres", "update", table, duration, rowsReturned)
+	return execResult, nil
 }
 
 func (pg *Postgres) DeleteQuery(
@@ -622,6 +697,7 @@ func (pg *Postgres) Delete(
 	conditions cdt.Condition,
 	opts *options.QueryOptions,
 ) (*ExecResult, error) {
+	startTime := time.Now()
 	c, span := otel.UseTracer(ctx, "postgres.Delete",
 		trace.WithSpanKind(trace.SpanKindClient),
 		trace.WithAttributes(
@@ -635,6 +711,7 @@ func (pg *Postgres) Delete(
 		err := fmt.Errorf("postgres.Delete: failed to build delete query: %w", err)
 		span.RecordError(err)
 		span.SetStatus(codes.Error, err.Error())
+		pg.safeLogger.QueryError(c, "postgres", "delete", table, 0, err)
 		return nil, err
 	}
 
@@ -643,10 +720,20 @@ func (pg *Postgres) Delete(
 		err := fmt.Errorf("postgres.Delete: failed to execute delete query: %w", err)
 		span.RecordError(err)
 		span.SetStatus(codes.Error, err.Error())
+		duration := time.Since(startTime)
+		pg.safeLogger.QueryError(c, "postgres", "delete", table, duration, err)
 		return nil, err
 	}
+	duration := time.Since(startTime)
+	execResult := fromCommandTag(result)
+
 	span.SetStatus(codes.Ok, "delete successful")
-	return fromCommandTag(result), nil
+	rowsReturned := 0
+	if execResult != nil {
+		rowsReturned = int(execResult.RowsAffected)
+	}
+	pg.safeLogger.QuerySuccess(c, "postgres", "delete", table, duration, rowsReturned)
+	return execResult, nil
 }
 
 func (pg *Postgres) Query(
@@ -654,6 +741,7 @@ func (pg *Postgres) Query(
 	query string,
 	args ...any,
 ) ([]map[string]any, error) {
+	startTime := time.Now()
 	c, span := otel.UseTracer(ctx, "postgres.Query",
 		trace.WithSpanKind(trace.SpanKindClient),
 		trace.WithAttributes(
@@ -666,6 +754,7 @@ func (pg *Postgres) Query(
 		err := fmt.Errorf("postgres.Query: failed to execute query: %w", pg.errorMapper.MapError(err))
 		span.RecordError(err)
 		span.SetStatus(codes.Error, err.Error())
+		pg.safeLogger.Error(fmt.Errorf("postgres.Query: failed to execute query: %w", err))
 		return nil, err
 	}
 	defer rows.Close()
@@ -680,14 +769,19 @@ func (pg *Postgres) Query(
 	if err != nil {
 		span.RecordError(err)
 		span.SetStatus(codes.Error, err.Error())
+		pg.safeLogger.Error(fmt.Errorf("postgres.Query: failed to scan rows: %w", err))
 		return results, err
 	}
+
+	duration := time.Since(startTime)
 	span.SetStatus(codes.Ok, "query executed")
+	pg.safeLogger.QuerySuccess(c, "postgres", "query", "", duration, len(results))
 	return results, nil
 }
 
 //nolint:dupl,sqlclosecheck
 func (pg *Postgres) QueryRaw(ctx context.Context, query string, args ...any) (*RowsAdapter, error) {
+	startTime := time.Now()
 	c, span := otel.UseTracer(ctx, "postgres.QueryRaw",
 		trace.WithSpanKind(trace.SpanKindClient),
 		trace.WithAttributes(
@@ -700,6 +794,7 @@ func (pg *Postgres) QueryRaw(ctx context.Context, query string, args ...any) (*R
 		err := fmt.Errorf("postgres.QueryRaw: failed to execute query: %w", pg.errorMapper.MapError(err))
 		span.RecordError(err)
 		span.SetStatus(codes.Error, err.Error())
+		pg.safeLogger.Error(fmt.Errorf("postgres.QueryRaw: failed to execute query: %w", err))
 		return nil, err
 	}
 
@@ -708,10 +803,13 @@ func (pg *Postgres) QueryRaw(ctx context.Context, query string, args ...any) (*R
 		err := fmt.Errorf("postgres.QueryRaw: failed to create rows adapter: %w", err)
 		span.RecordError(err)
 		span.SetStatus(codes.Error, err.Error())
+		pg.safeLogger.Error(fmt.Errorf("postgres.QueryRaw: failed to create rows adapter: %w", err))
 		return nil, err
 	}
 
+	duration := time.Since(startTime)
 	span.SetStatus(codes.Ok, "query executed")
+	pg.safeLogger.QuerySuccess(c, "postgres", "query", "", duration, -1)
 	return ra, nil
 }
 
@@ -720,6 +818,7 @@ func (pg *Postgres) Exec(
 	query string,
 	values ...any,
 ) (*ExecResult, error) {
+	startTime := time.Now()
 	c, span := otel.UseTracer(ctx, "postgres.Exec",
 		trace.WithSpanKind(trace.SpanKindClient),
 		trace.WithAttributes(
@@ -732,10 +831,20 @@ func (pg *Postgres) Exec(
 		err := fmt.Errorf("postgres.Exec: failed to execute query: %w", pg.errorMapper.MapError(err))
 		span.RecordError(err)
 		span.SetStatus(codes.Error, err.Error())
+		pg.safeLogger.Error(fmt.Errorf("postgres.Exec: failed to execute query: %w", err))
 		return nil, err
 	}
+
+	execResult := fromCommandTag(result)
+	duration := time.Since(startTime)
+
 	span.SetStatus(codes.Ok, "exec completed")
-	return fromCommandTag(result), nil
+	rowsAffected := int(0)
+	if execResult != nil {
+		rowsAffected = int(execResult.RowsAffected)
+	}
+	pg.safeLogger.QuerySuccess(c, "postgres", "exec", "", duration, rowsAffected)
+	return execResult, nil
 }
 
 func (pg *Postgres) Explain(
@@ -756,9 +865,13 @@ func (pg *Postgres) Explain(
 		err := fmt.Errorf("postgres.Explain: failed to execute explain query: %w", err)
 		span.RecordError(err)
 		span.SetStatus(codes.Error, err.Error())
+
+		pg.safeLogger.Error(fmt.Errorf("postgres.Explain: failed to execute explain query: %w", err))
 		return nil, err
 	}
+
 	span.SetStatus(codes.Ok, "explain executed")
+	pg.safeLogger.Debug("postgres.Explain: explain query executed successfully")
 	return rows, nil
 }
 
@@ -783,13 +896,14 @@ func (pg *Postgres) WithTransaction(ctx context.Context, fn func(tx Tx) error) e
 		var e error
 		if p := recover(); p != nil {
 			e = tx.Rollback(c)
-			if pg.logger != nil {
-				pg.logger.Error("postgres.WithTransaction: panic in transaction, rolled back", "panic", p, "error", e)
-			}
 			span.RecordError(fmt.Errorf("panic in transaction: %v", p))
 			span.SetStatus(codes.Error, "panic occurred in transaction")
+			//nolint:errorlint
+			pg.safeLogger.Error(
+				fmt.Errorf("postgres.WithTransaction: panic occurred: %v, rollback error: %v", p, e),
+			)
 		} else if err != nil {
-			e = tx.Rollback(c) // err is non-nil; don't change it
+			e = tx.Rollback(c)
 			if e != nil {
 				err = fmt.Errorf(
 					"postgres.WithTransaction: execution failed with error: %w, transaction rollback: %w",
@@ -800,7 +914,7 @@ func (pg *Postgres) WithTransaction(ctx context.Context, fn func(tx Tx) error) e
 			span.RecordError(err)
 			span.SetStatus(codes.Error, err.Error())
 		} else {
-			err = tx.Commit(c) // err is nil; if Commit returns error update err
+			err = tx.Commit(c)
 			if err != nil {
 				err = fmt.Errorf("postgres.WithTransaction: failed to commit transaction: %w", err)
 				span.RecordError(err)
@@ -828,7 +942,9 @@ func (pg *Postgres) Close() error {
 	return nil
 }
 
+//nolint:dupl
 func (pg *Postgres) Commit(ctx context.Context) error {
+	startTime := time.Now()
 	_, span := otel.UseTracer(ctx, "postgres.Commit",
 		trace.WithSpanKind(trace.SpanKindClient),
 		trace.WithAttributes(
@@ -838,22 +954,29 @@ func (pg *Postgres) Commit(ctx context.Context) error {
 	defer span.End()
 	pgxTx, ok := pg.querier.(pgx.Tx)
 	if !ok {
-		err := fmt.Errorf("postgres.Commit: invalid querier type, expected *pgxpool.Pool")
+		err := fmt.Errorf("postgres.Commit: invalid querier type, expected pgx.Tx")
 		span.RecordError(err)
 		span.SetStatus(codes.Error, err.Error())
+		pg.safeLogger.QueryError(ctx, "postgres", "commit", "", 0, err)
 		return err
 	}
 	if err := pgxTx.Commit(ctx); err != nil {
+		duration := time.Since(startTime)
 		err := fmt.Errorf("postgres.Commit: failed to commit transaction: %w", err)
 		span.RecordError(err)
 		span.SetStatus(codes.Error, err.Error())
+		pg.safeLogger.QueryError(ctx, "postgres", "commit", "", duration, err)
 		return err
 	}
+
 	span.SetStatus(codes.Ok, "transaction committed")
+	pg.safeLogger.TransactionSuccess(ctx, "postgres", "commit")
 	return nil
 }
 
+//nolint:dupl
 func (pg *Postgres) Rollback(ctx context.Context) error {
+	startTime := time.Now()
 	_, span := otel.UseTracer(ctx, "postgres.Rollback",
 		trace.WithSpanKind(trace.SpanKindClient),
 		trace.WithAttributes(
@@ -863,17 +986,23 @@ func (pg *Postgres) Rollback(ctx context.Context) error {
 	defer span.End()
 	pgxTx, ok := pg.querier.(pgx.Tx)
 	if !ok {
-		err := fmt.Errorf("postgres.Rollback: invalid querier type, expected *pgxpool.Pool")
+		err := fmt.Errorf("postgres.Rollback: invalid querier type, expected pgx.Tx")
 		span.RecordError(err)
 		span.SetStatus(codes.Error, err.Error())
+
+		pg.safeLogger.QueryError(ctx, "postgres", "rollback", "", 0, err)
 		return err
 	}
 	if err := pgxTx.Rollback(ctx); err != nil {
+		duration := time.Since(startTime)
 		err := fmt.Errorf("postgres.Rollback: failed to rollback transaction: %w", err)
 		span.RecordError(err)
 		span.SetStatus(codes.Error, err.Error())
+		pg.safeLogger.QueryError(ctx, "postgres", "rollback", "", duration, err)
 		return err
 	}
+
 	span.SetStatus(codes.Ok, "transaction rolled back")
+	pg.safeLogger.TransactionSuccess(ctx, "postgres", "rollback")
 	return nil
 }

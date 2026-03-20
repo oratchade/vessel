@@ -79,12 +79,12 @@ type MSSQL struct {
 	querier sqlQuerier // Underlying sql.DB connection pool
 
 	queryBuilder builder.QueryBuilder // Query builder for constructing SQL queries
-	logger       Logger               // Logger for logging database operations
 	errorMapper  dberror.ErrorMapper  // Error mapper for standardizing database errors
+	safeLogger   *SafeLogger          // SafeLogger for automatic error classification and logging
 }
 
 // newMSSQL initializes a new MSSQL connection using the provided config.
-func newMSSQL(cfg MSSQLConfig) (*MSSQL, error) {
+func newMSSQL(cfg MSSQLConfig, logger Logger) (*MSSQL, error) {
 	dsn := cfg.DSN()
 
 	db, err := sql.Open("sqlserver", dsn)
@@ -104,15 +104,16 @@ func newMSSQL(cfg MSSQLConfig) (*MSSQL, error) {
 		querier:      db,
 		queryBuilder: builder.NewMSSQLQueryBuilder(sqldialect.MSSQLDialect{}),
 		errorMapper:  dberror.GetMapper(definition.DriverMSSQL),
+		safeLogger:   NewSafeLogger(logger),
 	}, nil
 }
 
-func mssqlCfgToDB(cfg DBConfig) (*MSSQL, error) {
+func mssqlCfgToDB(cfg DBConfig, logger Logger) (*MSSQL, error) {
 	switch c := cfg.(type) {
 	case MSSQLConfig:
-		return newMSSQL(c)
+		return newMSSQL(c, logger)
 	case *MSSQLConfig:
-		return newMSSQL(*c)
+		return newMSSQL(*c, logger)
 	default:
 		return nil, fmt.Errorf("unsupported mssql config type: %T", cfg)
 	}
@@ -121,8 +122,8 @@ func mssqlCfgToDB(cfg DBConfig) (*MSSQL, error) {
 // MSSQLCfgToDB is an exported version of mssqlCfgToDB for use by plugin implementations.
 // Plugin authors can use this to reuse the MSSQL driver implementation.
 // The config type must be MSSQLConfig or *MSSQLConfig.
-func MSSQLCfgToDB(cfg DBConfig) (DB, error) {
-	return mssqlCfgToDB(cfg)
+func MSSQLCfgToDB(cfg DBConfig, logger Logger) (DB, error) {
+	return mssqlCfgToDB(cfg, logger)
 }
 
 func (m *MSSQL) PoolStats() (*PoolStatistics, error) {
@@ -145,6 +146,7 @@ func (m *MSSQL) PoolStats() (*PoolStatistics, error) {
 	}, nil
 }
 
+//nolint:dupl
 func (m *MSSQL) Ping(ctx context.Context) error {
 	c, span := oh.UseTracer(ctx, "mssql.Ping",
 		trace.WithSpanKind(trace.SpanKindClient),
@@ -165,6 +167,7 @@ func (m *MSSQL) Ping(ctx context.Context) error {
 		err := fmt.Errorf("mssql.Ping: failed to ping database: %w", err)
 		span.RecordError(err)
 		span.SetStatus(codes.Error, err.Error())
+		m.safeLogger.Error(fmt.Errorf("mssql.Ping: failed to ping database: %w", err))
 		return err
 	}
 	span.SetStatus(codes.Ok, "ping successful")
@@ -184,6 +187,7 @@ func (m *MSSQL) Begin(ctx context.Context) (Tx, error) {
 		err := fmt.Errorf("mssql.Begin: underlying db is not *sql.DB")
 		span.RecordError(err)
 		span.SetStatus(codes.Error, err.Error())
+		m.safeLogger.QueryError(c, "mssql", "begin", "", 0, err)
 		return nil, err
 	}
 	t, err := sqlDB.BeginTx(c, nil)
@@ -191,14 +195,17 @@ func (m *MSSQL) Begin(ctx context.Context) (Tx, error) {
 		err := fmt.Errorf("mssql.Begin: failed to begin transaction: %w", err)
 		span.RecordError(err)
 		span.SetStatus(codes.Error, err.Error())
+		m.safeLogger.QueryError(c, "mssql", "begin", "", 0, err)
 		return nil, err
 	}
+
 	span.SetStatus(codes.Ok, "transaction begun")
+	m.safeLogger.TransactionSuccess(c, "mssql", "begin")
 	return &MSSQL{
 		querier: t,
 
 		queryBuilder: m.queryBuilder,
-		logger:       m.logger,
+		safeLogger:   m.safeLogger,
 	}, nil
 }
 
@@ -212,7 +219,6 @@ func (m *MSSQL) GetQuery(
 	o := dbOpts{
 		builder: m.queryBuilder,
 		querier: m.querier,
-		logger:  m.logger,
 	}
 	return getQuery(table, columns, joins, conditions, opts, o)
 }
@@ -225,6 +231,7 @@ func (m *MSSQL) Get(
 	conditions cdt.Condition,
 	opts *options.QueryOptions,
 ) ([]map[string]any, error) {
+	startTime := time.Now()
 	c, span := oh.UseTracer(ctx, "mssql.Get",
 		trace.WithSpanKind(trace.SpanKindClient),
 		trace.WithAttributes(
@@ -236,15 +243,19 @@ func (m *MSSQL) Get(
 	o := dbOpts{
 		builder: m.queryBuilder,
 		querier: m.querier,
-		logger:  m.logger,
 	}
 	results, err := get(c, table, columns, joins, conditions, opts, o)
+	duration := time.Since(startTime)
+
 	if err != nil {
 		span.RecordError(err)
 		span.SetStatus(codes.Error, err.Error())
+		m.safeLogger.QueryError(c, "mssql", "select", table, duration, err)
 		return results, err
 	}
+
 	span.SetStatus(codes.Ok, "get successful")
+	m.safeLogger.QuerySuccess(c, "mssql", "select", table, duration, len(results))
 	return results, nil
 }
 
@@ -256,6 +267,7 @@ func (m *MSSQL) GetRaw(
 	conditions cdt.Condition,
 	opts *options.QueryOptions,
 ) (*RowsAdapter, error) {
+	startTime := time.Now()
 	c, span := oh.UseTracer(ctx, "mssql.GetRaw",
 		trace.WithSpanKind(trace.SpanKindClient),
 		trace.WithAttributes(
@@ -267,15 +279,19 @@ func (m *MSSQL) GetRaw(
 	o := dbOpts{
 		builder: m.queryBuilder,
 		querier: m.querier,
-		logger:  m.logger,
 	}
 	results, err := getRaw(c, table, columns, joins, conditions, opts, o)
+	duration := time.Since(startTime)
+
 	if err != nil {
 		span.RecordError(err)
 		span.SetStatus(codes.Error, err.Error())
+		m.safeLogger.QueryError(c, "mssql", "select", table, duration, err)
 		return results, err
 	}
+
 	span.SetStatus(codes.Ok, "getRaw successful")
+	m.safeLogger.QuerySuccess(c, "mssql", "select", table, duration, -1)
 	return results, nil
 }
 
@@ -288,11 +304,11 @@ func (m *MSSQL) GetByIDQuery(
 	o := dbOpts{
 		builder: m.queryBuilder,
 		querier: m.querier,
-		logger:  m.logger,
 	}
 	return getByIDQuery(table, id, joins, opts, o)
 }
 
+//nolint:dupl
 func (m *MSSQL) GetByID(
 	ctx context.Context,
 	table string,
@@ -300,6 +316,7 @@ func (m *MSSQL) GetByID(
 	joins []cdt.Join,
 	opts *options.QueryOptions,
 ) ([]map[string]any, error) {
+	startTime := time.Now()
 	c, span := oh.UseTracer(ctx, "mssql.GetByID",
 		trace.WithSpanKind(trace.SpanKindClient),
 		trace.WithAttributes(
@@ -311,15 +328,19 @@ func (m *MSSQL) GetByID(
 	o := dbOpts{
 		builder: m.queryBuilder,
 		querier: m.querier,
-		logger:  m.logger,
 	}
 	results, err := getByID(c, table, id, joins, opts, o)
+	duration := time.Since(startTime)
+
 	if err != nil {
 		span.RecordError(err)
 		span.SetStatus(codes.Error, err.Error())
+		m.safeLogger.QueryError(c, "mssql", "select", table, duration, err)
 		return results, err
 	}
+
 	span.SetStatus(codes.Ok, "getByID successful")
+	m.safeLogger.QuerySuccess(c, "mssql", "select", table, duration, len(results))
 	return results, nil
 }
 
@@ -330,6 +351,7 @@ func (m *MSSQL) GetByIDRaw(
 	joins []cdt.Join,
 	opts *options.QueryOptions,
 ) (*RowsAdapter, error) {
+	startTime := time.Now()
 	c, span := oh.UseTracer(ctx, "mssql.GetByIDRaw",
 		trace.WithSpanKind(trace.SpanKindClient),
 		trace.WithAttributes(
@@ -341,15 +363,18 @@ func (m *MSSQL) GetByIDRaw(
 	o := dbOpts{
 		builder: m.queryBuilder,
 		querier: m.querier,
-		logger:  m.logger,
 	}
 	results, err := getByIDRaw(c, table, id, joins, opts, o)
+	duration := time.Since(startTime)
 	if err != nil {
 		span.RecordError(err)
 		span.SetStatus(codes.Error, err.Error())
+		m.safeLogger.QueryError(c, "mssql", "select", table, duration, err)
 		return results, err
 	}
+
 	span.SetStatus(codes.Ok, "getByIDRaw successful")
+	m.safeLogger.QuerySuccess(c, "mssql", "select", table, duration, -1)
 	return results, nil
 }
 
@@ -361,17 +386,18 @@ func (m *MSSQL) InsertQuery(
 	o := dbOpts{
 		builder: m.queryBuilder,
 		querier: m.querier,
-		logger:  m.logger,
 	}
 	return insertQuery(table, data, opts, o)
 }
 
+//nolint:dupl
 func (m *MSSQL) Insert(
 	ctx context.Context,
 	table string,
 	data map[string]any,
 	opts *options.QueryOptions,
 ) (*ExecResult, error) {
+	startTime := time.Now()
 	c, span := oh.UseTracer(ctx, "mssql.Insert",
 		trace.WithSpanKind(trace.SpanKindClient),
 		trace.WithAttributes(
@@ -383,15 +409,24 @@ func (m *MSSQL) Insert(
 	o := dbOpts{
 		builder: m.queryBuilder,
 		querier: m.querier,
-		logger:  m.logger,
 	}
 	result, err := insert(c, table, data, opts, o)
+	duration := time.Since(startTime)
+
 	if err != nil {
 		span.RecordError(err)
 		span.SetStatus(codes.Error, err.Error())
+		m.safeLogger.QueryError(c, "msql", "insert", table, duration, err)
 		return result, err
 	}
+
 	span.SetStatus(codes.Ok, "insert successful")
+
+	rowsAffected := int(0)
+	if result != nil {
+		rowsAffected = int(result.RowsAffected)
+	}
+	m.safeLogger.QuerySuccess(c, "mssql", "insert", table, duration, rowsAffected)
 	return result, nil
 }
 
@@ -403,17 +438,18 @@ func (m *MSSQL) InsertsQuery(
 	o := dbOpts{
 		builder: m.queryBuilder,
 		querier: m.querier,
-		logger:  m.logger,
 	}
 	return insertsQuery(table, data, opts, o)
 }
 
+//nolint:dupl
 func (m *MSSQL) Inserts(
 	ctx context.Context,
 	table string,
 	data []map[string]any,
 	opts *options.QueryOptions,
 ) (*ExecResult, error) {
+	startTime := time.Now()
 	c, span := oh.UseTracer(ctx, "mssql.Inserts",
 		trace.WithSpanKind(trace.SpanKindClient),
 		trace.WithAttributes(
@@ -425,15 +461,24 @@ func (m *MSSQL) Inserts(
 	o := dbOpts{
 		builder: m.queryBuilder,
 		querier: m.querier,
-		logger:  m.logger,
 	}
 	result, err := inserts(c, table, data, opts, o)
+	duration := time.Since(startTime)
+
 	if err != nil {
 		span.RecordError(err)
 		span.SetStatus(codes.Error, err.Error())
+		m.safeLogger.QueryError(c, "mssql", "insert", table, duration, err)
 		return result, err
 	}
+
 	span.SetStatus(codes.Ok, "inserts successful")
+
+	rowsAffected := int(0)
+	if result != nil {
+		rowsAffected = int(result.RowsAffected)
+	}
+	m.safeLogger.QuerySuccess(c, "mssql", "insert", table, duration, rowsAffected)
 	return result, nil
 }
 
@@ -447,7 +492,6 @@ func (m *MSSQL) UpdateQuery(
 	o := dbOpts{
 		builder: m.queryBuilder,
 		querier: m.querier,
-		logger:  m.logger,
 	}
 	return updateQuery(table, data, joins, conditions, opts, o)
 }
@@ -460,6 +504,7 @@ func (m *MSSQL) Update(
 	conditions cdt.Condition,
 	opts *options.QueryOptions,
 ) (*ExecResult, error) {
+	startTime := time.Now()
 	c, span := oh.UseTracer(ctx, "mssql.Update",
 		trace.WithSpanKind(trace.SpanKindClient),
 		trace.WithAttributes(
@@ -471,15 +516,24 @@ func (m *MSSQL) Update(
 	o := dbOpts{
 		builder: m.queryBuilder,
 		querier: m.querier,
-		logger:  m.logger,
 	}
 	result, err := update(c, table, data, joins, conditions, opts, o)
+	duration := time.Since(startTime)
+
 	if err != nil {
 		span.RecordError(err)
 		span.SetStatus(codes.Error, err.Error())
+		m.safeLogger.QueryError(c, "mssql", "update", table, duration, err)
 		return result, err
 	}
+
 	span.SetStatus(codes.Ok, "update successful")
+
+	rowsAffected := int(0)
+	if result != nil {
+		rowsAffected = int(result.RowsAffected)
+	}
+	m.safeLogger.QuerySuccess(c, "mssql", "update", table, duration, rowsAffected)
 	return result, nil
 }
 
@@ -492,7 +546,6 @@ func (m *MSSQL) DeleteQuery(
 	o := dbOpts{
 		builder: m.queryBuilder,
 		querier: m.querier,
-		logger:  m.logger,
 	}
 	return deleteQuery(table, joins, conditions, opts, o)
 }
@@ -504,6 +557,7 @@ func (m *MSSQL) Delete(
 	conditions cdt.Condition,
 	opts *options.QueryOptions,
 ) (*ExecResult, error) {
+	startTime := time.Now()
 	c, span := oh.UseTracer(ctx, "mssql.Delete",
 		trace.WithSpanKind(trace.SpanKindClient),
 		trace.WithAttributes(
@@ -515,15 +569,24 @@ func (m *MSSQL) Delete(
 	o := dbOpts{
 		builder: m.queryBuilder,
 		querier: m.querier,
-		logger:  m.logger,
 	}
 	result, err := delete(c, table, joins, conditions, opts, o)
+	duration := time.Since(startTime)
+
 	if err != nil {
 		span.RecordError(err)
 		span.SetStatus(codes.Error, err.Error())
+		m.safeLogger.QueryError(c, "mssql", "delete", table, duration, err)
 		return result, err
 	}
+
 	span.SetStatus(codes.Ok, "delete successful")
+
+	rowsAffected := int(0)
+	if result != nil {
+		rowsAffected = int(result.RowsAffected)
+	}
+	m.safeLogger.QuerySuccess(c, "mssql", "delete", table, duration, rowsAffected)
 	return result, nil
 }
 
@@ -533,6 +596,7 @@ func (m *MSSQL) Query(
 	query string,
 	args ...any,
 ) ([]map[string]any, error) {
+	startTime := time.Now()
 	c, span := oh.UseTracer(ctx, "mssql.Query",
 		trace.WithSpanKind(trace.SpanKindClient),
 		trace.WithAttributes(
@@ -545,13 +609,12 @@ func (m *MSSQL) Query(
 		err := fmt.Errorf("mssql.Query: failed to execute query: %w", m.errorMapper.MapError(err))
 		span.RecordError(err)
 		span.SetStatus(codes.Error, err.Error())
+		m.safeLogger.Error(fmt.Errorf("mssql.Query: failed to execute query: %w", err))
 		return nil, err
 	}
 	defer func() {
 		if err := rows.Close(); err != nil {
-			if m.logger != nil {
-				m.logger.Error("mssql.Query: failed to close rows", "error", err)
-			}
+			m.safeLogger.Error(fmt.Errorf("mssql.Query: failed to close rows: %w", err))
 		}
 	}()
 
@@ -560,6 +623,7 @@ func (m *MSSQL) Query(
 		err := fmt.Errorf("mssql.Query: failed to get columns: %w", err)
 		span.RecordError(err)
 		span.SetStatus(codes.Error, err.Error())
+		m.safeLogger.Error(fmt.Errorf("mssql.Query: failed to get columns: %w", err))
 		return nil, err
 	}
 
@@ -567,14 +631,20 @@ func (m *MSSQL) Query(
 	if err != nil {
 		span.RecordError(err)
 		span.SetStatus(codes.Error, err.Error())
+
+		m.safeLogger.Error(fmt.Errorf("mssql.Query: failed to scan rows: %w", err))
 		return results, err
 	}
+
+	duration := time.Since(startTime)
 	span.SetStatus(codes.Ok, "query executed")
+	m.safeLogger.QuerySuccess(c, "mssql", "query", "", duration, len(results))
 	return results, nil
 }
 
 //nolint:dupl
 func (m *MSSQL) QueryRaw(ctx context.Context, query string, args ...any) (*RowsAdapter, error) {
+	startTime := time.Now()
 	c, span := oh.UseTracer(ctx, "mssql.QueryRaw",
 		trace.WithSpanKind(trace.SpanKindClient),
 		trace.WithAttributes(
@@ -587,6 +657,7 @@ func (m *MSSQL) QueryRaw(ctx context.Context, query string, args ...any) (*RowsA
 		err := fmt.Errorf("mssql.QueryRaw: failed to execute query: %w", m.errorMapper.MapError(err))
 		span.RecordError(err)
 		span.SetStatus(codes.Error, err.Error())
+		m.safeLogger.Error(fmt.Errorf("mssql.QueryRaw: failed to execute query: %w", err))
 		return nil, err
 	}
 
@@ -595,9 +666,13 @@ func (m *MSSQL) QueryRaw(ctx context.Context, query string, args ...any) (*RowsA
 		err := fmt.Errorf("mssql.QueryRaw: failed to create rows adapter: %w", err)
 		span.RecordError(err)
 		span.SetStatus(codes.Error, err.Error())
+		m.safeLogger.Error(fmt.Errorf("mssql.QueryRaw: failed to create rows adapter: %w", err))
 		return nil, err
 	}
+
+	duration := time.Since(startTime)
 	span.SetStatus(codes.Ok, "query executed")
+	m.safeLogger.QuerySuccess(c, "mssql", "query", "", duration, -1)
 	return ra, nil
 }
 
@@ -606,6 +681,7 @@ func (m *MSSQL) Exec(
 	query string,
 	values ...any,
 ) (*ExecResult, error) {
+	startTime := time.Now()
 	c, span := oh.UseTracer(ctx, "mssql.Exec",
 		trace.WithSpanKind(trace.SpanKindClient),
 		trace.WithAttributes(
@@ -618,10 +694,20 @@ func (m *MSSQL) Exec(
 		err := fmt.Errorf("mssql.Exec: failed to execute query: %w", m.errorMapper.MapError(err))
 		span.RecordError(err)
 		span.SetStatus(codes.Error, err.Error())
+		m.safeLogger.Error(fmt.Errorf("mssql.Exec: failed to execute query: %w", err))
 		return nil, err
 	}
+
+	execResult := fromSQLResult(result)
+	duration := time.Since(startTime)
+
 	span.SetStatus(codes.Ok, "exec completed")
-	return fromSQLResult(result), nil
+	rowsAffected := int(0)
+	if execResult != nil {
+		rowsAffected = int(execResult.RowsAffected)
+	}
+	m.safeLogger.QuerySuccess(c, "mssql", "exec", "", duration, rowsAffected)
+	return execResult, nil
 }
 
 func (m *MSSQL) Explain(
@@ -642,9 +728,12 @@ func (m *MSSQL) Explain(
 		err := fmt.Errorf("mssql.Explain: failed to execute explain query: %w", err)
 		span.RecordError(err)
 		span.SetStatus(codes.Error, err.Error())
+		m.safeLogger.Error(fmt.Errorf("mssql.Explain: failed to execute explain query: %w", err))
 		return nil, err
 	}
+
 	span.SetStatus(codes.Ok, "explain executed")
+	m.safeLogger.Debug("mssql.Explain: explain query executed successfully")
 	return rows, nil
 }
 
@@ -669,13 +758,12 @@ func (m *MSSQL) WithTransaction(ctx context.Context, fn func(tx Tx) error) error
 		var e error
 		if p := recover(); p != nil {
 			e = tx.Rollback(c)
-			if m.logger != nil {
-				m.logger.Error("mssql.WithTransaction: panic in transaction, rolled back", "panic", p, "error", e)
-			}
 			span.RecordError(fmt.Errorf("panic in transaction: %v", p))
 			span.SetStatus(codes.Error, "panic occurred in transaction")
+			//nolint:errorlint
+			m.safeLogger.Error(fmt.Errorf("mssql.WithTransaction: panic occurred: %v, rollback error: %v", p, e))
 		} else if err != nil {
-			e = tx.Rollback(c) // err is non-nil; don't change it
+			e = tx.Rollback(c)
 			if e != nil {
 				err = fmt.Errorf(
 					"mssql.WithTransaction: execution failed with error: %w, transaction rollback: %w",
@@ -686,7 +774,7 @@ func (m *MSSQL) WithTransaction(ctx context.Context, fn func(tx Tx) error) error
 			span.RecordError(err)
 			span.SetStatus(codes.Error, err.Error())
 		} else {
-			err = tx.Commit(c) // err is nil; if Commit returns error update err
+			err = tx.Commit(c)
 			if err != nil {
 				err = fmt.Errorf("mssql.WithTransaction: failed to commit transaction: %w", err)
 				span.RecordError(err)
@@ -717,7 +805,9 @@ func (m *MSSQL) Close() error {
 	return nil
 }
 
+//nolint:dupl
 func (m *MSSQL) Commit(ctx context.Context) error {
+	startTime := time.Now()
 	_, span := oh.UseTracer(ctx, "mssql.Commit",
 		trace.WithSpanKind(trace.SpanKindClient),
 		trace.WithAttributes(
@@ -730,19 +820,26 @@ func (m *MSSQL) Commit(ctx context.Context) error {
 		err := fmt.Errorf("mssql.Commit: underlying db is not *sql.Tx")
 		span.RecordError(err)
 		span.SetStatus(codes.Error, err.Error())
+		m.safeLogger.QueryError(ctx, "mssql", "commit", "", 0, err)
 		return err
 	}
 	if err := sqlTX.Commit(); err != nil {
+		duration := time.Since(startTime)
 		err := fmt.Errorf("mssql.Commit: failed to commit transaction: %w", err)
 		span.RecordError(err)
 		span.SetStatus(codes.Error, err.Error())
+		m.safeLogger.QueryError(ctx, "mssql", "commit", "", duration, err)
 		return err
 	}
+
 	span.SetStatus(codes.Ok, "transaction committed")
+	m.safeLogger.TransactionSuccess(ctx, "mssql", "commit")
 	return nil
 }
 
+//nolint:dupl
 func (m *MSSQL) Rollback(ctx context.Context) error {
+	startTime := time.Now()
 	_, span := oh.UseTracer(ctx, "mssql.Rollback",
 		trace.WithSpanKind(trace.SpanKindClient),
 		trace.WithAttributes(
@@ -755,14 +852,19 @@ func (m *MSSQL) Rollback(ctx context.Context) error {
 		err := fmt.Errorf("mssql.Rollback: underlying db is not *sql.Tx")
 		span.RecordError(err)
 		span.SetStatus(codes.Error, err.Error())
+		m.safeLogger.QueryError(ctx, "mssql", "rollback", "", 0, err)
 		return err
 	}
 	if err := sqlTX.Rollback(); err != nil {
+		duration := time.Since(startTime)
 		err := fmt.Errorf("mssql.Rollback: failed to rollback transaction: %w", err)
 		span.RecordError(err)
 		span.SetStatus(codes.Error, err.Error())
+		m.safeLogger.QueryError(ctx, "mssql", "rollback", "", duration, err)
 		return err
 	}
+
 	span.SetStatus(codes.Ok, "transaction rolled back")
+	m.safeLogger.TransactionSuccess(ctx, "mssql", "rollback")
 	return nil
 }
