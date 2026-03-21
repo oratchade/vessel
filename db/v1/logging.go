@@ -3,6 +3,8 @@ package v1
 
 import (
 	"context"
+	"crypto/rand"
+	"encoding/hex"
 	"fmt"
 	"regexp"
 	"strings"
@@ -410,7 +412,9 @@ func ExtractCorrelationID(ctx context.Context) string {
 // GenerateTransactionID generates a unique transaction ID for tracking.
 // This is used to correlate all operations within a transaction in logs.
 func GenerateTransactionID() string {
-	return fmt.Sprintf("tx_%d_%d", time.Now().UnixNano(), time.Now().Nanosecond())
+	b := make([]byte, 8)
+	rand.Read(b)
+	return fmt.Sprintf("tx_%d_%s", time.Now().UnixNano(), hex.EncodeToString(b))
 }
 
 // SanitizeTableName ensures table name is safe for logging.
