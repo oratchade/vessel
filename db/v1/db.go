@@ -21,7 +21,6 @@ import (
 // ExecResult holds metadata returned by mutation statements such as INSERT,
 // UPDATE and DELETE (last insert id when available and number of rows affected).
 type ExecResult struct {
-	LastInsertID int64
 	RowsAffected int64
 }
 
@@ -39,10 +38,8 @@ type PoolStatistics struct {
 }
 
 func fromSQLResult(res sql.Result) *ExecResult {
-	liid, _ := res.LastInsertId() // ignore unsupported err
 	ra, _ := res.RowsAffected()
 	return &ExecResult{
-		LastInsertID: liid,
 		RowsAffected: ra,
 	}
 }

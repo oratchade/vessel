@@ -55,16 +55,13 @@ func TestExecResult(t *testing.T) {
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
 			mockResult := mockSQLResult{
-				lastInsertID: tc.lastInsID,
 				rowsAffected: tc.rowsAffect,
 			}
 
 			result := &v1.ExecResult{
-				LastInsertID: tc.lastInsID,
 				RowsAffected: tc.rowsAffect,
 			}
 
-			assert.Equal(t, mockResult.lastInsertID, result.LastInsertID)
 			assert.Equal(t, mockResult.rowsAffected, result.RowsAffected)
 		})
 	}

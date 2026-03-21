@@ -79,7 +79,6 @@ func insertExample(ctx context.Context, dm *v1.DBManager) {
 		"name":  "Alice",
 		"email": "alice@example.com",
 	}, nil)
-
 	// Check error first
 	if err != nil {
 		log.Printf("Insert error: %v\n", err)
@@ -88,7 +87,7 @@ func insertExample(ctx context.Context, dm *v1.DBManager) {
 
 	// Use result directly
 	//nolint:gosec
-	log.Printf("✓ Inserted: ID=%v, Rows=%d\n", result.LastInsertID, result.RowsAffected)
+	log.Printf("✓ Rows=%d\n", result.RowsAffected)
 }
 
 // getExample demonstrates fetching multiple rows synchronously
@@ -98,7 +97,6 @@ func getExample(ctx context.Context, dm *v1.DBManager) {
 
 	// Execute synchronous get query
 	data, err := dm.Get(ctx, "users", []string{"id", "name", "email"}, nil, cond, nil)
-
 	// Check error first
 	if err != nil {
 		log.Printf("Get error: %v\n", err)
@@ -123,7 +121,6 @@ func updateExample(ctx context.Context, dm *v1.DBManager) {
 	result, err := dm.Update(ctx, "users", map[string]any{
 		"email": "alice.updated@example.com",
 	}, nil, cond, nil)
-
 	// Check error first
 	if err != nil {
 		log.Printf("Update error: %v\n", err)
@@ -142,7 +139,6 @@ func deleteExample(ctx context.Context, dm *v1.DBManager) {
 
 	// Execute synchronous delete query
 	result, err := dm.Delete(ctx, "users", nil, cond, nil)
-
 	// Check error first
 	if err != nil {
 		log.Printf("Delete error: %v\n", err)

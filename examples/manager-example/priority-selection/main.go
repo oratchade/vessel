@@ -120,7 +120,7 @@ func mixedOperationsExample(ctx context.Context, dm *v1.DBManager) {
 			log.Printf("   INSERT error: %v\n", err)
 		} else {
 			//nolint:gosec
-			log.Printf("   INSERT OK: ID=%v\n", result.LastInsertID)
+			log.Printf("   INSERT OK: ID=%v\n", result.RowsAffected)
 		}
 	}()
 

@@ -26,7 +26,6 @@ import (
 
 func fromCommandTag(tag pgconn.CommandTag) *ExecResult {
 	return &ExecResult{
-		LastInsertID: 0, // use RETURNING if you want this
 		RowsAffected: tag.RowsAffected(),
 	}
 }

@@ -57,7 +57,7 @@ func main() {
 	if err != nil {
 		log.Printf("Insert failed: %v\n", err)
 	} else {
-		log.Printf("Inserted %d rows, ID: %d\n", result.RowsAffected, result.LastInsertID)
+		log.Printf("Inserted %d rows\n", result.RowsAffected)
 	}
 
 	// Example: Query users

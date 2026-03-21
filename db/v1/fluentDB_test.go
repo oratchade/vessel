@@ -722,7 +722,7 @@ func TestInsertBuilderValues(t *testing.T) {
 						assert.Equal(t, 30, data["age"])
 						assert.Equal(t, "john@example.com", data["email"])
 					}
-					return &v1.ExecResult{LastInsertID: 1, RowsAffected: 1}, nil
+					return &v1.ExecResult{RowsAffected: 1}, nil
 				}).Times(1)
 
 			_, _ = builder.Exec()
@@ -752,7 +752,7 @@ func TestInsertBuilderSetMap(t *testing.T) {
 			assert.Equal(t, "John", data["name"])
 			assert.Equal(t, 30, data["age"])
 			assert.Equal(t, "john@example.com", data["email"])
-			return &v1.ExecResult{LastInsertID: 1, RowsAffected: 1}, nil
+			return &v1.ExecResult{RowsAffected: 1}, nil
 		}).Times(1)
 
 	_, _ = builder.Exec()
@@ -781,7 +781,7 @@ func TestInsertBuilderValuesBulk(t *testing.T) {
 			assert.Equal(t, "John", bulkData[0]["name"])
 			assert.Equal(t, "Jane", bulkData[1]["name"])
 			assert.Equal(t, "Bob", bulkData[2]["name"])
-			return &v1.ExecResult{LastInsertID: 1, RowsAffected: 3}, nil
+			return &v1.ExecResult{RowsAffected: 3}, nil
 		}).Times(1)
 
 	_, _ = builder.Exec()
@@ -810,7 +810,7 @@ func TestInsertBuilderExec(t *testing.T) {
 			},
 			mockSetup: func() {
 				db.EXPECT().Insert(ctx, "users", gomock.Any(), nil).
-					Return(&v1.ExecResult{LastInsertID: 1, RowsAffected: 1}, nil).
+					Return(&v1.ExecResult{RowsAffected: 1}, nil).
 					Times(1)
 			},
 			expectError: false,
@@ -884,7 +884,7 @@ func TestInsertBuilderWithTx(t *testing.T) {
 
 	// Verify that subsequent Exec() call uses tx instead of db
 	tx.EXPECT().Insert(ctx, "users", gomock.Any(), nil).
-		Return(&v1.ExecResult{LastInsertID: 1, RowsAffected: 1}, nil).
+		Return(&v1.ExecResult{RowsAffected: 1}, nil).
 		Times(1)
 
 	_, _ = result.Into("users").Set("name", "John").Exec()
@@ -1505,7 +1505,7 @@ func BenchmarkInsertBuilderExecution(b *testing.B) {
 
 	// Mock the Insert method to return immediately
 	db.EXPECT().Insert(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).
-		Return(&v1.ExecResult{LastInsertID: 1, RowsAffected: 1}, nil).
+		Return(&v1.ExecResult{RowsAffected: 1}, nil).
 		AnyTimes()
 
 	b.ResetTimer()
