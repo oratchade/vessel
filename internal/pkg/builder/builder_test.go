@@ -68,6 +68,26 @@ func TestSanitizeColumn(t *testing.T) {
 			expected: `"table"."col" AS "alias"`,
 		},
 		{
+			name:     "function with alias",
+			input:    "COUNT(*) AS count",
+			expected: `COUNT(*) AS "count"`,
+		},
+		{
+			name:     "function with lowercase alias",
+			input:    "count(*) as count",
+			expected: `count(*) AS "count"`,
+		},
+		{
+			name:     "column with lowercase as alias",
+			input:    "col as alias",
+			expected: `"col" AS "alias"`,
+		},
+		{
+			name:     "column with mixed case as alias",
+			input:    "col aS alias",
+			expected: `"col" AS "alias"`,
+		},
+		{
 			name:     "whitespace tolerance",
 			input:    "  table .  col  AS   alias  ",
 			expected: `"table"."col" AS "alias"`,
@@ -94,6 +114,10 @@ func TestSanitizeColumn_MultipleDialects(t *testing.T) {
 		{"qualified column", "table.col", `"table"."col"`},
 		{"multiple parts", "db.schema.table.col", `"db"."schema"."table"."col"`},
 		{"with alias", "col AS alias", `"col" AS "alias"`},
+		{"function with alias", "COUNT(*) AS count", `COUNT(*) AS "count"`},
+		{"function with lowercase alias", "count(*) as count", `count(*) AS "count"`},
+		{"with lowercase alias", "col as alias", `"col" AS "alias"`},
+		{"with mixed case alias", "col aS alias", `"col" AS "alias"`},
 		{"qualified with alias", "table.col AS alias", `"table"."col" AS "alias"`},
 		{"whitespace tolerance", "  table .  col  AS   alias  ", `"table"."col" AS "alias"`},
 		{"all columns", "*", "*"},

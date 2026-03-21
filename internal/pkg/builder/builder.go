@@ -3,6 +3,7 @@ package builder
 
 import (
 	"fmt"
+	"regexp"
 	"sort"
 	"strings"
 
@@ -10,6 +11,8 @@ import (
 	"tounilab.com/fabric/pkg/query/definition"
 	"tounilab.com/fabric/pkg/query/options"
 )
+
+var sqlFunctionPattern = regexp.MustCompile(`(?i)^([a-z_][a-z0-9_]*)\s*\(.*\)$`)
 
 //go:generate mockgen -source=builder.go -destination=builder_mocks.go -package=builder QueryBuilder
 
@@ -172,12 +175,16 @@ func sanitizeColumn(dialect cdt.SQLDialect, column string) string {
 		return "*"
 	}
 
-	if strings.Contains(column, dialect.Operator("AS")) {
-		p := strings.SplitN(column, dialect.Operator("AS"), 2)
-		c, alias = p[0], p[1]
+	asPattern := regexp.MustCompile(`(?i)\s+` + regexp.QuoteMeta(dialect.Operator("AS")) + `\s+`)
+	if loc := asPattern.FindStringIndex(column); loc != nil {
+		c, alias = column[:loc[0]], column[loc[1]:]
 	}
 	if alias != "" {
 		alias = " " + dialect.Operator("AS") + " " + dialect.QuoteIdentifier(strings.TrimSpace(alias))
+	}
+	c = strings.TrimSpace(c)
+	if sqlFunctionPattern.MatchString(c) {
+		return fmt.Sprintf("%s%s", c, alias)
 	}
 	if strings.Contains(c, ".") {
 		parts := []string{}

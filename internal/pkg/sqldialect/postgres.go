@@ -23,6 +23,8 @@ func (d PostgresDialect) Placeholder(index int) string {
 //nolint:cyclop
 func (d PostgresDialect) Operator(op string) string {
 	switch strings.ToLower(op) {
+	case operator.As:
+		return "AS"
 	case operator.Equal:
 		return "="
 	case operator.NotEqual:

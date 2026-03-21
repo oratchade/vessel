@@ -6,6 +6,7 @@ package operator
 // are mapped to dialect-specific SQL by the builder layer.
 
 const (
+	As                      = "as"
 	Equal                   = "eq"
 	NotEqual                = "neq"
 	LowerThan               = "lt"

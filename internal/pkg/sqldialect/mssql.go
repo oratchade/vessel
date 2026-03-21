@@ -23,6 +23,8 @@ func (d MSSQLDialect) Placeholder(index int) string {
 //nolint:cyclop
 func (d MSSQLDialect) Operator(op string) string {
 	switch strings.ToLower(op) {
+	case operator.As:
+		return "AS"
 	case operator.Equal:
 		return "="
 	case operator.NotEqual:

@@ -22,6 +22,8 @@ func (d MySQLDialect) Placeholder(_ int) string {
 //nolint:cyclop
 func (d MySQLDialect) Operator(op string) string {
 	switch strings.ToLower(op) {
+	case operator.As:
+		return "AS"
 	case operator.Equal:
 		return "="
 	case operator.NotEqual:
