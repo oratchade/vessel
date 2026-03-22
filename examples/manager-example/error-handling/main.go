@@ -4,9 +4,11 @@ import (
 	"context"
 	"errors"
 	"log"
+	"log/slog"
 	"os"
 	"time"
 
+	dbv1 "tounilab.com/fabric/db/v1"
 	"tounilab.com/fabric/db/v1/dberror"
 	v1 "tounilab.com/fabric/manager/v1"
 )
@@ -31,7 +33,9 @@ func main() {
 		configPath = os.Args[1]
 	}
 
-	dm, err := v1.NewDBManager(ctx, configPath)
+	logger := slog.New(slog.NewJSONHandler(os.Stdout, nil))
+	adapter := dbv1.NewSlogAdapter(logger)
+	dm, err := v1.NewDBManager(ctx, configPath, adapter)
 	if err != nil {
 		log.Fatalf("Failed to create DBManager: %v", err)
 	}
