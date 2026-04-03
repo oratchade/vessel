@@ -6,6 +6,7 @@ package tests
 import (
 	"context"
 	"fmt"
+	"os"
 	"testing"
 	"time"
 
@@ -17,6 +18,14 @@ import (
 	v1 "tounilab.com/fabric/db/v1"
 	"tounilab.com/fabric/pkg/query/condition"
 )
+
+// getEnv retrieves environment variable with fallback default
+func getEnv(key, defaultVal string) string {
+	if val := os.Getenv(key); val != "" {
+		return val
+	}
+	return defaultVal
+}
 
 const (
 	inactiveStatus = "inactive"
@@ -60,11 +69,11 @@ var testDatabases = []TestDB{
 		name:   "MySQL",
 		driver: "mysql",
 		config: v1.MysqlConfig{
-			User:            "root",
-			Password:        "root_password",
-			Host:            "localhost",
+			User:            getEnv("DB_MYSQL_USER", "root"),
+			Password:        getEnv("DB_MYSQL_PASSWORD", "root_password"),
+			Host:            getEnv("DB_MYSQL_HOST", "localhost"),
 			Port:            3306,
-			Database:        "test_db",
+			Database:        getEnv("DB_MYSQL_DATABASE", "test_db"),
 			Charset:         "utf8mb4",
 			ParseTime:       true,
 			Loc:             "Local",
@@ -81,11 +90,11 @@ var testDatabases = []TestDB{
 		name:   "PostgreSQL",
 		driver: "postgres",
 		config: v1.PostgresConfig{
-			User:           "test_user",
-			Password:       "test_password",
-			Host:           "localhost",
+			User:           getEnv("DB_POSTGRES_USER", "test_user"),
+			Password:       getEnv("DB_POSTGRES_PASSWORD", "test_password"),
+			Host:           getEnv("DB_POSTGRES_HOST", "localhost"),
 			Port:           5432,
-			Database:       "test_db",
+			Database:       getEnv("DB_POSTGRES_DATABASE", "test_db"),
 			SSLMode:        "disable",
 			ConnectTimeout: 10 * time.Second,
 			PoolMaxConns:   10,
@@ -97,11 +106,11 @@ var testDatabases = []TestDB{
 		name:   "MSSQL",
 		driver: "sqlserver",
 		config: v1.MSSQLConfig{
-			User:            "sa",
-			Password:        "TestPassword123!",
-			Host:            "localhost",
+			User:            getEnv("DB_MSSQL_USER", "sa"),
+			Password:        getEnv("DB_MSSQL_PASSWORD", "TestPassword123!"),
+			Host:            getEnv("DB_MSSQL_HOST", "localhost"),
 			Port:            1433,
-			Database:        "test_db",
+			Database:        getEnv("DB_MSSQL_DATABASE", "test_db"),
 			Encrypt:         "disable",
 			TrustServerCert: true,
 			MaxOpenConns:    10,
