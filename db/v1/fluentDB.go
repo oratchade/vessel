@@ -785,7 +785,37 @@ func (u *UpdateBuilder) Exec() (*ExecResult, error) {
 	}
 	if u.conditions == nil {
 		return nil, fmt.Errorf(
-			"updateBuilder: WHERE condition required (use Where method or call DeleteAll for unfiltered delete)")
+			"updateBuilder: WHERE condition required (use Where method or call UpdateAll for unfiltered update)")
+	}
+	result, err := u.db.Update(u.ctx, u.table, u.data, u.joins, u.conditions, u.opts)
+	if err != nil {
+		return nil, fmt.Errorf("updateBuilder: failed to update rows: %w", err)
+	}
+	return result, nil
+}
+
+// UpdateAll executes an UPDATE query without a WHERE condition.
+// ⚠️ WARNING: This updates ALL rows in the table. Use with extreme caution.
+// Requires explicit method call to prevent accidental data loss.
+//
+// Returns:
+//
+//	*ExecResult: The result of the update operation (RowsAffected).
+//	error: An error if the update fails.
+//
+// Example:
+//
+//	// Update all users' status field
+//	result, err := NewFluentDB(db, ctx).
+//	    Update("users").
+//	    Set("status", "inactive").
+//	    UpdateAll()  // No WHERE clause
+func (u *UpdateBuilder) UpdateAll() (*ExecResult, error) {
+	if u.table == "" {
+		return nil, fmt.Errorf("updateBuilder: table not specified")
+	}
+	if len(u.data) == 0 {
+		return nil, fmt.Errorf("updateBuilder: no data to update")
 	}
 	result, err := u.db.Update(u.ctx, u.table, u.data, u.joins, u.conditions, u.opts)
 	if err != nil {
@@ -968,6 +998,39 @@ func (d *DeleteBuilder) Exec() (*ExecResult, error) {
 	if d.conditions == nil {
 		return nil, fmt.Errorf(
 			"deleteBuilder: WHERE condition required (use Where method or call DeleteAll for unfiltered delete)")
+	}
+	result, err := d.db.Delete(d.ctx, d.table, d.joins, d.conditions, d.opts)
+	if err != nil {
+		return nil, fmt.Errorf("deleteBuilder: failed to delete rows: %w", err)
+	}
+	return result, nil
+}
+
+// DeleteAll executes a DELETE query without a WHERE condition.
+// ⚠️ WARNING: This deletes ALL rows in the table. Use with extreme caution.
+// Requires explicit method call to prevent accidental data loss.
+//
+// Returns:
+//
+//	*ExecResult: The result of the delete operation (RowsAffected).
+//	error: An error if the delete fails.
+//
+// Example:
+//
+//	// Delete all inactive users
+//	result, err := NewFluentDB(db, ctx).
+//	    Delete().
+//	    From("users").
+//	    Where(cdt.NewExpr().Column("status").Op("=").Value("inactive")).
+//	    Exec()
+//	// For truly unfiltered delete:
+//	result, err := NewFluentDB(db, ctx).
+//	    Delete().
+//	    From("users").
+//	    DeleteAll()  // No WHERE clause
+func (d *DeleteBuilder) DeleteAll() (*ExecResult, error) {
+	if d.table == "" {
+		return nil, fmt.Errorf("deleteBuilder: table not specified")
 	}
 	result, err := d.db.Delete(d.ctx, d.table, d.joins, d.conditions, d.opts)
 	if err != nil {

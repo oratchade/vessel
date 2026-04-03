@@ -1310,6 +1310,179 @@ func TestDeleteBuilderWithTx(t *testing.T) {
 	_, _ = result.From("users").Where(cdt.NewExpr().Column("id").Op("=").Value(1)).Exec()
 }
 
+// TestUpdateBuilderUpdateAll tests the UpdateAll method for unfiltered updates
+func TestUpdateBuilderUpdateAll(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	db := v1.NewMockDBActions(ctrl)
+	ctx := context.Background()
+	fluentDB := v1.NewFluentDB(db, ctx)
+
+	testCases := []struct {
+		name          string
+		setup         func(*v1.UpdateBuilder) *v1.UpdateBuilder
+		mockSetup     func()
+		expectError   bool
+		expectedError string
+	}{
+		{
+			name: "successful update all - no where condition",
+			setup: func(b *v1.UpdateBuilder) *v1.UpdateBuilder {
+				return b.Set("status", "active")
+			},
+			mockSetup: func() {
+				db.EXPECT().Update(ctx, "users", gomock.Any(), nil, nil, nil).
+					Return(&v1.ExecResult{RowsAffected: 100}, nil).
+					Times(1)
+			},
+			expectError: false,
+		},
+		{
+			name: "update all with existing where condition is ignored",
+			setup: func(b *v1.UpdateBuilder) *v1.UpdateBuilder {
+				return b.Set("status", "inactive").Where(cdt.NewExpr().Column("id").Op(">").Value(50))
+			},
+			mockSetup: func() {
+				db.EXPECT().Update(ctx, "users", gomock.Any(), nil, gomock.Any(), nil).
+					Return(&v1.ExecResult{RowsAffected: 100}, nil).
+					Times(1)
+			},
+			expectError: false,
+		},
+		{
+			name: "no table specified",
+			setup: func(b *v1.UpdateBuilder) *v1.UpdateBuilder {
+				return fluentDB.Update("").Set("status", "active")
+			},
+			mockSetup:     func() {},
+			expectError:   true,
+			expectedError: "table not specified",
+		},
+		{
+			name: "no data to update",
+			setup: func(b *v1.UpdateBuilder) *v1.UpdateBuilder {
+				return b
+			},
+			mockSetup:     func() {},
+			expectError:   true,
+			expectedError: "no data to update",
+		},
+		{
+			name: "database error",
+			setup: func(b *v1.UpdateBuilder) *v1.UpdateBuilder {
+				return b.Set("status", "active")
+			},
+			mockSetup: func() {
+				db.EXPECT().Update(ctx, "users", gomock.Any(), nil, nil, nil).
+					Return(nil, errors.New("update failed")).
+					Times(1)
+			},
+			expectError: true,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			tc.mockSetup()
+			builder := tc.setup(fluentDB.Update("users"))
+			result, err := builder.UpdateAll()
+
+			if tc.expectError {
+				assert.Error(t, err)
+				assert.Contains(t, err.Error(), tc.expectedError)
+				assert.Nil(t, result)
+			} else {
+				assert.NoError(t, err)
+				assert.NotNil(t, result)
+				assert.Greater(t, result.RowsAffected, int64(0))
+			}
+		})
+	}
+}
+
+// TestDeleteBuilderDeleteAll tests the DeleteAll method for unfiltered deletes
+func TestDeleteBuilderDeleteAll(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	db := v1.NewMockDBActions(ctrl)
+	ctx := context.Background()
+	fluentDB := v1.NewFluentDB(db, ctx)
+
+	testCases := []struct {
+		name          string
+		setup         func(*v1.DeleteBuilder) *v1.DeleteBuilder
+		mockSetup     func()
+		expectError   bool
+		expectedError string
+	}{
+		{
+			name: "successful delete all - no where condition",
+			setup: func(b *v1.DeleteBuilder) *v1.DeleteBuilder {
+				return b.From("users")
+			},
+			mockSetup: func() {
+				db.EXPECT().Delete(ctx, "users", nil, nil, nil).
+					Return(&v1.ExecResult{RowsAffected: 100}, nil).
+					Times(1)
+			},
+			expectError: false,
+		},
+		{
+			name: "delete all with existing where condition is ignored",
+			setup: func(b *v1.DeleteBuilder) *v1.DeleteBuilder {
+				return b.From("users").Where(cdt.NewExpr().Column("status").Op("=").Value("inactive"))
+			},
+			mockSetup: func() {
+				db.EXPECT().Delete(ctx, "users", nil, gomock.Any(), nil).
+					Return(&v1.ExecResult{RowsAffected: 100}, nil).
+					Times(1)
+			},
+			expectError: false,
+		},
+		{
+			name: "no table specified",
+			setup: func(b *v1.DeleteBuilder) *v1.DeleteBuilder {
+				return b
+			},
+			mockSetup:     func() {},
+			expectError:   true,
+			expectedError: "table not specified",
+		},
+		{
+			name: "database error",
+			setup: func(b *v1.DeleteBuilder) *v1.DeleteBuilder {
+				return b.From("users")
+			},
+			mockSetup: func() {
+				db.EXPECT().Delete(ctx, "users", nil, nil, nil).
+					Return(nil, errors.New("delete failed")).
+					Times(1)
+			},
+			expectError: true,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			tc.mockSetup()
+			builder := tc.setup(fluentDB.Delete())
+			result, err := builder.DeleteAll()
+
+			if tc.expectError {
+				assert.Error(t, err)
+				assert.Contains(t, err.Error(), tc.expectedError)
+				assert.Nil(t, result)
+			} else {
+				assert.NoError(t, err)
+				assert.NotNil(t, result)
+				assert.Greater(t, result.RowsAffected, int64(0))
+			}
+		})
+	}
+}
+
 // Helper function
 func intPtr(i int) *int {
 	return &i

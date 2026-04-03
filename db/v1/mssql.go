@@ -1,4 +1,7 @@
-// Package db provides database abstraction interfaces and implementations for multiple database engines.
+// Package db provides a high-performance abstraction layer for Microsoft SQL Server 2016+,
+// with support for parameterized queries, connection pooling via go-mssqldb,
+// automatic identifier quoting using square brackets ([]), and T-SQL specific
+// features like @@IDENTITY, WAITFOR clauses, and table-valued parameters.
 package v1
 
 import (

@@ -1,4 +1,7 @@
-// Package db provides database abstraction interfaces and implementations for multiple database engines.
+// Package db provides a lightweight abstraction layer for SQLite 3.x,
+// optimized for embedded and serverless use cases. Supports in-memory databases,
+// file-backed persistence, automatic identifier quoting with no special characters,
+// and seamless foreign key enforcement. Ideal for local development and edge deployment.
 package v1
 
 import (

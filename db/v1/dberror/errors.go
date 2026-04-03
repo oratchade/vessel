@@ -34,6 +34,14 @@ import (
 	"strings"
 )
 
+const (
+	// Database prefix identifiers for error messages
+	MySQLPrefix    = "[mysql]"
+	PostgresPrefix = "[postgres]"
+	SQLitePrefix   = "[sqlite]"
+	MSSQLPrefix    = "[mssql]"
+)
+
 var (
 	// ErrNotFound is returned when a query returns no rows.
 	ErrNotFound = errors.New("record not found")
@@ -68,10 +76,16 @@ type ErrorMapper interface {
 	MapError(err error) error
 }
 
+// wrapError wraps a sentinel error with database prefix and original error.
+// This provides clear context about which database reported the error.
+func wrapError(prefix string, sentinel, original error) error {
+	return fmt.Errorf("%s %w: %w", prefix, sentinel, original)
+}
+
 // MySQLErrorMapper maps MySQL error codes to sentinel errors.
 type MySQLErrorMapper struct{}
 
-// MapError maps MySQL error codes to sentinel errors.
+// MapError maps MySQL error codes to sentinel errors with [mysql] prefix.
 func (m MySQLErrorMapper) MapError(err error) error {
 	if err == nil {
 		return nil
@@ -80,23 +94,23 @@ func (m MySQLErrorMapper) MapError(err error) error {
 	errMsg := err.Error()
 
 	if checkMySQLDuplicateKey(errMsg) {
-		return fmt.Errorf("%w: %w", ErrDuplicateKey, err)
+		return wrapError(MySQLPrefix, ErrDuplicateKey, err)
 	}
 
 	if checkMySQLForeignKey(errMsg) {
-		return fmt.Errorf("%w: %w", ErrForeignKeyViolation, err)
+		return wrapError(MySQLPrefix, ErrForeignKeyViolation, err)
 	}
 
 	if checkMySQLConnection(errMsg) {
-		return fmt.Errorf("%w: %w", ErrConnectionFailed, err)
+		return wrapError(MySQLPrefix, ErrConnectionFailed, err)
 	}
 
 	if checkMySQLSyntaxError(errMsg) {
-		return fmt.Errorf("%w: %w", ErrSyntaxError, err)
+		return wrapError(MySQLPrefix, ErrSyntaxError, err)
 	}
 
 	if checkMySQLTimeout(errMsg) {
-		return fmt.Errorf("%w: %w", ErrQueryTimeout, err)
+		return wrapError(MySQLPrefix, ErrQueryTimeout, err)
 	}
 
 	return err
@@ -105,7 +119,7 @@ func (m MySQLErrorMapper) MapError(err error) error {
 // PostgresErrorMapper maps PostgreSQL SQLSTATE codes to sentinel errors.
 type PostgresErrorMapper struct{}
 
-// MapError maps PostgreSQL error codes to sentinel errors.
+// MapError maps PostgreSQL error codes to sentinel errors with [postgres] prefix.
 func (m PostgresErrorMapper) MapError(err error) error {
 	if err == nil {
 		return nil
@@ -114,23 +128,23 @@ func (m PostgresErrorMapper) MapError(err error) error {
 	errMsg := err.Error()
 
 	if checkPostgresDuplicateKey(errMsg) {
-		return fmt.Errorf("%w: %w", ErrDuplicateKey, err)
+		return wrapError(PostgresPrefix, ErrDuplicateKey, err)
 	}
 
 	if checkPostgresForeignKey(errMsg) {
-		return fmt.Errorf("%w: %w", ErrForeignKeyViolation, err)
+		return wrapError(PostgresPrefix, ErrForeignKeyViolation, err)
 	}
 
 	if checkPostgresConnection(errMsg) {
-		return fmt.Errorf("%w: %w", ErrConnectionFailed, err)
+		return wrapError(PostgresPrefix, ErrConnectionFailed, err)
 	}
 
 	if checkPostgresSyntaxError(errMsg) {
-		return fmt.Errorf("%w: %w", ErrSyntaxError, err)
+		return wrapError(PostgresPrefix, ErrSyntaxError, err)
 	}
 
 	if checkPostgresTimeout(errMsg) {
-		return fmt.Errorf("%w: %w", ErrQueryTimeout, err)
+		return wrapError(PostgresPrefix, ErrQueryTimeout, err)
 	}
 
 	return err
@@ -139,7 +153,7 @@ func (m PostgresErrorMapper) MapError(err error) error {
 // SQLiteErrorMapper maps SQLite error messages to sentinel errors.
 type SQLiteErrorMapper struct{}
 
-// MapError maps SQLite error messages to sentinel errors.
+// MapError maps SQLite error messages to sentinel errors with [sqlite] prefix.
 func (m SQLiteErrorMapper) MapError(err error) error {
 	if err == nil {
 		return nil
@@ -150,27 +164,27 @@ func (m SQLiteErrorMapper) MapError(err error) error {
 	// SQLite uses string error messages
 	// UNIQUE constraint failed
 	if strings.Contains(errMsg, "UNIQUE constraint failed") {
-		return fmt.Errorf("%w: %w", ErrDuplicateKey, err)
+		return wrapError(SQLitePrefix, ErrDuplicateKey, err)
 	}
 
 	// FOREIGN KEY constraint failed
 	if strings.Contains(errMsg, "FOREIGN KEY constraint failed") || strings.Contains(errMsg, "foreign key constraint") {
-		return fmt.Errorf("%w: %w", ErrForeignKeyViolation, err)
+		return wrapError(SQLitePrefix, ErrForeignKeyViolation, err)
 	}
 
 	// Connection errors
 	if strings.Contains(errMsg, "unable to open database") || strings.Contains(errMsg, "cannot open") {
-		return fmt.Errorf("%w: %w", ErrConnectionFailed, err)
+		return wrapError(SQLitePrefix, ErrConnectionFailed, err)
 	}
 
 	// Syntax errors
 	if strings.Contains(errMsg, "syntax error") {
-		return fmt.Errorf("%w: %w", ErrSyntaxError, err)
+		return wrapError(SQLitePrefix, ErrSyntaxError, err)
 	}
 
 	// Query timeout
 	if strings.Contains(errMsg, "deadline exceeded") || strings.Contains(errMsg, "query timeout") {
-		return fmt.Errorf("%w: %w", ErrQueryTimeout, err)
+		return wrapError(SQLitePrefix, ErrQueryTimeout, err)
 	}
 
 	return err
@@ -231,7 +245,7 @@ func checkPostgresTimeout(errMsg string) bool {
 // MSSQLErrorMapper maps SQL Server error codes to sentinel errors.
 type MSSQLErrorMapper struct{}
 
-// MapError maps MSSQL error codes to sentinel errors.
+// MapError maps MSSQL error codes to sentinel errors with [mssql] prefix.
 func (m MSSQLErrorMapper) MapError(err error) error {
 	if err == nil {
 		return nil
@@ -240,23 +254,23 @@ func (m MSSQLErrorMapper) MapError(err error) error {
 	errMsg := err.Error()
 
 	if checkMSSQLDuplicateKey(errMsg) {
-		return fmt.Errorf("%w: %w", ErrDuplicateKey, err)
+		return wrapError(MSSQLPrefix, ErrDuplicateKey, err)
 	}
 
 	if checkMSSQLForeignKey(errMsg) {
-		return fmt.Errorf("%w: %w", ErrForeignKeyViolation, err)
+		return wrapError(MSSQLPrefix, ErrForeignKeyViolation, err)
 	}
 
 	if checkMSSQLConnection(errMsg) {
-		return fmt.Errorf("%w: %w", ErrConnectionFailed, err)
+		return wrapError(MSSQLPrefix, ErrConnectionFailed, err)
 	}
 
 	if checkMSSQLSyntaxError(errMsg) {
-		return fmt.Errorf("%w: %w", ErrSyntaxError, err)
+		return wrapError(MSSQLPrefix, ErrSyntaxError, err)
 	}
 
 	if checkMSSQLTimeout(errMsg) {
-		return fmt.Errorf("%w: %w", ErrQueryTimeout, err)
+		return wrapError(MSSQLPrefix, ErrQueryTimeout, err)
 	}
 
 	return err

@@ -566,8 +566,13 @@ func ScanRowsTo[T any](ctx context.Context, ra *RowsAdapter) ([]T, error) {
 		return nil, err
 	}
 
-	// build mapping column -> struct field index
-	fieldMap := buildFieldMap(tType)
+	fieldMap := globalFieldMapCache.get(tType)
+
+	// pre-compute lowercase column names to avoid repeated string operations
+	lowerCols := make([]string, len(cols))
+	for i, col := range cols {
+		lowerCols[i] = strings.ToLower(col)
+	}
 
 	for ra.next() {
 		if err := ra.scan(ptrs...); err != nil {
@@ -591,7 +596,7 @@ func ScanRowsTo[T any](ctx context.Context, ra *RowsAdapter) ([]T, error) {
 			if raw == nil {
 				continue
 			}
-			colKey := strings.ToLower(col)
+			colKey := lowerCols[i]
 			if fi, ok := fieldMap[colKey]; ok {
 				f := itemVal.Field(fi)
 				if !f.CanSet() {

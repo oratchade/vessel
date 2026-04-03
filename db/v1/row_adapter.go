@@ -8,9 +8,50 @@ import (
 	"reflect"
 	"strconv"
 	"strings"
+	"sync"
 
 	"github.com/jackc/pgx/v5"
 )
+
+// fieldMapCache stores a global cache of reflect.Type to field map mappings.
+// This improves performance by avoiding repeated reflection work for the same struct type.
+type fieldMapCache struct {
+	mu sync.RWMutex
+	m  map[reflect.Type]map[string]int
+}
+
+// globalFieldMapCache is a singleton cache for field maps.
+//
+//nolint:gochecknoglobals
+var globalFieldMapCache = &fieldMapCache{
+	m: make(map[reflect.Type]map[string]int),
+}
+
+// get retrieves a cached field map for the given type, or builds and caches it if not found.
+func (fmc *fieldMapCache) get(tType reflect.Type) map[string]int {
+	// Fast path: try read lock first
+	fmc.mu.RLock()
+	if fieldMap, ok := fmc.m[tType]; ok {
+		fmc.mu.RUnlock()
+		return fieldMap
+	}
+	fmc.mu.RUnlock()
+
+	// Slow path: build and cache
+	fieldMap := buildFieldMap(tType)
+
+	// Write to cache with write lock
+	fmc.mu.Lock()
+	// Double-check after acquiring write lock
+	if existing, ok := fmc.m[tType]; ok {
+		fmc.mu.Unlock()
+		return existing
+	}
+	fmc.m[tType] = fieldMap
+	fmc.mu.Unlock()
+
+	return fieldMap
+}
 
 // RowsAdapter provides a small wrapper around driver-specific Rows types so
 // callers can use a unified API (Next, Scan, Err, Columns).
@@ -387,4 +428,25 @@ func setFieldFromValue(f reflect.Value, cv any) error {
 	}
 
 	return nil
+}
+
+// GetFieldMapCacheForTest returns the global field map cache for testing purposes.
+// This function is only available during tests.
+func GetFieldMapCacheForTest() *fieldMapCacheTest {
+	return &fieldMapCacheTest{cache: globalFieldMapCache}
+}
+
+// fieldMapCacheTest is a test wrapper around fieldMapCache that exposes the Get method.
+type fieldMapCacheTest struct {
+	cache *fieldMapCache
+}
+
+// Get retrieves a field map from the cache, building and caching it if necessary.
+func (fct *fieldMapCacheTest) Get(tType reflect.Type) map[string]int {
+	return fct.cache.get(tType)
+}
+
+// BuildFieldMapForTest exposes the buildFieldMap function for testing.
+func BuildFieldMapForTest(tType reflect.Type) map[string]int {
+	return buildFieldMap(tType)
 }

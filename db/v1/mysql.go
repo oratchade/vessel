@@ -1,4 +1,7 @@
-// Package db provides database abstraction interfaces and implementations for multiple database engines.
+// Package db provides a high-performance abstraction layer for MySQL 5.7+,
+// with support for parameterized queries, connection pooling via standard library,
+// and automatic identifier quoting using backticks (`). Optimized for InnoDB
+// with support for JSON columns, generated columns, COLLATE clauses, and XA transactions.
 package v1
 
 import (

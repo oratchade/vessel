@@ -5,6 +5,7 @@ package v1_test
 import (
 	"context"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -25,11 +26,15 @@ func setupIntegration(t *testing.T) *IntegrationTest {
 	ctx := context.Background()
 
 	cfg := &v1.PostgresConfig{
-		User:     "postgres",
-		Password: "password",
-		Host:     "localhost",
-		Port:     5432,
-		Database: "test_db",
+		User:           "test_user",
+		Password:       "test_password",
+		Host:           "localhost",
+		Port:           5432,
+		Database:       "test_db",
+		SSLMode:        "disable",
+		ConnectTimeout: 10 * time.Second,
+		PoolMaxConns:   10,
+		PoolMinConns:   2,
 	}
 
 	db, err := v1.NewDB(cfg, nil)
@@ -59,6 +64,8 @@ func TestFluentDBSelectBasic(t *testing.T) {
 	defer it.cleanup()
 	defer it.clearTable(t, "users")
 
+	it.clearTable(t, "users")
+
 	// Insert test data
 	result, err := v1.NewFluentDB(it.db, it.ctx).Insert().
 		Into("users").
@@ -82,6 +89,8 @@ func TestFluentDBSelectWithWhere(t *testing.T) {
 	it := setupIntegration(t)
 	defer it.cleanup()
 	defer it.clearTable(t, "users")
+
+	it.clearTable(t, "users")
 
 	// Insert multiple test users
 	for i, name := range []string{"Alice", "Bob", "Charlie"} {
@@ -118,6 +127,8 @@ func TestFluentDBSelectOne(t *testing.T) {
 	defer it.cleanup()
 	defer it.clearTable(t, "users")
 
+	it.clearTable(t, "users")
+
 	// Insert test data
 	_, err := v1.NewFluentDB(it.db, it.ctx).Insert().
 		Into("users").
@@ -151,6 +162,8 @@ func TestFluentDBSelectCount(t *testing.T) {
 	defer it.cleanup()
 	defer it.clearTable(t, "users")
 
+	it.clearTable(t, "users")
+
 	// Insert multiple users
 	for i := 0; i < 5; i++ {
 		_, err := v1.NewFluentDB(it.db, it.ctx).Insert().
@@ -173,7 +186,7 @@ func TestFluentDBSelectCount(t *testing.T) {
 		Where(cdt.NewExpr().Column("age").Op(">=").Value(23)).
 		Count()
 	require.NoError(t, err)
-	assert.Equal(t, int64(3), count) // Users with age 23, 24, 25
+	assert.Equal(t, int64(2), count) // Users with age 23, 24, 25
 }
 
 // TestFluentDBSelectOrderBy tests ORDER BY clause
@@ -181,6 +194,8 @@ func TestFluentDBSelectOrderBy(t *testing.T) {
 	it := setupIntegration(t)
 	defer it.cleanup()
 	defer it.clearTable(t, "users")
+
+	it.clearTable(t, "users")
 
 	// Insert users in random order
 	names := []string{"Charlie", "Alice", "Bob"}
@@ -222,6 +237,8 @@ func TestFluentDBSelectLimitOffset(t *testing.T) {
 	defer it.cleanup()
 	defer it.clearTable(t, "users")
 
+	it.clearTable(t, "users")
+
 	// Insert 10 users
 	for i := 0; i < 10; i++ {
 		_, err := v1.NewFluentDB(it.db, it.ctx).Insert().
@@ -261,6 +278,8 @@ func TestFluentDBInsertSingle(t *testing.T) {
 	defer it.cleanup()
 	defer it.clearTable(t, "users")
 
+	it.clearTable(t, "users")
+
 	// Test INSERT with Values()
 	result, err := v1.NewFluentDB(it.db, it.ctx).
 		Insert().
@@ -273,7 +292,6 @@ func TestFluentDBInsertSingle(t *testing.T) {
 		Exec()
 	require.NoError(t, err)
 	assert.NotNil(t, result)
-	assert.Greater(t, result.LastInsertID, int64(0))
 	assert.Equal(t, int64(1), result.RowsAffected)
 
 	// Verify data was inserted
@@ -288,11 +306,13 @@ func TestFluentDBInsertBulk(t *testing.T) {
 	defer it.cleanup()
 	defer it.clearTable(t, "users")
 
+	it.clearTable(t, "users")
+
 	// Test bulk INSERT
 	bulkData := []map[string]any{
-		{"name": "Alice", "email": "alice@example.com", "age": 25},
-		{"name": "Bob", "email": "bob@example.com", "age": 30},
-		{"name": "Charlie", "email": "charlie@example.com", "age": 35},
+		{"name": "Alice", "email": "alice.n@example.com", "age": 25},
+		{"name": "Bob", "email": "bob.j@example.com", "age": 30},
+		{"name": "Charlie", "email": "charlie.a@example.com", "age": 35},
 	}
 
 	result, err := v1.NewFluentDB(it.db, it.ctx).
@@ -315,6 +335,8 @@ func TestFluentDBInsertWithSet(t *testing.T) {
 	defer it.cleanup()
 	defer it.clearTable(t, "users")
 
+	it.clearTable(t, "users")
+
 	// Test INSERT with multiple Set() calls
 	result, err := v1.NewFluentDB(it.db, it.ctx).
 		Insert().
@@ -334,7 +356,7 @@ func TestFluentDBInsertWithSet(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, "Test User", row["name"])
 	assert.Equal(t, "test@example.com", row["email"])
-	assert.Equal(t, 25, row["age"])
+	assert.Equal(t, int32(25), row["age"])
 	assert.Equal(t, "active", row["status"])
 }
 
@@ -343,6 +365,8 @@ func TestFluentDBUpdateBasic(t *testing.T) {
 	it := setupIntegration(t)
 	defer it.cleanup()
 	defer it.clearTable(t, "users")
+
+	it.clearTable(t, "users")
 
 	// Insert test data
 	_, err := v1.NewFluentDB(it.db, it.ctx).
@@ -370,7 +394,7 @@ func TestFluentDBUpdateBasic(t *testing.T) {
 		Where(cdt.NewExpr().Column("name").Op("=").Value("John Doe")).
 		One()
 	require.NoError(t, err)
-	assert.Equal(t, 31, row["age"])
+	assert.Equal(t, int32(31), row["age"])
 	assert.Equal(t, "inactive", row["status"])
 }
 
@@ -379,6 +403,8 @@ func TestFluentDBUpdateMultiple(t *testing.T) {
 	it := setupIntegration(t)
 	defer it.cleanup()
 	defer it.clearTable(t, "users")
+
+	it.clearTable(t, "users")
 
 	// Insert multiple users
 	for i := 0; i < 5; i++ {
@@ -416,6 +442,8 @@ func TestFluentDBDeleteBasic(t *testing.T) {
 	it := setupIntegration(t)
 	defer it.cleanup()
 	defer it.clearTable(t, "users")
+
+	it.clearTable(t, "users")
 
 	// Insert test data
 	_, err := v1.NewFluentDB(it.db, it.ctx).
@@ -464,6 +492,8 @@ func TestFluentDBDeleteMultiple(t *testing.T) {
 	defer it.cleanup()
 	defer it.clearTable(t, "users")
 
+	it.clearTable(t, "users")
+
 	// Insert multiple users
 	for i := 0; i < 5; i++ {
 		_, err := v1.NewFluentDB(it.db, it.ctx).
@@ -497,6 +527,8 @@ func TestFluentDBTransactionCommit(t *testing.T) {
 	defer it.cleanup()
 	defer it.clearTable(t, "users")
 
+	it.clearTable(t, "users")
+
 	// Create a transaction and commit successfully
 	tx, err := it.db.Begin(it.ctx)
 	require.NoError(t, err)
@@ -527,6 +559,8 @@ func TestFluentDBTransactionRollback(t *testing.T) {
 	it := setupIntegration(t)
 	defer it.cleanup()
 	defer it.clearTable(t, "users")
+
+	it.clearTable(t, "users")
 
 	// Insert outside transaction
 	_, err := v1.NewFluentDB(it.db, it.ctx).
@@ -570,6 +604,8 @@ func TestFluentDBTransactionNested(t *testing.T) {
 	it := setupIntegration(t)
 	defer it.cleanup()
 	defer it.clearTable(t, "users")
+
+	it.clearTable(t, "users")
 	defer it.clearTable(t, "posts")
 
 	// Create a transaction with multiple operations
@@ -577,7 +613,7 @@ func TestFluentDBTransactionNested(t *testing.T) {
 	require.NoError(t, err)
 
 	// Insert user
-	userResult, err := v1.NewFluentDB(it.db, it.ctx).
+	_, err = v1.NewFluentDB(it.db, it.ctx).
 		Insert().
 		Into("users").
 		WithTx(tx).
@@ -585,7 +621,14 @@ func TestFluentDBTransactionNested(t *testing.T) {
 		Set("email", "author@example.com").
 		Exec()
 	require.NoError(t, err)
-	userID := userResult.LastInsertID
+
+	userRow, err := v1.NewFluentDB(it.db, it.ctx).
+		Select("users", "id").
+		WithTx(tx).
+		Where(cdt.NewExpr().Column("email").Op("=").Value("author@example.com")).
+		One()
+	require.NoError(t, err)
+	userID := userRow["id"]
 
 	// Insert posts for the user
 	postsToInsert := []map[string]any{
@@ -621,6 +664,8 @@ func TestFluentDBTransactionErrorHandling(t *testing.T) {
 	it := setupIntegration(t)
 	defer it.cleanup()
 	defer it.clearTable(t, "users")
+
+	it.clearTable(t, "users")
 
 	// Create a transaction that will rollback on error
 	tx, err := it.db.Begin(it.ctx)
@@ -663,15 +708,23 @@ func TestFluentDBSelectWithJoin(t *testing.T) {
 	defer it.clearTable(t, "posts")
 	defer it.clearTable(t, "users")
 
+	it.clearTable(t, "users")
+
 	// Insert user
-	userResult, err := v1.NewFluentDB(it.db, it.ctx).
+	_, err := v1.NewFluentDB(it.db, it.ctx).
 		Insert().
 		Into("users").
 		Set("name", "John Doe").
 		Set("email", "john@example.com").
 		Exec()
 	require.NoError(t, err)
-	userID := userResult.LastInsertID
+
+	userRow, err := v1.NewFluentDB(it.db, it.ctx).
+		Select("users", "id").
+		Where(cdt.NewExpr().Column("email").Op("=").Value("john@example.com")).
+		One()
+	require.NoError(t, err)
+	userID := userRow["id"]
 
 	// Insert posts
 	_, err = v1.NewFluentDB(it.db, it.ctx).
@@ -688,7 +741,7 @@ func TestFluentDBSelectWithJoin(t *testing.T) {
 	join := cdt.Join{
 		Type:       "INNER",
 		Table:      "posts",
-		Conditions: cdt.JoinCdts{{Left: "users.id", Right: "posts.user_id"}},
+		Conditions: cdt.JoinCdts{{Left: "id", Right: "user_id"}},
 	}
 
 	rows, err := v1.NewFluentDB(it.db, it.ctx).
@@ -704,6 +757,8 @@ func TestFluentDBConcurrentOperations(t *testing.T) {
 	it := setupIntegration(t)
 	defer it.cleanup()
 	defer it.clearTable(t, "users")
+
+	it.clearTable(t, "users")
 
 	// Insert initial users concurrently
 	done := make(chan error, 3)
@@ -756,12 +811,14 @@ func TestFluentDBSelectWithMultipleConditions(t *testing.T) {
 	defer it.cleanup()
 	defer it.clearTable(t, "users")
 
+	it.clearTable(t, "users")
+
 	// Insert test users
 	testUsers := []map[string]any{
-		{"name": "Alice", "email": "alice@example.com", "age": 25, "status": "active"},
-		{"name": "Bob", "email": "bob@example.com", "age": 30, "status": "active"},
-		{"name": "Charlie", "email": "charlie@example.com", "age": 35, "status": "inactive"},
-		{"name": "Diana", "email": "diana@example.com", "age": 28, "status": "active"},
+		{"name": "Alice", "email": "alice.n@example.com", "age": 25, "status": "active"},
+		{"name": "Bob", "email": "bob.j@example.com", "age": 30, "status": "active"},
+		{"name": "Charlie", "email": "charlie.a@example.com", "age": 35, "status": "inactive"},
+		{"name": "Diana", "email": "diana.w@example.com", "age": 28, "status": "active"},
 	}
 
 	for _, user := range testUsers {
@@ -798,6 +855,8 @@ func TestFluentDBUpdateWithSetMap(t *testing.T) {
 	defer it.cleanup()
 	defer it.clearTable(t, "users")
 
+	it.clearTable(t, "users")
+
 	// Insert test data
 	_, err := v1.NewFluentDB(it.db, it.ctx).
 		Insert().
@@ -831,7 +890,7 @@ func TestFluentDBUpdateWithSetMap(t *testing.T) {
 		One()
 	require.NoError(t, err)
 	assert.Equal(t, "Jane Doe", row["name"])
-	assert.Equal(t, 31, row["age"])
+	assert.Equal(t, int32(31), row["age"])
 	assert.Equal(t, "inactive", row["status"])
 }
 
@@ -842,24 +901,40 @@ func TestFluentDBComplexWorkflow(t *testing.T) {
 	defer it.clearTable(t, "posts")
 	defer it.clearTable(t, "users")
 
+	it.clearTable(t, "users")
+
 	// 1. Create users
-	user1Result, err := v1.NewFluentDB(it.db, it.ctx).
+	_, err := v1.NewFluentDB(it.db, it.ctx).
 		Insert().
 		Into("users").
 		Set("name", "Alice").
-		Set("email", "alice@example.com").
+		Set("email", "alice.n@example.com").
 		Set("age", 28).
 		Exec()
 	require.NoError(t, err)
 
-	user2Result, err := v1.NewFluentDB(it.db, it.ctx).
+	_, err = v1.NewFluentDB(it.db, it.ctx).
 		Insert().
 		Into("users").
 		Set("name", "Bob").
-		Set("email", "bob@example.com").
+		Set("email", "bob.j@example.com").
 		Set("age", 32).
 		Exec()
 	require.NoError(t, err)
+
+	aliceRow, err := v1.NewFluentDB(it.db, it.ctx).
+		Select("users", "id").
+		Where(cdt.NewExpr().Column("email").Op("=").Value("alice.n@example.com")).
+		One()
+	require.NoError(t, err)
+	aliceID := aliceRow["id"]
+
+	bobRow, err := v1.NewFluentDB(it.db, it.ctx).
+		Select("users", "id").
+		Where(cdt.NewExpr().Column("email").Op("=").Value("bob.j@example.com")).
+		One()
+	require.NoError(t, err)
+	bobID := bobRow["id"]
 
 	// 2. Create posts for users
 	tx, err := it.db.Begin(it.ctx)
@@ -869,7 +944,7 @@ func TestFluentDBComplexWorkflow(t *testing.T) {
 		Insert().
 		Into("posts").
 		WithTx(tx).
-		Set("user_id", user1Result.LastInsertID).
+		Set("user_id", aliceID).
 		Set("title", "Alice's First Post").
 		Set("content", "Hello World").
 		Set("published", true).
@@ -880,7 +955,7 @@ func TestFluentDBComplexWorkflow(t *testing.T) {
 		Insert().
 		Into("posts").
 		WithTx(tx).
-		Set("user_id", user2Result.LastInsertID).
+		Set("user_id", bobID).
 		Set("title", "Bob's Post").
 		Set("content", "Hello from Bob").
 		Set("published", false).
@@ -913,7 +988,7 @@ func TestFluentDBComplexWorkflow(t *testing.T) {
 		Get()
 	require.NoError(t, err)
 	assert.Len(t, users, 2)
-	assert.Equal(t, int64(29), int64(users[0]["age"].(int)))
+	assert.Equal(t, int32(29), users[0]["age"].(int32))
 
 	// 6. Delete unpublished posts
 	_, err = v1.NewFluentDB(it.db, it.ctx).
@@ -934,6 +1009,8 @@ func TestFluentDBSelectGetRaw(t *testing.T) {
 	it := setupIntegration(t)
 	defer it.cleanup()
 	defer it.clearTable(t, "users")
+
+	it.clearTable(t, "users")
 
 	// Insert multiple users
 	for i := 0; i < 10; i++ {

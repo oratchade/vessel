@@ -1,4 +1,7 @@
-// Package db provides database abstraction interfaces and implementations for multiple database engines.
+// Package db provides a high-performance abstraction layer for PostgreSQL 9.6+,
+// with support for parameterized queries, connection pooling via pgxpool,
+// automatic identifier quoting using double quotes ("), and advanced features
+// like RETURNING clauses, LISTEN/NOTIFY, window functions, CTEs, and custom types.
 package v1
 
 import (
