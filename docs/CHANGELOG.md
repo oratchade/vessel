@@ -8,26 +8,9 @@ For a high-level overview of releases, see [RELEASES.md](./RELEASES.md).
 
 ### Planned for v1.1.0
 
-#### Added
-
-- Extended type support (time.Time, UUID, custom JSON types)
-- Batch upsert operations
-- Query result caching layer
-- Performance benchmarks suite
-
-#### Changed
-
-- Improved error messages with additional context
-- Enhanced connection pool statistics
-- **QueryOptions.OrderBy** - Changed from `[]string` to `[]OrderBy` struct type for better type safety and clarity
-
-#### Fixed
-
-- Minor performance optimizations in row scanning
-
 ---
 
-## [1.0.0] - 2026-03-15
+## [1.0.0] - 2026-03-22
 
 ### Added
 
@@ -91,6 +74,28 @@ For a high-level overview of releases, see [RELEASES.md](./RELEASES.md).
   - Backward compatible with FluentDB API
   - Comprehensive documentation in `ORDERBY_CHANGES.md`
 
+#### Added
+
+- Extended type support (time.Time, UUID, custom JSON types)
+- Batch upsert operations
+- Query result caching layer
+- Performance benchmarks suite
+- **Logger Adapters** - Support for multiple logging libraries with adapters for:
+  - `slog` (Go standard library, Go 1.21+, recommended)
+  - `logrus` (github.com/sirupsen/logrus)
+  - `zap` (go.uber.org/zap)
+  - `apex/log` (github.com/apex/log)
+
+#### Changed
+
+- Improved error messages with additional context
+- Enhanced connection pool statistics
+- **QueryOptions.OrderBy** - Changed from `[]string` to `[]OrderBy` struct type for better type safety and clarity
+
+#### Fixed
+
+- Minor performance optimizations in row scanning
+
 #### Documentation
 
 - **README.md** - Comprehensive feature overview with 10+ code examples covering basic connections, queries, inserts, bulk operations, and transactions
@@ -103,7 +108,7 @@ For a high-level overview of releases, see [RELEASES.md](./RELEASES.md).
 
 #### Testing
 
-- 260+ comprehensive test cases (241 unit tests + 20 integration tests)
+- 290+ comprehensive test cases (271 unit tests + 19 integration tests)
 - Unit tests for all core functionality with 100% pass rate
 - Integration tests across all supported databases (MySQL, PostgreSQL, SQLite, MSSQL)
 - Mock generation via `go:generate` for testability

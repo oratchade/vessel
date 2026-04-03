@@ -13,7 +13,7 @@ For detailed technical changes, see the [CHANGELOG](./CHANGELOG.md).
 
 [Download v1.0.0](https://github.com/oratchade/fabric/releases/tag/v1.0.0) | [View Detailed Changes](./CHANGELOG.md#100---2026-03-03)
 
-First production-ready release with comprehensive documentation, 99+ test cases, and support for MySQL, PostgreSQL, SQLite, and MSSQL.
+First production-ready release with comprehensive documentation, 290+ test cases, and support for MySQL, PostgreSQL, SQLite, and MSSQL.
 
 ---
 
@@ -130,7 +130,7 @@ OpenTelemetry integration is already included in v1.0.0.
 
 All releases must pass:
 
-- ✅ 97+ test cases with 100% pass rate
+- ✅ 290+ test cases with 100% pass rate
 - ✅ Zero linting issues (40+ linters)
 - ✅ Code review completion
 - ✅ Documentation updates
