@@ -39,8 +39,14 @@ type DBEntry struct {
 }
 
 // newDBEntry creates a new DBEntry instance.
-// It initializes the database connection, worker queues, and other settings based on the provided configuration.
-func newDBEntry(ctx context.Context, mc *config.ManagerConfig, cfg *config.ConfigEntry, logger db.Logger) (*DBEntry, error) {
+// It initializes the database connection, worker queues, and other settings
+// based on the provided configuration.
+func newDBEntry(
+	ctx context.Context,
+	mc *config.ManagerConfig,
+	cfg *config.ConfigEntry,
+	logger db.Logger,
+) (*DBEntry, error) {
 	// Ensure logger is never nil - use a no-op logger if not provided
 	if logger == nil {
 		logger = &noOpLogger{}
@@ -187,63 +193,16 @@ func (de *DBEntry) healthCheck(ctx context.Context) {
 		case <-ticker.C:
 			err := de.db.Ping(ctx)
 			if err != nil {
-				failureCount++
-				wasHealthy := de.healthy.Load()
-
-				// Classify the error for appropriate logging
-				errorType, logLevel := db.ClassifyError(err)
-
-				// Log at appropriate level based on error classification
-				switch logLevel {
-				case db.LogLevelError:
-					de.logger.Error("Health check failed",
-						"name", de.name,
-						"failure_count", failureCount,
-						"error_type", errorType,
-						"error", err.Error(),
-					)
-				case db.LogLevelWarn:
-					de.logger.Warn("Health check failed",
-						"name", de.name,
-						"failure_count", failureCount,
-						"error_type", errorType,
-						"error", err.Error(),
-					)
-				default:
-					de.logger.Debug("Health check failed",
-						"name", de.name,
-						"failure_count", failureCount,
-						"error_type", errorType,
-						"error", err.Error(),
-					)
-				}
-
-				if failureCount >= maxFailures && wasHealthy {
-					de.healthy.Store(false)
-					de.logger.Warn("Database entry marked unhealthy",
-						"name", de.name,
-						"consecutive_failures", failureCount,
-						"priority", de.priority,
-					)
-				}
-
+				failureCount = de.handleHealthCheckFailure(
+					failureCount,
+					maxFailures,
+					err,
+				)
 				continue
 			}
-			// Success: reset failure count and mark healthy
-			wasUnhealthy := !de.healthy.Load()
-			failureCount = 0
-			de.healthy.Store(true)
 
-			if wasUnhealthy {
-				de.logger.Info("Database entry recovered and marked healthy",
-					"name", de.name,
-					"priority", de.priority,
-				)
-			} else {
-				de.logger.Debug("Health check passed",
-					"name", de.name,
-				)
-			}
+			de.handleHealthCheckSuccess()
+			failureCount = 0
 		case <-ctx.Done():
 			de.logger.Debug("Health check stopped",
 				"name", de.name,
@@ -253,54 +212,76 @@ func (de *DBEntry) healthCheck(ctx context.Context) {
 	}
 }
 
+// processWriteRequest handles a write request and returns the response.
+func (de *DBEntry) processWriteRequest(ctx context.Context, qd *Query) *QueryResponse {
+	switch qd.Request {
+	case ReqInsert:
+		resp, err := de.db.Insert(
+			ctx,
+			qd.Data.Table,
+			qd.Data.Data,
+			qd.Data.Opts,
+		)
+		return &QueryResponse{ExecData: resp, Error: err}
+	case ReqInserts:
+		resp, err := de.db.Inserts(
+			ctx,
+			qd.Data.Table,
+			qd.Data.BulkData,
+			qd.Data.Opts,
+		)
+		return &QueryResponse{ExecData: resp, Error: err}
+	case ReqUpdate:
+		resp, err := de.db.Update(
+			ctx,
+			qd.Data.Table,
+			qd.Data.Data,
+			qd.Data.Joins,
+			qd.Data.Conditions,
+			qd.Data.Opts,
+		)
+		return &QueryResponse{ExecData: resp, Error: err}
+	case ReqDelete:
+		resp, err := de.db.Delete(
+			ctx,
+			qd.Data.Table,
+			qd.Data.Joins,
+			qd.Data.Conditions,
+			qd.Data.Opts,
+		)
+		return &QueryResponse{ExecData: resp, Error: err}
+	case ReqExec:
+		resp, err := de.db.Exec(
+			ctx,
+			qd.Data.Query,
+			qd.Data.Params...,
+		)
+		return &QueryResponse{ExecData: resp, Error: err}
+	}
+	return &QueryResponse{}
+}
+
 // writeWorker processes write queries from its queue and executes them against the database.
 func (de *DBEntry) writeWorker(ctx context.Context, w *dbEntryWorker) {
+	const responseSendTimeout = 5 * time.Second
 	for {
 		select {
 		case qd := <-w.queue:
-			switch qd.Request {
-			case ReqInsert:
-				resp, err := de.db.Insert(
-					ctx,
-					qd.Data.Table,
-					qd.Data.Data,
-					qd.Data.Opts,
-				)
-				qd.ResponseCh <- &QueryResponse{ExecData: resp, Error: err}
-			case ReqInserts:
-				resp, err := de.db.Inserts(
-					ctx,
-					qd.Data.Table,
-					qd.Data.BulkData,
-					qd.Data.Opts,
-				)
-				qd.ResponseCh <- &QueryResponse{ExecData: resp, Error: err}
-			case ReqUpdate:
-				resp, err := de.db.Update(
-					ctx,
-					qd.Data.Table,
-					qd.Data.Data,
-					qd.Data.Joins,
-					qd.Data.Conditions,
-					qd.Data.Opts,
-				)
-				qd.ResponseCh <- &QueryResponse{ExecData: resp, Error: err}
-			case ReqDelete:
-				resp, err := de.db.Delete(
-					ctx,
-					qd.Data.Table,
-					qd.Data.Joins,
-					qd.Data.Conditions,
-					qd.Data.Opts,
-				)
-				qd.ResponseCh <- &QueryResponse{ExecData: resp, Error: err}
-			case ReqExec:
-				resp, err := de.db.Exec(
-					ctx,
-					qd.Data.Query,
-					qd.Data.Params...,
-				)
-				qd.ResponseCh <- &QueryResponse{ExecData: resp, Error: err}
+			response := de.processWriteRequest(ctx, qd)
+			// Send response with timeout to prevent worker from blocking indefinitely
+			select {
+			case qd.ResponseCh <- response:
+				// Response sent successfully
+			case <-time.After(responseSendTimeout):
+				if de.logger != nil {
+					de.logger.Warn("Response send timeout",
+						"name", de.name,
+						"request_type", qd.Request,
+						"reason", "consumer_not_reading",
+					)
+				}
+			case <-ctx.Done():
+				return
 			}
 		case <-ctx.Done():
 			return
@@ -308,64 +289,86 @@ func (de *DBEntry) writeWorker(ctx context.Context, w *dbEntryWorker) {
 	}
 }
 
+// processReadRequest handles a read request and returns the response.
+func (de *DBEntry) processReadRequest(ctx context.Context, qd *Query) *QueryResponse {
+	switch qd.Request {
+	case ReqGet:
+		resp, err := de.db.Get(
+			ctx,
+			qd.Data.Table,
+			qd.Data.Columns,
+			qd.Data.Joins,
+			qd.Data.Conditions,
+			qd.Data.Opts,
+		)
+		return &QueryResponse{Data: resp, Error: err}
+	case ReqGetRaw:
+		resp, err := de.db.GetRaw(
+			ctx,
+			qd.Data.Table,
+			qd.Data.Columns,
+			qd.Data.Joins,
+			qd.Data.Conditions,
+			qd.Data.Opts,
+		)
+		return &QueryResponse{RawData: resp, Error: err}
+	case ReqGetByID:
+		resp, err := de.db.GetByID(
+			ctx,
+			qd.Data.Table,
+			qd.Data.ID,
+			qd.Data.Joins,
+			qd.Data.Opts,
+		)
+		return &QueryResponse{Data: resp, Error: err}
+	case ReqGetByIDRaw:
+		resp, err := de.db.GetByIDRaw(
+			ctx,
+			qd.Data.Table,
+			qd.Data.ID,
+			qd.Data.Joins,
+			qd.Data.Opts,
+		)
+		return &QueryResponse{RawData: resp, Error: err}
+	case ReqQuery:
+		resp, err := de.db.Query(
+			ctx,
+			qd.Data.Query,
+			qd.Data.Params...,
+		)
+		return &QueryResponse{Data: resp, Error: err}
+	case ReqQueryRaw:
+		resp, err := de.db.QueryRaw(
+			ctx,
+			qd.Data.Query,
+			qd.Data.Params...,
+		)
+		return &QueryResponse{RawData: resp, Error: err}
+	}
+	return &QueryResponse{}
+}
+
 // readWorker processes read queries from its queue and executes them against the database.
 func (de *DBEntry) readWorker(ctx context.Context, w *dbEntryWorker) {
+	const responseSendTimeout = 5 * time.Second
 	for {
 		select {
 		case qd := <-w.queue:
-			switch qd.Request {
-			case ReqGet:
-				resp, err := de.db.Get(
-					ctx,
-					qd.Data.Table,
-					qd.Data.Columns,
-					qd.Data.Joins,
-					qd.Data.Conditions,
-					qd.Data.Opts,
-				)
-				qd.ResponseCh <- &QueryResponse{Data: resp, Error: err}
-			case ReqGetRaw:
-				resp, err := de.db.GetRaw(
-					ctx,
-					qd.Data.Table,
-					qd.Data.Columns,
-					qd.Data.Joins,
-					qd.Data.Conditions,
-					qd.Data.Opts,
-				)
-				qd.ResponseCh <- &QueryResponse{RawData: resp, Error: err}
-			case ReqGetByID:
-				resp, err := de.db.GetByID(
-					ctx,
-					qd.Data.Table,
-					qd.Data.ID,
-					qd.Data.Joins,
-					qd.Data.Opts,
-				)
-				qd.ResponseCh <- &QueryResponse{Data: resp, Error: err}
-			case ReqGetByIDRaw:
-				resp, err := de.db.GetByIDRaw(
-					ctx,
-					qd.Data.Table,
-					qd.Data.ID,
-					qd.Data.Joins,
-					qd.Data.Opts,
-				)
-				qd.ResponseCh <- &QueryResponse{RawData: resp, Error: err}
-			case ReqQuery:
-				resp, err := de.db.Query(
-					ctx,
-					qd.Data.Query,
-					qd.Data.Params...,
-				)
-				qd.ResponseCh <- &QueryResponse{Data: resp, Error: err}
-			case ReqQueryRaw:
-				resp, err := de.db.QueryRaw(
-					ctx,
-					qd.Data.Query,
-					qd.Data.Params...,
-				)
-				qd.ResponseCh <- &QueryResponse{RawData: resp, Error: err}
+			response := de.processReadRequest(ctx, qd)
+			// Send response with timeout to prevent worker from blocking indefinitely
+			select {
+			case qd.ResponseCh <- response:
+				// Response sent successfully
+			case <-time.After(responseSendTimeout):
+				if de.logger != nil {
+					de.logger.Warn("Response send timeout",
+						"name", de.name,
+						"request_type", qd.Request,
+						"reason", "consumer_not_reading",
+					)
+				}
+			case <-ctx.Done():
+				return
 			}
 		case <-ctx.Done():
 			return
@@ -418,4 +421,70 @@ func (nol *noOpLogger) Error(msg string, args ...any) {}
 // With returns itself, satisfying the Logger interface.
 func (nol *noOpLogger) With(fields ...any) db.Logger {
 	return nol
+}
+
+// handleHealthCheckFailure handles a failed health check and returns the updated failure count.
+func (de *DBEntry) handleHealthCheckFailure(
+	failureCount int,
+	maxFailures int,
+	err error,
+) int {
+	failureCount++
+	wasHealthy := de.healthy.Load()
+
+	// Classify the error for appropriate logging
+	errorType, logLevel := db.ClassifyError(err)
+
+	// Log at appropriate level based on error classification
+	switch logLevel {
+	case db.LogLevelError:
+		de.logger.Error("Health check failed",
+			"name", de.name,
+			"failure_count", failureCount,
+			"error_type", errorType,
+			"error", err.Error(),
+		)
+	case db.LogLevelWarn:
+		de.logger.Warn("Health check failed",
+			"name", de.name,
+			"failure_count", failureCount,
+			"error_type", errorType,
+			"error", err.Error(),
+		)
+	default:
+		de.logger.Debug("Health check failed",
+			"name", de.name,
+			"failure_count", failureCount,
+			"error_type", errorType,
+			"error", err.Error(),
+		)
+	}
+
+	if failureCount >= maxFailures && wasHealthy {
+		de.healthy.Store(false)
+		de.logger.Warn("Database entry marked unhealthy",
+			"name", de.name,
+			"consecutive_failures", failureCount,
+			"priority", de.priority,
+		)
+	}
+
+	return failureCount
+}
+
+// handleHealthCheckSuccess handles a successful health check.
+func (de *DBEntry) handleHealthCheckSuccess() {
+	wasUnhealthy := !de.healthy.Load()
+	de.healthy.Store(true)
+
+	if wasUnhealthy {
+		de.logger.Info("Database entry recovered and marked healthy",
+			"name", de.name,
+			"priority", de.priority,
+		)
+	} else {
+		de.logger.Debug("Health check passed",
+			"name", de.name,
+		)
+	}
 }

@@ -19,8 +19,13 @@ import (
 	"tounilab.com/fabric/pkg/query/options"
 )
 
-// setupDBs initializes DBEntry maps for read-only and read-write databases based on the provided configuration.
-func setupDBs(ctx context.Context, cfg *config.ManagerConfig, logger db.Logger) (map[string]*DBEntry, map[string]*DBEntry, error) {
+// setupDBs initializes DBEntry maps for read-only and read-write databases
+// based on the provided configuration.
+func setupDBs(
+	ctx context.Context,
+	cfg *config.ManagerConfig,
+	logger db.Logger,
+) (map[string]*DBEntry, map[string]*DBEntry, error) {
 	var err error
 	readOnly := make(map[string]*DBEntry)
 	readWrite := make(map[string]*DBEntry)
@@ -125,11 +130,13 @@ type DBManager struct {
 
 	writeWorkerIdx AtomicWrapCounter
 	readWorkerIdx  AtomicWrapCounter
+	readEntryIdx   AtomicWrapCounter
+	writeEntryIdx  AtomicWrapCounter
 }
 
 // NewDBManager creates a new DBManager instance by loading
 // the configuration from the specified path and setting up the database entries.
-func NewDBManager(ctx context.Context, configPath string) (*DBManager, error) {
+func NewDBManager(ctx context.Context, configPath string, logger db.Logger) (*DBManager, error) {
 	var err error
 
 	cfg, err := (&DBManager{}).loadConfig(configPath)
@@ -142,7 +149,9 @@ func NewDBManager(ctx context.Context, configPath string) (*DBManager, error) {
 	}
 
 	// Use a no-op logger if none is provided
-	logger := &noOpLogger{}
+	if logger == nil {
+		logger = &noOpLogger{}
+	}
 
 	readOnly, readWrite, err := setupDBs(ctx, cfg, logger)
 	if err != nil {
@@ -159,6 +168,8 @@ func NewDBManager(ctx context.Context, configPath string) (*DBManager, error) {
 		logger:           logger,
 		writeWorkerIdx:   *NewAtomicWrapCounter(int64(len(readWrite))),
 		readWorkerIdx:    *NewAtomicWrapCounter(int64(len(readOnly))),
+		readEntryIdx:     *NewAtomicWrapCounter(int64(len(readOnly))),
+		writeEntryIdx:    *NewAtomicWrapCounter(int64(len(readWrite))),
 	}
 
 	logger.Info("Database manager created successfully",
@@ -321,6 +332,8 @@ func (dm *DBManager) Stop() {
 //	    type: read-only
 //
 // Returns nil if no read-only entries are configured.
+//
+//nolint:dupl
 func (dm *DBManager) readOnlyEntry() *DBEntry {
 	entries := dm.readOnlyEntries
 	if len(entries) == 0 {
@@ -356,7 +369,7 @@ func (dm *DBManager) readOnlyEntry() *DBEntry {
 	}
 
 	// Fallback: select from all entries if no healthy ones available
-	fallback := dm.selectByPriorityAndRoundRobin(entries, &dm.readWorkerIdx)
+	fallback := dm.selectByPriorityAndRoundRobin(entries, &dm.readEntryIdx)
 	if dm.logger != nil {
 		dm.logger.Warn("No healthy read-only entries available, selecting from unhealthy entries",
 			"selected_entry", func() string {
@@ -397,6 +410,8 @@ func (dm *DBManager) readOnlyEntry() *DBEntry {
 //	    type: read-write
 //
 // Returns nil if no read-write entries are configured.
+//
+//nolint:dupl
 func (dm *DBManager) readWriteEntry() *DBEntry {
 	entries := dm.readWriteEntries
 	if len(entries) == 0 {
@@ -432,7 +447,7 @@ func (dm *DBManager) readWriteEntry() *DBEntry {
 	}
 
 	// Fallback: select from all entries if no healthy ones available
-	fallback := dm.selectByPriorityAndRoundRobin(entries, &dm.writeWorkerIdx)
+	fallback := dm.selectByPriorityAndRoundRobin(entries, &dm.writeEntryIdx)
 	if dm.logger != nil {
 		dm.logger.Warn("No healthy read-write entries available, selecting from unhealthy entries",
 			"selected_entry", func() string {
@@ -499,8 +514,8 @@ func (dm *DBManager) selectHealthyEntry(entries map[string]*DBEntry) *DBEntry {
 	}
 
 	// Multiple healthy entries with same max priority: use round-robin
-	// Note: This uses a simple approach; in production, separate counters per entry type might be better
-	idx := dm.readWorkerIdx.Next() % int64(len(priorityEntries))
+	// Uses entry-level counter for fair distribution across replicas
+	idx := dm.readEntryIdx.Next() % int64(len(priorityEntries))
 	return priorityEntries[idx]
 }
 
@@ -549,7 +564,8 @@ func (dm *DBManager) selectByPriorityAndRoundRobin(entries map[string]*DBEntry, 
 }
 
 // GetAsync fetches data from the database asynchronously based on the specified table, columns, and conditions.
-// This method returns a channel that will receive the result.
+// This method returns a channel that will receive the result and an error.
+// Returns an error immediately if no entries are available or if context is already canceled.
 // For synchronous access, use Get() instead.
 func (dm *DBManager) GetAsync(
 	ctx context.Context,
@@ -558,7 +574,12 @@ func (dm *DBManager) GetAsync(
 	joins []condition.Join,
 	cond condition.Condition,
 	opts *options.QueryOptions,
-) <-chan *QueryResponse {
+) (<-chan *QueryResponse, error) {
+	dbEntry := dm.readOnlyEntry()
+	if dbEntry == nil {
+		return nil, fmt.Errorf("no read-only database entries available")
+	}
+
 	q := &Query{
 		Request: ReqGet,
 		Data: &QueryData{
@@ -571,21 +592,16 @@ func (dm *DBManager) GetAsync(
 		ResponseCh: make(chan *QueryResponse),
 	}
 
-	dbEntry := dm.readOnlyEntry()
-	if dbEntry == nil {
-		go func() {
-			q.ResponseCh <- &QueryResponse{Error: fmt.Errorf("no read-only database entries available")}
-			close(q.ResponseCh)
-		}()
-		return q.ResponseCh
+	if err := dbEntry.roundRobinQueueRead(ctx, q); err != nil {
+		return nil, fmt.Errorf("GetAsync: failed to enqueue query: %w", err)
 	}
-	_ = dbEntry.roundRobinQueueRead(ctx, q)
 
-	return q.ResponseCh
+	return q.ResponseCh, nil
 }
 
 // GetRawAsync fetches raw data from the database asynchronously based on the specified table, columns, and conditions.
-// This method returns a channel that will receive the result.
+// This method returns a channel that will receive the result and an error.
+// Returns an error immediately if no entries are available or if context is already canceled.
 // For synchronous access, use GetRaw() instead.
 func (dm *DBManager) GetRawAsync(
 	ctx context.Context,
@@ -594,7 +610,12 @@ func (dm *DBManager) GetRawAsync(
 	joins []condition.Join,
 	cond condition.Condition,
 	opts *options.QueryOptions,
-) <-chan *QueryResponse {
+) (<-chan *QueryResponse, error) {
+	dbEntry := dm.readOnlyEntry()
+	if dbEntry == nil {
+		return nil, fmt.Errorf("no read-only database entries available")
+	}
+
 	q := &Query{
 		Request: ReqGetRaw,
 		Data: &QueryData{
@@ -607,21 +628,16 @@ func (dm *DBManager) GetRawAsync(
 		ResponseCh: make(chan *QueryResponse),
 	}
 
-	dbEntry := dm.readOnlyEntry()
-	if dbEntry == nil {
-		go func() {
-			q.ResponseCh <- &QueryResponse{Error: fmt.Errorf("no read-only database entries available")}
-			close(q.ResponseCh)
-		}()
-		return q.ResponseCh
+	if err := dbEntry.roundRobinQueueRead(ctx, q); err != nil {
+		return nil, fmt.Errorf("GetRawAsync: failed to enqueue query: %w", err)
 	}
-	_ = dbEntry.roundRobinQueueRead(ctx, q)
 
-	return q.ResponseCh
+	return q.ResponseCh, nil
 }
 
 // GetByIDAsync fetches a single record from the database asynchronously based on the specified table and ID.
-// This method returns a channel that will receive the result.
+// This method returns a channel that will receive the result and an error.
+// Returns an error immediately if no entries are available or if context is already canceled.
 // For synchronous access, use GetByID() instead.
 func (dm *DBManager) GetByIDAsync(
 	ctx context.Context,
@@ -629,7 +645,12 @@ func (dm *DBManager) GetByIDAsync(
 	id any,
 	joins []condition.Join,
 	opts *options.QueryOptions,
-) <-chan *QueryResponse {
+) (<-chan *QueryResponse, error) {
+	dbEntry := dm.readOnlyEntry()
+	if dbEntry == nil {
+		return nil, fmt.Errorf("no read-only database entries available")
+	}
+
 	q := &Query{
 		Request: ReqGetByID,
 		Data: &QueryData{
@@ -641,21 +662,16 @@ func (dm *DBManager) GetByIDAsync(
 		ResponseCh: make(chan *QueryResponse),
 	}
 
-	dbEntry := dm.readOnlyEntry()
-	if dbEntry == nil {
-		go func() {
-			q.ResponseCh <- &QueryResponse{Error: fmt.Errorf("no read-only database entries available")}
-			close(q.ResponseCh)
-		}()
-		return q.ResponseCh
+	if err := dbEntry.roundRobinQueueRead(ctx, q); err != nil {
+		return nil, fmt.Errorf("GetByIDAsync: failed to enqueue query: %w", err)
 	}
-	_ = dbEntry.roundRobinQueueRead(ctx, q)
 
-	return q.ResponseCh
+	return q.ResponseCh, nil
 }
 
 // GetByIDRawAsync fetches a single record from the database asynchronously based on the specified table and ID.
-// This method returns a channel that will receive the result.
+// This method returns a channel that will receive the result and an error.
+// Returns an error immediately if no entries are available or if context is already canceled.
 // For synchronous access, use GetByIDRaw() instead.
 func (dm *DBManager) GetByIDRawAsync(
 	ctx context.Context,
@@ -663,7 +679,12 @@ func (dm *DBManager) GetByIDRawAsync(
 	id any,
 	joins []condition.Join,
 	opts *options.QueryOptions,
-) <-chan *QueryResponse {
+) (<-chan *QueryResponse, error) {
+	dbEntry := dm.readOnlyEntry()
+	if dbEntry == nil {
+		return nil, fmt.Errorf("no read-only database entries available")
+	}
+
 	q := &Query{
 		Request: ReqGetByIDRaw,
 		Data: &QueryData{
@@ -675,28 +696,28 @@ func (dm *DBManager) GetByIDRawAsync(
 		ResponseCh: make(chan *QueryResponse),
 	}
 
-	dbEntry := dm.readOnlyEntry()
-	if dbEntry == nil {
-		go func() {
-			q.ResponseCh <- &QueryResponse{Error: fmt.Errorf("no read-only database entries available")}
-			close(q.ResponseCh)
-		}()
-		return q.ResponseCh
+	if err := dbEntry.roundRobinQueueRead(ctx, q); err != nil {
+		return nil, fmt.Errorf("GetByIDRawAsync: failed to enqueue query: %w", err)
 	}
-	_ = dbEntry.roundRobinQueueRead(ctx, q)
 
-	return q.ResponseCh
+	return q.ResponseCh, nil
 }
 
 // InsertAsync adds a new record to the specified table in the database asynchronously.
-// This method returns a channel that will receive the result.
+// This method returns a channel that will receive the result and an error.
+// Returns an error immediately if no entries are available or if context is already canceled.
 // For synchronous access, use Insert() instead.
 func (dm *DBManager) InsertAsync(
 	ctx context.Context,
 	table string,
 	data map[string]any,
 	opts *options.QueryOptions,
-) <-chan *QueryResponse {
+) (<-chan *QueryResponse, error) {
+	dbEntry := dm.readWriteEntry()
+	if dbEntry == nil {
+		return nil, fmt.Errorf("no read-write database entries available")
+	}
+
 	q := &Query{
 		Request: ReqInsert,
 		Data: &QueryData{
@@ -707,28 +728,28 @@ func (dm *DBManager) InsertAsync(
 		ResponseCh: make(chan *QueryResponse),
 	}
 
-	dbEntry := dm.readWriteEntry()
-	if dbEntry == nil {
-		go func() {
-			q.ResponseCh <- &QueryResponse{Error: fmt.Errorf("no read-write database entries available")}
-			close(q.ResponseCh)
-		}()
-		return q.ResponseCh
+	if err := dbEntry.roundRobinQueueWrite(ctx, q); err != nil {
+		return nil, fmt.Errorf("InsertAsync: failed to enqueue query: %w", err)
 	}
-	_ = dbEntry.roundRobinQueueWrite(ctx, q)
 
-	return q.ResponseCh
+	return q.ResponseCh, nil
 }
 
 // InsertsAsync adds multiple new records to the specified table in the database asynchronously.
-// This method returns a channel that will receive the result.
+// This method returns a channel that will receive the result and an error.
+// Returns an error immediately if no entries are available or if context is already canceled.
 // For synchronous access, use Inserts() instead.
 func (dm *DBManager) InsertsAsync(
 	ctx context.Context,
 	table string,
 	data []map[string]any,
 	opts *options.QueryOptions,
-) <-chan *QueryResponse {
+) (<-chan *QueryResponse, error) {
+	dbEntry := dm.readWriteEntry()
+	if dbEntry == nil {
+		return nil, fmt.Errorf("no read-write database entries available")
+	}
+
 	q := &Query{
 		Request: ReqInserts,
 		Data: &QueryData{
@@ -739,22 +760,17 @@ func (dm *DBManager) InsertsAsync(
 		ResponseCh: make(chan *QueryResponse),
 	}
 
-	dbEntry := dm.readWriteEntry()
-	if dbEntry == nil {
-		go func() {
-			q.ResponseCh <- &QueryResponse{Error: fmt.Errorf("no read-write database entries available")}
-			close(q.ResponseCh)
-		}()
-		return q.ResponseCh
+	if err := dbEntry.roundRobinQueueWrite(ctx, q); err != nil {
+		return nil, fmt.Errorf("InsertsAsync: failed to enqueue query: %w", err)
 	}
-	_ = dbEntry.roundRobinQueueWrite(ctx, q)
 
-	return q.ResponseCh
+	return q.ResponseCh, nil
 }
 
 // UpdateAsync updates an existing record in the database asynchronously.
 // Updates are based on the specified table, data, and conditions.
-// This method returns a channel that will receive the result.
+// This method returns a channel that will receive the result and an error.
+// Returns an error immediately if no entries are available or if context is already canceled.
 // For synchronous access, use Update() instead.
 func (dm *DBManager) UpdateAsync(
 	ctx context.Context,
@@ -763,7 +779,12 @@ func (dm *DBManager) UpdateAsync(
 	joins []condition.Join,
 	cond condition.Condition,
 	opts *options.QueryOptions,
-) <-chan *QueryResponse {
+) (<-chan *QueryResponse, error) {
+	dbEntry := dm.readWriteEntry()
+	if dbEntry == nil {
+		return nil, fmt.Errorf("no read-write database entries available")
+	}
+
 	q := &Query{
 		Request: ReqUpdate,
 		Data: &QueryData{
@@ -776,21 +797,16 @@ func (dm *DBManager) UpdateAsync(
 		ResponseCh: make(chan *QueryResponse),
 	}
 
-	dbEntry := dm.readWriteEntry()
-	if dbEntry == nil {
-		go func() {
-			q.ResponseCh <- &QueryResponse{Error: fmt.Errorf("no read-write database entries available")}
-			close(q.ResponseCh)
-		}()
-		return q.ResponseCh
+	if err := dbEntry.roundRobinQueueWrite(ctx, q); err != nil {
+		return nil, fmt.Errorf("UpdateAsync: failed to enqueue query: %w", err)
 	}
-	_ = dbEntry.roundRobinQueueWrite(ctx, q)
 
-	return q.ResponseCh
+	return q.ResponseCh, nil
 }
 
 // DeleteAsync removes records from the database asynchronously based on the specified table and conditions.
-// This method returns a channel that will receive the result.
+// This method returns a channel that will receive the result and an error.
+// Returns an error immediately if no entries are available or if context is already canceled.
 // For synchronous access, use Delete() instead.
 func (dm *DBManager) DeleteAsync(
 	ctx context.Context,
@@ -798,7 +814,12 @@ func (dm *DBManager) DeleteAsync(
 	joins []condition.Join,
 	cond condition.Condition,
 	opts *options.QueryOptions,
-) <-chan *QueryResponse {
+) (<-chan *QueryResponse, error) {
+	dbEntry := dm.readWriteEntry()
+	if dbEntry == nil {
+		return nil, fmt.Errorf("no read-write database entries available")
+	}
+
 	q := &Query{
 		Request: ReqDelete,
 		Data: &QueryData{
@@ -810,23 +831,23 @@ func (dm *DBManager) DeleteAsync(
 		ResponseCh: make(chan *QueryResponse),
 	}
 
-	dbEntry := dm.readWriteEntry()
-	if dbEntry == nil {
-		go func() {
-			q.ResponseCh <- &QueryResponse{Error: fmt.Errorf("no read-write database entries available")}
-			close(q.ResponseCh)
-		}()
-		return q.ResponseCh
+	if err := dbEntry.roundRobinQueueWrite(ctx, q); err != nil {
+		return nil, fmt.Errorf("DeleteAsync: failed to enqueue query: %w", err)
 	}
-	_ = dbEntry.roundRobinQueueWrite(ctx, q)
 
-	return q.ResponseCh
+	return q.ResponseCh, nil
 }
 
 // QueryAsync executes a raw query against the database asynchronously and returns the results.
-// This method returns a channel that will receive the result.
+// This method returns a channel that will receive the result and an error.
+// Returns an error immediately if no entries are available or if context is already canceled.
 // For synchronous access, use Query() instead.
-func (dm *DBManager) QueryAsync(ctx context.Context, query string, args ...any) <-chan *QueryResponse {
+func (dm *DBManager) QueryAsync(ctx context.Context, query string, args ...any) (<-chan *QueryResponse, error) {
+	dbEntry := dm.readOnlyEntry()
+	if dbEntry == nil {
+		return nil, fmt.Errorf("no read-only database entries available")
+	}
+
 	q := &Query{
 		Request: ReqQuery,
 		Data: &QueryData{
@@ -836,23 +857,23 @@ func (dm *DBManager) QueryAsync(ctx context.Context, query string, args ...any) 
 		ResponseCh: make(chan *QueryResponse),
 	}
 
-	dbEntry := dm.readOnlyEntry()
-	if dbEntry == nil {
-		go func() {
-			q.ResponseCh <- &QueryResponse{Error: fmt.Errorf("no read-only database entries available")}
-			close(q.ResponseCh)
-		}()
-		return q.ResponseCh
+	if err := dbEntry.roundRobinQueueRead(ctx, q); err != nil {
+		return nil, fmt.Errorf("QueryAsync: failed to enqueue query: %w", err)
 	}
-	_ = dbEntry.roundRobinQueueRead(ctx, q)
 
-	return q.ResponseCh
+	return q.ResponseCh, nil
 }
 
 // QueryRawAsync executes a raw query against the database asynchronously and returns the results.
-// This method returns a channel that will receive the result.
+// This method returns a channel that will receive the result and an error.
+// Returns an error immediately if no entries are available or if context is already canceled.
 // For synchronous access, use QueryRaw() instead.
-func (dm *DBManager) QueryRawAsync(ctx context.Context, query string, args ...any) <-chan *QueryResponse {
+func (dm *DBManager) QueryRawAsync(ctx context.Context, query string, args ...any) (<-chan *QueryResponse, error) {
+	dbEntry := dm.readOnlyEntry()
+	if dbEntry == nil {
+		return nil, fmt.Errorf("no read-only database entries available")
+	}
+
 	q := &Query{
 		Request: ReqQueryRaw,
 		Data: &QueryData{
@@ -862,23 +883,23 @@ func (dm *DBManager) QueryRawAsync(ctx context.Context, query string, args ...an
 		ResponseCh: make(chan *QueryResponse),
 	}
 
-	dbEntry := dm.readOnlyEntry()
-	if dbEntry == nil {
-		go func() {
-			q.ResponseCh <- &QueryResponse{Error: fmt.Errorf("no read-only database entries available")}
-			close(q.ResponseCh)
-		}()
-		return q.ResponseCh
+	if err := dbEntry.roundRobinQueueRead(ctx, q); err != nil {
+		return nil, fmt.Errorf("QueryRawAsync: failed to enqueue query: %w", err)
 	}
-	_ = dbEntry.roundRobinQueueRead(ctx, q)
 
-	return q.ResponseCh
+	return q.ResponseCh, nil
 }
 
 // ExecAsync executes a raw query against the database asynchronously and returns the execution result.
-// This method returns a channel that will receive the result.
+// This method returns a channel that will receive the result and an error.
+// Returns an error immediately if no entries are available or if context is already canceled.
 // For synchronous access, use Exec() instead.
-func (dm *DBManager) ExecAsync(ctx context.Context, query string, args ...any) <-chan *QueryResponse {
+func (dm *DBManager) ExecAsync(ctx context.Context, query string, args ...any) (<-chan *QueryResponse, error) {
+	dbEntry := dm.readWriteEntry()
+	if dbEntry == nil {
+		return nil, fmt.Errorf("no read-write database entries available")
+	}
+
 	q := &Query{
 		Request: ReqExec,
 		Data: &QueryData{
@@ -888,17 +909,11 @@ func (dm *DBManager) ExecAsync(ctx context.Context, query string, args ...any) <
 		ResponseCh: make(chan *QueryResponse),
 	}
 
-	dbEntry := dm.readWriteEntry()
-	if dbEntry == nil {
-		go func() {
-			q.ResponseCh <- &QueryResponse{Error: fmt.Errorf("no read-write database entries available")}
-			close(q.ResponseCh)
-		}()
-		return q.ResponseCh
+	if err := dbEntry.roundRobinQueueWrite(ctx, q); err != nil {
+		return nil, fmt.Errorf("ExecAsync: failed to enqueue query: %w", err)
 	}
-	_ = dbEntry.roundRobinQueueWrite(ctx, q)
 
-	return q.ResponseCh
+	return q.ResponseCh, nil
 }
 
 // Ping checks the database connection synchronously.

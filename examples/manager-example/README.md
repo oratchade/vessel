@@ -196,15 +196,70 @@ Sending query with 1-second timeout...
 - `ErrSyntaxError` - Non-retryable
 - `ErrPermissionDenied` - Non-retryable
 
+### 4. `retry/` - Retry Integration Examples
+
+**What it does:**
+
+- Demonstrates automatic backoff strategies (Exponential, Linear, Fixed)
+- Shows read operations with entry fallback across replicas
+- Shows write operations with guaranteed delivery
+- Demonstrates health checks with retry
+- Shows parallel batch operations with coordinated retry
+- Explains when to use each backoff strategy
+
+**Run:**
+
+```bash
+cd retry/
+go run main.go
+```
+
+**Example output:**
+
+```
+=== Retry Integration Examples ===
+
+1. Basic Retry Patterns
+───────────────────────
+
+  • Query with default exponential backoff (100ms → 5s, 3 attempts)
+    Result: Query executed with automatic retry
+
+  • Query with linear backoff (50ms → 2s, 4 attempts)
+    Result: Predictable retry intervals
+
+  • Write (INSERT) with retry and guaranteed delivery
+    Result: 1 rows affected
+
+  • Health check with fixed backoff
+    Result: Health check completed
+
+...
+```
+
+**Use cases demonstrated:**
+
+- **API Rate Limiting** - ExponentialBackoff for transient failures
+- **Database Connection** - LinearBackoff for predictable delays
+- **Health Checks** - FixedBackoff for known recovery time
+- **Critical Operations** - Exponential with conservative limits
+- **Thundering Herd** - Fixed with high jitter
+
+See [retry/README.md](./retry/README.md) for detailed backoff strategy explanations.
+
 ## Running All Examples
 
 ```bash
-# Run all three examples in sequence
-for file in basic priority_selection error_handling; do
-  echo "=== Running $file.go ==="
-  go run $file.go
+# Run all examples in sequence
+for example in basic error_handling priority_selection; do
+  echo "=== Running $example.go ==="
+  go run $example.go
   echo ""
 done
+
+# Run retry examples separately
+echo "=== Running retry examples ==="
+cd retry && go run main.go
 ```
 
 ## Common Issues

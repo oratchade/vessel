@@ -1,0 +1,46 @@
+# DBManager Configuration for Retry Examples
+# Demonstrates multi-entry setup suitable for retry operations
+
+# Global defaults
+writeQueueSize: 1000
+readQueueSize: 2000
+writeWorkers: 4
+readWorkers: 8
+healthInterval: 30s
+
+entries:
+  # Primary database - receives all writes
+  - name: primary-db
+    type: read-write
+    priority: 100
+    database: postgres
+    host: localhost
+    port: 5432
+    user: postgres
+    password: secret
+    dbname: fabric_db
+    sslmode: disable
+
+  # Read replica 1 - fallback for queries
+  - name: replica-1
+    type: read-only
+    priority: 50
+    database: postgres
+    host: replica1.example.com
+    port: 5432
+    user: postgres
+    password: secret
+    dbname: fabric_db
+    sslmode: require
+
+  # Read replica 2 - second fallback
+  - name: replica-2
+    type: read-only
+    priority: 40
+    database: postgres
+    host: replica2.example.com
+    port: 5432
+    user: postgres
+    password: secret
+    dbname: fabric_db
+    sslmode: require

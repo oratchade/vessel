@@ -121,7 +121,10 @@ func (dm *DBManager) Get(
 	cond condition.Condition,
 	opts *options.QueryOptions,
 ) ([]map[string]any, error) {
-	responseCh := dm.GetAsync(ctx, table, columns, joins, cond, opts)
+	responseCh, err := dm.GetAsync(ctx, table, columns, joins, cond, opts)
+	if err != nil {
+		return nil, err
+	}
 	resp, err := waitForResponse(ctx, responseCh)
 	if err != nil {
 		return nil, err
@@ -163,7 +166,10 @@ func (dm *DBManager) GetRaw(
 	cond condition.Condition,
 	opts *options.QueryOptions,
 ) (*db.RowsAdapter, error) {
-	responseCh := dm.GetRawAsync(ctx, table, columns, joins, cond, opts)
+	responseCh, err := dm.GetRawAsync(ctx, table, columns, joins, cond, opts)
+	if err != nil {
+		return nil, err
+	}
 	resp, err := waitForResponse(ctx, responseCh)
 	if err != nil {
 		return nil, err
@@ -203,7 +209,10 @@ func (dm *DBManager) GetByID(
 	joins []condition.Join,
 	opts *options.QueryOptions,
 ) ([]map[string]any, error) {
-	responseCh := dm.GetByIDAsync(ctx, table, id, joins, opts)
+	responseCh, err := dm.GetByIDAsync(ctx, table, id, joins, opts)
+	if err != nil {
+		return nil, err
+	}
 	resp, err := waitForResponse(ctx, responseCh)
 	if err != nil {
 		return nil, err
@@ -240,7 +249,10 @@ func (dm *DBManager) GetByIDRaw(
 	joins []condition.Join,
 	opts *options.QueryOptions,
 ) (*db.RowsAdapter, error) {
-	responseCh := dm.GetByIDRawAsync(ctx, table, id, joins, opts)
+	responseCh, err := dm.GetByIDRawAsync(ctx, table, id, joins, opts)
+	if err != nil {
+		return nil, err
+	}
 	resp, err := waitForResponse(ctx, responseCh)
 	if err != nil {
 		return nil, err
@@ -272,7 +284,10 @@ func (dm *DBManager) Query(
 	query string,
 	args ...any,
 ) ([]map[string]any, error) {
-	responseCh := dm.QueryAsync(ctx, query, args...)
+	responseCh, err := dm.QueryAsync(ctx, query, args...)
+	if err != nil {
+		return nil, err
+	}
 	resp, err := waitForResponse(ctx, responseCh)
 	if err != nil {
 		return nil, err
@@ -307,7 +322,10 @@ func (dm *DBManager) QueryRaw(
 	query string,
 	args ...any,
 ) (*db.RowsAdapter, error) {
-	responseCh := dm.QueryRawAsync(ctx, query, args...)
+	responseCh, err := dm.QueryRawAsync(ctx, query, args...)
+	if err != nil {
+		return nil, err
+	}
 	resp, err := waitForResponse(ctx, responseCh)
 	if err != nil {
 		return nil, err
@@ -345,7 +363,10 @@ func (dm *DBManager) Insert(
 	data map[string]any,
 	opts *options.QueryOptions,
 ) (*db.ExecResult, error) {
-	responseCh := dm.InsertAsync(ctx, table, data, opts)
+	responseCh, err := dm.InsertAsync(ctx, table, data, opts)
+	if err != nil {
+		return nil, err
+	}
 	resp, err := waitForResponse(ctx, responseCh)
 	if err != nil {
 		return nil, err
@@ -383,7 +404,10 @@ func (dm *DBManager) Inserts(
 	data []map[string]any,
 	opts *options.QueryOptions,
 ) (*db.ExecResult, error) {
-	responseCh := dm.InsertsAsync(ctx, table, data, opts)
+	responseCh, err := dm.InsertsAsync(ctx, table, data, opts)
+	if err != nil {
+		return nil, err
+	}
 	resp, err := waitForResponse(ctx, responseCh)
 	if err != nil {
 		return nil, err
@@ -426,7 +450,10 @@ func (dm *DBManager) Update(
 	cond condition.Condition,
 	opts *options.QueryOptions,
 ) (*db.ExecResult, error) {
-	responseCh := dm.UpdateAsync(ctx, table, data, joins, cond, opts)
+	responseCh, err := dm.UpdateAsync(ctx, table, data, joins, cond, opts)
+	if err != nil {
+		return nil, err
+	}
 	resp, err := waitForResponse(ctx, responseCh)
 	if err != nil {
 		return nil, err
@@ -464,7 +491,10 @@ func (dm *DBManager) Delete(
 	cond condition.Condition,
 	opts *options.QueryOptions,
 ) (*db.ExecResult, error) {
-	responseCh := dm.DeleteAsync(ctx, table, joins, cond, opts)
+	responseCh, err := dm.DeleteAsync(ctx, table, joins, cond, opts)
+	if err != nil {
+		return nil, err
+	}
 	resp, err := waitForResponse(ctx, responseCh)
 	if err != nil {
 		return nil, err
@@ -498,7 +528,10 @@ func (dm *DBManager) Exec(
 	query string,
 	args ...any,
 ) (*db.ExecResult, error) {
-	responseCh := dm.ExecAsync(ctx, query, args...)
+	responseCh, err := dm.ExecAsync(ctx, query, args...)
+	if err != nil {
+		return nil, err
+	}
 	resp, err := waitForResponse(ctx, responseCh)
 	if err != nil {
 		return nil, err

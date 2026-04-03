@@ -292,59 +292,63 @@ func TestDBManagerStartStop(t *testing.T) {
 	dm.Stop()
 }
 
-// TestDBManagerGetNoDBs tests Get returns channel when no databases configured.
+// TestDBManagerGetNoDBs tests Get returns error when no databases configured.
 func TestDBManagerGetNoDBs(t *testing.T) {
 	dm := &v1.DBManager{}
 	ctx := context.Background()
 
-	result := dm.GetAsync(ctx, "users", []string{"id", "name"}, nil, nil, nil)
+	ch, err := dm.GetAsync(ctx, "users", []string{"id", "name"}, nil, nil, nil)
 
-	assert.NotNil(t, result)
-	// Channel should be readable; may timeout or error is fine
+	assert.Nil(t, ch)
+	assert.Error(t, err)
 }
 
-// TestDBManagerGetByIDNoDBs tests GetByID returns channel when no databases configured.
+// TestDBManagerGetByIDNoDBs tests GetByID returns error when no databases configured.
 func TestDBManagerGetByIDNoDBs(t *testing.T) {
 	dm := &v1.DBManager{}
 	ctx := context.Background()
 
-	result := dm.GetByIDAsync(ctx, "users", 1, nil, nil)
+	ch, err := dm.GetByIDAsync(ctx, "users", 1, nil, nil)
 
-	assert.NotNil(t, result)
+	assert.Nil(t, ch)
+	assert.Error(t, err)
 }
 
-// TestDBManagerGetRawNoDBs tests GetRaw returns channel when no databases configured.
+// TestDBManagerGetRawNoDBs tests GetRaw returns error when no databases configured.
 func TestDBManagerGetRawNoDBs(t *testing.T) {
 	dm := &v1.DBManager{}
 	ctx := context.Background()
 
-	result := dm.GetRawAsync(ctx, "users", []string{"id", "name"}, nil, nil, nil)
+	ch, err := dm.GetRawAsync(ctx, "users", []string{"id", "name"}, nil, nil, nil)
 
-	assert.NotNil(t, result)
+	assert.Nil(t, ch)
+	assert.Error(t, err)
 }
 
-// TestDBManagerGetByIDRawNoDBs tests GetByIDRaw returns channel when no databases.
+// TestDBManagerGetByIDRawNoDBs tests GetByIDRaw returns error when no databases.
 func TestDBManagerGetByIDRawNoDBs(t *testing.T) {
 	dm := &v1.DBManager{}
 	ctx := context.Background()
 
-	result := dm.GetByIDRawAsync(ctx, "users", 1, nil, nil)
+	ch, err := dm.GetByIDRawAsync(ctx, "users", 1, nil, nil)
 
-	assert.NotNil(t, result)
+	assert.Nil(t, ch)
+	assert.Error(t, err)
 }
 
-// TestDBManagerInsertNoDBs tests Insert returns channel when no write databases.
+// TestDBManagerInsertNoDBs tests Insert returns error when no write databases.
 func TestDBManagerInsertNoDBs(t *testing.T) {
 	dm := &v1.DBManager{}
 	ctx := context.Background()
 	data := map[string]any{"name": "John"}
 
-	result := dm.InsertAsync(ctx, "users", data, nil)
+	ch, err := dm.InsertAsync(ctx, "users", data, nil)
 
-	assert.NotNil(t, result)
+	assert.Nil(t, ch)
+	assert.Error(t, err)
 }
 
-// TestDBManagerInsertsNoDBs tests Inserts returns channel when no write databases.
+// TestDBManagerInsertsNoDBs tests Inserts returns error when no write databases.
 func TestDBManagerInsertsNoDBs(t *testing.T) {
 	dm := &v1.DBManager{}
 	ctx := context.Background()
@@ -353,60 +357,66 @@ func TestDBManagerInsertsNoDBs(t *testing.T) {
 		{"name": "Bob"},
 	}
 
-	result := dm.InsertsAsync(ctx, "users", bulkData, nil)
+	ch, err := dm.InsertsAsync(ctx, "users", bulkData, nil)
 
-	assert.NotNil(t, result)
+	assert.Nil(t, ch)
+	assert.Error(t, err)
 }
 
-// TestDBManagerUpdateNoDBs tests Update returns channel when no write databases.
+// TestDBManagerUpdateNoDBs tests Update returns error when no write databases.
 func TestDBManagerUpdateNoDBs(t *testing.T) {
 	dm := &v1.DBManager{}
 	ctx := context.Background()
 	data := map[string]any{"name": "Jane"}
 
-	result := dm.UpdateAsync(ctx, "users", data, nil, nil, nil)
+	ch, err := dm.UpdateAsync(ctx, "users", data, nil, nil, nil)
 
-	assert.NotNil(t, result)
+	assert.Nil(t, ch)
+	assert.Error(t, err)
 }
 
-// TestDBManagerDeleteNoDBs tests Delete returns channel when no write databases.
+// TestDBManagerDeleteNoDBs tests Delete returns error when no write databases.
 func TestDBManagerDeleteNoDBs(t *testing.T) {
 	dm := &v1.DBManager{}
 	ctx := context.Background()
 
-	result := dm.DeleteAsync(ctx, "users", nil, nil, nil)
+	ch, err := dm.DeleteAsync(ctx, "users", nil, nil, nil)
 
-	assert.NotNil(t, result)
+	assert.Nil(t, ch)
+	assert.Error(t, err)
 }
 
-// TestDBManagerQueryNoDBs tests Query returns channel when no databases.
+// TestDBManagerQueryNoDBs tests Query returns error when no databases.
 func TestDBManagerQueryNoDBs(t *testing.T) {
 	dm := &v1.DBManager{}
 	ctx := context.Background()
 
-	result := dm.QueryAsync(ctx, "SELECT * FROM users")
+	ch, err := dm.QueryAsync(ctx, "SELECT * FROM users")
 
-	assert.NotNil(t, result)
+	assert.Nil(t, ch)
+	assert.Error(t, err)
 }
 
-// TestDBManagerQueryRawNoDBs tests QueryRaw returns channel when no databases.
+// TestDBManagerQueryRawNoDBs tests QueryRaw returns error when no databases.
 func TestDBManagerQueryRawNoDBs(t *testing.T) {
 	dm := &v1.DBManager{}
 	ctx := context.Background()
 
-	result := dm.QueryRawAsync(ctx, "SELECT * FROM users")
+	ch, err := dm.QueryRawAsync(ctx, "SELECT * FROM users")
 
-	assert.NotNil(t, result)
+	assert.Nil(t, ch)
+	assert.Error(t, err)
 }
 
-// TestDBManagerExecNoDBs tests Exec returns channel when no write databases.
+// TestDBManagerExecNoDBs tests Exec returns error when no write databases.
 func TestDBManagerExecNoDBs(t *testing.T) {
 	dm := &v1.DBManager{}
 	ctx := context.Background()
 
-	result := dm.ExecAsync(ctx, "INSERT INTO users VALUES (?, ?)", "John", 30)
+	ch, err := dm.ExecAsync(ctx, "INSERT INTO users VALUES (?, ?)", "John", 30)
 
-	assert.NotNil(t, result)
+	assert.Nil(t, ch)
+	assert.Error(t, err)
 }
 
 // TestDBManagerContextCancellation tests that canceled context is handled gracefully.
@@ -417,8 +427,10 @@ func TestDBManagerContextCancellation(t *testing.T) {
 	cancel()
 
 	// Should handle canceled context without panicking
-	result := dm.GetAsync(ctx, "users", []string{"id"}, nil, nil, nil)
-	assert.NotNil(t, result)
+	ch, err := dm.GetAsync(ctx, "users", []string{"id"}, nil, nil, nil)
+	// With no DBs configured, should immediately return error
+	assert.Nil(t, ch)
+	assert.Error(t, err)
 }
 
 // TestDBManagerContextTimeout tests that timed out context is handled gracefully.
@@ -428,8 +440,10 @@ func TestDBManagerContextTimeout(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 1*time.Millisecond)
 	defer cancel()
 
-	result := dm.GetAsync(ctx, "users", []string{"id"}, nil, nil, nil)
-	assert.NotNil(t, result)
+	ch, err := dm.GetAsync(ctx, "users", []string{"id"}, nil, nil, nil)
+	// With no DBs configured, should immediately return error
+	assert.Nil(t, ch)
+	assert.Error(t, err)
 }
 
 // TestDBManagerMultipleOperations tests that manager can handle multiple sequential operations.
@@ -438,50 +452,76 @@ func TestDBManagerMultipleOperations(t *testing.T) {
 	ctx := context.Background()
 
 	// Execute multiple operations in sequence
-	r1 := dm.GetAsync(ctx, "users", []string{"id"}, nil, nil, nil)
-	r2 := dm.InsertAsync(ctx, "users", map[string]any{}, nil)
-	r3 := dm.UpdateAsync(ctx, "users", map[string]any{}, nil, nil, nil)
-	r4 := dm.DeleteAsync(ctx, "users", nil, nil, nil)
-	r5 := dm.QueryAsync(ctx, "SELECT * FROM users")
+	// With no DBs configured, all should return errors
+	ch1, err1 := dm.GetAsync(ctx, "users", []string{"id"}, nil, nil, nil)
+	ch2, err2 := dm.InsertAsync(ctx, "users", map[string]any{}, nil)
+	ch3, err3 := dm.UpdateAsync(ctx, "users", map[string]any{}, nil, nil, nil)
+	ch4, err4 := dm.DeleteAsync(ctx, "users", nil, nil, nil)
+	ch5, err5 := dm.QueryAsync(ctx, "SELECT * FROM users")
 
-	assert.NotNil(t, r1)
-	assert.NotNil(t, r2)
-	assert.NotNil(t, r3)
-	assert.NotNil(t, r4)
-	assert.NotNil(t, r5)
+	assert.Nil(t, ch1)
+	assert.Nil(t, ch2)
+	assert.Nil(t, ch3)
+	assert.Nil(t, ch4)
+	assert.Nil(t, ch5)
+
+	assert.Error(t, err1)
+	assert.Error(t, err2)
+	assert.Error(t, err3)
+	assert.Error(t, err4)
+	assert.Error(t, err5)
 }
 
-// TestDBManagerReadOnlyVsReadWrite tests that read operations use read-only entries.
+// TestDBManagerReadOnlyVsReadWrite tests that read operations and write operations return proper errors when no DBs exist.
 func TestDBManagerReadOnlyVsReadWrite(t *testing.T) {
 	dm := &v1.DBManager{}
 	ctx := context.Background()
 
-	// Read operations
-	readResults := []<-chan *v1.QueryResponse{
-		dm.GetAsync(ctx, "users", []string{"id"}, nil, nil, nil),
-		dm.GetRawAsync(ctx, "users", []string{"id"}, nil, nil, nil),
-		dm.GetByIDAsync(ctx, "users", 1, nil, nil),
-		dm.GetByIDRawAsync(ctx, "users", 1, nil, nil),
-		dm.QueryAsync(ctx, "SELECT * FROM users"),
-		dm.QueryRawAsync(ctx, "SELECT * FROM users"),
-	}
+	// Read operations - all should return error with no DBs
+	ch1, err1 := dm.GetAsync(ctx, "users", []string{"id"}, nil, nil, nil)
+	assert.Nil(t, ch1)
+	assert.Error(t, err1)
 
-	// Write operations
-	writeResults := []<-chan *v1.QueryResponse{
-		dm.InsertAsync(ctx, "users", map[string]any{}, nil),
-		dm.InsertsAsync(ctx, "users", []map[string]any{}, nil),
-		dm.UpdateAsync(ctx, "users", map[string]any{}, nil, nil, nil),
-		dm.DeleteAsync(ctx, "users", nil, nil, nil),
-		dm.ExecAsync(ctx, "INSERT INTO users VALUES (?, ?)", "test"),
-	}
+	ch2, err2 := dm.GetRawAsync(ctx, "users", []string{"id"}, nil, nil, nil)
+	assert.Nil(t, ch2)
+	assert.Error(t, err2)
 
-	// All should return channels
-	for _, result := range readResults {
-		assert.NotNil(t, result)
-	}
-	for _, result := range writeResults {
-		assert.NotNil(t, result)
-	}
+	ch3, err3 := dm.GetByIDAsync(ctx, "users", 1, nil, nil)
+	assert.Nil(t, ch3)
+	assert.Error(t, err3)
+
+	ch4, err4 := dm.GetByIDRawAsync(ctx, "users", 1, nil, nil)
+	assert.Nil(t, ch4)
+	assert.Error(t, err4)
+
+	ch5, err5 := dm.QueryAsync(ctx, "SELECT * FROM users")
+	assert.Nil(t, ch5)
+	assert.Error(t, err5)
+
+	ch6, err6 := dm.QueryRawAsync(ctx, "SELECT * FROM users")
+	assert.Nil(t, ch6)
+	assert.Error(t, err6)
+
+	// Write operations - all should return error with no DBs
+	ch7, err7 := dm.InsertAsync(ctx, "users", map[string]any{}, nil)
+	assert.Nil(t, ch7)
+	assert.Error(t, err7)
+
+	ch8, err8 := dm.InsertsAsync(ctx, "users", []map[string]any{}, nil)
+	assert.Nil(t, ch8)
+	assert.Error(t, err8)
+
+	ch9, err9 := dm.UpdateAsync(ctx, "users", map[string]any{}, nil, nil, nil)
+	assert.Nil(t, ch9)
+	assert.Error(t, err9)
+
+	ch10, err10 := dm.DeleteAsync(ctx, "users", nil, nil, nil)
+	assert.Nil(t, ch10)
+	assert.Error(t, err10)
+
+	ch11, err11 := dm.ExecAsync(ctx, "INSERT INTO users VALUES (?, ?)", "test")
+	assert.Nil(t, ch11)
+	assert.Error(t, err11)
 }
 
 // TestDBManagerQueryParameters tests that query parameters are properly passed.
@@ -489,31 +529,34 @@ func TestDBManagerQueryParameters(t *testing.T) {
 	dm := &v1.DBManager{}
 	ctx := context.Background()
 
-	// Test Query with multiple parameters
-	result := dm.QueryAsync(ctx, "SELECT * FROM users WHERE id = ? AND name = ?", 1, "John")
-	assert.NotNil(t, result)
+	// Test Query with multiple parameters - should return error with no DBs
+	ch, err := dm.QueryAsync(ctx, "SELECT * FROM users WHERE id = ? AND name = ?", 1, "John")
+	assert.Nil(t, ch)
+	assert.Error(t, err)
 
-	// Test Exec with multiple parameters
-	execResult := dm.ExecAsync(ctx, "INSERT INTO users (id, name, age) VALUES (?, ?, ?)", 1, "John", 30)
-	assert.NotNil(t, execResult)
+	// Test Exec with multiple parameters - should return error with no DBs
+	execCh, execErr := dm.ExecAsync(ctx, "INSERT INTO users (id, name, age) VALUES (?, ?, ?)", 1, "John", 30)
+	assert.Nil(t, execCh)
+	assert.Error(t, execErr)
 }
 
-// TestDBManagerChannelNonBlocking tests that operations return channels immediately.
+// TestDBManagerChannelNonBlocking tests that operations return errors immediately when no DBs exist.
 func TestDBManagerChannelNonBlocking(t *testing.T) {
 	dm := &v1.DBManager{}
 	ctx := context.Background()
 
-	// These should all return immediately with channels
-	ch1 := dm.GetAsync(ctx, "users", []string{"id"}, nil, nil, nil)
-	ch2 := dm.InsertAsync(ctx, "users", map[string]any{}, nil)
-	ch3 := dm.QueryAsync(ctx, "SELECT * FROM users")
+	// These should all return immediately with errors when no DBs are configured
+	ch1, err1 := dm.GetAsync(ctx, "users", []string{"id"}, nil, nil, nil)
+	ch2, err2 := dm.InsertAsync(ctx, "users", map[string]any{}, nil)
+	ch3, err3 := dm.QueryAsync(ctx, "SELECT * FROM users")
 
-	// All channels should be non-nil
-	assert.NotNil(t, ch1)
-	assert.NotNil(t, ch2)
-	assert.NotNil(t, ch3)
+	// All channels should be nil when no DBs exist
+	assert.Nil(t, ch1)
+	assert.Nil(t, ch2)
+	assert.Nil(t, ch3)
 
-	// Channels should be distinct
-	assert.NotEqual(t, ch1, ch2)
-	assert.NotEqual(t, ch2, ch3)
+	// All should return errors
+	assert.Error(t, err1)
+	assert.Error(t, err2)
+	assert.Error(t, err3)
 }
