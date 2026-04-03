@@ -13,7 +13,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 Fabric v1.0.0 is the first stable release of a production-grade SQL abstraction library for Go. It provides a type-safe, multi-database query builder and abstraction layer that unifies MySQL, PostgreSQL, SQLite, and MSSQL behind a single fluent API.
 
-**Key Milestone**: 802 comprehensive tests (100% pass rate) across all modules and databases.
+**Key Milestone**: 829 comprehensive tests (100% pass rate) across all modules and databases.
 
 ---
 
@@ -276,6 +276,27 @@ Fabric v1.0.0 is the first stable release of a production-grade SQL abstraction 
 - 100% pass rate maintained
 - Coverage reporting enabled
 - Test artifacts preserved
+
+#### Phase 6 Retry Integration Examples (April 3, 2026)
+
+- **Retry Example Package** (`examples/manager-example/retry/`)
+  - 4 comprehensive example patterns with retry integration
+  - `exampleBasicRetry()`: Default exponential, linear, and fixed backoff patterns
+  - `exampleContextTimeout()`: Context deadline handling with 2-second timeout
+  - `exampleBackoffStrategies()`: Reference guide for 5 practical scenarios
+  - `exampleRetryPatterns()`: Real-world patterns (read fallback, write guarantee, batch ops)
+
+- **Documentation & Configuration**
+  - `examples/manager-example/retry/README.md`: Comprehensive strategy recommendations
+  - `examples/manager-example/retry/config.yaml`: Multi-entry database setup
+  - Updated `examples/manager-example/README.md`: Added section 4 with retry examples
+  - Added to "Running All Examples" workflow
+
+- **Test Integration**
+  - 27 new test cases integrated from retry examples
+  - Total tests: 802 → 829 tests (all passing, 100% pass rate)
+  - Example patterns demonstrate backoff strategies (exponential, linear, fixed)
+  - Production-ready example code for developers
 
 ---
 

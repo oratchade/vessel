@@ -15,7 +15,7 @@ A lightweight, multi-database SQL abstraction library for Go with support for My
 - 📊 **Connection Pooling** - Per-dialect statistics and configuration
 - ✨ **Zero-Copy Row Scanning** - Efficient field mapping to Go types
 - 📡 **OpenTelemetry Tracing** - Distributed tracing for all database operations
-- 🧪 **Comprehensive Testing** - 802 unit tests with 100% pass rate
+- 🧪 **Comprehensive Testing** - 829 unit tests with 100% pass rate
 
 ## Installation
 
@@ -32,7 +32,8 @@ Requires Go 1.26.0 or later.
 Fabric v1.0.0 is the first stable release with:
 
 - ✅ Full multi-database support (MySQL, PostgreSQL, SQLite, MSSQL)
-- ✅ 802 comprehensive tests (100% pass rate)
+- ✅ 829 comprehensive tests (100% pass rate)
+- ✅ Retry integration with automatic backoff strategies
 - ✅ Production-ready and battle-tested
 - ✅ Complete documentation and examples
 
