@@ -9,23 +9,32 @@
 
 ## 1. Executive Summary
 
-The fabric is a **well-engineered, production-ready** database abstraction library that provides clean, unified access to four major SQL databases (MySQL, PostgreSQL, SQLite, MSSQL).
+The fabric is a **well-engineered, production-ready** database abstraction
+library that provides clean, unified access to four major SQL databases
+(MySQL, PostgreSQL, SQLite, MSSQL).
 
 **Key Highlights:**
 
 - ✅ **49+ Integration tests** passing across SQLite, MySQL, PostgreSQL, and MSSQL
-- ✅ **829 total test cases** (Phase 5: +30 tests, Phase 6: +27 examples) with 0 failures
-- ✅ **100% test pass rate** with comprehensive coverage including retry patterns
+- ✅ **829 total test cases** (Phase 5: +30 tests, Phase 6: +27 examples)
+  with 0 failures
+- ✅ **100% test pass rate** with comprehensive coverage including
+  retry patterns
 - ✅ **0 linting issues** (golangci-lint clean, 40+ enabled linters)
 - ✅ **Excellent architecture** with proper interface hierarchy
-- ✅ **Production-grade error handling** with sentinel errors and error mapping
-- ✅ **Complete documentation** (README, error handling guide, contribution guide, operator matrix, code comments)
-- ✅ **Full parameterized query support** (SQL injection protection)
+- ✅ **Production-grade error handling** with sentinel errors and
+  error mapping
+- ✅ **Complete documentation** (README, error handling guide,
+  contribution guide, operator matrix, code comments)
+- ✅ **Full parameterized query support** (SQL injection
+  protection)
 - ✅ **Comprehensive mock generation** with proper go:generate directives
-- ✅ **FluentDB API** - New ergonomic query builder with full feature support
+- ✅ **FluentDB API** - New ergonomic query builder with full
+  feature support
 - ✅ **Structured Logging** - Comprehensive logging implementation
 
-**Critical Issues:** None remaining - all critical functionality validated and documented
+**Critical Issues:** None remaining - all critical functionality
+validated and documented
 
 ---
 
@@ -34,103 +43,131 @@ The fabric is a **well-engineered, production-ready** database abstraction libra
 ```text
 fabric/
 ├── db/v1/                                              # Version 1 public API
-│   ├── db.go (22 KB)                                   # Core interfaces (DB, DBActions, Tx, PoolStatistics)
+│   ├── db.go (22 KB)                                   # Core interfaces
+│   │   # (DB, DBActions, Tx, PoolStatistics)
 │   ├── db_test.go                                      # DB interface tests
 │   ├── db_mocks.go                                     # Generated mocks
 │   ├── config_test.go                                  # Configuration tests
-│   ├── fluentDB.go (24 KB)                             # Fluent/chainable query builder API
-│   ├── fluentDB_test.go                                # Comprehensive FluentDB tests
-│   ├── fluentdb_integration_test.go                    # Integration tests for FluentDB
-│   ├── logging.go (14 KB)                              # Structured logging implementation
+│   ├── fluentDB.go (24 KB)                             # Fluent query
+│   │   # builder API
+│   ├── fluentDB_test.go                                # FluentDB
+│   │   # tests
+│   ├── fluentdb_integration_test.go                    # FluentDB
+│   │   # integration tests
+│   ├── logging.go (14 KB)      # Structured logging implementation
 │   ├── logging_test.go                                 # Logging tests
-│   ├── logger.go, logger_mocks.go, logger_test.go      # Logger interface & mocks
-│   ├── row_adapter.go (9 KB)                           # SQL/pgx unified row interface + field scanning
+│   ├── logger.go, logger_mocks.go,
+│   │   logger_test.go      # Logger interface & mocks
+│   ├── row_adapter.go (9 KB)                           # SQL/pgx row
+│   │   # interface + field scanning
 │   ├── row_adapter_test.go                             # Row adapter tests
-│   ├── utils.go (8 KB)                                 # Shared query execution logic
-│   ├── mysql.go (29 KB), mysql_test.go                 # MySQL driver implementation & tests
-│   ├── postgres.go (32 KB), postgres_test.go           # PostgreSQL driver implementation & tests
-│   ├── sqlite.go (25 KB), sqlite_test.go               # SQLite driver implementation & tests
-│   ├── mssql.go (27 KB), mssql_test.go                 # MSSQL driver implementation & tests
-│   ├── dberror/                                        # Error handling & mapping
-│   │   ├── errors.go (13 KB)                           # Sentinel errors + dialect-specific mappers
-│   │   └── errors_test.go                              # Comprehensive error mapping tests
-│   └── plugin/                                         # Plugin system for custom database drivers
-│       └── registry.go (6 KB)                          # DriverFactory registry with thread-safe access
+│   ├── utils.go (8 KB)                                 # Shared
+│   │   # query execution
+│   ├── mysql.go (29 KB), mysql_test.go                 # MySQL
+│   │   # driver & tests
+│   ├── postgres.go (32 KB), postgres_test.go           # PostgreSQL
+│   │   # driver & tests
+│   ├── sqlite.go (25 KB), sqlite_test.go               # SQLite
+│   │   # driver & tests
+│   ├── mssql.go (27 KB), mssql_test.go                 # MSSQL
+│   │   # driver & tests
+│   ├── dberror/         # Error handling & mapping
+│   │   ├── errors.go (13 KB)                           # Sentinel errors
+│   │   │   # + dialect-specific mappers
+│   │   └── errors_test.go                              # Error
+│   │       # mapping tests
+│   └── plugin/                                         # Plugin
+│       # system for custom drivers
+│       └── registry.go (6 KB)                          # Driver
+│           # registry (thread-safe)
 │
 ├── internal/pkg/
-│   ├── builder/                                        # SQL query builder (CRUD operations)
+│   ├── builder/                                        # SQL query
+│   │   # builder (CRUD)
 │   │   ├── builder.go                                  # QueryBuilder interface
-│   │   ├── builder_test.go                             # Builder tests (requires -tags=test)
+│   │   ├── builder_test.go                             # Builder
+│   │   │   # tests (requires -tags=test)
 │   │   ├── builder_mocks.go                            # Generated mocks
-│   │   ├── mysql.go, mysql_builder_test.go             # MySQL builder implementation & tests
-│   │   ├── postgres.go, postgres_builder_test.go       # PostgreSQL builder implementation & tests
-│   │   ├── sqlite.go, sqlite_builder_test.go           # SQLite builder implementation & tests
-│   │   ├── mssql.go, mssql_builder_test.go             # MSSQL builder implementation & tests
+│   │   ├── mysql.go, mysql_builder_test.go             # MySQL
+│   │   │   # builder & tests
+│   │   ├── postgres.go,
+│   │   │   postgres_builder_test.go       # PostgreSQL
+│   │   │   # builder & tests
+│   │   ├── sqlite.go, sqlite_builder_test.go
+│   │   │   # SQLite builder implementation & tests
+│   │   ├── mssql.go, mssql_builder_test.go
+│   │   │   # MSSQL builder implementation & tests
 │   │   └── test_helpers.go                             # Test utilities
 │   │
-│   ├── sqldialect/                                     # SQL dialect abstractions
-│   │   ├── sql_dialect.go                              # Shared dialect logic (supportedOptions, formatting)
-│   │   ├── sql_dialect_test.go                         # Dialect tests
-│   │   ├── mysql.go                                    # MySQL dialect implementation
-│   │   ├── postgres.go                                 # PostgreSQL dialect implementation
-│   │   ├── mssql.go                                    # MSSQL dialect implementation
+│   ├── sqldialect/             # SQL dialect abstractions
+│   │   ├── sql_dialect.go      # Dialect logic
+│   │   ├── sql_dialect_test.go # Dialect tests
+│   │   ├── mysql.go            # MySQL dialect
+│   │   ├── postgres.go         # PostgreSQL dialect
+│   │   ├── mssql.go            # MSSQL dialect
 │   │   └── operator.go                                 # Operator mapping
 │   │
-│   ├── operator/                                       # SQL operator definitions
-│   │   ├── operator.go                                 # Operator constants and utilities
+│   ├── operator/                               # SQL operator defs
+│   │   ├── operator.go                    # Operator constants
 │   │   └── operator_test.go                            # Operator tests
 │   │
-│   ├── helpers/                                        # Utility functions
+│   ├── helpers/                                # Utility functions
 │   │   ├── helpers.go                                  # Helper functions
 │   │   └── helpers_test.go                             # Helper tests
 │   │
-│   └── otel/                                           # OpenTelemetry integration
+│   └── otel/                               # OpenTelemetry integration
 │       ├── otel.go                                     # OTEL instrumentation
 │       └── otel_test.go                                # OTEL tests
 │
 ├── pkg/query/
-│   ├── condition/                                      # Query condition DSL
-│   │   ├── condition.go                                # Condition & SQLDialect interfaces
+│   ├── condition/                            # Query condition DSL
+│   │   ├── condition.go            # Condition & SQLDialect
 │   │   ├── condition_mocks.go                          # Generated mocks
-│   │   ├── expression.go, expression_test.go           # Simple column op value expressions
-│   │   ├── and.go, and_test.go                         # AND composition
+│   │   ├── expression.go,
+│   │   expression_test.go           # Expression
+│   │   ├── and.go, and_test.go                         # AND
+│   │   # composition
 │   │   ├── or.go, or_test.go                           # OR composition
-│   │   ├── not.go, not_test.go                         # NOT composition
+│   │   ├── not.go, not_test.go                         # NOT
+│   │   # composition
 │   │   ├── in.go, in_test.go                           # IN operator
 │   │   ├── between.go, between_test.go                 # BETWEEN operator
 │   │   └── join.go, join_test.go                       # JOIN clauses
 │   │
-│   ├── definition/                                     # Constants (driver names, query types)
+│   ├── definition/                                     # Constants
+│   │   # (driver names, query types)
 │   │   └── constants.go                                # Query definition constants
 │   │
-│   └── options/                                        # QueryOptions struct (LIMIT, OFFSET, ORDER BY, etc.)
+│   └── options/                                # QueryOptions
 │       └── options.go                                  # Query options configuration
 │
 ├── tests/                                              # Integration tests
-│   ├── integration_test.go                             # Integration tests (19 real database tests)
-│   └── mocks.go                                        # Test mocks & fixtures
+│   ├── integration_test.go                             # Tests
+│   └── mocks.go                                        # Test
 │
-├── manager/v1/                                         # Query manager (higher-level API)
+├── manager/v1/                             # Query manager API
 │   ├── manager.go                                      # Manager implementation
 │   ├── db_entry.go                                     # Database entry configuration
 │   ├── sync.go                                         # Sync utilities for manager
 │   ├── manager_test.go                                 # Manager tests
 │   ├── utils_test.go                                   # Manager utility tests
 │   └── config/                                         # Manager configuration
-│       ├── manager_config.go                           # Config structure
-│       └── entry_config.go, entry_config_test.go       # Entry config handling
+│   ├── entry_config.go,
+│   │   entry_config_test.go       # Entry config
 │
 ├── examples/                                           # Usage examples
 │   ├── explain-example/                                # Query explanation examples
-│   ├── manager-example/                                # Manager usage examples with error handling
-│   ├── fluentdb-example/                               # FluentDB usage examples (basic/advanced/transactions)
-│   └── plugin-example/                                 # Plugin system examples (CockroachDB)
+│   ├── manager-example/                                # Manager
+│   │   # usage examples
+│   ├── fluentdb-example/                               # FluentDB
+│   │   # usage examples (all variations)
+│   └── plugin-example/             # Plugin examples (CockroachDB)
 │
-├── Makefile                                            # Build, test, coverage, linting targets
-├── .golangci.yml                                       # 40+ enabled linters configuration
-├── docker-compose.test.yml                             # Docker Compose for integration tests
-├── go.mod, go.sum                                      # Dependencies (Go 1.26.0)
-└── gopls.env                                           # Language server configuration
+├── Makefile                                  # Build, test, coverage, lint
+├── .golangci.yml                  # 40+ enabled linters config
+├── docker-compose.test.yml       # Docker Compose integration
+├── go.mod, go.sum           # Dependencies (Go 1.26.0)
+└── gopls.env                       # Language server config
 ```
 
 **Total Go Files:** 90 files  
@@ -156,12 +193,14 @@ fabric/
 
 ### 3.1 Core Interfaces (Excellent Design ✅)
 
-**DB Interface** - Main entry point (`db/v1/db.go` lines 263-308)
+**DB Interface** - Main entry point
+(`db/v1/db.go` lines 263-308)
 
 ```go
 type DB interface {
-    DBActions                                    // Embedded: Get, Insert, Update, Delete
-    DBQueries                                    // Embedded: GetQuery, InsertQuery, Explain, etc.
+    DBActions // Embedded: Get, Insert, Update, Delete
+    // Embedded: GetQuery, InsertQuery, Explain, etc.
+    DBQueries
     Ping(ctx context.Context) error             // Health check
     PoolStats() (*PoolStatistics, error)        // Connection pool diagnostics
     Begin(ctx context.Context) (Tx, error)      // Start transaction
@@ -170,7 +209,8 @@ type DB interface {
 }
 ```
 
-- ✅ Clean separation: data access (DBActions) vs. introspection (DBQueries) vs. connection management
+- ✅ Clean separation: data access (DBActions) vs. introspection
+  (DBQueries) vs. connection management
 - ✅ Context propagation throughout
 - ✅ Proper health check and pool monitoring exposed
 
@@ -179,11 +219,14 @@ type DB interface {
 ```go
 type DBActions interface {
     Get(ctx, table, columns, joins, conditions, opts) ([]map[string]any, error)
-    GetRaw(ctx, table, columns, joins, conditions, opts) (*RowsAdapter, error)  // Unscanned
+    GetRaw(ctx, table, columns, joins, conditions, opts)
+        (*RowsAdapter, error)  // Unscanned
     GetByID(ctx, table, id, joins, opts) ([]map[string]any, error)
-    GetByIDRaw(ctx, table, id, joins, opts) (*RowsAdapter, error)  // Unscanned
-    Insert(ctx, table, data, opts) (*ExecResult, error)           // Single row
-    Inserts(ctx, table, data []map[string]any, opts) (*ExecResult, error)  // Bulk insert
+    GetByIDRaw(ctx, table, id, joins, opts)
+        (*RowsAdapter, error)  // Unscanned
+    Insert(ctx, table, data, opts) (*ExecResult, error)
+    Inserts(ctx, table, data []map[string]any, opts)
+        (*ExecResult, error)  // Bulk insert
     Update(ctx, table, data, conditions, opts) (*ExecResult, error)
     Delete(ctx, table, conditions, opts) (*ExecResult, error)
     Query(ctx, query string, args) ([]map[string]any, error)    // Raw SQL
@@ -207,18 +250,21 @@ type DBQueries interface {
     InsertsQuery(table, data []map[string]any, opts) (string, []any, error)
     UpdateQuery(table, data, conditions, opts) (string, []any, error)
     DeleteQuery(table, conditions, opts) (string, []any, error)
-    Explain(ctx context.Context, query string, args ...any) (*RowsAdapter, error)  // Preview execution plan
+    Explain(ctx context.Context, query string, args ...any) (
+        *RowsAdapter, error)  // Preview execution plan
 }
 ```
 
-**Purpose:** Enables query introspection without execution for debugging, logging, and
-performance analysis.
+**Purpose:** Enables query introspection without execution for debugging,
+logging, and performance analysis.
 
 **Benefits:**
 
-- ✅ **SQL Injection Prevention** - xxxQuery methods generate parameterized SQL safely
+- ✅ **SQL Injection Prevention** - xxxQuery methods generate
+  parameterized SQL safely
 - ✅ **Query Validation** - Inspect generated SQL before execution
-- ✅ **Performance Analysis** - Run EXPLAIN to understand query execution plans across databases
+- ✅ **Performance Analysis** - Run EXPLAIN to understand query execution
+  plans across databases
 - ✅ **Audit Trails** - Log all generated SQL for compliance and debugging
 - ✅ **Batch Building** - Construct multiple queries before executing any
 
@@ -226,13 +272,15 @@ performance analysis.
 
 ```go
 // Generate and inspect query
-query, args, err := db.GetQuery("users", []string{"id", "name"}, nil,
+query, args, err := db.GetQuery(
+    "users", []string{"id", "name"}, nil,
     cdt.NewExpr().Column("age").Op(">").Value(25), nil)
 // Output: query = "SELECT id, name FROM users WHERE age > ?"
 //         args = [25]
 
 // Analyze performance with EXPLAIN
-plan, err := db.Explain(ctx, query, args...)  // Uses parameterized SQL safely
+plan, err := db.Explain(ctx, query, args...)
+// Uses parameterized SQL safely
 // Output: Execution plan for performance analysis
 ```
 
@@ -243,7 +291,8 @@ type SQLDialect interface {
     Placeholder(index int) string                      // $1 vs ? vs @p1
     Operator(op string) string                         // Dialect-specific operators
     QuoteIdentifier(value string) string               // "col" vs `col` vs [col]
-    SupportedOptions(queryType, opts, paramBase) (string, []any, error)  // LIMIT, OFFSET
+    SupportedOptions(queryType, opts, paramBase) (
+        string, []any, error)  // LIMIT, OFFSET
 }
 ```
 
@@ -252,8 +301,9 @@ type SQLDialect interface {
 
 ### 3.1.5 Plugin System for Custom Drivers ✨ (NEW)
 
-**Overview:** The fabric now supports a registry-based plugin system that allows users
-to register custom database drivers without modifying the core library.
+**Overview:** The fabric now supports a registry-based plugin
+system that allows users to register custom database drivers
+without modifying the core library.
 
 **Registry Architecture** (`db/v1/plugin/registry.go`)
 
@@ -261,22 +311,25 @@ The plugin package provides a thread-safe driver registry:
 
 ```go
 type DriverFactory interface {
-    Name() string                                      // Driver identifier (e.g., "mydb")
-    Create(ctx context.Context, cfg any) (any, error)  // Create DB instance
+    Name() string // Driver identifier (e.g., "mydb")
+    Create(ctx context.Context, cfg any) (any, error)
 }
 
 // API Functions:
-Register(factory DriverFactory) error                 // Register a driver (prevents duplicates)
-MustRegister(factory DriverFactory)                   // Register, panic on error (for init)
+Register(factory DriverFactory) error
+    // Register a driver (prevents duplicates)
+MustRegister(factory DriverFactory)
+    // Register, panic on error (for init)
 Get(driverName string) (DriverFactory, bool)          // Look up by name
 List() []string                                       // List all registered drivers
 Unregister(driverName string) error                   // Remove driver (testing)
 Clear()                                               // Remove all drivers (testing)
 ```
 
-**Integration with NewDB**
+#### Integration with NewDB
 
-The `db.NewDB()` function checks the plugin registry first, then falls back to built-in drivers:
+The `db.NewDB()` function checks the plugin registry first,
+then falls back to built-in drivers:
 
 ```text
 User calls NewDB(cfg)
@@ -286,7 +339,7 @@ Check plugin.Get(cfg.Driver())
     └─ If not found → Fall back to hardcoded switch for built-in drivers
 ```
 
-**Exported Driver Functions**
+#### Exported Driver Functions
 
 Plugin authors can reuse built-in driver implementations:
 
@@ -297,7 +350,7 @@ SQLiteCfgToDB(cfg DBConfig) (DB, error)        // SQLite wrapper
 MSSQLCfgToDB(cfg DBConfig) (DB, error)         // MSSQL wrapper
 ```
 
-**Example: Creating a Custom Driver**
+#### Example: Creating a Custom Driver
 
 ```go
 // In your package (e.g., mydb/factory.go)
@@ -324,7 +377,7 @@ func init() {
 }
 ```
 
-**Usage by End Users**
+#### Usage by End Users
 
 ```go
 import (
@@ -336,7 +389,7 @@ cfg := &mydb.Config{...}
 database, err := db.NewDB(cfg, nil)  // Uses registered plugin
 ```
 
-**Benefits**
+#### Benefits
 
 - ✅ **Decoupled** - Plugins don't require core library modifications
 - ✅ **Thread-Safe** - sync.RWMutex protects all registry operations
@@ -345,9 +398,10 @@ database, err := db.NewDB(cfg, nil)  // Uses registered plugin
 - ✅ **Reusable** - Plugins can wrap or extend built-in drivers
 - ✅ **No Circular Imports** - Clean architecture
 
-**Complete Implementation Example**
+#### Complete Implementation Example
 
-See [examples/plugin-example/](../../examples/plugin-example/) for a complete working example:
+See [examples/plugin-example/](../../examples/plugin-example/)
+for a complete working example:
 
 - `cockroachdb/driver.go` - Full CockroachDB plugin implementation
 - `main.go` - Usage example with database operations
@@ -386,7 +440,10 @@ type QueryBuilder interface {
 
 **Package:** `db/v1/fluentDB.go` (958 lines)
 
-The fabric now includes a **fluent/chainable builder API** (`FluentDB`) that provides an ergonomic interface for constructing SELECT, INSERT, UPDATE, and DELETE queries. This complements the lower-level DBActions interface while maintaining 100% code reuse through delegation.
+The fabric now includes a **fluent/chainable builder API** (`FluentDB`).
+It provides an ergonomic interface for constructing SELECT, INSERT, UPDATE,
+and DELETE queries. This complements the lower-level DBActions interface
+while maintaining 100% code reuse through delegation.
 
 **Architecture Overview:**
 
@@ -664,12 +721,12 @@ go test -tags=test ./...
 
 **Test Results:**
 
-| Package                   | Tests | Status  | Notes                                                 |
-| ------------------------- | ----- | ------- | ----------------------------------------------------- |
-| `internal/pkg/builder`    | 20+   | ✅ PASS | `-tags=test` required (intentional test-only exports) |
-| `internal/pkg/sqldialect` | 5+    | ✅ PASS | MSSQL OFFSET validation tested                        |
-| `pkg/query/condition`     | 30+   | ✅ PASS | And, Or, Not, In, Between, Expr, Join                 |
-| `db/v1/dberror`           | 42+   | ✅ PASS | Error mapping: MySQL, Postgres, SQLite, MSSQL         |
+| Package                   | Tests | Status  | Notes                       |
+| ------------------------- | ----- | ------- | --------------------------- |
+| `internal/pkg/builder`    | 20+   | ✅ PASS | Test-only exports required  |
+| `internal/pkg/sqldialect` | 5+    | ✅ PASS | MSSQL OFFSET validation     |
+| `pkg/query/condition`     | 30+   | ✅ PASS | All condition types covered |
+| `db/v1/dberror`           | 42+   | ✅ PASS | All database error mapping  |
 
 **Total Test Cases:** 290+ all passing ✅
 
@@ -680,7 +737,8 @@ go test -tags=test ./...
 1. **Core DB/V1 Integration Tests (19 tests)** - `tests/integration_test.go`
    - Validating all major db/v1 API methods against real databases
 
-2. **FluentDB Integration Tests (30+ tests)** - `db/v1/fluentdb_integration_test.go` (NEW - March 21)
+2. **FluentDB Integration Tests (30+ tests)** -
+   `db/v1/fluentdb_integration_test.go` (NEW - March 21)
    - Comprehensive FluentDB API validation
    - All builder types: SelectBuilder, InsertBuilder, UpdateBuilder, DeleteBuilder
    - Chaining, options, and advanced scenarios
@@ -733,17 +791,17 @@ go test -tags=test -run "^Test(Integration|FluentDB)" -v ./...
 
 **Test Summary:**
 
-| Package/Category              | Tests | Status  | Notes                                                 |
-| ----------------------------- | ----- | ------- | ----------------------------------------------------- |
-| `db/v1/fluentdb_integration`  | 30+   | ✅ PASS | FluentDB builders across all 3 databases              |
-| `tests/integration_test`      | 19    | ✅ PASS | Core DB API tests (SQLite, MySQL, PostgreSQL)         |
-| `db/v1/fluentDB_test`         | 40+   | ✅ PASS | FluentDB unit tests (builder patterns, chaining)      |
-| `db/v1/logging_test`          | 15+   | ✅ PASS | Structured logging implementation tests               |
-| `internal/pkg/builder`        | 20+   | ✅ PASS | `-tags=test` required (intentional test-only exports) |
-| `internal/pkg/sqldialect`     | 5+    | ✅ PASS | MSSQL OFFSET validation tested                        |
-| `pkg/query/condition`         | 30+   | ✅ PASS | And, Or, Not, In, Between, Expr, Join                 |
-| `db/v1/dberror`               | 42+   | ✅ PASS | Error mapping: MySQL, Postgres, SQLite, MSSQL         |
-| `db/v1/*_test` (driver tests) | 20+   | ✅ PASS | Database driver unit tests                            |
+| Package/Category              | Tests | Status  | Notes             |
+| ----------------------------- | ----- | ------- | ----------------- |
+| `db/v1/fluentdb_integration`  | 30+   | ✅ PASS | FluentDB builders |
+| `tests/integration_test`      | 19    | ✅ PASS | Core DB API tests |
+| `db/v1/fluentDB_test`         | 40+   | ✅ PASS | FluentDB unit     |
+| `db/v1/logging_test`          | 15+   | ✅ PASS | Logging tests     |
+| `internal/pkg/builder`        | 20+   | ✅ PASS | Test-only exports |
+| `internal/pkg/sqldialect`     | 5+    | ✅ PASS | MSSQL validation  |
+| `pkg/query/condition`         | 30+   | ✅ PASS | Condition ops     |
+| `db/v1/dberror`               | 42+   | ✅ PASS | Error mapping     |
+| `db/v1/*_test` (driver tests) | 20+   | ✅ PASS | Driver tests      |
 
 **Total Test Cases:** 290+ all passing ✅
 
@@ -771,7 +829,8 @@ go test -tags=test -run "^Test(Integration|FluentDB)" -v ./...
 18. `TestIntegration_NotEqualOperator` - != operator
 19. `TestIntegration_InOperator` - IN operator with lists
 
-**FluentDB Integration Tests** (30+ tests in `db/v1/fluentdb_integration_test.go`) (NEW - March 21)
+**FluentDB Integration Tests** (30+ tests in
+`db/v1/fluentdb_integration_test.go`) (NEW - March 21)
 
 SelectBuilder Tests:
 
@@ -859,7 +918,8 @@ Advanced Tests:
 - ✅ **30+ Phase 5 tests** (dialect operators, options, complex conditions)
 - ✅ **27+ Phase 6 tests** (retry integration examples and patterns)
 - ✅ **829 total test cases** - 100% pass rate
-- ✅ Full integration test suite with Docker composition (MySQL, Postgres, SQLite, MSSQL 2022)
+- ✅ Full integration test suite with Docker composition
+  (MySQL, Postgres, SQLite, MSSQL 2022)
 - ✅ All core functionality validated end-to-end
 - ✅ FluentDB API fully tested across all builder types
 - ✅ Cross-dialect compatibility verified
@@ -954,12 +1014,16 @@ make fmt-check
 
 **Comments:**
 
-- ✅ **ALL packages follow Go standards** - Every package starts with `// Package <name>` comment describing its purpose
+- ✅ **ALL packages follow Go standards** - Every package starts with
+  `// Package <name>` comment describing its purpose
 - ✅ **All exported types documented** - Type comments immediately precede declarations
-- ✅ **All exported functions/methods documented** - Function comments follow Go best practices
-- ✅ **Interface methods well-documented** - Method signatures, parameters, and returns clearly described
+- ✅ **All exported functions/methods documented** - Function comments
+  follow Go best practices
+- ✅ **Interface methods well-documented** - Method signatures, parameters,
+  and returns clearly described
 - ✅ **Struct fields documented** - All public fields have inline comments
-- ✅ **Implementation details documented** - Field coercion logic, row scanning logic, and SQL building all have supporting comments
+- ✅ **Implementation details documented** - Field coercion logic, row scanning
+  logic, and SQL building all have supporting comments
 - ✅ **Test helpers documented** - Package-internal test utilities have clear documentation
 
 **Package Organization:**
@@ -1020,7 +1084,8 @@ make fmt-check
 **Type Coercion** (`setFieldFromValue()`)
 
 - ✅ Handles basic types: string, int*, uint*, float\*, bool
-- ✅ **SQL Null types:** NullString, NullInt64, NullBool, NullFloat64, NullByte, NullTime
+- ✅ **SQL Null types:** NullString, NullInt64, NullBool,
+  NullFloat64, NullByte, NullTime
 - ✅ Direct assignment when types match
 - ✅ Type conversion for compatible types
 - ✅ Fallback: string parsing → JSON unmarshaling
@@ -1051,14 +1116,15 @@ users, err := ScanRowsTo[User](rows)
 
 **selectQ()** (`internal/pkg/builder/builder.go` lines 68-145)
 
-- Builds: `SELECT col1, col2 FROM table JOIN ... WHERE ... GROUP BY ... ORDER BY ... LIMIT ...`
+- Builds:
+  `SELECT col1, col2 FROM table JOIN .. WHERE .. GROUP BY .. ORDER BY .. LIMIT ..`
 - Proper column quoting via dialect
 - JOIN integration
 - Condition building with parameter tracking
 - Options (GROUP BY, HAVING, ORDER BY, LIMIT, OFFSET) with dialect-aware formatting
 - Semicolon termination for safety
 
-**Parameter Placeholder Calculation**
+#### Parameter Placeholder Calculation
 
 ```go
 // Track parameter indices across conditions and options
@@ -1072,12 +1138,15 @@ allArgs := append(values, optArgs...)
 
 **inserts()** (`internal/pkg/builder/builder.go` lines 212-249)
 
-- Generates multi-row INSERT statements: `INSERT INTO table (col1, col2) VALUES (?, ?), (?, ?), ...`
-- Fixes: Extracts column names once from first row, then builds placeholders per row
+- Generates multi-row INSERT statements:
+  `INSERT INTO table (col1, col2) VALUES (?, ?), (?, ?), ...`
+- Fixes: Extracts column names once from first row,
+  then builds placeholders per row
 - Handles missing columns in rows by inserting `NULL` values
 - Parameter indices properly tracked across all rows
 - Dialect-aware identifier quoting and placeholder syntax
-- Implemented consistently across all 4 database drivers (MySQL, PostgreSQL, SQLite, MSSQL)
+- Implemented consistently across all
+  4 database drivers (MySQL, PostgreSQL, SQLite, MSSQL)
 - Proper error handling with context propagation
 
 **SQL Generation Example:**
@@ -1184,8 +1253,10 @@ MSSQL: `INSERT INTO users (id, name) VALUES (@p1, @p2), (@p3, @p4);`
 
 - **Current:** 20 integration tests across 4 real databases
 - **Coverage:** All major db/v1 API methods validated
-- **Architecture:** docker-compose.yml based (MySQL 8.0, PostgreSQL 15, SQLite, MSSQL 2022)
-- **Result:** 100% pass rate on SQLite, MySQL, PostgreSQL (MSSQL gracefully skipped when unavailable)
+- **Architecture:** docker-compose.yml based
+  (MySQL 8.0, PostgreSQL 15, SQLite, MSSQL 2022)
+- **Result:** 100% pass rate on
+  SQLite, MySQL, PostgreSQL (MSSQL gracefully skipped when unavailable)
 
 **Test Suite Breakdown:**
 
@@ -1227,20 +1298,20 @@ Status: ✅ PRODUCTION READY
 
 **Coverage Matrix:**
 
-| Feature                   | SQLite | MySQL | PostgreSQL   | MSSQL | FluentDB | Logging |
-| ------------------------- | ------ | ----- | ------------ | ----- | -------- | ------- |
-| CRUD Operations           | ✅     | ✅    | ✅           | ✅    | ✅       | ✅      |
-| Transactions              | ✅     | ✅    | ✅           | ✅    | ✅       | ✅      |
-| Complex Conditions        | ✅     | ✅    | ✅           | ✅    | ✅       | ✅      |
-| Raw Queries               | ✅     | ✅    | ✅           | ✅    | ✅       | ✅      |
-| All Operators             | ✅     | ✅    | ✅           | ✅    | ✅       | N/A     |
-| JOINs                     | ✅     | ✅    | ✅           | ✅    | ✅       | N/A     |
-| Connection Pooling        | ✅     | ✅    | ✅ (pgxpool) | ✅    | N/A      | N/A     |
-| Error Mapping             | ✅     | ✅    | ✅           | ✅    | ✅       | N/A     |
-| Bulk Operations (Inserts) | ✅     | ✅    | ✅           | ✅    | ✅       | N/A     |
-| Type Coercion             | ✅     | ✅    | ✅           | ✅    | N/A      | N/A     |
-| Plugin System             | ✅     | ✅    | ✅           | ✅    | N/A      | N/A     |
-| Integration Tests (19)    | ✅     | ✅    | ✅           | ⏭️    | ✅       | ✅      |
+| Feature                   | SQLite | MySQL | Postgres | MSSQL | Fluent | Log |
+| ------------------------- | ------ | ----- | -------- | ----- | ------ | --- |
+| CRUD Operations           | ✅     | ✅    | ✅       | ✅    | ✅     | ✅  |
+| Transactions              | ✅     | ✅    | ✅       | ✅    | ✅     | ✅  |
+| Complex Conditions        | ✅     | ✅    | ✅       | ✅    | ✅     | ✅  |
+| Raw Queries               | ✅     | ✅    | ✅       | ✅    | ✅     | ✅  |
+| All Operators             | ✅     | ✅    | ✅       | ✅    | ✅     | N/A |
+| JOINs                     | ✅     | ✅    | ✅       | ✅    | ✅     | N/A |
+| Connection Pooling        | ✅     | ✅    | ✅       | ✅    | N/A    | N/A |
+| Error Mapping             | ✅     | ✅    | ✅       | ✅    | ✅     | N/A |
+| Bulk Operations (Inserts) | ✅     | ✅    | ✅       | ✅    | ✅     | N/A |
+| Type Coercion             | ✅     | ✅    | ✅       | ✅    | N/A    | N/A |
+| Plugin System             | ✅     | ✅    | ✅       | ✅    | N/A    | N/A |
+| Integration Tests (19)    | ✅     | ✅    | ✅       | ⏭️    | ✅     | ✅  |
 
 **Legend:**
 
@@ -1289,16 +1360,16 @@ No critical production blockers identified. All existing issues have been addres
 
 ## 10. Database Dialect Comparison
 
-| Feature            | MySQL              | PostgreSQL         | SQLite             | MSSQL                   |
-| ------------------ | ------------------ | ------------------ | ------------------ | ----------------------- |
-| Placeholder Style  | `?`                | `$1, $2...`        | `?`                | `@p1, @p2...`           |
-| Identifier Quote   | `` ` ``            | `"`                | `` ` ``            | `[` `]`                 |
-| RETURNING          | ✅\*               | ✅                 | ❌                 | ✅\*                    |
-| LIMIT/OFFSET       | `LIMIT x OFFSET y` | `LIMIT x OFFSET y` | `LIMIT x OFFSET y` | `OFFSET x FETCH NEXT y` |
-| Connection Pooling | sql.DB             | pgxpool            | sql.DB             | sql.DB                  |
-| JOIN Support       | ✅                 | ✅                 | ✅                 | ✅                      |
-| CTE Support        | ✅                 | ✅                 | ✅                 | ✅                      |
-| Transactions       | ✅                 | ✅                 | ✅                 | ✅                      |
+| Feature      | MySQL    | PostgreSQL  | SQLite   | MSSQL         |
+| ------------ | -------- | ----------- | -------- | ------------- |
+| Placeholder  | `?`      | `$1, $2...` | `?`      | `@p1, @p2...` |
+| Quote        | `` ` ``  | `"`         | `` ` ``  | `[` `]`       |
+| RETURNING    | ✅\*     | ✅          | ❌       | ✅\*          |
+| LIMIT/OFFSET | Standard | Standard    | Standard | OFFSET/FETCH  |
+| Connection   | sql.DB   | pgxpool     | sql.DB   | sql.DB        |
+| JOIN         | ✅       | ✅          | ✅       | ✅            |
+| CTE          | ✅       | ✅          | ✅       | ✅            |
+| Transactions | ✅       | ✅          | ✅       | ✅            |
 
 **Notes:**
 
@@ -1324,20 +1395,21 @@ No critical production blockers identified. All existing issues have been addres
 
 ## 12. Production Readiness Checklist
 
-| Aspect         | Status | Notes                                                                  |
-| -------------- | ------ | ---------------------------------------------------------------------- |
-| API Design     | ✅     | Interfaces are stable and well-designed                                |
-| Linting        | ✅     | 0 issues with 40+ enabled linters                                      |
-| Code Comments  | ✅     | All Go standards (packages, types, functions)                          |
-| Error Handling | ✅     | Sentinel errors + proper wrapping                                      |
-| Security       | ✅     | Parameterized queries throughout                                       |
-| Testing        | ✅     | 829 tests passing (Phase 5: +30, Phase 6: +27 examples), zero failures |
-| Documentation  | ✅     | Complete (README, CHANGELOG, CONTRIBUTING, error handling)             |
-| Performance    | ⚠️     | No benchmarks, but design is sound                                     |
-| Observability  | ⚠️     | Has logging interface + PoolStats + OpenTelemetry distributed tracing  |
-| Deployment     | ✅     | Self-contained, minimal dependencies                                   |
+| Aspect         | Status | Notes                                   |
+| -------------- | ------ | --------------------------------------- |
+| API Design     | ✅     | Interfaces are stable and well-designed |
+| Linting        | ✅     | 0 issues with 40+ enabled linters       |
+| Code Comments  | ✅     | All Go standards                        |
+| Error Handling | ✅     | Sentinel errors + proper wrapping       |
+| Security       | ✅     | Parameterized queries throughout        |
+| Testing        | ✅     | 829 tests passing, zero failures        |
+| Documentation  | ✅     | Complete                                |
+| Performance    | ⚠️     | No benchmarks, but design is sound      |
+| Observability  | ⚠️     | logging + PoolStats + OpenTelemetry     |
+| Deployment     | ✅     | Self-contained, minimal dependencies    |
 
-**Summary:** ✅ **PRODUCTION READY** - All integration tests complete, comprehensive documentation, comprehensive observability, zero critical issues.
+**Summary:** ✅ **PRODUCTION READY** - All integration tests complete,
+comprehensive documentation, comprehensive observability, zero critical issues.
 
 ---
 
@@ -1345,13 +1417,23 @@ No critical production blockers identified. All existing issues have been addres
 
 The following comprehensive documentation files are available in the repository:
 
-- **[README.md](../README.md)** - Feature overview, quick start guide with 7+ examples (including ScanRowsTo), configuration per dialect, type support, monitoring
-- **[RELEASES.md](./RELEASES.md)** - Version support matrix, upgrade guides, roadmap, installation by version, security policy
-- **[CHANGELOG.md](./CHANGELOG.md)** - Complete technical history per Keep a Changelog format with all features, fixes, deprecations across versions
-- **[ERROR_HANDLING.md](./ERROR_HANDLING.md)** - Comprehensive error handling guide with sentinel errors, dialect-specific error mapping, recovery strategies, and tested patterns
-- **[CONTRIBUTING.md](../CONTRIBUTING.md)** - Contribution guidelines covering development setup, testing, code style, commit format, pull requests, GitHub template, and issue reporting
-- **[OPERATORS_COMPATIBILITY.md](./OPERATORS_COMPATIBILITY.md)** - Comprehensive operator support matrix showing which SQL operators are supported by each database dialect (MySQL, PostgreSQL, SQLite, MSSQL)
-- **[SQL_NULL_TYPES.md](./SQL_NULL_TYPES.md)** - Implementation guide for SQL.Null\* type support
+- **[README.md](../README.md)** - Feature overview, quick start guide with
+  7+ examples (including ScanRowsTo), configuration per dialect, type support, monitoring
+- **[RELEASES.md](./RELEASES.md)** - Version support matrix, upgrade guides,
+  roadmap, installation by version, security policy
+- **[CHANGELOG.md](./CHANGELOG.md)** - Complete technical history per Keep
+  a Changelog format with all features, fixes, deprecations across versions
+- **[ERROR_HANDLING.md](./ERROR_HANDLING.md)** - Comprehensive error handling guide
+  with sentinel errors, dialect-specific error mapping, recovery strategies,
+  and tested patterns
+- **[CONTRIBUTING.md](../CONTRIBUTING.md)** - Contribution guidelines covering
+  development setup, testing, code style, commit format, pull requests,
+  GitHub template, and issue reporting
+- **[OPERATORS_COMPATIBILITY.md](./OPERATORS_COMPATIBILITY.md)** - Comprehensive
+  operator support matrix showing which SQL operators are supported by
+  each database dialect (MySQL, PostgreSQL, SQLite, MSSQL)
+- **[SQL_NULL_TYPES.md](./SQL_NULL_TYPES.md)** - Implementation guide
+  for SQL.Null\* type support
 
 ---
 
@@ -1376,25 +1458,26 @@ The following comprehensive documentation files are available in the repository:
 
 ## 15. File Size Analysis
 
-| File                            | Lines | Purpose                            | Quality    |
-| ------------------------------- | ----- | ---------------------------------- | ---------- |
-| db/v1/db.go                     | 625   | Core interfaces + ScanRowsTo       | ⭐⭐⭐⭐⭐ |
-| db/v1/postgres.go               | 1,007 | PostgreSQL driver implementation   | ⭐⭐⭐⭐   |
-| db/v1/mysql.go                  | 924   | MySQL driver implementation        | ⭐⭐⭐⭐   |
-| db/v1/fluentDB.go               | 977   | Fluent/chainable query builder API | ⭐⭐⭐⭐⭐ |
-| db/v1/mssql.go                  | 870   | MSSQL driver implementation        | ⭐⭐⭐⭐   |
-| db/v1/sqlite.go                 | 863   | SQLite driver implementation       | ⭐⭐⭐⭐   |
-| db/v1/logging.go                | 457   | Structured logging implementation  | ⭐⭐⭐⭐   |
-| internal/pkg/builder/builder.go | 447   | Query builder interface            | ⭐⭐⭐⭐⭐ |
-| db/v1/row_adapter.go            | 390   | Row scanning + type coercion       | ⭐⭐⭐⭐⭐ |
-| db/v1/utils.go                  | 332   | Shared query execution             | ⭐⭐⭐⭐   |
-| db/v1/dberror/errors.go         | 419   | Error mapping & sentinel errors    | ⭐⭐⭐⭐⭐ |
+| File                 | Lines | Purpose                  | Quality    |
+| -------------------- | ----- | ------------------------ | ---------- |
+| db/v1/db.go          | 625   | Core interfaces          | ⭐⭐⭐⭐⭐ |
+| db/v1/postgres.go    | 1,007 | PostgreSQL driver        | ⭐⭐⭐⭐   |
+| db/v1/mysql.go       | 924   | MySQL driver             | ⭐⭐⭐⭐   |
+| db/v1/fluentDB.go    | 977   | Fluent/chainable builder | ⭐⭐⭐⭐⭐ |
+| db/v1/mssql.go       | 870   | MSSQL driver             | ⭐⭐⭐⭐   |
+| db/v1/sqlite.go      | 863   | SQLite driver            | ⭐⭐⭐⭐   |
+| db/v1/logging.go     | 457   | Logging                  | ⭐⭐⭐⭐   |
+| builder/builder.go   | 447   | Query builder            | ⭐⭐⭐⭐⭐ |
+| db/v1/row_adapter.go | 390   | Row scanning             | ⭐⭐⭐⭐⭐ |
+| db/v1/utils.go       | 332   | Query execution          | ⭐⭐⭐⭐   |
+| dberror/errors.go    | 419   | Error mapping            | ⭐⭐⭐⭐⭐ |
 
 **Key Observations:**
 
 - ✅ **PostgreSQL driver** is most complex (1,007 lines) - pgxpool integration
 - ✅ **MySQL & FluentDB** well-balanced (924/977 lines)
-- ✅ **Drivers are consistent** - Similar patterns across MySQL, PostgreSQL, SQLite, MSSQL
+- ✅ **Drivers are consistent** - Similar patterns across MySQL, PostgreSQL,
+  SQLite, MSSQL
 - ✅ **Core abstractions** lightweight (db.go 625 lines)
 - ✅ **Error mapping comprehensive** (419 lines for all 4 dialects)
   | internal/pkg/builder/builder.go | 234 | Query builder interface | ⭐⭐⭐⭐⭐ |
@@ -1410,9 +1493,11 @@ The following comprehensive documentation files are available in the repository:
 **Breakdown:**
 
 - ✅ Architecture: 9/10
-- ✅ Code Quality: 10/10 (comprehensive Go comments + zero linting issues + all tests passing)
+- ✅ Code Quality: 10/10 (comprehensive Go comments + zero linting issues +
+  all tests passing)
 - ✅ Testing: 10/10 (829 tests including 49 integration tests, all passing)
-- ✅ Documentation: 9/10 (complete: README, error handling, contribution guide, release notes, code comments)
+- ✅ Documentation: 9/10 (complete: README, error handling, contribution guide,
+  release notes, code comments)
 - ✅ Error Handling: 10/10 (sentinel errors, proper wrapping, tested error mapping)
 - ✅ Security: 10/10 (parameterized queries throughout)
 - ✅ Linting Compliance: 10/10 (zero issues, 40+ linters enabled)
@@ -1428,12 +1513,16 @@ The fabric is **well-engineered, production-ready software** that demonstrates:
 - ✅ Comprehensive testing methodology (97+ tests)
 - ✅ Professional code organization
 - ✅ 100% Go standard comment compliance (all packages, types, functions documented)
-- ✅ Complete documentation (README, error handling guide, contribution guide, release notes, operator matrix)
-- ✅ Community contribution framework (CONTRIBUTING.md with setup and submission guidelines)
+- ✅ Complete documentation (README, error handling guide, contribution guide,
+  release notes, operator matrix)
+- ✅ Community contribution framework (CONTRIBUTING.md with setup
+  and submission guidelines)
 
 **Deployment Recommendation:** **APPROVED - Deploy with confidence**
 
-This is a mature, well-tested library with comprehensive documentation suitable for production use. All identified improvements have been addressed. The codebase shows evidence of thoughtful design and thorough implementation.
+This is a mature, well-tested library with comprehensive documentation suitable
+for production use. All identified improvements have been addressed.
+The codebase shows evidence of thoughtful design and thorough implementation.
 
 ---
 
@@ -1462,7 +1551,9 @@ make cover-html  # Opens browser
 
 ### Overview
 
-Fabric provides a flexible logger adapter system that allows you to use your preferred Go logging library. This is implemented through a simple `Logger` interface that all logging libraries can implement through adapters.
+Fabric provides a flexible logger adapter system that allows you to use
+your preferred Go logging library. This is implemented through
+a simple `Logger` interface that all logging libraries can implement through adapters.
 
 ### Logger Interface
 
@@ -1485,10 +1576,12 @@ type Logger interface {
 
 ### Design Pattern
 
-The adapter pattern allows Fabric to remain agnostic to logging libraries while giving users choice. Each adapter:
+The adapter pattern allows Fabric to remain agnostic to logging libraries
+while giving users choice. Each adapter:
 
 - **Wraps** the underlying logger library with the `Logger` interface
-- **Converts** key-value arguments from Fabric's `any...` format to the library's format
+- **Converts** key-value arguments from Fabric's `any...` format to the
+  library's format
 - **Preserves** all logging semantics (structured fields, levels, handlers)
 - **Supports** chaining with `With()` for adding context to loggers
 
@@ -1502,7 +1595,8 @@ database, err := db.NewDB(config, adapter)
 
 ### Key Features
 
-- ✅ **No External Dependencies** - Adapters don't require logging libraries as dependencies of Fabric
+- ✅ **No External Dependencies** - Adapters don't require logging libraries
+  as dependencies of Fabric
 - ✅ **Flexible** - Users can pass any logger implementation or nil
 - ✅ **Type-Safe** - Works with interface types, no type assertions needed by users
 - ✅ **Composable** - Supports chaining with `With()` for structured context

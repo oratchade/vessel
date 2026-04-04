@@ -1,6 +1,7 @@
 # Contributing to fabric
 
-Thank you for your interest in contributing to fabric! This document provides guidelines and instructions for contributing to the project.
+Thank you for your interest in contributing to fabric! This document
+provides guidelines and instructions for contributing to the project.
 
 ## Table of Contents
 
@@ -13,11 +14,11 @@ Thank you for your interest in contributing to fabric! This document provides gu
 - [Commit Messages](#commit-messages)
 - [Pull Requests](#pull-requests)
 - [Reporting Issues](#reporting-issues)
-- [License](#license)
 
 ## Code of Conduct
 
-This project adheres to the Contributor Covenant Code of Conduct. By participating, you are expected to uphold this code.
+This project adheres to the Contributor Covenant Code of Conduct. By
+participating, you are expected to uphold this code.
 
 **Be respectful.** Be kind and constructive in all interactions with other contributors.
 
@@ -29,7 +30,8 @@ This project adheres to the Contributor Covenant Code of Conduct. By participati
 - Git
 - Docker (for running database tests)
 - Make
-- One or more SQL databases for testing (MySQL, PostgreSQL, SQLite, MSSQL)
+- One or more SQL databases for testing (MySQL,
+  PostgreSQL, SQLite, MSSQL)
 
 ### Fork and Clone
 
@@ -44,7 +46,8 @@ This project adheres to the Contributor Covenant Code of Conduct. By participati
 3. Add upstream remote:
 
    ```bash
-   git remote add upstream https://github.com/oratchade/fabric.git
+   git remote add upstream https://github.com/oratchade/\
+   fabric.git
    ```
 
 ## Development Setup
@@ -180,7 +183,8 @@ Supported database versions in tests:
 
 ### Go Standards
 
-This project follows [Effective Go](https://golang.org/doc/effective_go) and [Go Code Review Comments](https://github.com/golang/go/wiki/CodeReviewComments).
+This project follows [Effective Go](https://golang.org/doc/effective_go)
+and [Go Code Review Comments](https://github.com/golang/go/wiki/CodeReviewComments).
 
 ### Formatting
 
@@ -261,7 +265,7 @@ golangci-lint run ./... --enable=errname
 
 ### Format
 
-```
+```text
 <type>(<scope>): <subject>
 
 <body>
@@ -273,7 +277,7 @@ golangci-lint run ./... --enable=errname
 
 **Simple fix:**
 
-```
+```text
 fix(mysql): connection pool leak in Close()
 
 Properly release all idle connections on database close.
@@ -281,7 +285,7 @@ Properly release all idle connections on database close.
 
 **New feature:**
 
-```
+```text
 feat(builder): add HAVING clause support
 
 Allow filtering aggregated results with HAVING conditions.
@@ -290,7 +294,7 @@ Closes #123
 
 **Documentation:**
 
-```
+```text
 docs: add error handling guide
 
 Comprehensive guide covering sentinel errors, dialect-specific
@@ -336,7 +340,9 @@ mapping, and recovery strategies.
 
 ### PR Description Template
 
-When you open a pull request, GitHub will automatically display a template to help you fill in all required information. The template includes:
+When you open a pull request, GitHub will automatically display a
+template to help you fill in all required information. The template
+includes:
 
 ```markdown
 ## Description
@@ -369,7 +375,8 @@ Closes #(issue number)
 - [ ] Documentation updated
 ```
 
-**The full template is located at [`.github/pull_request_template.md`](./.github/pull_request_template.md) and will be automatically populated when you create a PR.**
+**The full template is located at [`.github/pull_request_template.md`](./.github/pull_request_template.md) and will be automatically populated
+when you create a PR.**
 
 Key points:
 
@@ -410,7 +417,7 @@ Include:
 
 **Example:**
 
-```markdown
+````markdown
 ## Bug Report
 
 **Go Version:** go 1.26.0
@@ -432,19 +439,20 @@ Inserting NULL values in query conditions causes panic.
 Query should return no results or proper error
 
 ### Error Message
-```
 
+```text
 panic: invalid argument to IsNil
 goroutine 1 [running]: ...
-
+```
 ````
 
 ### Minimal Code
+
 ```go
 db.Get(ctx, "users", cols, "", "email IS NULL", nil)
-````
+```
 
-````
+````text
 
 ### Feature Requests
 
@@ -456,6 +464,7 @@ Include:
 - Implementation notes (optional)
 
 **Example:**
+
 ```markdown
 ## Feature Request: Batch Insert
 
@@ -466,33 +475,32 @@ Support batch/bulk insert operations for better performance with large datasets.
 Inserting 10,000+ records is slow with individual insert calls.
 
 ### Proposed API
+
 ```go
 results, err := db.BatchInsert(ctx, "users", []map[string]any{
     {"name": "Alice"},
     {"name": "Bob"},
 })
-````
+```
 
 ### Alternatives
 
 - Use raw SQL for bulk insert
 - Use transactions with multiple inserts
 
-```
+```text
 
 ## Architecture Guidelines
 
 ### Package Structure
 
-```
-
+```text
 fabric/
 ├── db/v1/ # Public API (stable, versioned)
 ├── internal/pkg/ # Internal packages (no stability guarantee)
 ├── pkg/query/ # Query building DSL
 └── tests/ # Integration tests
-
-````
+```
 
 ### Interfaces Over Implementations
 
@@ -523,14 +531,15 @@ All public packages, types, and functions must have comments:
 # Check documentation coverage
 go doc ./db/v1
 go doc tounilab.com/fabric/db/v1
-````
+```
 
 ### User Documentation
 
 - **README.md** - Feature overview, quick start, examples
 - **ERROR_HANDLING.md** - Error patterns and recovery strategies
 - **OPERATORS_COMPATIBILITY.md** - Dialect-specific operator support
-- **SQL_NULL_TYPES.md** - NULL type handling guide ([docs/SQL_NULL_TYPES.md](./docs/SQL_NULL_TYPES.md))
+- **SQL_NULL_TYPES.md** - NULL type handling guide
+  ([docs/SQL_NULL_TYPES.md](./docs/SQL_NULL_TYPES.md))
 - **CODE_REVIEW.md** - Code quality assessment and metrics
 
 ## Performance Considerations
@@ -597,6 +606,8 @@ Contributors are recognized in:
 
 ---
 
-Thank you for contributing to fabric! Your efforts help make this library better for everyone.
+Thank you for contributing to fabric! Your efforts help make this
+library better for everyone.
 
-**Happy contributing! 🎉**
+Happy contributing! 🎉
+````

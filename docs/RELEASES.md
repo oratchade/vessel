@@ -1,6 +1,8 @@
 # Releases
 
-All notable changes to fabric are documented in [CHANGELOG.md](./CHANGELOG.md). This page provides release management information, version support, and roadmap.
+All notable changes to fabric are documented in [CHANGELOG.md](./CHANGELOG.md).
+This page provides release management information, version support, and
+roadmap.
 
 For detailed technical changes, see the [CHANGELOG](./CHANGELOG.md).
 
@@ -11,17 +13,19 @@ For detailed technical changes, see the [CHANGELOG](./CHANGELOG.md).
 **Release Date:** March 3, 2026  
 **Status:** ✅ Supported
 
-[Download v1.0.0](https://github.com/oratchade/fabric/releases/tag/v1.0.0) | [View Detailed Changes](./CHANGELOG.md#100---2026-03-03)
+[Download v1.0.0](https://github.com/oratchade/fabric/releases/tag/v1.0.0) |
+[View Detailed Changes](./CHANGELOG.md#100---2026-03-03)
 
-First production-ready release with comprehensive documentation, 290+ test cases, and support for MySQL, PostgreSQL, SQLite, and MSSQL.
+First production-ready release with comprehensive documentation, 290+
+test cases, and support for MySQL, PostgreSQL, SQLite, and MSSQL.
 
 ---
 
 ## Version Support Matrix
 
-| Version | Release Date | Go Version | MySQL | PostgreSQL | SQLite | MSSQL | Status       | Support Ends |
-| ------- | ------------ | ---------- | ----- | ---------- | ------ | ----- | ------------ | ------------ |
-| 1.0.x   | Mar 15, 2026 | 1.26+      | 8.0+  | 15+        | ✅     | 2022+ | ✅ Supported | Mar 2027     |
+| Version | Release Date | Go Version | Databases | Status       | Ends   |
+| ------- | ------------ | ---------- | --------- | ------------ | ------ |
+| 1.0.x   | Mar 15, 2026 | 1.26+      | 4         | ✅ Supported | Mar 27 |
 
 **Status Definitions:**
 
@@ -82,7 +86,7 @@ OpenTelemetry integration is already included in v1.0.0.
 
 **Focus:** Advanced features and optimization
 
-#### Planned Features
+#### Upcoming Features
 
 - [ ] Connection retry policies
 - [ ] Graceful shutdown helpers
@@ -91,7 +95,7 @@ OpenTelemetry integration is already included in v1.0.0.
 - [ ] Extended operator support
 - [ ] DBManager enhancement with circuit breaker patterns
 
-#### Estimated Effort
+#### Development Effort
 
 - 6-8 weeks development
 - Target: September 2026
@@ -179,7 +183,8 @@ Email security issues to: `security@example.com`
 
 ### Official Releases
 
-All releases available at [GitHub Releases](https://github.com/oratchade/fabric/releases)
+All releases available at
+[GitHub Releases](https://github.com/oratchade/fabric/releases)
 
 ### Checksums
 
@@ -211,7 +216,8 @@ go list -u -m tounilab.com/fabric
 
 ## License
 
-fabric is licensed under the MIT License. See [../LICENSE.md](../LICENSE.md) for details.
+fabric is licensed under the MIT License. See
+[../LICENSE.md](../LICENSE.md) for details.
 
 Changes are tracked in [CHANGELOG.md](./CHANGELOG.md).
 

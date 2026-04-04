@@ -1,6 +1,8 @@
 # DBManager - Multi-Database Management
 
-The `DBManager` is an advanced component of fabric that manages multiple database connections simultaneously with intelligent routing, automatic failover, and async operations.
+The `DBManager` is an advanced component of fabric that manages multiple
+database connections simultaneously with intelligent routing, automatic
+failover, and async operations.
 
 ## Table of Contents
 
@@ -29,15 +31,19 @@ Use DBManager when you need:
 
 ### Key Concepts
 
-| Concept         | Description                                                                     |
-| --------------- | ------------------------------------------------------------------------------- |
-| **Entry**       | A single database connection configuration (name, type, priority, config)       |
-| **Type**        | Either `read-only` (for read queries) or `read-write` (for read+write)          |
-| **Priority**    | Integer (0-infinite) controlling selection order; higher = preferred            |
-| **Health**      | Periodic `Ping()` checks; marks database unhealthy after 5 consecutive failures |
-| **Worker Pool** | Goroutines handling database queries for an entry (separate read/write)         |
-| **Queue**       | Bounded channel holding pending queries (backpressure mechanism)                |
-| **Async API**   | Channel-based query responses; non-blocking, fire-and-forget pattern            |
+- **Entry**: Single database connection configuration (name, type,
+  priority, config)
+- **Type**: Either `read-only` (read queries) or `read-write`
+  (read+write)
+- **Priority**: Integer (0-infinite) controlling selection order; higher
+  = preferred
+- **Health**: Periodic `Ping()` checks; marks database unhealthy after 5
+  consecutive failures
+- **Worker Pool**: Goroutines handling database queries per entry
+  (separate read/write)
+- **Queue**: Bounded channel holding pending queries (backpressure)
+- **Async API**: Channel-based query responses; non-blocking, fire-and-
+  forget pattern
 
 ## Architecture
 
@@ -45,7 +51,7 @@ Use DBManager when you need:
 
 DBManager uses hierarchical configuration with automatic fallback:
 
-```
+```text
 Query Parameters
     ↓
 Entry-Level Overrides (e.g., entry.readQueueSize)
@@ -59,7 +65,7 @@ Built-in Constants (DefaultReadQueueSize = 1000)
 
 **DBManager uses a health-first selection strategy with intelligent fallback:**
 
-```
+```text
         ┌─────────────────────────────────────┐
         │  Incoming Query (Get, Insert, etc)  │
         └──────────────┬──────────────────────┘
@@ -119,7 +125,7 @@ Built-in Constants (DefaultReadQueueSize = 1000)
 
 Each database entry maintains separate worker pools:
 
-```
+```text
 Database Entry
 ├── Read-Only Workers (e.g., 4 goroutines)
 │   └── Read Queue (bounded, e.g., 1000 items)
@@ -142,12 +148,15 @@ Database Entry
 
 Each database entry runs a periodic health check goroutine that:
 
-1. **Checks connectivity** - Executes `Ping()` at configured interval (default: 30s)
+1. **Checks connectivity** - Executes `Ping()` at configured interval
+   (default: 30s)
 2. **Tracks failures** - Increments failure counter on errors
-3. **Marks unhealthy** - Database marked unhealthy after 5 consecutive failures
+3. **Marks unhealthy** - Database marked unhealthy after 5 consecutive
+   failures
 4. **Recovery** - Resets to healthy immediately on next successful `Ping()`
 
-**Health Status:** Stored with atomic operations (thread-safe, lock-free)
+**Health Status:** Stored with atomic operations (thread-safe,
+lock-free)
 
 ### Health Check Example
 
@@ -173,9 +182,11 @@ entries:
 
 **Routing Before T+120s:** Queries use primary database (highest priority)
 
-**Routing After T+120s:** Queries automatically route to replica (healthy, next priority)
+**Routing After T+120s:** Queries automatically route to replica
+(healthy, next priority)
 
-**Recovery:** When primary recovers and `Ping()` succeeds → immediately returns to HEALTHY
+**Recovery:** When primary recovers and `Ping()` succeeds → immediately
+returns to HEALTHY
 
 ### Configuration
 
@@ -206,7 +217,7 @@ if entry.Health() {
 }
 ```
 
-## Configuration
+## Configuration Basics
 
 ### File Formats
 
@@ -248,17 +259,23 @@ entries:
 
 ### Entry Type
 
-| Type         | Purpose                     | Supported Operations                                                       |
-| ------------ | --------------------------- | -------------------------------------------------------------------------- |
-| `read-only`  | Read-only replica databases | Get, GetByID, Query, GetRaw, GetByIDRaw, QueryRaw, Exec (read-only)        |
-| `read-write` | Primary database            | All operations: Get, GetByID, Insert, Inserts, Update, Delete, Query, Exec |
+**read-only**: Read-only replica databases
+
+- Supported operations: Get, GetByID, Query, GetRaw, GetByIDRaw, QueryRaw,
+  Exec (read-only)
+
+**read-write**: Primary database
+
+- Supported operations: Get, GetByID, Insert, Inserts, Update, Delete,
+  Query, Exec
 
 ### Priority Rules
 
 - **Higher number = higher priority** (100 > 50 > 10)
 - **Default = 0** (if not specified)
 - **Multiple same priority** = load-balanced with round-robin
-- **Automatic failover** = queries fall back to next priority tier if preferred tier unavailable
+- **Automatic failover** = queries fall back to next priority tier if
+  preferred tier unavailable
 
 Example:
 
@@ -277,22 +294,27 @@ entries:
     priority: 10 # Last resort
 ```
 
-Result: Write queries go to primary-writer; if unavailable, alternate between replica-1/replica-2; if those unavailable, use analytics.
+Result: Write queries go to primary-writer; if unavailable, alternate
+between replica-1/replica-2; if those unavailable, use analytics.
 
 ## Priority-Based Selection
 
 ### How Selection Works
 
-DBManager selects entries using a **health-aware priority system:**
+DBManager selects entries using a **health-aware priority system**:
 
-1. **Health-First:** Filters for healthy entries only (those with successful recent `Ping()`)
-2. **Priority-Based:** Among healthy entries, selects the group with highest priority
-3. **Load-Balanced:** Within same priority, distributes using round-robin with atomic counter
-4. **Graceful Fallback:** If no healthy entries exist, uses all entries ranked by priority
+1. **Health-First:** Filters for healthy entries only (those with
+   successful recent `Ping()`)
+2. **Priority-Based:** Among healthy entries, selects the group with
+   highest priority
+3. **Load-Balanced:** Within same priority, distributes using round-robin
+   with atomic counter
+4. **Graceful Fallback:** If no healthy entries exist, uses all entries
+   ranked by priority
 
 **Selection Hierarchy:**
 
-```
+```text
 HEALTHY + HIGHEST PRIORITY + ROUND-ROBIN
     ↓ (if no healthy with highest priority)
 HEALTHY + NEXT PRIORITY + ROUND-ROBIN
@@ -312,7 +334,7 @@ entries:
     priority: 50
 ```
 
-### Example 1: Single Priority (Health-Aware Failover)
+### Example: Single Priority (Health-Aware Failover)
 
 ```yaml
 entries:
@@ -324,21 +346,14 @@ entries:
 
 **Routing Behavior:**
 
-- **While primary is healthy:** All queries → primary (highest priority)
-- **When primary becomes unhealthy:** Automatically route → secondary (highest healthy priority)
-- **When primary recovers:** Automatically resume → primary (highest priority, now healthy)
+- **While primary is healthy:** All queries → primary (highest
+  priority)
+- **When primary becomes unhealthy:** Automatically route → secondary
+  (highest healthy priority)
+- **When primary recovers:** Automatically resume → primary (highest
+  priority, now healthy)
 
 **No code changes required** - health-aware routing is automatic and transparent.
-
-### Example 2: Load Balancing (Health-Aware)
-
-```yaml
-entries:
-  - name: replica-us-east
-    priority: 50
-  - name: replica-us-west
-    priority: 50
-```
 
 ### Example 2: Load Balancing (Health-Aware)
 
@@ -354,21 +369,11 @@ entries:
 
 - **Both healthy:** Load-balanced round-robin between both replicas
 - **One unhealthy:** All queries → remaining healthy replica
-- **Both unhealthy:** Graceful fallback - queries continue using both (with potential errors logged)
+- **Both unhealthy:** Graceful fallback - queries continue using both
+  (with potential errors logged)
 
-**Benefits:** Automatic handling of replica failures without reconfiguration.
-
-### Example 3: Tiered Failover (Health-Aware)
-
-```yaml
-entries:
-  - name: primary-eu-central
-    priority: 100
-  - name: replica-eu-west
-    priority: 50
-  - name: replica-us-east
-    priority: 10
-```
+**Benefits:** Automatic handling of replica failures without
+reconfiguration.
 
 ### Example 3: Tiered Failover (Health-Aware)
 
@@ -386,14 +391,18 @@ entries:
 
 - **Primary healthy:** Primary receives all queries
 - **Primary unhealthy:** EU replica (priority 50) receives all queries
-- **Primary + EU unhealthy:** US replica (priority 10) receives all queries
-- **All unhealthy:** Fallback to highest priority (primary) - graceful degradation
+- **Primary + EU unhealthy:** US replica (priority 10) receives all
+  queries
+- **All unhealthy:** Fallback to highest priority (primary) - graceful
+  degradation
 
-**Advantages:** Automatic cascading failover based on health status, with smart fallback to ensure service availability.
+**Advantages:** Automatic cascading failover based on health status,
+with smart fallback to ensure service availability.
 
 ### Thread-Safe Round-Robin
 
-Within a priority tier, queries are distributed using atomic counters (no locking):
+Within a priority tier, queries are distributed using atomic counters
+(no locking):
 
 ```go
 // Two replicas with same priority
@@ -408,7 +417,8 @@ return replicas[idx]
 - ✅ **Predictable overhead** - Atomic operation only
 - ✅ **Deterministic** - Consistent distribution
 
-**Note:** Order within priority tier is non-deterministic (Go map iteration), but each query gets dispatched fairly.
+**Note:** Order within priority tier is non-deterministic (Go map iteration),
+but each query gets dispatched fairly.
 
 ## Usage
 
@@ -557,7 +567,8 @@ func (dm *DBManager) Get(
 ) chan<- *QueryResponse
 ```
 
-Fetch multiple rows with optional conditions and joins. Automatically selects read-only entry with highest priority.
+Fetch multiple rows with optional conditions and joins.
+Automatically selects read-only entry with highest priority.
 
 #### GetByID
 
@@ -831,7 +842,8 @@ entries:
 - Use the same priority for primary and replicas (defeats failover)
 - Change priorities without understanding the impact
 - Use negative priorities
-- Assume unhealthy databases won't receive queries (they will if all healthy are down)
+- Assume unhealthy databases won't receive queries
+  (they will if all healthy are down)
 
 ### 3. Health Monitoring
 
@@ -849,7 +861,7 @@ entries:
 - Assume health checks have zero performance impact (they don't)
 - Disable health checks in production (they catch failures quickly)
 
-**Example: Health-Aware Configuration**
+### Example: Health-Aware Configuration
 
 ```yaml
 entries:
@@ -937,8 +949,10 @@ entries:
 
 1. Queue full (backpressure activated) → increase `writeQueueSize`/`readQueueSize`
 2. Workers overloaded → increase `writeWorkers`/`readWorkers`
-3. Database connection slow → increase `MaxOpenConns` in database config
-4. All databases unhealthy → queries falling back to unhealthy entries (slower, more errors)
+3. Database connection slow → increase `MaxOpenConns` in database
+   config
+4. All databases unhealthy → queries fall back to
+   unhealthy entries (slower, more errors)
 
 **Solution:**
 
@@ -1025,8 +1039,10 @@ log.Printf("Selected entry: %s (healthy: %v)\n", readOnlyEntry.Name(), readOnlyE
 **Causes:**
 
 1. Multiple entries have different priorities (correct - highest priority used)
-2. Lower-priority entries are all unhealthy (correct - healthy entries preferred)
-3. All same-priority entries healthy (round-robin should work, but may appear like one)
+2. Lower-priority entries are all unhealthy (correct - healthy entries
+   preferred)
+3. All same-priority entries healthy (round-robin should work,
+   but may appear like one)
 
 **Solution:**
 

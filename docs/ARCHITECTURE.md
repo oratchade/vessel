@@ -1,6 +1,8 @@
 # Fabric Architecture
 
-**Fabric** is a production-grade, multi-database SQL abstraction layer for Go. This document provides the definitive architectural reference for understanding the entire system design, enabling rapid onboarding and informed extension decisions.
+**Fabric** is a production-grade, multi-database SQL abstraction layer for Go.
+This document provides the definitive architectural reference for understanding
+the entire system design, enabling rapid onboarding and informed extension decisions.
 
 **Version**: 1.0 (Post-Phase 5)  
 **Last Updated**: April 2, 2026  
@@ -32,9 +34,13 @@
 
 ### What is Fabric?
 
-Fabric is a **type-safe SQL query abstraction library** that unifies MySQL, PostgreSQL, SQLite, and MSSQL behind a single, ergonomic Go API. It eliminates the need for manual SQL string construction while maintaining complete control over query generation.
+Fabric is a **type-safe SQL query abstraction library** that unifies
+MySQL, PostgreSQL, SQLite, and MSSQL behind a single, ergonomic Go API.
+It eliminates the need for manual SQL string construction while
+maintaining complete control over query generation.
 
-Unlike traditional ORMs (Gorm, sqlc, Ent), Fabric occupies the sweet spot between manual SQL writing and full ORM abstraction:
+Unlike traditional ORMs (Gorm, sqlc, Ent), Fabric occupies
+the sweet spot between manual SQL writing and full ORM abstraction:
 
 | Aspect               | Manual SQL        | Fabric         | Full ORM |
 | -------------------- | ----------------- | -------------- | -------- |
@@ -70,14 +76,14 @@ Unlike traditional ORMs (Gorm, sqlc, Ent), Fabric occupies the sweet spot betwee
 
 ### Key Metrics
 
-| Metric                     | Value                                                      |
-| -------------------------- | ---------------------------------------------------------- |
-| **Test Suite**             | 802 tests (100% pass)                                      |
-| **Code Grade**             | A+ (94/100, Production Ready)                              |
-| **Coverage**               | Operator (75%+), Options (85%+), Complex conditions (80%+) |
-| **Linting**                | 0 issues                                                   |
-| **Security Advisories**    | 0                                                          |
-| **Production Deployments** | Ready for immediate use                                    |
+| Metric      | Value          |
+| ----------- | -------------- |
+| Test Suite  | 802 tests pass |
+| Code Grade  | A+ (94/100)    |
+| Coverage    | 75-85%+        |
+| Linting     | 0 issues       |
+| Security    | 0 advisories   |
+| Deployments | Production     |
 
 ---
 
@@ -94,7 +100,8 @@ Each layer has **one job**:
 - Dialect layer: Database-specific SQL rendering
 - Driver layer: Database connection management
 
-Changes to SQL generation don't affect the public API. New dialects can be added without touching builders.
+Changes to SQL generation don't affect the public API.
+New dialects can be added without touching builders.
 
 ### 2. Interface-First Design
 
@@ -113,7 +120,8 @@ type mysqlDB struct { /* internal */ }
 type postgresDB struct { /* internal */ }
 ```
 
-**Benefits**: Tests mock interfaces, not databases. New implementations can be added without breaking users.
+**Benefits**: Tests mock interfaces, not databases.
+New implementations can be added without breaking users.
 
 ### 3. Pluggable Extensibility
 
@@ -139,7 +147,8 @@ query := v1.NewFluentDB(db, ctx).
 
 ### 5. Minimal Runtime Overhead
 
-No reflection-based magic. Queries are **compiled to SQL** at builder time, not runtime.
+No reflection-based magic. Queries are **compiled to SQL** at builder time,
+not runtime.
 
 ---
 
@@ -147,7 +156,7 @@ No reflection-based magic. Queries are **compiled to SQL** at builder time, not 
 
 ### Layered Architecture Diagram
 
-```
+```text
 ┌─────────────────────────────────────────────────────────────┐
 │  User Application Code                                      │
 │  (uses db/v1 interfaces + query builders)                   │
@@ -183,7 +192,7 @@ No reflection-based magic. Queries are **compiled to SQL** at builder time, not 
 │  • PostgresDialect  (double-quote, RETURNING keyword)       │
 │  • SQLiteDialect    (no identifier quoting)                 │
 │  • MSSQLDialect     (square bracket, TOP N syntax)          │
-│  • Operator definitions (=, >, <, LIKE, IN, BETWEEN, NULL) │
+│  • Operator definitions (=, >, <, LIKE, IN, BETWEEN, NULL)  │
 └────────────────────┬────────────────────────────────────────┘
                      │
 ┌────────────────────▼────────────────────────────────────────┐
@@ -196,7 +205,7 @@ No reflection-based magic. Queries are **compiled to SQL** at builder time, not 
 │    - Between (range testing)                                │
 │    - IsNull/IsNotNull (NULL checks)                         │
 │  • options/: Query modifiers                                │
-│    - OrderBy, GroupBy, Having, Limit, Offset, Returning    │
+│    - OrderBy, GroupBy, Having, Limit, Offset, Returning     │
 └────────────────────┬────────────────────────────────────────┘
                      │
 ┌────────────────────▼────────────────────────────────────────┐
@@ -213,7 +222,7 @@ No reflection-based magic. Queries are **compiled to SQL** at builder time, not 
 
 ### Data Flow: Query Construction → Execution
 
-```
+```text
 ┌─────────────────────────────────────────────────────────────┐
 │ User Code                                                   │
 │                                                             │
@@ -286,13 +295,21 @@ The **only layer users interact with**. All core interfaces are defined here.
 
 #### Primary Interfaces
 
-| Interface    | Purpose                   | Key Methods                                                |
-| ------------ | ------------------------- | ---------------------------------------------------------- |
-| **DB**       | Database connection pool  | Get, Insert, Update, Delete, Begin, Ping, Close, PoolStats |
-| **Tx**       | Transaction scope         | Get, Insert, Update, Delete, Commit, Rollback              |
-| **Logger**   | Pluggable logging         | Debug, Info, Warn, Error, With                             |
-| **Row**      | Result row abstraction    | Scan (all columns), ScanOne (single column)                |
-| **FluentDB** | Query builder entry point | Select, Insert, Update, Delete (return builders)           |
+| Interface    | Purpose                   |
+| ------------ | ------------------------- |
+| **DB**       | Database connection pool  |
+| **Tx**       | Transaction scope         |
+| **Logger**   | Pluggable logging         |
+| **Row**      | Result row abstraction    |
+| **FluentDB** | Query builder entry point |
+
+**Method Groups**:
+
+- **DB**: Get, Insert, Update, Delete, Begin, Ping, Close, PoolStats
+- **Tx**: Get, Insert, Update, Delete, Commit, Rollback
+- **Logger**: Debug, Info, Warn, Error, With
+- **Row**: Scan (all columns), ScanOne (single column)
+- **FluentDB**: Select, Insert, Update, Delete (return builders)
 
 #### Key Entry Points
 
@@ -325,7 +342,7 @@ Each database has a config factory:
 
 #### Architecture
 
-```
+```text
 QueryBuilder (interface)
     ↓
 ├── MySQLBuilder
@@ -363,23 +380,28 @@ Each builder implements:
 
 Each dialect defines:
 
-- **Identifier Quoting**: MySQL (backticks), Postgres (double quotes), SQLite (none), MSSQL (square brackets)
-- **Operator Support**: Which operators are supported (IN, BETWEEN, LIKE, NULL checks)
-- **Keyword Rendering**: LIMIT vs TOP, OFFSET vs FETCH, RETURNING support
-- **Type Mapping**: How Go types map to database types (optional, for schema generation)
+- **Identifier Quoting**: MySQL (backticks), Postgres (double quotes),
+  SQLite (none), MSSQL (square brackets)
+- **Operator Support**: Which operators are supported (IN, BETWEEN,
+  LIKE, NULL checks)
+- **Keyword Rendering**: LIMIT vs TOP, OFFSET vs FETCH, RETURNING
+  support
+- **Type Mapping**: How Go types map to database types (optional, for
+  schema generation)
 
 ```go
 type Dialect interface {
-    QuoteIdentifier(name string) string      // "table" → `table` or "table" or [table]
-    RenderOperator(op string) string         // Custom operator formatting
-    SupportsBatch() bool                     // INSERT...SELECT support
-    SupportsReturning() bool                 // OUTPUT/RETURNING clause
+    QuoteIdentifier(name string) string // "table" → `table` ...
+    RenderOperator(op string) string    // Custom operator format
+    SupportsBatch() bool                 // INSERT...SELECT support
+    SupportsReturning() bool             // OUTPUT/RETURNING clause
 }
 ```
 
 ### 4. Query DSL Layer (`pkg/query/`)
 
-**Responsibility**: Provide user-friendly APIs for building WHERE clauses and query options.
+**Responsibility**: Provide user-friendly APIs for building WHERE
+clauses and query options.
 
 #### Conditions (`condition/` package)
 
@@ -421,7 +443,8 @@ opts.Returning("id", "created_at")  // PostgreSQL only
 
 ## Database Support
 
-Fabric supports **4 production databases**, each with optimized driver configuration and dialect handling.
+Fabric supports **4 production databases**, each with optimized
+driver configuration and dialect handling.
 
 ### MySQL 5.7+
 
@@ -535,11 +558,13 @@ func init() {
 
 // Later, user can create DB with custom driver
 type CustomPostgresFactory struct{}
-func (f *CustomPostgresFactory) Create(ctx context.Context, cfg any) (any, error) {
+func (f *CustomPostgresFactory) Create(ctx context.Context,
+    cfg any) (any, error) {
     // Custom initialization logic
 }
 
-db, err := v1.NewDB(&CustomConfig{}, logger)  // Uses custom driver
+db, err := v1.NewDB(&CustomConfig{}, logger)  //
+    // Uses custom driver
 ```
 
 **Benefits**:
@@ -563,7 +588,8 @@ type DB interface {
 type MockDB struct {
     mock.Mock
 }
-func (m *MockDB) Get(ctx context.Context, query string, args ...any) ([]Row, error) {
+func (m *MockDB) Get(ctx context.Context, query string, args ...any)
+    ([]Row, error) {
     // Test behavior
 }
 
@@ -651,16 +677,16 @@ logger := v1.NewApexAdapter(apexLogger)
 
 ### Data Access Methods
 
-| Method      | Purpose                                 | Example                                                    |
-| ----------- | --------------------------------------- | ---------------------------------------------------------- |
-| **Get**     | Execute SELECT, return all rows         | `db.Get(ctx, "SELECT * FROM users")`                       |
-| **GetByID** | SELECT WHERE id = ?, convenience method | `db.GetByID(ctx, "users", 123)`                            |
-| **Insert**  | INSERT record, return inserted row      | `db.Insert(ctx, "users", map[string]any{"name": "Alice"})` |
-| **Inserts** | INSERT multiple records (batch)         | `db.Inserts(ctx, "users", []map[string]any{...})`          |
-| **Update**  | UPDATE records matching condition       | `db.Update(ctx, "users", data, cdt.NewExpr()...)`          |
-| **Delete**  | DELETE records matching condition       | `db.Delete(ctx, "users", cdt.NewExpr()...)`                |
-| **Query**   | Raw query with parameters               | `db.Query(ctx, "SELECT * FROM users WHERE id = ?", 123)`   |
-| **Exec**    | Execute raw SQL (DDL, etc)              | `db.Exec(ctx, "CREATE TABLE ...")`                         |
+| Method      | Purpose                           | Example                |
+| ----------- | --------------------------------- | ---------------------- |
+| **Get**     | Execute SELECT, return all rows   | `db.Get(ctx, ...)`     |
+| **GetByID** | SELECT WHERE id = ?, convenience  | `db.GetByID(ctx, ...)` |
+| **Insert**  | INSERT record, return row         | `db.Insert(ctx, ...)`  |
+| **Inserts** | INSERT multiple records (batch)   | `db.Inserts(ctx, ...)` |
+| **Update**  | UPDATE records matching condition | `db.Update(ctx, ...)`  |
+| **Delete**  | DELETE records matching condition | `db.Delete(ctx, ...)`  |
+| **Query**   | Raw query with parameters         | `db.Query(ctx, ...)`   |
+| **Exec**    | Execute raw SQL (DDL, etc)        | `db.Exec(ctx, ...)`    |
 
 ### Transaction Methods
 
@@ -721,7 +747,7 @@ rows, err := limitBuilder.Execute()
 
 ### What Happens Inside Execute()
 
-```
+```text
 Execute()
   ↓
 builder.Build()  // Generate SQL
@@ -840,7 +866,7 @@ db, err := v1.NewDB(cfg, &MyLogger{})
 
 ### Test Organization
 
-```
+```text
 fabric/
 ├── db/v1/
 │   ├── *_test.go                    # Unit tests for public API
@@ -1056,15 +1082,15 @@ logger.Info("connecting", "config", cfg.String())  // Password exposed!
 
 ### Direct Dependencies
 
-| Package                   | Version  | Purpose           | Usage                             |
-| ------------------------- | -------- | ----------------- | --------------------------------- |
-| **go-sql-driver/mysql**   | Latest   | MySQL driver      | MySQL support                     |
-| **jackc/pgx**             | Latest   | PostgreSQL driver | PostgreSQL support (with pgxpool) |
-| **mattn/go-sqlite3**      | Latest   | SQLite driver     | SQLite support (CGO)              |
-| **denisenkom/go-mssqldb** | Latest   | MSSQL driver      | MSSQL support                     |
-| **sirupsen/logrus**       | Optional | Log framework     | Logrus adapter                    |
-| **uber-go/zap**           | Optional | Log framework     | Zap adapter                       |
-| **apex/log**              | Optional | Log framework     | Apex adapter                      |
+| Package                   | Version  | Purpose         | Usage              |
+| ------------------------- | -------- | --------------- | ------------------ |
+| **go-sql-driver/mysql**   | Latest   | MySQL driver    | MySQL support      |
+| **jackc/pgx**             | Latest   | Postgres driver | Postgres w pgxpool |
+| **mattn/go-sqlite3**      | Latest   | SQLite driver   | SQLite (CGO)       |
+| **denisenkom/go-mssqldb** | Latest   | MSSQL driver    | MSSQL support      |
+| **sirupsen/logrus**       | Optional | Log framework   | Logrus adapter     |
+| **uber-go/zap**           | Optional | Log framework   | Zap adapter        |
+| **apex/log**              | Optional | Log framework   | Apex adapter       |
 
 ### Indirect Dependencies
 
@@ -1196,7 +1222,7 @@ Before deploying Fabric in production:
 
 ### At a Glance
 
-```
+```text
 Fabric = Multi-database SQL abstraction for Go
 
 Layers:
@@ -1234,4 +1260,5 @@ Testing:
 
 ---
 
-**Fabric is production-ready and actively maintained. Questions? Open an issue or start a discussion.**
+**Fabric is production-ready and actively maintained. Questions? Open
+an issue or start a discussion.**

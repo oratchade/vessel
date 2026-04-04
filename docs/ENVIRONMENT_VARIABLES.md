@@ -1,10 +1,13 @@
 # Test Environment Variables
 
-This guide explains how to configure test credentials for the fabric SQL abstraction library without exposing sensitive information in source code.
+This guide explains how to configure test credentials for the fabric
+SQL abstraction library without exposing sensitive information in
+source code.
 
 ## Overview
 
-All test database credentials are configurable via environment variables with sensible fallbacks for local development. This approach:
+All test database credentials are configurable via environment variables
+with sensible fallbacks for local development. This approach:
 
 - ✅ Prevents accidental credential exposure in version control
 - ✅ Supports both local and CI/CD environments
@@ -67,14 +70,14 @@ docker-compose -f docker-compose.test.yml down
 
 ### MySQL Configuration
 
-| Variable            | Purpose            | Default         | Example                           |
-| ------------------- | ------------------ | --------------- | --------------------------------- |
-| `DB_MYSQL_USER`     | MySQL root user    | `root`          | `root`                            |
-| `DB_MYSQL_PASSWORD` | MySQL password     | `root_password` | Safe to use (not a real password) |
-| `DB_MYSQL_HOST`     | MySQL host         | `localhost`     | `mysql.internal.company.com`      |
-| `DB_MYSQL_PORT`     | MySQL port         | `3306`          | `3306`                            |
-| `DB_MYSQL_DATABASE` | Test database name | `test_db`       | `integration_tests`               |
-| `DB_MYSQL_CHARSET`  | Character set      | `utf8mb4`       | `utf8mb4`                         |
+| Variable            | Purpose  | Default         | Example       |
+| ------------------- | -------- | --------------- | ------------- |
+| `DB_MYSQL_USER`     | User     | `root`          | `root`        |
+| `DB_MYSQL_PASSWORD` | Password | `root_password` | (not exposed) |
+| `DB_MYSQL_HOST`     | Host     | `localhost`     | `localhost`   |
+| `DB_MYSQL_PORT`     | Port     | `3306`          | `3306`        |
+| `DB_MYSQL_DATABASE` | Database | `test_db`       | `test_db`     |
+| `DB_MYSQL_CHARSET`  | Charset  | `utf8mb4`       | `utf8mb4`     |
 
 **Example `.env` entry:**
 
@@ -89,14 +92,14 @@ DB_MYSQL_CHARSET=utf8mb4
 
 ### PostgreSQL Configuration
 
-| Variable               | Purpose             | Default         | Example                           |
-| ---------------------- | ------------------- | --------------- | --------------------------------- |
-| `DB_POSTGRES_USER`     | PostgreSQL user     | `test_user`     | `postgres`                        |
-| `DB_POSTGRES_PASSWORD` | PostgreSQL password | `test_password` | Safe to use (not a real password) |
-| `DB_POSTGRES_HOST`     | PostgreSQL host     | `localhost`     | `postgres.internal.company.com`   |
-| `DB_POSTGRES_PORT`     | PostgreSQL port     | `5432`          | `5432`                            |
-| `DB_POSTGRES_DATABASE` | Test database name  | `test_db`       | `integration_tests`               |
-| `DB_POSTGRES_SSLMODE`  | SSL mode            | `disable`       | `require` for production          |
+| Variable               | Purpose  | Default         | Example       |
+| ---------------------- | -------- | --------------- | ------------- |
+| `DB_POSTGRES_USER`     | User     | `test_user`     | `postgres`    |
+| `DB_POSTGRES_PASSWORD` | Password | `test_password` | (not exposed) |
+| `DB_POSTGRES_HOST`     | Host     | `localhost`     | `localhost`   |
+| `DB_POSTGRES_PORT`     | Port     | `5432`          | `5432`        |
+| `DB_POSTGRES_DATABASE` | Database | `test_db`       | `test_db`     |
+| `DB_POSTGRES_SSLMODE`  | SSL mode | `disable`       | `require`     |
 
 **Example `.env` entry:**
 
@@ -111,15 +114,15 @@ DB_POSTGRES_SSLMODE=disable
 
 ### Microsoft SQL Server Configuration
 
-| Variable                     | Purpose                | Default            | Example                           |
-| ---------------------------- | ---------------------- | ------------------ | --------------------------------- |
-| `DB_MSSQL_USER`              | SA (system admin) user | `sa`               | `sa`                              |
-| `DB_MSSQL_PASSWORD`          | MSSQL password         | `TestPassword123!` | Must meet complexity requirements |
-| `DB_MSSQL_HOST`              | MSSQL host             | `localhost`        | `mssql.internal.company.com`      |
-| `DB_MSSQL_PORT`              | MSSQL port             | `1433`             | `1433`                            |
-| `DB_MSSQL_DATABASE`          | Test database name     | `test_db`          | `integration_tests`               |
-| `DB_MSSQL_ENCRYPT`           | Encryption mode        | `disable`          | `true` for production             |
-| `DB_MSSQL_TRUST_SERVER_CERT` | Trust server cert      | `true`             | `false` for production            |
+| Variable                     | Purpose    | Default            | Example     |
+| ---------------------------- | ---------- | ------------------ | ----------- |
+| `DB_MSSQL_USER`              | SA user    | `sa`               | `sa`        |
+| `DB_MSSQL_PASSWORD`          | Password   | `TestPassword123!` | (secure)    |
+| `DB_MSSQL_HOST`              | Host       | `localhost`        | `localhost` |
+| `DB_MSSQL_PORT`              | Port       | `1433`             | `1433`      |
+| `DB_MSSQL_DATABASE`          | Database   | `test_db`          | `test_db`   |
+| `DB_MSSQL_ENCRYPT`           | Encryption | `disable`          | `true`      |
+| `DB_MSSQL_TRUST_SERVER_CERT` | Trust cert | `true`             | `false`     |
 
 **Example `.env` entry:**
 
@@ -135,11 +138,12 @@ DB_MSSQL_TRUST_SERVER_CERT=true
 
 ### SQLite Configuration
 
-| Variable         | Purpose                          | Default    | Example        |
-| ---------------- | -------------------------------- | ---------- | -------------- |
-| `DB_SQLITE_PATH` | Database file path or `:memory:` | `:memory:` | `/tmp/test.db` |
+| Variable         | Purpose            | Default    | Example   |
+| ---------------- | ------------------ | ---------- | --------- |
+| `DB_SQLITE_PATH` | Database file path | `:memory:` | `/tmp/db` |
 
-**Note**: SQLite requires no authentication. In-memory mode (`:memory:`) is recommended for test isolation.
+**Note**: SQLite requires no authentication. In-memory mode (`:memory:`) is
+recommended for test isolation.
 
 ---
 

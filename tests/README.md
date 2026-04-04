@@ -1,6 +1,8 @@
 # Integration Tests for fabric
 
-This directory contains comprehensive integration tests for the fabric library, testing support for SQLite, MySQL, PostgreSQL, and MSSQL databases.
+This directory contains comprehensive integration tests for the fabric
+library, testing support for SQLite, MySQL, PostgreSQL, and MSSQL
+databases.
 
 ## Overview
 
@@ -23,7 +25,7 @@ All tests use a consistent schema across all databases:
 
 ### Users Table
 
-```
+```sql
 id: INTEGER PRIMARY KEY
 name: TEXT NOT NULL
 email: TEXT UNIQUE NOT NULL
@@ -33,7 +35,7 @@ status: TEXT (default: 'active')
 
 ### Posts Table
 
-```
+```sql
 id: INTEGER PRIMARY KEY
 user_id: INTEGER FOREIGN KEY
 title: TEXT NOT NULL
@@ -43,7 +45,7 @@ published: BOOLEAN/INTEGER (default: 0/FALSE)
 
 ### Comments Table
 
-```
+```sql
 id: INTEGER PRIMARY KEY
 post_id: INTEGER FOREIGN KEY
 user_id: INTEGER FOREIGN KEY
@@ -98,6 +100,10 @@ make integration-test-mssql
 
 # Or using the script
 ./scripts/run-integration-tests.sh mssql --verbose
+
+## Docker Setup Note
+
+See docker-compose configuration documentation below.
 ```
 
 ### Running All Database Tests
@@ -142,7 +148,7 @@ Examples:
 # Verbose SQLite tests with 60-second timeout
 ./scripts/run-integration-tests.sh sqlite --verbose --timeout 60
 
-# All tests with coverage reporting
+# All tests with coverage
 ./scripts/run-integration-tests.sh all --coverage
 
 # PostgreSQL tests with verbose output
@@ -159,7 +165,8 @@ export DB_TYPE=sqlite  # or mysql, postgres, sqlserver
 
 # Database connection strings
 export MYSQL_DSN="root:password@tcp(localhost:3306)/test_db?parseTime=true"
-export POSTGRES_DSN="host=localhost user=postgres password=password dbname=test_db sslmode=disable"
+export POSTGRES_DSN="host=localhost user=postgres password=password \
+  dbname=test_db sslmode=disable"
 export MSSQL_DSN="sqlserver://sa:YourPassword123@localhost:1433?database=TestDB"
 
 # Test timeout
@@ -344,6 +351,7 @@ When adding new tests:
 3. **Add seed data if needed** to the `setupSQLiteTestDB` function
 
 4. **Test locally** before committing:
+
    ```bash
    go test -v ./tests -run TestIntegration_YourFeature
    ```

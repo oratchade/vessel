@@ -30,7 +30,8 @@ Brief description of the changes and their purpose.
 
 - [ ] Bug fix (non-breaking change that fixes an issue)
 - [ ] New feature (non-breaking change that adds functionality)
-- [ ] Breaking change (fix or feature that would cause existing functionality to change)
+- [ ] Breaking change (fix or feature that would alter existing
+      functionality)
 - [ ] Documentation update
 - [ ] Performance improvement
 - [ ] Code refactoring
@@ -74,7 +75,8 @@ Related to #(issue number)
 - [ ] Code follows Go style guidelines (gofumpt, golangci-lint)
 - [ ] Comments follow Go effective comment standards
 - [ ] Updated [README.md](../README.md) if needed
-- [ ] Updated [ERROR_HANDLING.md](../ERROR_HANDLING.md) if error handling changed
+- [ ] Updated [ERROR_HANDLING.md](../ERROR_HANDLING.md) if error handling
+      changed
 - [ ] No new linting warnings generated
 - [ ] Tests pass locally (`make test`)
 - [ ] Code review comments addressed
@@ -101,7 +103,8 @@ None
 
 ## Screenshots / Diagrams (if applicable)
 
-<!-- Add screenshots or diagrams if this PR includes UI changes or architectural changes -->
+<!-- Add screenshots or diagrams if this PR includes UI changes or
+     architectural changes -->
 
 ## Additional Notes
 

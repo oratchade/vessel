@@ -1,10 +1,13 @@
 # FluentDB Examples
 
-Complete working examples demonstrating FluentDB builder API: a fluent/chainable query builder for Fabric's multi-database abstraction layer.
+Complete working examples demonstrating FluentDB builder API: a fluent and
+chainable query builder for Fabric's multi-database abstraction layer.
 
 ## Overview
 
-The **FluentDB** API provides an ergonomic, chainable interface for building and executing SQL queries. It wraps the existing `DBActions` interface while providing a more intuitive API for common database operations.
+The **FluentDB** API provides an ergonomic, chainable interface for building
+and executing SQL queries. It wraps the existing `DBActions` interface while
+providing a more intuitive API for common database operations.
 
 ## Prerequisites
 
@@ -14,8 +17,9 @@ The **FluentDB** API provides an ergonomic, chainable interface for building and
 
 ### Setup Test Database
 
+Start your database and create test tables. For PostgreSQL:
+
 ```bash
-# PostgreSQL
 psql -U postgres -c "CREATE DATABASE myapp;"
 
 # Create tables

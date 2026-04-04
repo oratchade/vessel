@@ -1,6 +1,7 @@
 # DBManager Examples
 
-Complete working examples demonstrating DBManager features: multi-database routing, priority-based selection, async operations, and error handling.
+Complete working examples demonstrating DBManager features: multi-database
+routing, priority-based selection, async operations, and error handling.
 
 ## Prerequisites
 
@@ -32,11 +33,13 @@ psql -p 5432 -U postgres -d myapp -c "
 "
 
 # Replicate to other databases (manual for example)
-pg_dump -p 5432 -U postgres -d myapp --schema-only | psql -p 5433 -U postgres -d myapp
-pg_dump -p 5432 -U postgres -d myapp --schema-only | psql -p 5434 -U postgres -d myapp
+pg_dump -p 5432 -U postgres -d myapp --schema-only
+  | psql -p 5433 -U postgres -d myapp
+pg_dump -p 5432 -U postgres -d myapp --schema-only
+  | psql -p 5434 -U postgres -d myapp
 ```
 
-**Alternative: Use Docker**
+### Alternative: Use Docker
 
 ```bash
 docker-compose up -d   # See docker-compose.yml in parent directory
@@ -89,7 +92,7 @@ go run basic.go /path/to/config.yaml
 
 **Output:**
 
-```
+```text
 === DBManager Basic Example ===
 
 1. Inserting user...
@@ -126,7 +129,7 @@ go run priority_selection.go
 
 **Output:**
 
-```
+```text
 === DBManager Priority Selection Example ===
 
 1. Testing priority-based selection:
@@ -171,7 +174,7 @@ go run error_handling.go
 
 **Output:**
 
-```
+```text
 === DBManager Error Handling Example ===
 
 1. Detecting specific error types:
@@ -216,7 +219,7 @@ go run main.go
 
 **Example output:**
 
-```
+```text
 === Retry Integration Examples ===
 
 1. Basic Retry Patterns

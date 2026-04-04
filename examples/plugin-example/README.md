@@ -1,12 +1,15 @@
 # Plugin System Example
 
-This directory demonstrates how to implement custom database drivers using the **fabric plugin system**.
+This directory demonstrates how to implement custom database drivers
+using the **fabric plugin system**.
 
 ## Overview
 
-The fabric plugin system allows you to register custom database drivers without modifying the core library. This example shows:
+The fabric plugin system allows you to register custom database drivers without
+modifying the core library. This example shows:
 
-1. **CockroachDB Plugin** - A complete driver implementation wrapping PostgreSQL (since CockroachDB is wire-compatible)
+1. **CockroachDB Plugin** - A complete driver implementation wrapping
+   PostgreSQL (since CockroachDB is wire-compatible)
 2. **Main Example** - How to use custom plugins in your application
 
 ## Plugin Architecture
@@ -50,13 +53,14 @@ Each plugin must:
    ```
 
 3. **Import as blank import in main**
+
    ```go
    import _ "your-module/examples/plugin-example/cockroachdb"
    ```
 
 ## Directory Structure
 
-```
+```text
 examples/plugin-example/
 ├── cockroachdb/
 │   └── driver.go          # CockroachDB plugin implementation
@@ -108,7 +112,8 @@ func (f *Factory) Create(ctx context.Context, cfg any) (any, error) {
 }
 ```
 
-**Why This Works:** CockroachDB uses the same wire protocol as PostgreSQL, so we can wrap the PostgreSQL driver implementation.
+**Why This Works:** CockroachDB uses the same wire protocol as PostgreSQL,
+so we can wrap the PostgreSQL driver implementation.
 
 ## Usage Example
 
@@ -229,7 +234,8 @@ func init() {
 #### Pattern 1: Wrapping Existing Drivers (Recommended for Compatible Databases)
 
 ```go
-// Use PostgreSQL driver for wire-compatible databases (CockroachDB, Postgres-compatible services)
+// Use PostgreSQL driver for wire-compatible databases
+// (CockroachDB, Postgres-compatible services)
 func (f *Factory) Create(ctx context.Context, cfg any) (any, error) {
     myCfg := cfg.(*Config)
     pgCfg := convertToPostgresConfig(myCfg)
@@ -254,10 +260,14 @@ type MyDriver struct {
 }
 
 func (d *MyDriver) Ping(ctx context.Context) error { ... }
-func (d *MyDriver) Get(ctx context.Context, table string, ...) ([]map[string]any, error) { ... }
-func (d *MyDriver) Insert(ctx context.Context, table string, ...) (*db.Result, error) { ... }
-func (d *MyDriver) Update(ctx context.Context, table string, ...) (*db.Result, error) { ... }
-func (d *MyDriver) Delete(ctx context.Context, table string, ...) (*db.Result, error) { ... }
+func (d *MyDriver) Get(ctx context.Context, table string, ...)
+    ([]map[string]any, error) { ... }
+func (d *MyDriver) Insert(ctx context.Context, table string, ...)
+    (*db.Result, error) { ... }
+func (d *MyDriver) Update(ctx context.Context, table string, ...)
+    (*db.Result, error) { ... }
+func (d *MyDriver) Delete(ctx context.Context, table string, ...)
+    (*db.Result, error) { ... }
 func (d *MyDriver) Close() error { ... }
 func (d *MyDriver) PoolStats() (*db.PoolStats, error) { ... }
 ```
@@ -271,7 +281,8 @@ type LoggingDriver struct {
     inner db.DB  // Wrapped driver
 }
 
-func (d *LoggingDriver) Get(ctx context.Context, table string, ...) ([]map[string]any, error) {
+func (d *LoggingDriver) Get(ctx context.Context, table string, ...)
+    ([]map[string]any, error) {
     log.Printf("Getting from %s", table)
     result, err := d.inner.Get(ctx, table, ...)
     log.Printf("Got %d rows", len(result))
@@ -372,7 +383,7 @@ plugin.Clear()
 
 3. **Expected output**
 
-   ```
+   ```text
    Registered drivers: [cockroachdb]
    ✅ Connected to CockroachDB
    Inserted 1 rows, ID: 1

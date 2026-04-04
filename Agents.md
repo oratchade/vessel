@@ -8,14 +8,19 @@
 
 ## Overview
 
-This file documents agent instructions and workflows for working with the Fabric database abstraction library. Use this guide to understand how to approach common tasks, maintain code quality, and contribute to the project.
+This file documents agent instructions and workflows for working with the
+Fabric database abstraction library. Use this guide to understand how to
+approach common tasks, maintain code quality, and contribute to the project.
 
 ---
 
 ## Agent Purpose
 
 **Role:** Database Library Developer  
-**Responsibility:** Build and maintain a clean, maintainable database abstraction layer that handles SQL generation and query building without overcomplicating. Keep the API fluent and intuitive, support multiple database dialects, and ensure all code is well-tested.
+**Responsibility:** Build and maintain a clean, maintainable database
+abstraction layer that handles SQL generation and query building without
+overcomplicating. Keep the API fluent and intuitive, support multiple
+database dialects, and ensure all code is well-tested.
 
 **Key Focus Areas:**
 
@@ -43,34 +48,36 @@ This file documents agent instructions and workflows for working with the Fabric
 
 ## Project Structure
 
-```
+```text
 fabric/
 ├── db/v1/                           # Public API (version 1)
 │   ├── db.go                        # Core DB/DBActions/Tx interfaces
-│   ├── fluentDB.go                  # Fluent query builder (SelectBuilder, UpdateBuilder, etc.)
-│   ├── config_*.go                  # Database configs (MySQL, PostgreSQL, SQLite, MSSQL)
+│   ├── fluentDB.go                  # Fluent query builder
+│   │                                 # (SelectBuilder, UpdateBuilder, etc.)
+│   ├── config_*.go                  # Database configs
+│   │                                 # (MySQL, PostgreSQL, SQLite, MSSQL)
 │   ├── row_adapter.go               # Row scanning abstraction
 │   ├── logger.go                    # Logging interface
 │   └── *_test.go                    # Unit tests (80+ tests)
 │
-├── internal/pkg/
+├── internal/pkg/                    # Internal implementation packages
 │   ├── builder/                     # SQL query builder (internal)
 │   │   ├── builder.go               # Builder interface
 │   │   ├── mysql.go, postgres.go    # Dialect implementations
-│   │   └── *_builder_test.go        # Builder tests
+│   │   └── *_builder_test.go        # Builder tests (per-dialect)
 │   │
 │   ├── sqldialect/                  # SQL dialect abstractions
 │   │   ├── sql_dialect.go           # Shared dialect logic
 │   │   ├── mysql.go, postgres.go    # Dialect-specific implementations
-│   │   └── sql_dialect_test.go      # Dialect tests
+│   │   └── sql_dialect_test.go      # Dialect tests (per-dialect)
 │   │
 │   ├── operator/                    # Operator definitions
 │   ├── helpers/                     # Utility functions
 │   └── otel/                        # OpenTelemetry integration
 │
-├── pkg/query/
-│   ├── condition/                   # Query condition DSL (Expression, And, Or, In, etc.)
-│   ├── options/                     # QueryOptions struct (OrderBy, Limit, etc.)
+├── pkg/query/                       # Public query DSL packages
+│   ├── condition/                   # Condition DSL (Expr, And, Or, In)
+│   ├── options/                     # QueryOptions (OrderBy, Limit)
 │   └── definition/                  # Constants
 │
 ├── manager/v1/                      # Query manager (higher-level API)
@@ -90,11 +97,15 @@ fabric/
 **Steps:**
 
 1. Create driver config in `db/v1/{dialect}.go`
-2. Implement `SQLDialect` interface in `internal/pkg/sqldialect/{dialect}.go`
-3. Implement `QueryBuilder` interface in `internal/pkg/builder/{dialect}.go`
-4. Add unit tests: `{dialect}_test.go`, `{dialect}_builder_test.go`
+2. Implement `SQLDialect` interface in
+   `internal/pkg/sqldialect/{dialect}.go`
+3. Implement `QueryBuilder` interface in
+   `internal/pkg/builder/{dialect}.go`
+4. Add unit tests: `{dialect}_test.go`,
+   `{dialect}_builder_test.go`
 5. Add integration tests in `tests/integration_test.go`
-6. Update docs in `README.md` and `OPERATORS_COMPATIBILITY.md`
+6. Update docs in `README.md` and
+   `OPERATORS_COMPATIBILITY.md`
 
 **Key Files to Modify:**
 
@@ -125,22 +136,28 @@ fabric/
 
 - `db/v1/fluentDB_test.go` - Builder API tests
 - `internal/pkg/builder/builder_test.go` - Builder tests
-- `internal/pkg/sqldialect/sql_dialect_test.go` - SQL generation tests
+- `internal/pkg/sqldialect/sql_dialect_test.go` - SQL
+  generation tests
 
-**Important:** Never commit without running full test suite and linter
+**Important:** Never commit without running full test suite
+and linter
 
 ---
 
 ### 3. **Adding New Query Features**
 
-**Example: Adding LIMIT/OFFSET support**
+#### Example: Adding LIMIT/OFFSET support
 
 **Process:**
 
-1. **Define:** Add feature to `QueryOptions` struct in `pkg/query/options/options.go`
-2. **Builder:** Add builder method to `SelectBuilder`/`UpdateBuilder`/`DeleteBuilder` in `db/v1/fluentDB.go`
-3. **SQL Generation:** Update SQL generation in `internal/pkg/sqldialect/sql_dialect.go`
-4. **Per-Dialect:** Update each dialect if special handling needed (e.g., MSSQL OFFSET/FETCH syntax)
+1. **Define:** Add feature to `QueryOptions` struct in
+   `pkg/query/options/options.go`
+2. **Builder:** Add builder method to `SelectBuilder`,
+   `UpdateBuilder`, `DeleteBuilder` in `db/v1/fluentDB.go`
+3. **SQL Generation:** Update SQL generation in
+   `internal/pkg/sqldialect/sql_dialect.go`
+4. **Per-Dialect:** Update each dialect if special handling is
+   needed (e.g., MSSQL OFFSET/FETCH syntax)
 5. **Test:** Add comprehensive tests to `fluentDB_test.go` and `sql_dialect_test.go`
 6. **Document:** Update `README.md` and migration guide
 
@@ -176,7 +193,8 @@ if opts.NewFeature != nil {
 
 **Process:**
 
-1. Understand the `supportedOptions()` function (handles LIMIT, OFFSET, ORDER BY, etc.)
+1. Understand the `supportedOptions()` function (handles LIMIT,
+   OFFSET, ORDER BY, etc.)
 2. Check dialect-specific implementations in `{dialect}.go`
 3. Verify `QuoteIdentifier()` is used for all column/table names
 4. Test with all 4 dialects (MySQL, PostgreSQL, SQLite, MSSQL)
@@ -231,17 +249,17 @@ testCases := []struct {
 
 **Documentation Files:**
 
-| File                              | Purpose                                    |
-| --------------------------------- | ------------------------------------------ |
-| `README.md`                       | Feature overview, quick start, examples    |
-| `MIGRATION_FLUENTDB.md`           | Migration guide from DBActions to FluentDB |
-| `ORDERBY_CHANGES.md`              | OrderBy struct redesign documentation      |
-| `docs/CHANGELOG.md`               | Version history and changes                |
-| `docs/CODE_REVIEW.md`             | Architecture documentation                 |
-| `docs/ERROR_HANDLING.md`          | Error handling guide                       |
-| `docs/OPERATORS_COMPATIBILITY.md` | Operator support matrix                    |
-| `docs/SQL_NULL_TYPES.md`          | Nullable type handling                     |
-| `docs/CONTRIBUTING.md`            | Contribution guidelines                    |
+| File                              | Purpose                    |
+| --------------------------------- | -------------------------- |
+| `README.md`                       | Feature overview and quick |
+| `MIGRATION_FLUENTDB.md`           | Migration from DBActions   |
+| `ORDERBY_CHANGES.md`              | OrderBy redesign           |
+| `docs/CHANGELOG.md`               | Version history            |
+| `docs/CODE_REVIEW.md`             | Architecture docs          |
+| `docs/ERROR_HANDLING.md`          | Error handling             |
+| `docs/OPERATORS_COMPATIBILITY.md` | Operator support           |
+| `docs/SQL_NULL_TYPES.md`          | Null type handling         |
+| `docs/CONTRIBUTING.md`            | Contributing guide         |
 
 **When to Update Documentation:**
 

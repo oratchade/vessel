@@ -11,9 +11,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### 🎉 Overview
 
-Fabric v1.0.0 is the first stable release of a production-grade SQL abstraction library for Go. It provides a type-safe, multi-database query builder and abstraction layer that unifies MySQL, PostgreSQL, SQLite, and MSSQL behind a single fluent API.
+Fabric v1.0.0 is the first stable release of a production-grade SQL
+abstraction library for Go. It provides a type-safe, multi-database
+query builder and abstraction layer that unifies MySQL, PostgreSQL,
+SQLite, and MSSQL behind a single fluent API.
 
-**Key Milestone**: 829 comprehensive tests (100% pass rate) across all modules and databases.
+**Key Milestone**: 829 comprehensive tests (100% pass rate) across
+all modules and databases.
 
 ---
 
@@ -29,7 +33,8 @@ Fabric v1.0.0 is the first stable release of a production-grade SQL abstraction 
   - Consistent API across all databases
 
 - **🔄 Fluent Query DSL** (`db/v1/fluentDB.go`)
-  - SelectBuilder with WHERE, ORDER BY, LIMIT, OFFSET, GROUP BY, HAVING
+  - SelectBuilder with WHERE, ORDER BY, LIMIT, OFFSET, GROUP BY,
+    HAVING
   - InsertBuilder with single and bulk inserts
   - UpdateBuilder with WHERE filtering and UpdateAll() for unfiltered updates
   - DeleteBuilder with WHERE filtering and DeleteAll() for unfiltered deletes
@@ -43,10 +48,12 @@ Fabric v1.0.0 is the first stable release of a production-grade SQL abstraction 
 
 - **🔌 Pluggable Logger Adapters** (`db/v1/logger_adapters.go`)
   - **SlogAdapter** - Go stdlib `log/slog.Logger` integration
-  - **LogrusAdapter** - `github.com/sirupsen/logrus` integration with dual type support
+  - **LogrusAdapter** - `github.com/sirupsen/logrus` integration with
+    dual type support
   - **ZapAdapter** - `go.uber.org/zap` integration with efficient field handling
   - **ApexAdapter** - `github.com/apex/log` integration
-  - All adapters implement Logger interface with context chaining via `With()`
+  - All adapters implement Logger interface with context
+    chaining via `With()`
 
 - **📊 Query Capabilities**
   - CRUD operations (Get, Insert, Update, Delete, Query, Exec)
@@ -83,7 +90,7 @@ Fabric v1.0.0 is the first stable release of a production-grade SQL abstraction 
   - Database routing by entity type
   - Configuration from YAML/TOML/JSON
   - Health check support
-  - Request dispatch with query routing
+  - Request dispatch with query routing (feature)
 
 - **✅ Row Scanning Abstraction** (`db/v1/row_adapter.go`)
   - Universal Row interface for all databases
@@ -112,8 +119,7 @@ Fabric v1.0.0 is the first stable release of a production-grade SQL abstraction 
 
 - **PostgreSQL Hanging Connection Tests** (`48f6557`)
   - Fixed hanging postgres integration test
-  - Better connection cleanup
-  - Timeout handling improvements
+  - Better connection cleanup and timeout handling
 
 - **Error Handling**
   - Added `ErrQueryTimeout` for timeout scenarios
@@ -129,7 +135,7 @@ Fabric v1.0.0 is the first stable release of a production-grade SQL abstraction 
 - **Fluent API Redesign** (`29099e1`)
   - Restructured for maximum ergonomics
   - Chainable builder methods
-  - Clear separation of concerns
+  - Clear separation of concerns (improved)
 
 - **OrderBy Implementation** (`d07bace`)
   - Restructured to support ASC/DESC direction control
@@ -139,7 +145,7 @@ Fabric v1.0.0 is the first stable release of a production-grade SQL abstraction 
 - **SQL Function Support** (`4badb9e`)
   - Better support for AS aliases
   - SQL function integration in column expressions
-  - Proper parenthesis handling
+  - Proper parenthesis handling (improved)
 
 - **Interface Modernization** (`a998f29`)
   - Replaced `interface{}` with `any` throughout
@@ -281,10 +287,14 @@ Fabric v1.0.0 is the first stable release of a production-grade SQL abstraction 
 
 - **Retry Example Package** (`examples/manager-example/retry/`)
   - 4 comprehensive example patterns with retry integration
-  - `exampleBasicRetry()`: Default exponential, linear, and fixed backoff patterns
-  - `exampleContextTimeout()`: Context deadline handling with 2-second timeout
-  - `exampleBackoffStrategies()`: Reference guide for 5 practical scenarios
-  - `exampleRetryPatterns()`: Real-world patterns (read fallback, write guarantee, batch ops)
+  - `exampleBasicRetry()`: Default exponential, linear, and fixed
+    backoff patterns
+  - `exampleContextTimeout()`: Context deadline handling with
+    2-second timeout
+  - `exampleBackoffStrategies()`: Reference guide for 5 practical
+    scenarios
+  - `exampleRetryPatterns()`: Real-world patterns (read fallback,
+    write guarantee, batch ops)
 
 - **Documentation & Configuration**
   - `examples/manager-example/retry/README.md`: Comprehensive strategy recommendations
@@ -327,7 +337,7 @@ Fabric v1.0.0 is the first stable release of a production-grade SQL abstraction 
 
 - `go.opentelemetry.io/otel` - OpenTelemetry tracing
 
-### Testing
+### Test Assertions
 
 - `github.com/stretchr/testify` - Assertions and mocking
 
@@ -359,7 +369,8 @@ Fabric v1.0.0 is the first stable release of a production-grade SQL abstraction 
 
 ## Known Limitations
 
-1. **Row Materialization**: All rows returned as maps (high GC pressure on massive datasets)
+1. **Row Materialization**: All rows returned as maps (high GC pressure on
+   massive datasets)
    - **Mitigation**: `GetRaw()` for streaming; `RowsAdapter` for custom scanning
 
 2. **No ORM Features**: Fabric is query-focused, not entity-focused
@@ -394,7 +405,8 @@ Fabric v1.0.0 is the first stable release of a production-grade SQL abstraction 
 
 ## Credits
 
-**Fabric** is maintained by the **oratchade** team with contributions from the Go community.
+**Fabric** is maintained by the **oratchade** team with contributions
+from the Go community.
 
 ### Key Contributors
 
@@ -454,9 +466,9 @@ See [README.md](README.md) and [examples/\*\*](examples/) for more.
 
 ## Version History
 
-| Version | Date       | Status | Notes                                                 |
-| ------- | ---------- | ------ | ----------------------------------------------------- |
-| 1.0.0   | 2026-04-03 | Stable | Initial release with 802 tests, full multi-DB support |
+| Version | Date       | Status | Notes            |
+| ------- | ---------- | ------ | ---------------- |
+| 1.0.0   | 2026-04-03 | Stable | v1.0 - 802 tests |
 
 ---
 

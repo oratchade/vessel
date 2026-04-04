@@ -1,10 +1,12 @@
 # Retry Integration Examples
 
-Comprehensive examples demonstrating the retry integration system in fabric's DBManager.
+Comprehensive examples demonstrating the retry integration system in
+fabric's DBManager.
 
 ## Overview
 
-The retry system provides automatic backoff strategies for transient failures in database operations, with support for:
+The retry system provides automatic backoff strategies for
+transient failures in database operations, with support for:
 
 - **Multiple backoff strategies**: Exponential, Linear, Fixed
 - **Configurable retry attempts**: Per-operation or all entries
@@ -38,7 +40,7 @@ Best for: Predictable delays, steady retry intervals
 
 Best for: Unknown recovery time, constant polling
 
-- Pattern: 500ms, 500ms, 500ms (all equal intervals)
+- Pattern: 500ms, 500ms, 500ms (equal intervals)
 - Use when: Connection pool exhaustion, health checks
 
 ## Configuration
@@ -47,7 +49,8 @@ All retry operations use `QueryWithRetryConfig`:
 
 ```go
 cfg := &v1.QueryWithRetryConfig{
-    Strategy:         retry.NewExponentialBackoff(100*time.Millisecond, 5*time.Second, 2.0, 3, 0.1),
+    Strategy:         retry.NewExponentialBackoff(
+        100*time.Millisecond, 5*time.Second, 2.0, 3, 0.1),
     MaxEntryAttempts: 3,  // Try 3 different entries (-1 = all)
     Logger:           logger,
 }
@@ -82,7 +85,8 @@ Run the main program to see:
 1. **Basic Retry Patterns** - Query, write, health check examples
 2. **Context Timeout Handling** - How deadlines interact with retry
 3. **Backoff Strategy Recommendations** - When to use each strategy
-4. **Practical Patterns** - Real-world use cases (read fallback, write guarantee, batch ops)
+4. **Practical Patterns** - Real-world use cases (read fallback,
+   write guarantee, batch operations)
 
 ## Integration
 
@@ -95,17 +99,20 @@ if err != nil {
 }
 
 // Basic query with default retry
-rows, err := dm.QueryWithRetry(ctx, v1.DefaultQueryRetryConfig(), func(ctx context.Context) ([]map[string]any, error) {
+rows, err := dm.QueryWithRetry(ctx, v1.DefaultQueryRetryConfig(),
+    func(ctx context.Context) ([]map[string]any, error) {
     return dm.Query(ctx, "SELECT * FROM users")
 })
 
 // Custom retry configuration
 cfg := &v1.QueryWithRetryConfig{
-    Strategy:         retry.NewExponentialBackoff(100*time.Millisecond, 10*time.Second, 2.0, 5, 0.1),
+    Strategy: retry.NewExponentialBackoff(
+        100*time.Millisecond, 10*time.Second, 2.0, 5, 0.1),
     MaxEntryAttempts: -1,  // Guaranteed delivery
     Logger:           logger,
 }
-result, err := dm.ExecWithRetry(ctx, cfg, func(ctx context.Context) (*db.ExecResult, error) {
+result, err := dm.ExecWithRetry(ctx, cfg,
+    func(ctx context.Context) (*db.ExecResult, error) {
     return dm.Exec(ctx, "INSERT INTO user_log (action) VALUES (?)", "login")
 })
 ```
@@ -114,4 +121,4 @@ result, err := dm.ExecWithRetry(ctx, cfg, func(ctx context.Context) (*db.ExecRes
 
 - [manager/v1 package](../../) - Main DBManager implementation
 - [retry package](../../../pkg/retry) - Backoff strategy implementations
-- [example_manager_retry.go](../../example_manager_retry.go) - Additional package-level examples
+- [example_manager_retry.go](../../example_manager_retry.go) - Examples

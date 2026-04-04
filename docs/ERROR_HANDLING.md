@@ -7,8 +7,10 @@ This guide explains how to properly handle errors in fabric applications.
 fabric provides structured error handling with:
 
 1. **Sentinel Errors** - Specific error types for common database errors
-2. **Error Mapping** - Dialect-specific error translation (MySQL, PostgreSQL, SQLite, MSSQL)
-3. **Error Wrapping** - Full error context with stack traces via `fmt.Errorf`
+2. **Error Mapping** - Dialect-specific error translation
+   (MySQL, PostgreSQL, SQLite, MSSQL)
+3. **Error Wrapping** - Full error context with stack traces
+   via `fmt.Errorf`
 4. **Context Propagation** - Proper timeout and cancellation handling
 
 ## Sentinel Errors
@@ -21,13 +23,13 @@ import "tounilab.com/fabric/db/v1/dberror"
 
 ### Common Sentinel Errors
 
-| Error                     | Cause                              | Handling                                    |
-| ------------------------- | ---------------------------------- | ------------------------------------------- |
-| `ErrDuplicateKey`         | Unique constraint violation        | Retry with different data or update instead |
-| `ErrForeignKeyConstraint` | Foreign key violation              | Ensure referenced record exists             |
-| `ErrConnectionFailed`     | Cannot connect to database         | Retry with exponential backoff              |
-| `ErrNoRows`               | Query returned no results          | Check query conditions or provide defaults  |
-| `ErrNotSupported`         | Operation not supported by dialect | Use dialect-specific fallback               |
+| Error                     | Cause                     | Handling             |
+| ------------------------- | ------------------------- | -------------------- |
+| `ErrDuplicateKey`         | Unique constraint         | Retry with different |
+| `ErrForeignKeyConstraint` | Foreign key violation     | Ensure ref exists    |
+| `ErrConnectionFailed`     | Cannot connect to DB      | Retry with backoff   |
+| `ErrNoRows`               | Query returned no results | Check conditions     |
+| `ErrNotSupported`         | Not supported by dialect  | Use fallback         |
 
 ### Checking Sentinel Errors
 
@@ -276,7 +278,9 @@ type Event struct {
 }
 
 if err != nil {
-    log.Printf("event=insert status=failed table=users email=%s error=%v\n", email, err)
+    log.Printf(
+        "event=insert status=failed table=users email=%s error=%v\n",
+        email, err)
 }
 ```
 

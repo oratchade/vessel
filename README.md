@@ -1,6 +1,7 @@
 # fabric
 
-A lightweight, multi-database SQL abstraction library for Go with support for MySQL, PostgreSQL, SQLite, and MSSQL.
+A lightweight, multi-database SQL abstraction library for Go with
+support for MySQL, PostgreSQL, SQLite, and MSSQL.
 
 [![GoDoc](https://godoc.org/tounilab.com/fabric?status.svg)](https://godoc.org/tounilab.com/fabric)
 [![Go Report Card](https://goreportcard.com/badge/tounilab.com/fabric)](https://goreportcard.com/report/tounilab.com/fabric)
@@ -8,13 +9,15 @@ A lightweight, multi-database SQL abstraction library for Go with support for My
 
 ## Features
 
-- 🗄️ **Multi-Database Support** - MySQL, PostgreSQL, SQLite, MSSQL with unified API
+- 🗄️ **Multi-Database Support** - MySQL, PostgreSQL, SQLite,
+  MSSQL with unified API
 - 🔒 **Type-Safe Queries** - Parameterized SQL with automatic escaping
 - 🎯 **Query Builder** - Fluent DSL for dynamic SQL construction
 - 🔄 **Transaction Support** - ACID compliance with automatic rollback on panic
 - 📊 **Connection Pooling** - Per-dialect statistics and configuration
 - ✨ **Zero-Copy Row Scanning** - Efficient field mapping to Go types
-- 📡 **OpenTelemetry Tracing** - Distributed tracing for all database operations
+- 📡 **OpenTelemetry Tracing** - Distributed tracing for all
+  database operations
 - 🧪 **Comprehensive Testing** - 829 unit tests with 100% pass rate
 
 ## Installation
@@ -37,15 +40,20 @@ Fabric v1.0.0 is the first stable release with:
 - ✅ Production-ready and battle-tested
 - ✅ Complete documentation and examples
 
-**See**: [RELEASES.md](RELEASES.md) for release highlights | [CHANGELOG.md](CHANGELOG.md) for detailed changes
+**See**: [RELEASES.md](RELEASES.md) for release highlights |
+[CHANGELOG.md](CHANGELOG.md) for detailed changes
 
 ## OpenTelemetry Tracing & Observability
 
-All database operations are automatically instrumented with OpenTelemetry for distributed tracing and observability. This includes metrics and spans for all queries, transactions, and row scanning operations.
+All database operations are automatically instrumented with
+OpenTelemetry for distributed tracing and observability. This
+includes metrics and spans for all queries, transactions, and
+row scanning operations.
 
 ### Configuration
 
-Tracing is **enabled by default**. To disable tracing, set the `OTEL_ENABLED` environment variable:
+Tracing is **enabled by default**. To disable tracing, set the
+`OTEL_ENABLED` environment variable:
 
 ```bash
 # Disable tracing
@@ -55,13 +63,15 @@ export OTEL_ENABLED=false
 export OTEL_ENABLED=true
 ```
 
-When disabled, all tracing operations are replaced with no-op implementations, providing zero overhead.
+When disabled, all tracing operations are replaced with no-op implementations,
+providing zero overhead.
 
 ### Captured Operations
 
 Traces include:
 
-- Database operations: `Ping`, `Begin`, `Get`, `GetRaw`, `GetByID`, `Insert`, `Inserts`, `Update`, `Delete`, `Query`, `QueryRaw`, `Exec`, `Explain`
+- Database operations: `Ping`, `Begin`, `Get`, `GetRaw`, `GetByID`, `Insert`,
+  `Inserts`, `Update`, `Delete`, `Query`, `QueryRaw`, `Exec`, `Explain`
 - Transactions: `Commit`, `Rollback`, `WithTransaction`
 - Row scanning: `ScanRowsTo[T]` with full error context
 - Semantic conventions from OpenTelemetry specification
@@ -69,7 +79,8 @@ Traces include:
 
 ### Zero Overhead When Disabled
 
-When `OTEL_ENABLED=false`, the library uses OpenTelemetry's no-op tracer provider, resulting in:
+When `OTEL_ENABLED=false`, the library uses OpenTelemetry's
+no-op tracer provider, resulting in:
 
 - ✅ No performance impact
 - ✅ No memory allocations for tracing
@@ -119,14 +130,16 @@ func main() {
 ctx := context.Background()
 
 // Get all users
-users, err := database.Get(ctx, "users", []string{"id", "name", "email"}, nil, nil, nil)
+users, err := database.Get(ctx, "users", []string{"id", "name", "email"},
+    nil, nil, nil)
 if err != nil {
     log.Fatal(err)
 }
 
 for _, user := range users {
     log.Printf("User: %v\n", user)
-    // Output: User: map[string]any{"id": 1, "name": "Alice", "email": "alice@example.com"}
+    // Output: User: map[string]any{"id": 1, "name": "Alice",
+    //   "email": "alice@example.com"}
 }
 ```
 
@@ -251,7 +264,8 @@ for _, row := range results {
 
 ## Setting Up Test Environment
 
-Fabric uses environment variables for database test credentials, making it easy to configure testing for any database.
+Fabric uses environment variables for database test credentials,
+making it easy to configure testing for any database.
 
 ### Quick Setup
 
@@ -260,13 +274,15 @@ Fabric uses environment variables for database test credentials, making it easy 
 cp .env.example .env
 
 # Optionally customize for your local setup
-# See docs/ENVIRONMENT_VARIABLES.md for complete configuration guide
+// See docs/ENVIRONMENT_VARIABLES.md for complete config
 
 # Run unit tests
 make test
 ```
 
-**For local development with defaults**, just run tests directly—environment variables are optional with sensible fallbacks.
+**For local development with defaults**, just run tests
+directly—environment variables are optional with sensible
+fallbacks.
 
 ### Test Configuration
 
@@ -277,7 +293,8 @@ Test credentials are managed via environment variables:
 - **SQLite**: Direct file path (no server needed)
 - **MSSQL**: `DB_MSSQL_USER`, `DB_MSSQL_PASSWORD`, etc.
 
-For detailed configuration options, defaults, and CI/CD setup, see [docs/ENVIRONMENT_VARIABLES.md](./docs/ENVIRONMENT_VARIABLES.md).
+For detailed configuration options, defaults, and CI/CD setup,
+see [docs/ENVIRONMENT_VARIABLES.md](./docs/ENVIRONMENT_VARIABLES.md).
 
 ### Running Tests
 
@@ -298,13 +315,16 @@ make coverage
 make cover-html  # Opens HTML coverage report in browser
 ```
 
-**All 694 unit tests passing** ✅ with comprehensive coverage across MySQL, PostgreSQL, SQLite, and MSSQL.
+**All 694 unit tests passing** ✅ with comprehensive coverage across
+MySQL, PostgreSQL, SQLite, and MSSQL.
 
-See [CODE_REVIEW.md](./docs/CODE_REVIEW.md) for code quality standards and testing requirements.
+See [CODE_REVIEW.md](./docs/CODE_REVIEW.md) for code quality standards
+and testing requirements.
 
 ### Type-Safe Row Scanning with ScanRowsTo
 
-For advanced use cases, use `ScanRowsTo` to efficiently scan rows into strongly-typed structs:
+For advanced use cases, use `ScanRowsTo` to efficiently scan rows into
+strongly-typed structs:
 
 ```go
 import db "tounilab.com/fabric/db/v1"
@@ -338,13 +358,15 @@ for _, user := range users {
 
 ⚠️ **Important: RowsAdapter Lifecycle Management**
 
-The methods `GetRaw()`, `GetByIDRaw()`, and `QueryRaw()` return a `RowsAdapter` which you must explicitly close. This design allows you the flexibility to:
+The methods `GetRaw()`, `GetByIDRaw()`, and `QueryRaw()` return a `RowsAdapter`
+which you must explicitly close. This design allows you the flexibility to:
 
 - Use `db.ScanRowsTo[T](ctx, ...)` for type-safe scanning into structs
 - Use third-party row scanning libraries of your choice
 - Implement custom row processing logic
 
-**You are responsible for closing the RowsAdapter to prevent resource leaks.** Always use `defer` to ensure proper cleanup:
+**You are responsible for closing the RowsAdapter to prevent resource leaks.**
+Always use `defer` to ensure proper cleanup:
 
 ```go
 rowsAdapter, err := database.GetRaw(ctx, "users", []string{"*"}, nil, nil, nil)
@@ -374,7 +396,9 @@ Failure to close the adapter may result in:
 
 ### Query Introspection and Performance Analysis
 
-Generate SQL queries without executing them to inspect, log, or validate before execution. This is especially useful for debugging and performance analysis:
+Generate SQL queries without executing them to inspect, log, or validate
+before execution. This is especially useful for debugging and performance
+analysis:
 
 ```go
 // Introspect a GET query
@@ -383,7 +407,8 @@ query, args, err := database.GetQuery(
     []string{"id", "name", "email"},
     nil,
     cdt.NewExpr().Column("age").Op(">").Value(25),
-    nil,
+    nil, // order by
+    nil, // limit
 )
 if err != nil {
     log.Fatal(err)
@@ -424,15 +449,19 @@ for explainRows.Next() {
 
 **Benefits:**
 
-- ✅ **SQL Injection Prevention** - When combined with xxxQuery methods, ensures safe, parameterized SQL
+- ✅ **SQL Injection Prevention** - When combined with xxxQuery methods,
+  ensures safe, parameterized SQL
 - ✅ **Query Debugging** - Verify the actual SQL before execution
-- ✅ **Performance Analysis** - Run EXPLAIN to understand query execution plans
+- ✅ **Performance Analysis** - Run EXPLAIN to understand query plans
 - ✅ **Query Logging** - Log all generated SQL for audit trails
-- ✅ **Batch Operations** - Build and verify multiple queries before execution
+- ✅ **Batch Operations** - Build and verify multiple queries before
+  execution
 
 ### FluentDB - Fluent Query Builder API
 
-For a more ergonomic, chainable interface, use **FluentDB** - a fluent/builder-style API that wraps DBActions with a readable, SQL-like syntax:
+For a more ergonomic, chainable interface, use **FluentDB** - a
+fluent/builder-style API that wraps DBActions with a readable,
+SQL-like syntax:
 
 ```go
 import (
@@ -527,7 +556,9 @@ fdb.Select("users", "id", "name").
     Get()
 ```
 
-See [FluentDB Examples](./examples/fluentdb-example/README.md) for comprehensive tutorials on basic, advanced, and transaction-based usage.
+See [FluentDB Examples](./examples/fluentdb-example/README.md) for
+comprehensive tutorials on basic, advanced, and transaction-based
+usage.
 
 ## Database Support
 
@@ -544,7 +575,7 @@ See [FluentDB Examples](./examples/fluentdb-example/README.md) for comprehensive
 
 All operators are documented in the [Architecture Guide](./docs/ARCHITECTURE.md).
 
-## Configuration
+## Database Configuration
 
 ### MySQL
 
@@ -599,11 +630,14 @@ database, err := db.NewDB(db.MSSQLConfig{
 
 ## Logger Adapters
 
-Fabric supports structured logging with multiple popular Go logging libraries through its logger adapter system. You can use your preferred logging library without modifying Fabric's code.
+Fabric supports structured logging with multiple popular Go logging
+libraries through its logger adapter system. You can use your preferred
+logging library without modifying Fabric's code.
 
 ### Using slog (Standard Library - Recommended)
 
-The `slog` adapter works with Go's standard library structured logger (Go 1.21+):
+The `slog` adapter works with Go's standard library structured logger
+(Go 1.21+):
 
 ```go
 package main
@@ -765,7 +799,10 @@ database, err := db.NewDB(db.MysqlConfig{
 
 ## Error Handling
 
-The library provides structured error handling with database-dialect-specific error mapping. See [ERROR_HANDLING.md](./docs/ERROR_HANDLING.md) for comprehensive guidance on error handling patterns.
+The library provides structured error handling with
+database-dialect-specific error mapping. See
+[ERROR_HANDLING.md](./docs/ERROR_HANDLING.md) for comprehensive guidance on
+error handling patterns.
 
 ```go
 import "tounilab.com/fabric/db/v1/dberror"
@@ -801,21 +838,30 @@ log.Printf("Wait Duration: %v\n", stats.WaitDuration)
 
 ## Multi-Database Management
 
-The `DBManager` provides seamless access to multiple database connections with priority-based routing, automatic load-balancing, and async queries. Perfect for scenarios with primary/replica setups, multi-region deployments, or application-level sharding.
+The `DBManager` provides seamless access to multiple database connections
+with priority-based routing, automatic load-balancing, and async queries.
+Perfect for scenarios with primary/replica setups, multi-region deployments,
+or application-level sharding.
 
 **Key Features:**
 
 - 🎯 **Priority-Based Selection** - Route queries to preferred databases
-- ⚖️ **Load Balancing** - Distribute queries among same-priority databases
+- ⚖️ **Load Balancing** - Distribute queries among same-priority
+  databases
 - 🔧 **Worker Pools** - Configurable read/write workers per database
-- 📬 **Async Queries** - Channel-based responses for non-blocking operations
-- 🛡️ **Backpressure Handling** - Bounded queues prevent resource exhaustion
+- 📬 **Async Queries** - Channel-based responses for non-blocking
+  operations
+- 🛡️ **Backpressure Handling** - Bounded queues prevent resource
+  exhaustion
 
-For complete guide, configuration examples, and use cases, see [docs/DBManager.md](./docs/DBManager.md). Working examples available in [examples/manager-example/](./examples/manager-example/).
+For complete guide, configuration examples, and use cases, see
+[docs/DBManager.md](./docs/DBManager.md). Working examples available in
+[examples/manager-example/](./examples/manager-example/).
 
 ## Plugin System
 
-The fabric supports a registry-based plugin system that allows you to register custom database drivers without modifying the core library.
+The fabric supports a registry-based plugin system that allows you to
+register custom database drivers without modifying the core library.
 
 ### Creating a Custom Driver
 
@@ -953,33 +999,44 @@ func Clear()
 
 See the [examples](./examples) directory for complete working examples:
 
-- [`explain-example/`](./examples/explain-example/) - Query introspection with EXPLAIN analysis
-- [`manager-example/`](./examples/manager-example/) - Multi-database management:
+- [`explain-example/`](./examples/explain-example/) - Query introspection
+  with EXPLAIN analysis
+- [`manager-example/`](./examples/manager-example/) - Multi-database
+  management:
   - `basic/` - Basic DBManager usage patterns
   - `error-handling/` - Comprehensive error handling
-  - `priority-selection/` - Priority-based database selection and routing
-- [`plugin-example/`](./examples/plugin-example/) - Custom database driver plugin system with CockroachDB example
-- [`tester-example/`](./examples/tester-example/) - Tester utility and test helpers
+  - `priority-selection/` - Priority-based database selection and
+    routing
+- [`plugin-example/`](./examples/plugin-example/) - Custom database
+  driver plugin system with CockroachDB example
+- [`tester-example/`](./examples/tester-example/) - Tester utility and
+  test helpers
 
 ## Type Support
 
 Supported scalar types for row scanning:
 
-- **Basic Types**: `string`, `int`, `int8`, `int16`, `int32`, `int64`, `uint`, `uint8`, `uint16`, `uint32`, `uint64`, `float32`, `float64`, `bool`, `[]byte`
-- **SQL Null Types**: `sql.NullString`, `sql.NullInt32`, `sql.NullInt64`, `sql.NullFloat64`, `sql.NullBool`, `sql.NullTime`
+- **Basic Types**: `string`, `int`, `int8`, `int16`, `int32`, `int64`,
+  `uint`, `uint8`, `uint16`, `uint32`, `uint64`, `float32`, `float64`,
+  `bool`, `[]byte`
+- **SQL Null Types**: `sql.NullString`, `sql.NullInt32`, `sql.NullInt64`,
+  `sql.NullFloat64`, `sql.NullBool`, `sql.NullTime`
 
 For detailed NULL handling patterns, see [ERROR_HANDLING.md](./docs/ERROR_HANDLING.md).
 
 ## Contributing
 
-Contributions are welcome! Please read our [CONTRIBUTING.md](./CONTRIBUTING.md) guidelines before submitting PRs.
+Contributions are welcome! Please read our [CONTRIBUTING.md](./CONTRIBUTING.md)
+guidelines before submitting PRs.
 
 ## Performance
 
 The library is designed for production use with focus on:
 
-- **Zero-copy scanning** - Efficient field mapping without intermediate allocations
-- **Connection pooling** - Per-dialect optimizations (pgxpool for PostgreSQL)
+- **Zero-copy scanning** - Efficient field mapping without intermediate
+  allocations
+- **Connection pooling** - Per-dialect optimizations (pgxpool for
+  PostgreSQL)
 - **Prepared statements** - Parameterized queries throughout
 - **Memory efficiency** - Reusable row adapters and minimal allocations
 
@@ -996,12 +1053,18 @@ MIT License - see [LICENSE.md](./LICENSE.md)
 
 **Guides & References**:
 
-- 📐 **[ARCHITECTURE.md](./docs/ARCHITECTURE.md)** - Complete system design, layers, components, and extension points
-- 📋 **[CODE_REVIEW.md](./docs/CODE_REVIEW.md)** - Code quality standards and testing requirements
-- ⚠️ **[ERROR_HANDLING.md](./docs/ERROR_HANDLING.md)** - Error handling patterns and NULL type mapping
-- 🔧 **[DBMANAGER.md](./docs/DBMANAGER.md)** - Multi-database management and load balancing
-- 📦 **[ENVIRONMENT_VARIABLES.md](./docs/ENVIRONMENT_VARIABLES.md)** - Configuration and environment setup
-- 📚 **[LINTING.md](./docs/LINTING.md)** - Code style and linting standards
+- 📐 **[ARCHITECTURE.md](./docs/ARCHITECTURE.md)** - Complete system
+  design, layers, components, and extension points
+- 📋 **[CODE_REVIEW.md](./docs/CODE_REVIEW.md)** - Code quality
+  standards and testing requirements
+- ⚠️ **[ERROR_HANDLING.md](./docs/ERROR_HANDLING.md)** - Error handling
+  patterns and NULL type mapping
+- 🔧 **[DBMANAGER.md](./docs/DBMANAGER.md)** - Multi-database
+  management and load balancing
+- 📦 **[ENVIRONMENT_VARIABLES.md](./docs/ENVIRONMENT_VARIABLES.md)** -
+  Configuration and environment setup
+- 📚 **[LINTING.md](./docs/LINTING.md)** - Code style and linting
+  standards
 
 ## Support
 
@@ -1012,7 +1075,8 @@ MIT License - see [LICENSE.md](./LICENSE.md)
 
 See [RELEASES.md](./RELEASES.md) for version history and release notes.
 
-For detailed changes between versions, see [CHANGELOG.md](./CHANGELOG.md) (Keep a Changelog format).
+For detailed changes between versions, see [CHANGELOG.md](./CHANGELOG.md)
+(Keep a Changelog format).
 
 ---
 

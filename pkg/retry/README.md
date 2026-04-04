@@ -2,7 +2,9 @@
 
 ## Overview
 
-The `retry` package provides a flexible, configurable retry mechanism for Go applications with multiple backoff strategies. It handles context cancellation, error propagation, and timing with precision.
+The `retry` package provides a flexible retry mechanism for
+Go applications with multiple backoff strategies. It
+handles context cancellation, error propagation, and timing.
 
 **Key Features:**
 
@@ -48,7 +50,8 @@ Increases delay exponentially with each attempt.
 - `maxAttempts`: maximum retries (-1 for unlimited)
 - `jitterFactor`: randomization as fraction of delay (0.0-1.0)
 
-**Sequence:** `initialDelay * (baseMultiplier ^ attempt)`, capped at `maxDelay`
+**Sequence:** `initialDelay * (baseMultiplier ^ attempt)`
+capped at `maxDelay`
 
 **Use Case:** Network requests, API calls, transient failures
 
@@ -172,12 +175,13 @@ if err != nil {
 }
 ```
 
-### DoWithResult[T]() - Generic Result Returns
+### DoWithResult\[T\]() - Generic Result Returns
 
 Executes a function and returns both the result and error.
 
 ```go
-func DoWithResult[T any](ctx context.Context, strategy Strategy, fn func() (T, error)) (T, error)
+func DoWithResult[T any](ctx context.Context, strategy
+    Strategy, fn func() (T, error)) (T, error)
 ```
 
 **Example:**
@@ -237,7 +241,8 @@ err := retry.Do(ctx, strategy, func() error {
 
 ## Jitter
 
-Jitter prevents thundering herd problems in distributed systems. It adds randomness to delays.
+Jitter prevents thundering herd problems in distributed
+systems. It adds randomness to delays.
 
 **Without jitter:** All clients retry at exact same time → overload spike
 
@@ -245,7 +250,8 @@ Jitter prevents thundering herd problems in distributed systems. It adds randomn
 
 **Configuration:**
 
-- `jitterFactor`: fraction of delay to randomize (0.0 = no jitter, 0.1 = ±10%, 0.5 = ±50%)
+- `jitterFactor`: fraction to randomize (0.0 = no
+  jitter, 0.1 = ±10%, 0.5 = ±50%)
 - Actual delay = `baseDelay ± (baseDelay * jitterFactor * random)`
 
 **Example:**
@@ -262,11 +268,12 @@ jittered := retry.NewFixedBackoff(200*time.Millisecond, -1, 0.1)
 
 The package provides clear, actionable error messages:
 
-```
-retry: exhausted after 3 attempts: original error message
-retry: context done: context deadline exceeded
-retry: context done during delay: context canceled
-```
+````go
+var result string
+err := Do(ctx, func() error {
+    result = "value"
+    return nil
+}, strategy)
 
 ## Common Patterns
 
@@ -299,7 +306,7 @@ func getRetryStrategy() retry.Strategy {
         return retry.NewNoOpBackoff()
     }
 }
-```
+````
 
 ### Resource-Type Specific Strategies
 

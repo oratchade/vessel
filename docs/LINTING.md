@@ -1,6 +1,8 @@
 # Documentation Linting Guide
 
-This project includes comprehensive markdown and documentation linting tools to maintain consistent documentation quality across the fabric project.
+This project includes comprehensive markdown and documentation linting
+tools to maintain consistent documentation quality across the fabric
+project.
 
 ## Available Tools
 
@@ -77,7 +79,8 @@ vale --config .vale.yaml ./docs ./README.md
 
 ## Project Vocabulary
 
-Custom project terms are defined in `.vale/styles/Project.yml` to avoid false positives:
+Custom project terms are defined in `.vale/styles/Project.yml` to avoid
+false positives:
 
 ```yaml
 - fabric
@@ -132,11 +135,13 @@ vale.Simplicity = warning
 
 ## Best Practices
 
-1. **Keep lines under 120 characters** - Better readability and diff visibility
+1. **Keep lines under 120 characters** - Better readability and diff
+   visibility
 2. **Use meaningful headings** - Clear structure helps readers navigate
 3. **Include language tags in code blocks** - Enables syntax highlighting
 4. **Write clearly** - Avoid hedging language; be direct
-5. **Define new terms** - Add to `.vale/styles/Project.yml` if introducing new vocabulary
+5. **Define new terms** - Add to `.vale/styles/Project.yml` if
+   introducing new vocabulary
 
 ---
 
@@ -158,7 +163,8 @@ go install github.com/errata-ai/vale/v3@latest
 
 ### Too many warnings in check target
 
-Vale is configured to only warn by default. To fail on Vale warnings, edit `.vale.yaml`:
+Vale is configured to only warn by default. To fail on Vale warnings,
+edit `.vale.yaml`:
 
 ```yaml
 MinAlertLevel: error # Change from 'warning' to 'error'
@@ -190,7 +196,8 @@ MinAlertLevel: error # Change from 'warning' to 'error'
 
 ### Other Editors
 
-Most editors support these tools via plugins. Install the appropriate extension and point it to your configuration files.
+Most editors support these tools via plugins. Install the appropriate
+extension and point it to your configuration files.
 
 ---
 
@@ -213,23 +220,27 @@ The fabric library provides multiple database drivers:
 ```go
 db, err := fabric.NewDB(config)
 ```
-````
 
+```text
+
+```
 ````
 
 ### Issues to Avoid
-```markdown
+
+````markdown
 # Poorly formatted markdown that violates multiple rules
 
-
-This   has   inconsistent spacing and very long lines that exceed the recommended character limits set in the configuration.
+This has inconsistent spacing and very long lines that exceed the recommended
+character limits set in the configuration.
 
 ```python
 # Missing language tag - will trigger MD040
 code here
+```
 ````
 
-```
+```bash
 
 ---
 

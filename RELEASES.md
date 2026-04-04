@@ -1,6 +1,7 @@
 # Releases
 
-This file provides a quick overview of Fabric release history. For detailed changes, see [CHANGELOG.md](CHANGELOG.md).
+This file provides a quick overview of Fabric release history. For
+detailed changes, see [CHANGELOG.md](CHANGELOG.md).
 
 ---
 
@@ -74,9 +75,9 @@ This file provides a quick overview of Fabric release history. For detailed chan
 
 ## Version Matrix
 
-| Version | Release Date | Status    | Go Version | Go Version | Databases | Test Count |
-| ------- | ------------ | --------- | ---------- | ---------- | --------- | ---------- |
-| 1.0.0   | 2026-04-03   | Stable ✅ | 1.19+      | 1.26.0     | 4         | 829        |
+| Version | Release Date | Status    | Go Version | Databases | Count |
+| ------- | ------------ | --------- | ---------- | --------- | ----- |
+| 1.0.0   | 2026-04-03   | Stable ✅ | 1.26.0     | 4         | 829   |
 
 ---
 
@@ -197,6 +198,7 @@ If you've been using pre-release versions of Fabric, here's what changed:
    ```
 
 4. **Error Handling**: Errors now include database prefixes
+
    ```go
    // All errors include [database] prefix
    // e.g., "[postgres] connection refused: host=localhost"
@@ -215,7 +217,8 @@ If you've been using pre-release versions of Fabric, here's what changed:
   - Basic database operations (`basic/`)
   - Priority-based routing (`priority_selection/`)
   - Error handling patterns (`error_handling/`)
-  - **Retry integration examples** (`retry/`) - 4 patterns with exponential, linear, and fixed backoff
+  - **Retry integration examples** (`retry/`) - 4 patterns with
+    exponential, linear, and fixed backoff
 
 ### Getting Help
 
