@@ -136,10 +136,14 @@ type DBManager struct {
 
 // NewDBManager creates a new DBManager instance by loading
 // the configuration from the specified path and setting up the database entries.
-func NewDBManager(ctx context.Context, configPath string, logger db.Logger) (*DBManager, error) {
+//
+// Environment variable expansion in config files is opt-in.
+// Use WithEnvVars, WithEnvPrefix, or WithEnvFile to enable it.
+// Without any EnvOption, no expansion occurs (secure by default).
+func NewDBManager(ctx context.Context, configPath string, logger db.Logger, envOpts ...EnvOption) (*DBManager, error) {
 	var err error
 
-	cfg, err := (&DBManager{}).loadConfig(configPath)
+	cfg, err := (&DBManager{}).loadConfig(configPath, envOpts)
 	if err != nil {
 		return nil, fmt.Errorf("failed to load config: %w", err)
 	}
@@ -182,7 +186,7 @@ func NewDBManager(ctx context.Context, configPath string, logger db.Logger) (*DB
 }
 
 // loadConfig loads the configuration from the specified path.
-func (dm *DBManager) loadConfig(path string) (*config.ManagerConfig, error) {
+func (dm *DBManager) loadConfig(path string, envOpts []EnvOption) (*config.ManagerConfig, error) {
 	// Prevent directory traversal
 	cleanPath := filepath.Clean(path)
 	if strings.Contains(cleanPath, "..") {
@@ -193,6 +197,9 @@ func (dm *DBManager) loadConfig(path string) (*config.ManagerConfig, error) {
 	if err != nil {
 		return nil, fmt.Errorf("loadConfig: failed to read config file: %w", err)
 	}
+
+	// Expand ${VAR} and ${VAR:default} patterns if env options are provided
+	data = expandEnvVars(data, newEnvResolver(envOpts))
 
 	cfg := &config.ManagerConfig{}
 	ext := filepath.Ext(cleanPath)
