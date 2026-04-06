@@ -710,7 +710,14 @@ func TestIntegration_RawQuery(t *testing.T) {
 				t.Fatalf("QueryRaw failed: %v", err)
 			}
 
-			defer rows.Close()
+			list, err := v1.ScanRowsTo[User](context.Background(), rows)
+			if err != nil {
+				panic(fmt.Sprintf("ScanRowsTo failed: %v", err))
+			}
+
+			if len(list) != 1 {
+				t.Errorf("Expected 1 user, found %d", len(list))
+			}
 
 			// Also test with Get which will validate the query works
 			users, err := database.Get(

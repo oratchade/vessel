@@ -373,7 +373,8 @@ rowsAdapter, err := database.GetRaw(ctx, "users", []string{"*"}, nil, nil, nil)
 if err != nil {
     log.Fatal(err)
 }
-defer rowsAdapter.Close()  // ⚠️ REQUIRED: Always close the adapter
+// defer rowsAdapter.Close()
+// ⚠️ REQUIRED: Always close the adapter if you don't use ScanRowsTo
 
 // Now you can scan or process the rows
 users, err := db.ScanRowsTo[User](ctx, rowsAdapter)
@@ -1059,7 +1060,7 @@ MIT License - see [LICENSE.md](./LICENSE.md)
   standards and testing requirements
 - ⚠️ **[ERROR_HANDLING.md](./docs/ERROR_HANDLING.md)** - Error handling
   patterns and NULL type mapping
-- 🔧 **[DBMANAGER.md](./docs/DBMANAGER.md)** - Multi-database
+- 🔧 **[DB_MANAGER.md](./docs/DB_MANAGER.md)** - Multi-database
   management and load balancing
 - 📦 **[ENVIRONMENT_VARIABLES.md](./docs/ENVIRONMENT_VARIABLES.md)** -
   Configuration and environment setup
