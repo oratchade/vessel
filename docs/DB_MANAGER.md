@@ -223,6 +223,204 @@ if entry.Health() {
 
 DBManager supports YAML, JSON, and TOML configuration files.
 
+### Variables Expansion
+
+Configuration files support optional environment variable expansion using
+the `${VAR}` and `${VAR:default}` syntax. Variable expansion is **opt-in
+and disabled by default** for security.
+
+#### Enabling Variables Expansion
+
+Pass `EnvOption`s to `NewDBManager()`:
+
+```go
+dm, err := v1.NewDBManager(ctx, "config.yaml", logger,
+    v1.WithEnvVars(map[string]string{
+        "DB_HOST":     "localhost",
+        "DB_PASSWORD": os.Getenv("SECURE_PASSWORD"),
+    }),
+)
+```
+
+#### Available EnvOptions
+
+**WithEnvVars** - Explicit map (highest priority):
+
+```go
+v1.WithEnvVars(map[string]string{
+    "DB_HOST":     "prod-db.example.com",
+    "DB_PASSWORD": "secret123",
+})
+```
+
+**WithEnvPrefix** - Filter process environment by prefix:
+
+```go
+v1.WithEnvPrefix("DB_", "FABRIC_")
+// Expands ${DB_HOST}, ${DB_PORT}, ${FABRIC_NAME}, etc.
+// Other vars like ${SECRET_KEY} are protected (not expanded)
+```
+
+**WithEnvFile** - Load from .env file:
+
+```go
+v1.WithEnvFile(".env")
+// Reads key=value pairs, supports comments and quoted values
+```
+
+**Combine Options** - Multiple options work together:
+
+```go
+dm, err := v1.NewDBManager(ctx, "config.yaml", logger,
+    v1.WithEnvVars(map[string]string{"DB_HOST": "localhost"}),
+    v1.WithEnvFile(".env"),
+    v1.WithEnvPrefix("DB_", "FABRIC_"),
+)
+// Priority: explicit vars > file vars > prefix env
+```
+
+#### Variable Syntax
+
+**Simple variable:**
+
+```yaml
+host: ${DB_HOST}
+```
+
+**With default value:**
+
+```yaml
+port: ${DB_PORT:5432}
+```
+
+**Empty default:**
+
+```yaml
+password: ${DB_PASSWORD:}
+```
+
+**Bare $VAR is NOT expanded:**
+
+```yaml
+# This is left as-is
+example: $DB_HOST
+```
+
+#### Variable Resolution Behavior
+
+| Syntax           | Variable Found    | Variable Missing                     |
+| ---------------- | ----------------- | ------------------------------------ |
+| `${VAR}`         | Replaced w/ value | Left as literal `${VAR}` (fail-loud) |
+| `${VAR:default}` | Replaced w/ value | Replaced with `default`              |
+| `${VAR:}`        | Replaced w/ value | Replaced with empty string           |
+
+#### .env File Format
+
+```env
+# Comments start with #
+DB_HOST=localhost
+DB_PORT=5432
+
+# Quoted values are unquoted automatically
+DB_PASSWORD="my-secret-password"
+DB_USER='readonly-user'
+```
+
+#### Configuration Example with Variables
+
+```yaml
+# config.yaml
+writeQueueSize: ${WRITE_QUEUE:1000}
+readQueueSize: ${READ_QUEUE:2000}
+healthInterval: ${HEALTH_CHECK:30s}
+
+entries:
+  - name: primary
+    type: read-write
+    priority: 100
+    database: postgres
+    config:
+      host: ${DB_PRIMARY_HOST}
+      port: ${DB_PRIMARY_PORT:5432}
+      user: ${DB_USER}
+      password: ${DB_PASSWORD}
+      database: myapp
+      sslmode: require
+
+  - name: replica
+    type: read-only
+    priority: 50
+    database: postgres
+    config:
+      host: ${DB_REPLICA_HOST}
+      port: ${DB_REPLICA_PORT:5432}
+      user: ${DB_USER}
+      password: ${DB_PASSWORD:} # Empty password fallback
+      database: myapp
+      sslmode: require
+```
+
+Usage:
+
+```go
+dm, err := v1.NewDBManager(ctx, "config.yaml", logger,
+    v1.WithEnvVars(map[string]string{
+        "DB_PRIMARY_HOST": "primary.example.com",
+        "DB_REPLICA_HOST": "replica.example.com",
+        "DB_USER":         "app",
+        "DB_PASSWORD":     os.Getenv("VAULT_DB_PASSWORD"),
+    }),
+)
+```
+
+#### Security Best Practices
+
+✅ **DO:**
+
+- Use `WithEnvVars()` to pass sensitive values
+- Use `WithEnvPrefix()` to restrict which process env vars are accessible
+- Load secrets from vaults via `os.Getenv()` and pass to `WithEnvVars()`
+- Document which variables are expected in config files
+
+❌ **DON'T:**
+
+- Enable `WithEnvPrefix()` without prefixes (exposes all env vars)
+- Leave defaults empty for sensitive values like passwords
+- Hardcode secrets in config files
+- Enable variables expansion if not needed (keep default disabled)
+- Use `WithEnvFile()` for production secrets (use `WithEnvVars()` instead)
+
+#### Missing Variables
+
+- **With no option configured:** Variables are left unexpanded (default, safe)
+- **With option configured, var not found, no default:**
+  Variable is left as literal `${VAR}` (fail-loud, helps debug)
+- **File missing:** `WithEnvFile()` silently ignores missing files,
+  defaults still work
+
+#### .env File Example
+
+```bash
+# .env (committed to VCS, safe to share)
+DB_PRIMARY_HOST=primary.example.com
+DB_REPLICA_HOST=replica.example.com
+DB_USER=app
+
+# Production secrets (NOT committed, loaded from secure storage)
+# DB_PASSWORD=actual-secret-from-vault
+```
+
+Load only safe vars from file:
+
+```go
+dm, err := v1.NewDBManager(ctx, "config.yaml", logger,
+    v1.WithEnvFile(".env"),
+    v1.WithEnvVars(map[string]string{
+        "DB_PASSWORD": os.Getenv("VAULT_SECRET"),
+    }),
+)
+```
+
 ### Schema
 
 ```yaml

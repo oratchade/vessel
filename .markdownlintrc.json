@@ -1,10 +1,10 @@
 {
   "extends": "markdownlint/style/prettier",
-  "line_length": 120,
+  "line_length": 80,
   "no-hard-tabs": false,
   "code-block-language": true,
   "code-blocks": {
-    "line_length": 120
+    "line_length": 80
   },
   "no-multiple-blanks": {
     "maximum": 1

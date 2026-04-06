@@ -32,6 +32,10 @@ all modules and databases.
   - MSSQL 2016+ (`mssql.go`)
   - Consistent API across all databases
 
+- **Manager API** (`manager/v1/`)
+  - Support for variable expansion in configuration values (e.g. `${DB_PASSWORD}`)
+  - Environment variable loading from `.env` files
+
 - **🔄 Fluent Query DSL** (`db/v1/fluentDB.go`)
   - SelectBuilder with WHERE, ORDER BY, LIMIT, OFFSET, GROUP BY,
     HAVING
@@ -206,7 +210,7 @@ all modules and databases.
   - NULL type mapping and best practices
   - Wrapped error guidance
 
-- **[docs/DBMANAGER.md](docs/DBMANAGER.md)**
+- **[docs/DB_MANAGER.md](docs/DB_MANAGER.md)**
   - Multi-database management and routing
   - Configuration loading from YAML/TOML/JSON
   - Health check API usage
