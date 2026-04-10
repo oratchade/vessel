@@ -56,7 +56,7 @@ func TestSQLNullInt64Conversion(t *testing.T) {
 			if tc.input == nil {
 				ni.Valid = false
 			} else if s, ok := tc.input.(string); ok && s != "invalid" {
-				ni = sql.NullInt64{Int64: 123, Valid: true}
+				ni = sql.NullInt64{Valid: true}
 			}
 			assert.Equal(t, tc.expected, ni.Valid)
 		})

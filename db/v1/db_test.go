@@ -120,9 +120,8 @@ func TestPoolStatisticsZeroValues(t *testing.T) {
 
 func TestPoolStatisticsAvailableConnections(t *testing.T) {
 	stats := &v1.PoolStatistics{
-		Idle:            5,
-		InUse:           15,
-		OpenConnections: 20,
+		Idle:  5,
+		InUse: 15,
 	}
 
 	// Available should be derived from total - in use

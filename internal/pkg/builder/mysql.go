@@ -32,7 +32,7 @@ func (m *MySQLQueryBuilder) Select(
 ) (string, []any, error) {
 	q, v, err := selectQ(m.dialect, table, columns, joins, cond, opts, m.join)
 	if err != nil {
-		return "", nil, fmt.Errorf("select mssqlSQL Builder: error building select query: %w", err)
+		return "", nil, fmt.Errorf("select mysqlSQL Builder: error building select query: %w", err)
 	}
 	return q, v, nil
 }

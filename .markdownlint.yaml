@@ -212,3 +212,4 @@ ignore-patterns:
   - out/
   - ".git/"
   - ".vscode/"
+  - ".claude/"
