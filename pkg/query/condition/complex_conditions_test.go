@@ -10,6 +10,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	cdt "tounilab.com/fabric/pkg/query/condition"
+	"tounilab.com/fabric/tests"
 )
 
 // TestSimpleCondition tests basic condition building
@@ -247,28 +248,38 @@ func TestBetweenOperator(t *testing.T) {
 
 // TestNullConditions tests NULL handling
 func TestNullConditions(t *testing.T) {
-	tests := []struct {
-		name    string
-		builder func() cdt.Condition
+	dialect := tests.MockDialect{}
+
+	testCases := []struct {
+		name        string
+		builder     func() cdt.Condition
+		expectedSQL string
 	}{
 		{
 			name: "is null",
 			builder: func() cdt.Condition {
 				return cdt.NewExpr().Column("deleted_at").Op("IS NULL")
 			},
+			expectedSQL: "deleted_at IS NULL",
 		},
 		{
 			name: "is not null",
 			builder: func() cdt.Condition {
 				return cdt.NewExpr().Column("email").Op("IS NOT NULL")
 			},
+			expectedSQL: "email IS NOT NULL",
 		},
 	}
 
-	for _, tt := range tests {
+	for _, tt := range testCases {
 		t.Run(tt.name, func(t *testing.T) {
 			cond := tt.builder()
 			require.NotNil(t, cond)
+
+			sql, args, err := cond.ToSQL(dialect, 1)
+			require.NoError(t, err)
+			assert.Equal(t, tt.expectedSQL, sql)
+			assert.Empty(t, args)
 		})
 	}
 }
