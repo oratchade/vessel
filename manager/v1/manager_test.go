@@ -15,15 +15,12 @@ import (
 // TestQueryData tests the QueryData structure for different query types.
 func TestQueryData(t *testing.T) {
 	data := &v1.QueryData{
-		Table:      "users",
-		ID:         1,
-		Columns:    []string{"id", "name"},
-		Data:       map[string]any{"name": "John"},
-		BulkData:   []map[string]any{{}, {}},
-		Conditions: nil,
-		Opts:       nil,
-		Query:      "SELECT * FROM users",
-		Params:     []any{1, 2},
+		Table:    "users",
+		ID:       1,
+		Columns:  []string{"id", "name"},
+		Data:     map[string]any{"name": "John"},
+		BulkData: []map[string]any{{}, {}},
+		Params:   []any{1, 2},
 	}
 
 	assert.Equal(t, "users", data.Table)
@@ -41,9 +38,7 @@ func TestQueryResponse(t *testing.T) {
 		Data: []map[string]any{
 			{"id": 1, "name": "John"},
 		},
-		RawData:  nil,
-		ExecData: nil,
-		Error:    nil,
+		Error: nil,
 	}
 
 	assert.Equal(t, "req-123", response.RequestID)
@@ -92,7 +87,6 @@ func TestEmptyQueryResponse(t *testing.T) {
 // TestQueryDataWithNilConditions tests QueryData with nil conditions and options.
 func TestQueryDataWithNilConditions(t *testing.T) {
 	data := &v1.QueryData{
-		Table:      "users",
 		Conditions: nil,
 		Opts:       nil,
 	}
@@ -111,7 +105,6 @@ func TestQueryResponseWithData(t *testing.T) {
 	response := &v1.QueryResponse{
 		RequestID: "req-2",
 		Data:      testData,
-		Error:     nil,
 	}
 
 	assert.Equal(t, "req-2", response.RequestID)
@@ -149,7 +142,6 @@ func TestQueryDataWithParams(t *testing.T) {
 	}
 
 	data := &v1.QueryData{
-		Query:  "SELECT * FROM users WHERE name = ? AND age > ? AND active = ? AND score >= ?",
 		Params: params,
 	}
 
@@ -201,7 +193,6 @@ func TestQueryDataColumns(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			data := &v1.QueryData{
-				Table:   "users",
 				Columns: tt.columns,
 			}
 			assert.Equal(t, tt.columns, data.Columns)
@@ -233,13 +224,11 @@ func TestQueryDataWithDataMap(t *testing.T) {
 // TestQueryResponseMultipleRows tests QueryResponse containing multiple rows.
 func TestQueryResponseMultipleRows(t *testing.T) {
 	response := &v1.QueryResponse{
-		RequestID: "req-list",
 		Data: []map[string]any{
 			{"id": 1, "name": "Alice", "active": true},
 			{"id": 2, "name": "Bob", "active": false},
 			{"id": 3, "name": "Charlie", "active": true},
 		},
-		Error: nil,
 	}
 
 	assert.Len(t, response.Data, 3)
@@ -269,8 +258,7 @@ func TestQueryDataWithMultipleIDs(t *testing.T) {
 
 	for _, id := range ids {
 		data := &v1.QueryData{
-			Table: "users",
-			ID:    id,
+			ID: id,
 		}
 		assert.Equal(t, id, data.ID)
 	}
@@ -283,10 +271,9 @@ func TestQueryDataWithMultipleIDs(t *testing.T) {
 // TestDBManagerStartStop tests the manager lifecycle (start and stop).
 func TestDBManagerStartStop(t *testing.T) {
 	dm := &v1.DBManager{}
-	ctx := context.Background()
 
 	// Start should not panic with empty entries
-	dm.Start(ctx)
+	dm.Start()
 
 	// Stop should not panic
 	dm.Stop()

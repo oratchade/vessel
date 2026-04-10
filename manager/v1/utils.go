@@ -8,9 +8,6 @@ type AtomicWrapCounter struct {
 }
 
 func NewAtomicWrapCounter(max int64) *AtomicWrapCounter {
-	if max <= 0 {
-		panic("max must be > 0")
-	}
 	return &AtomicWrapCounter{max: max}
 }
 

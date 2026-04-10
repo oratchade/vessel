@@ -41,7 +41,7 @@ func main() {
 	}
 
 	// Start workers and health checks
-	dm.Start(ctx)
+	dm.Start()
 
 	defer dm.Stop()
 

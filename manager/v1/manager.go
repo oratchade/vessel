@@ -52,7 +52,7 @@ func setupDBs(
 				return nil, nil, fmt.Errorf("failed to create read-only DB entry: %w", err)
 			}
 		case config.ReadWrite:
-			readWrite[entry.Name], err = newDBEntry(c, cfg, &entry, logger)
+			dbEntry, err := newDBEntry(c, cfg, &entry, logger)
 			if err != nil {
 				logger.Error("Failed to create read-write database entry",
 					"entry_name", entry.Name,
@@ -60,6 +60,7 @@ func setupDBs(
 				)
 				return nil, nil, fmt.Errorf("failed to create read-write DB entry: %w", err)
 			}
+			readWrite[entry.Name] = dbEntry
 		}
 	}
 
@@ -225,27 +226,8 @@ func (dm *DBManager) loadConfig(path string, envOpts []EnvOption) (*config.Manag
 	return cfg, nil
 }
 
-// SetLogger sets the logger for the database manager and all its entries.
-// This should be called after NewDBManager and before Start().
-func (dm *DBManager) SetLogger(logger db.Logger) {
-	if logger == nil {
-		logger = &noOpLogger{}
-	}
-	dm.logger = logger
-	for _, entry := range dm.readOnlyEntries {
-		entry.logger = logger
-	}
-	for _, entry := range dm.readWriteEntries {
-		entry.logger = logger
-	}
-
-	if dm.logger != nil {
-		dm.logger.Debug("Logger configured for database manager and all entries")
-	}
-}
-
 // Start initializes the database entries and starts their worker routines.
-func (dm *DBManager) Start(ctx context.Context) {
+func (dm *DBManager) Start() {
 	if dm.logger != nil {
 		dm.logger.Info("Starting database manager",
 			"read_only_entries", len(dm.readOnlyEntries),
@@ -260,7 +242,7 @@ func (dm *DBManager) Start(ctx context.Context) {
 				"priority", entry.Priority(),
 			)
 		}
-		entry.start(ctx)
+		entry.start()
 	}
 	for name, entry := range dm.readWriteEntries {
 		if dm.logger != nil {
@@ -269,7 +251,7 @@ func (dm *DBManager) Start(ctx context.Context) {
 				"priority", entry.Priority(),
 			)
 		}
-		entry.start(ctx)
+		entry.start()
 	}
 
 	if dm.logger != nil {
@@ -582,7 +564,7 @@ func (dm *DBManager) GetAsync(
 	cond condition.Condition,
 	opts *options.QueryOptions,
 ) (<-chan *QueryResponse, error) {
-	dbEntry := dm.readOnlyEntry()
+	dbEntry := dm.readEntry()
 	if dbEntry == nil {
 		return nil, fmt.Errorf("no read-only database entries available")
 	}
@@ -618,7 +600,7 @@ func (dm *DBManager) GetRawAsync(
 	cond condition.Condition,
 	opts *options.QueryOptions,
 ) (<-chan *QueryResponse, error) {
-	dbEntry := dm.readOnlyEntry()
+	dbEntry := dm.readEntry()
 	if dbEntry == nil {
 		return nil, fmt.Errorf("no read-only database entries available")
 	}
@@ -653,7 +635,7 @@ func (dm *DBManager) GetByIDAsync(
 	joins []condition.Join,
 	opts *options.QueryOptions,
 ) (<-chan *QueryResponse, error) {
-	dbEntry := dm.readOnlyEntry()
+	dbEntry := dm.readEntry()
 	if dbEntry == nil {
 		return nil, fmt.Errorf("no read-only database entries available")
 	}
@@ -687,7 +669,7 @@ func (dm *DBManager) GetByIDRawAsync(
 	joins []condition.Join,
 	opts *options.QueryOptions,
 ) (<-chan *QueryResponse, error) {
-	dbEntry := dm.readOnlyEntry()
+	dbEntry := dm.readEntry()
 	if dbEntry == nil {
 		return nil, fmt.Errorf("no read-only database entries available")
 	}
@@ -850,7 +832,7 @@ func (dm *DBManager) DeleteAsync(
 // Returns an error immediately if no entries are available or if context is already canceled.
 // For synchronous access, use Query() instead.
 func (dm *DBManager) QueryAsync(ctx context.Context, query string, args ...any) (<-chan *QueryResponse, error) {
-	dbEntry := dm.readOnlyEntry()
+	dbEntry := dm.readEntry()
 	if dbEntry == nil {
 		return nil, fmt.Errorf("no read-only database entries available")
 	}
@@ -876,7 +858,7 @@ func (dm *DBManager) QueryAsync(ctx context.Context, query string, args ...any) 
 // Returns an error immediately if no entries are available or if context is already canceled.
 // For synchronous access, use QueryRaw() instead.
 func (dm *DBManager) QueryRawAsync(ctx context.Context, query string, args ...any) (<-chan *QueryResponse, error) {
-	dbEntry := dm.readOnlyEntry()
+	dbEntry := dm.readEntry()
 	if dbEntry == nil {
 		return nil, fmt.Errorf("no read-only database entries available")
 	}
@@ -895,6 +877,14 @@ func (dm *DBManager) QueryRawAsync(ctx context.Context, query string, args ...an
 	}
 
 	return q.ResponseCh, nil
+}
+
+func (dm *DBManager) readEntry() *DBEntry {
+	dbEntry := dm.readOnlyEntry()
+	if dbEntry == nil {
+		dbEntry = dm.readWriteEntry()
+	}
+	return dbEntry
 }
 
 // ExecAsync executes a raw query against the database asynchronously and returns the execution result.
@@ -926,11 +916,16 @@ func (dm *DBManager) ExecAsync(ctx context.Context, query string, args ...any) (
 // Ping checks the database connection synchronously.
 func (dm *DBManager) Ping(ctx context.Context) error {
 	entry := dm.readOnlyEntry()
-	if entry == nil {
-		return fmt.Errorf("no read-only database entries configured")
+	if entry != nil {
+		if err := entry.db.Ping(ctx); err != nil {
+			return fmt.Errorf("failed to ping database: %w", err)
+		}
 	}
-	if err := entry.db.Ping(ctx); err != nil {
-		return fmt.Errorf("failed to ping database: %w", err)
+	entry = dm.readWriteEntry()
+	if entry != nil {
+		if err := entry.db.Ping(ctx); err != nil {
+			return fmt.Errorf("failed to ping database: %w", err)
+		}
 	}
 	return nil
 }

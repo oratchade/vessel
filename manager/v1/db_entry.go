@@ -28,7 +28,7 @@ type DBEntry struct {
 	db     db.DB
 	logger db.Logger
 
-	healthy        atomic.Bool
+	healthy        *atomic.Bool
 	healthInterval time.Duration
 	priority       int
 
@@ -112,6 +112,7 @@ func newDBEntry(
 		db:             dbInstance,
 		logger:         logger,
 		healthInterval: mc.EntryHealthInterval(cfg),
+		healthy:        &atomic.Bool{},
 		priority:       mc.EntryPriority(cfg),
 		writeQueue:     writeQueue,
 		readQueue:      readQueue,
@@ -132,7 +133,7 @@ func (de *DBEntry) Health() bool {
 }
 
 // start launches worker goroutines for processing read and write queries.
-func (de *DBEntry) start(ctx context.Context) {
+func (de *DBEntry) start() {
 	de.logger.Info("Starting database entry workers",
 		"name", de.name,
 		"write_workers", len(de.writeQueue),
@@ -140,13 +141,13 @@ func (de *DBEntry) start(ctx context.Context) {
 	)
 
 	for i := range de.writeQueue {
-		go de.writeWorker(ctx, de.writeQueue[i])
+		go de.writeWorker(de.ctx, de.writeQueue[i])
 	}
 	for i := range de.readQueue {
-		go de.readWorker(ctx, de.readQueue[i])
+		go de.readWorker(de.ctx, de.readQueue[i])
 	}
 
-	go de.healthCheck(ctx)
+	go de.healthCheck(de.ctx)
 
 	de.logger.Debug("Database entry workers started and health check initiated",
 		"name", de.name,
@@ -154,11 +155,17 @@ func (de *DBEntry) start(ctx context.Context) {
 }
 
 // stop closes all worker goroutines and closes the database connection.
+// It cancels the context first to allow workers to exit via ctx.Done(),
+// then closes channels and the database.
 func (de *DBEntry) stop() {
 	de.logger.Info("Stopping database entry",
 		"name", de.name,
 	)
 
+	// Allow workers to detect ctx.Done() and exit cleanly
+	de.cancel()
+
+	// Then close channels for cleanup
 	for i := range de.writeQueue {
 		close(de.writeQueue[i].queue)
 	}
@@ -166,8 +173,8 @@ func (de *DBEntry) stop() {
 		close(de.readQueue[i].queue)
 	}
 
+	// Finally close database
 	_ = de.db.Close()
-	de.cancel()
 
 	de.logger.Debug("Database entry stopped",
 		"name", de.name,
@@ -263,26 +270,15 @@ func (de *DBEntry) processWriteRequest(ctx context.Context, qd *Query) *QueryRes
 
 // writeWorker processes write queries from its queue and executes them against the database.
 func (de *DBEntry) writeWorker(ctx context.Context, w *dbEntryWorker) {
-	const responseSendTimeout = 5 * time.Second
 	for {
 		select {
-		case qd := <-w.queue:
-			response := de.processWriteRequest(ctx, qd)
-			// Send response with timeout to prevent worker from blocking indefinitely
-			select {
-			case qd.ResponseCh <- response:
-				// Response sent successfully
-			case <-time.After(responseSendTimeout):
-				if de.logger != nil {
-					de.logger.Warn("Response send timeout",
-						"name", de.name,
-						"request_type", qd.Request,
-						"reason", "consumer_not_reading",
-					)
-				}
-			case <-ctx.Done():
+		case qd, ok := <-w.queue:
+			if !ok {
 				return
 			}
+			response := de.processWriteRequest(ctx, qd)
+			// Send response with timeout to prevent worker from blocking indefinitely
+			de.sendResponseWithTimeout(ctx, qd, response)
 		case <-ctx.Done():
 			return
 		}
@@ -350,29 +346,40 @@ func (de *DBEntry) processReadRequest(ctx context.Context, qd *Query) *QueryResp
 
 // readWorker processes read queries from its queue and executes them against the database.
 func (de *DBEntry) readWorker(ctx context.Context, w *dbEntryWorker) {
-	const responseSendTimeout = 5 * time.Second
 	for {
 		select {
-		case qd := <-w.queue:
-			response := de.processReadRequest(ctx, qd)
-			// Send response with timeout to prevent worker from blocking indefinitely
-			select {
-			case qd.ResponseCh <- response:
-				// Response sent successfully
-			case <-time.After(responseSendTimeout):
-				if de.logger != nil {
-					de.logger.Warn("Response send timeout",
-						"name", de.name,
-						"request_type", qd.Request,
-						"reason", "consumer_not_reading",
-					)
-				}
-			case <-ctx.Done():
+		case qd, ok := <-w.queue:
+			if !ok {
 				return
 			}
+			response := de.processReadRequest(ctx, qd)
+			// Send response with timeout to prevent worker from blocking indefinitely
+			de.sendResponseWithTimeout(ctx, qd, response)
 		case <-ctx.Done():
 			return
 		}
+	}
+}
+
+func (de *DBEntry) sendResponseWithTimeout(
+	ctx context.Context,
+	qd *Query,
+	response *QueryResponse,
+) {
+	const responseSendTimeout = 5 * time.Second
+	select {
+	case qd.ResponseCh <- response:
+		// Response sent successfully
+	case <-time.After(responseSendTimeout):
+		if qd.ResponseCh != nil && de.logger != nil {
+			de.logger.Warn("Response send timeout",
+				"name", de.name,
+				"request_type", qd.Request,
+				"reason", "consumer_not_reading",
+			)
+		}
+	case <-ctx.Done():
+		return
 	}
 }
 
