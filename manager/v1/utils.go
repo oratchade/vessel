@@ -1,14 +1,25 @@
 package v1
 
-import "sync/atomic"
+import (
+	"fmt"
+	"sync/atomic"
+)
 
 type AtomicWrapCounter struct {
 	value int64
 	max   int64
 }
 
-func NewAtomicWrapCounter(max int64) *AtomicWrapCounter {
-	return &AtomicWrapCounter{max: max}
+// ErrInvalidCounterMax is returned when attempting to create an AtomicWrapCounter with invalid max value.
+var ErrInvalidCounterMax = fmt.Errorf("invalid counter max: must be > 0")
+
+// NewAtomicWrapCounter creates a new AtomicWrapCounter with the given max value.
+// Returns an error if max is <= 0, as this would cause division by zero in Next() or Get().
+func NewAtomicWrapCounter(max int64) (*AtomicWrapCounter, error) {
+	if max <= 0 {
+		return nil, fmt.Errorf("%w (got %d)", ErrInvalidCounterMax, max)
+	}
+	return &AtomicWrapCounter{max: max}, nil
 }
 
 // Next increments and wraps around automatically.

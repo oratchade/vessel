@@ -11,22 +11,25 @@ import (
 	v1 "tounilab.com/fabric/manager/v1"
 )
 
-// TestNewAtomicWrapCounterPanic tests that New panics on invalid max value.
-func TestNewAtomicWrapCounterPanic(t *testing.T) {
-	// Test zero max panics
-	assert.Panics(t, func() {
-		v1.NewAtomicWrapCounter(0)
-	}, "should panic with max=0")
+// TestNewAtomicWrapCounterErrorHandling tests that NewAtomicWrapCounter returns error on invalid max value.
+func TestNewAtomicWrapCounterErrorHandling(t *testing.T) {
+	// Test zero max returns error
+	counter, err := v1.NewAtomicWrapCounter(0)
+	require.Error(t, err, "should return error with max=0")
+	require.Nil(t, counter, "counter should be nil on error")
+	require.ErrorIs(t, err, v1.ErrInvalidCounterMax)
 
-	// Test negative max panics
-	assert.Panics(t, func() {
-		v1.NewAtomicWrapCounter(-1)
-	}, "should panic with max=-1")
+	// Test negative max returns error
+	counter, err = v1.NewAtomicWrapCounter(-1)
+	require.Error(t, err, "should return error with max=-1")
+	require.Nil(t, counter, "counter should be nil on error")
+	require.ErrorIs(t, err, v1.ErrInvalidCounterMax)
 }
 
 // TestNewAtomicWrapCounterValid tests valid counter creation.
 func TestNewAtomicWrapCounterValid(t *testing.T) {
-	counter := v1.NewAtomicWrapCounter(10)
+	counter, err := v1.NewAtomicWrapCounter(10)
+	require.NoError(t, err)
 	require.NotNil(t, counter)
 
 	// Initial value should be 0
@@ -36,7 +39,8 @@ func TestNewAtomicWrapCounterValid(t *testing.T) {
 
 // TestAtomicWrapCounterNext tests wrap-around behavior.
 func TestAtomicWrapCounterNext(t *testing.T) {
-	counter := v1.NewAtomicWrapCounter(5)
+	counter, err := v1.NewAtomicWrapCounter(5)
+	require.NoError(t, err)
 
 	// Test sequence: should wrap at max
 	expected := []int64{1, 2, 3, 4, 0, 1, 2}
@@ -48,7 +52,8 @@ func TestAtomicWrapCounterNext(t *testing.T) {
 
 // TestAtomicWrapCounterGet returns current value without incrementing.
 func TestAtomicWrapCounterGet(t *testing.T) {
-	counter := v1.NewAtomicWrapCounter(10)
+	counter, err := v1.NewAtomicWrapCounter(10)
+	require.NoError(t, err)
 
 	// Get before any increments
 	val1 := counter.Get()
@@ -63,7 +68,8 @@ func TestAtomicWrapCounterGet(t *testing.T) {
 
 // TestAtomicWrapCounterReset tests the Reset function.
 func TestAtomicWrapCounterReset(t *testing.T) {
-	counter := v1.NewAtomicWrapCounter(10)
+	counter, err := v1.NewAtomicWrapCounter(10)
+	require.NoError(t, err)
 
 	// Increment a few times
 	counter.Next()
@@ -82,7 +88,8 @@ func TestAtomicWrapCounterReset(t *testing.T) {
 
 // TestAtomicWrapCounterConcurrency tests thread-safe behavior.
 func TestAtomicWrapCounterConcurrency(t *testing.T) {
-	counter := v1.NewAtomicWrapCounter(10)
+	counter, err := v1.NewAtomicWrapCounter(10)
+	require.NoError(t, err)
 	const goroutines = 50
 	const increments = 100
 
@@ -110,7 +117,8 @@ func TestAtomicWrapCounterConcurrency(t *testing.T) {
 // TestAtomicWrapCounterWrapDistribution tests even distribution across wrap values.
 func TestAtomicWrapCounterWrapDistribution(t *testing.T) {
 	const max = 5
-	counter := v1.NewAtomicWrapCounter(int64(max))
+	counter, err := v1.NewAtomicWrapCounter(int64(max))
+	require.NoError(t, err)
 
 	distribution := make(map[int64]int)
 

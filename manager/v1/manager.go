@@ -120,6 +120,14 @@ type QueryResponse struct {
 	Error     error
 }
 
+// HealthStatus represents the current health status of all database entries.
+type HealthStatus struct {
+	ReadOnlyHealthy  int // Number of healthy readonly entries
+	ReadOnlyTotal    int // Total number of readonly entries
+	ReadWriteHealthy int // Number of healthy readwrite entries
+	ReadWriteTotal   int // Total number of readwrite entries
+}
+
 // DBManager manages multiple database connections.
 type DBManager struct {
 	HealthInterval time.Duration
@@ -129,10 +137,10 @@ type DBManager struct {
 
 	logger db.Logger
 
-	writeWorkerIdx AtomicWrapCounter
-	readWorkerIdx  AtomicWrapCounter
-	readEntryIdx   AtomicWrapCounter
-	writeEntryIdx  AtomicWrapCounter
+	writeWorkerIdx *AtomicWrapCounter
+	readWorkerIdx  *AtomicWrapCounter
+	readEntryIdx   *AtomicWrapCounter
+	writeEntryIdx  *AtomicWrapCounter
 }
 
 // NewDBManager creates a new DBManager instance by loading
@@ -144,7 +152,7 @@ type DBManager struct {
 func NewDBManager(ctx context.Context, configPath string, logger db.Logger, envOpts ...EnvOption) (*DBManager, error) {
 	var err error
 
-	cfg, err := (&DBManager{}).loadConfig(configPath, envOpts)
+	cfg, err := loadConfig(configPath, envOpts)
 	if err != nil {
 		return nil, fmt.Errorf("failed to load config: %w", err)
 	}
@@ -166,15 +174,25 @@ func NewDBManager(ctx context.Context, configPath string, logger db.Logger, envO
 		return nil, fmt.Errorf("failed to setup DB entries: %w", err)
 	}
 
+	if len(readOnly) == 0 && len(readWrite) == 0 {
+		return nil, fmt.Errorf("NewDBManager: no database entries available")
+	}
+
+	writeWorkerIdxCounter, readWorkerIdxCounter,
+		readEntryIdxCounter, writeEntryIdxCounter, err := getRoundRobinCounters(readOnly, readWrite, logger)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create round robin counters: %w", err)
+	}
+
 	dm := &DBManager{
 		HealthInterval:   cfg.HealthInterval,
 		readOnlyEntries:  readOnly,
 		readWriteEntries: readWrite,
 		logger:           logger,
-		writeWorkerIdx:   *NewAtomicWrapCounter(int64(len(readWrite))),
-		readWorkerIdx:    *NewAtomicWrapCounter(int64(len(readOnly))),
-		readEntryIdx:     *NewAtomicWrapCounter(int64(len(readOnly))),
-		writeEntryIdx:    *NewAtomicWrapCounter(int64(len(readWrite))),
+		writeWorkerIdx:   writeWorkerIdxCounter,
+		readWorkerIdx:    readWorkerIdxCounter,
+		readEntryIdx:     readEntryIdxCounter,
+		writeEntryIdx:    writeEntryIdxCounter,
 	}
 
 	logger.Info("Database manager created successfully",
@@ -186,8 +204,76 @@ func NewDBManager(ctx context.Context, configPath string, logger db.Logger, envO
 	return dm, nil
 }
 
+func getRoundRobinCounters(
+	readOnly map[string]*DBEntry,
+	readWrite map[string]*DBEntry,
+	logger db.Logger,
+) (
+	*AtomicWrapCounter,
+	*AtomicWrapCounter,
+	*AtomicWrapCounter,
+	*AtomicWrapCounter,
+	error,
+) {
+	// Create round-robin counters for load balancing across workers and entries.
+	// Counters are only created if there are entries to distribute across.
+	var writeWorkerIdxCounter *AtomicWrapCounter
+	if len(readWrite) > 0 {
+		c, err := NewAtomicWrapCounter(int64(len(readWrite)))
+		if err != nil {
+			logger.Error("Failed to create write worker index counter",
+				"count", len(readWrite),
+				"error", err.Error(),
+			)
+			return nil, nil, nil, nil, fmt.Errorf("NewDBManager: failed to create write worker counter: %w", err)
+		}
+		writeWorkerIdxCounter = c
+	}
+
+	var readWorkerIdxCounter *AtomicWrapCounter
+	if len(readOnly) > 0 {
+		c, err := NewAtomicWrapCounter(int64(len(readOnly)))
+		if err != nil {
+			logger.Error("Failed to create read worker index counter",
+				"count", len(readOnly),
+				"error", err.Error(),
+			)
+			return nil, nil, nil, nil, fmt.Errorf("NewDBManager: failed to create read worker counter: %w", err)
+		}
+		readWorkerIdxCounter = c
+	}
+
+	var readEntryIdxCounter *AtomicWrapCounter
+	if len(readOnly) > 0 {
+		c, err := NewAtomicWrapCounter(int64(len(readOnly)))
+		if err != nil {
+			logger.Error("Failed to create read entry index counter",
+				"count", len(readOnly),
+				"error", err.Error(),
+			)
+			return nil, nil, nil, nil, fmt.Errorf("NewDBManager: failed to create read entry counter: %w", err)
+		}
+		readEntryIdxCounter = c
+	}
+
+	var writeEntryIdxCounter *AtomicWrapCounter
+	if len(readWrite) > 0 {
+		c, err := NewAtomicWrapCounter(int64(len(readWrite)))
+		if err != nil {
+			logger.Error("Failed to create write entry index counter",
+				"count", len(readWrite),
+				"error", err.Error(),
+			)
+			return nil, nil, nil, nil, fmt.Errorf("NewDBManager: failed to create write entry counter: %w", err)
+		}
+		writeEntryIdxCounter = c
+	}
+
+	return writeWorkerIdxCounter, readWorkerIdxCounter, readEntryIdxCounter, writeEntryIdxCounter, nil
+}
+
 // loadConfig loads the configuration from the specified path.
-func (dm *DBManager) loadConfig(path string, envOpts []EnvOption) (*config.ManagerConfig, error) {
+func loadConfig(path string, envOpts []EnvOption) (*config.ManagerConfig, error) {
 	// Prevent directory traversal
 	cleanPath := filepath.Clean(path)
 	if strings.Contains(cleanPath, "..") {
@@ -358,7 +444,7 @@ func (dm *DBManager) readOnlyEntry() *DBEntry {
 	}
 
 	// Fallback: select from all entries if no healthy ones available
-	fallback := dm.selectByPriorityAndRoundRobin(entries, &dm.readEntryIdx)
+	fallback := selectByPriorityAndRoundRobin(entries, dm.readEntryIdx)
 	if dm.logger != nil {
 		dm.logger.Warn("No healthy read-only entries available, selecting from unhealthy entries",
 			"selected_entry", func() string {
@@ -436,7 +522,7 @@ func (dm *DBManager) readWriteEntry() *DBEntry {
 	}
 
 	// Fallback: select from all entries if no healthy ones available
-	fallback := dm.selectByPriorityAndRoundRobin(entries, &dm.writeEntryIdx)
+	fallback := selectByPriorityAndRoundRobin(entries, dm.writeEntryIdx)
 	if dm.logger != nil {
 		dm.logger.Warn("No healthy read-write entries available, selecting from unhealthy entries",
 			"selected_entry", func() string {
@@ -510,7 +596,7 @@ func (dm *DBManager) selectHealthyEntry(entries map[string]*DBEntry) *DBEntry {
 
 // selectByPriorityAndRoundRobin selects an entry from the provided map using priority and round-robin,
 // without considering health status. Used as a fallback when no healthy entries are available.
-func (dm *DBManager) selectByPriorityAndRoundRobin(entries map[string]*DBEntry, counter *AtomicWrapCounter) *DBEntry {
+func selectByPriorityAndRoundRobin(entries map[string]*DBEntry, counter *AtomicWrapCounter) *DBEntry {
 	if len(entries) == 0 {
 		return nil
 	}
@@ -521,19 +607,7 @@ func (dm *DBManager) selectByPriorityAndRoundRobin(entries map[string]*DBEntry, 
 		}
 	}
 
-	// Convert map to slice to work with entries
-	var entriesList []*DBEntry
-	for _, entry := range entries {
-		entriesList = append(entriesList, entry)
-	}
-
-	// Find the maximum priority among all entries
-	var maxPriority int
-	for _, entry := range entriesList {
-		if entry.Priority() > maxPriority {
-			maxPriority = entry.Priority()
-		}
-	}
+	entriesList, maxPriority := getEntriesListAndMaxPriority(entries)
 
 	// Collect all entries with the maximum priority
 	var priorityEntries []*DBEntry
@@ -547,9 +621,34 @@ func (dm *DBManager) selectByPriorityAndRoundRobin(entries map[string]*DBEntry, 
 		return priorityEntries[0]
 	}
 
-	// Multiple entries with same max priority: use round-robin
+	// Multiple entries with same max priority: use round-robin.
+	// selectByPriorityAndRoundRobin requires counter to be non-nil when called.
+	if counter == nil {
+		return priorityEntries[0]
+	}
 	idx := counter.Next() % int64(len(priorityEntries))
 	return priorityEntries[idx]
+}
+
+// getEntriesListAndMaxPriority converts the entries map to a slice and finds the maximum priority among them.
+func getEntriesListAndMaxPriority(entries map[string]*DBEntry) ([]*DBEntry, int) {
+	// Convert map to slice to work with entries
+	entriesList := make([]*DBEntry, len(entries))
+	i := 0
+	for _, entry := range entries {
+		entriesList[i] = entry
+		i++
+	}
+
+	// Find the maximum priority among all entries
+	var maxPriority int
+	for _, entry := range entriesList {
+		if entry.Priority() > maxPriority {
+			maxPriority = entry.Priority()
+		}
+	}
+
+	return entriesList, maxPriority
 }
 
 // GetAsync fetches data from the database asynchronously based on the specified table, columns, and conditions.
@@ -914,18 +1013,56 @@ func (dm *DBManager) ExecAsync(ctx context.Context, query string, args ...any) (
 }
 
 // Ping checks the database connection synchronously.
-func (dm *DBManager) Ping(ctx context.Context) error {
-	entry := dm.readOnlyEntry()
-	if entry != nil {
-		if err := entry.db.Ping(ctx); err != nil {
-			return fmt.Errorf("failed to ping database: %w", err)
+// HealthStatus returns the current health status of all configured database entries.
+// It checks the health of each entry in both readonly and readwrite maps based on
+// the most recent health checks performed by background health check goroutines.
+func (dm *DBManager) HealthStatus() HealthStatus {
+	status := HealthStatus{
+		ReadOnlyTotal:  len(dm.readOnlyEntries),
+		ReadWriteTotal: len(dm.readWriteEntries),
+	}
+
+	for _, entry := range dm.readOnlyEntries {
+		if entry.Health() {
+			status.ReadOnlyHealthy++
 		}
 	}
-	entry = dm.readWriteEntry()
-	if entry != nil {
-		if err := entry.db.Ping(ctx); err != nil {
-			return fmt.Errorf("failed to ping database: %w", err)
+
+	for _, entry := range dm.readWriteEntries {
+		if entry.Health() {
+			status.ReadWriteHealthy++
 		}
 	}
-	return nil
+
+	return status
+}
+
+// Ping checks the health status of all database entries and returns detailed health information.
+// It checks every entry in both readonly and readwrite maps and returns a HealthStatus
+// containing counts of healthy vs. total entries.
+//
+// Returns an error if an entire entry category is unhealthy (e.g., all readonly entries down),
+// allowing for graceful degradation when isolated entries fail.
+func (dm *DBManager) Ping(ctx context.Context) (HealthStatus, error) {
+	status := dm.HealthStatus()
+
+	// Fail if readonly entries are configured but all are unhealthy
+	if status.ReadOnlyTotal > 0 && status.ReadOnlyHealthy == 0 {
+		return status, fmt.Errorf(
+			"all readonly entries unhealthy (%d/%d healthy)",
+			status.ReadOnlyHealthy,
+			status.ReadOnlyTotal,
+		)
+	}
+
+	// Fail if readwrite entries are configured but all are unhealthy
+	if status.ReadWriteTotal > 0 && status.ReadWriteHealthy == 0 {
+		return status, fmt.Errorf(
+			"all readwrite entries unhealthy (%d/%d healthy)",
+			status.ReadWriteHealthy,
+			status.ReadWriteTotal,
+		)
+	}
+
+	return status, nil
 }

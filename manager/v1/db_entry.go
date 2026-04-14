@@ -34,8 +34,8 @@ type DBEntry struct {
 
 	writeQueue     []*dbEntryWorker
 	readQueue      []*dbEntryWorker
-	writeWorkerIdx AtomicWrapCounter
-	readWorkerIdx  AtomicWrapCounter
+	writeWorkerIdx *AtomicWrapCounter
+	readWorkerIdx  *AtomicWrapCounter
 }
 
 // newDBEntry creates a new DBEntry instance.
@@ -103,6 +103,34 @@ func newDBEntry(
 		"health_interval_ms", mc.EntryHealthInterval(cfg).Milliseconds(),
 	)
 
+	var writeWorkerIdxCounter *AtomicWrapCounter
+	if len(writeQueue) > 0 {
+		c, err := NewAtomicWrapCounter(int64(len(writeQueue)))
+		if err != nil {
+			logger.Error("Failed to create write worker index counter",
+				"name", cfg.Name,
+				"queue_size", len(writeQueue),
+				"error", err.Error(),
+			)
+			return nil, fmt.Errorf("newDBEntry: failed to create write worker counter: %w", err)
+		}
+		writeWorkerIdxCounter = c
+	}
+
+	var readWorkerIdxCounter *AtomicWrapCounter
+	if len(readQueue) > 0 {
+		c, err := NewAtomicWrapCounter(int64(len(readQueue)))
+		if err != nil {
+			logger.Error("Failed to create read worker index counter",
+				"name", cfg.Name,
+				"queue_size", len(readQueue),
+				"error", err.Error(),
+			)
+			return nil, fmt.Errorf("newDBEntry: failed to create read worker counter: %w", err)
+		}
+		readWorkerIdxCounter = c
+	}
+
 	c, cancel := context.WithCancel(ctx)
 	dbe := &DBEntry{
 		ctx:            c,
@@ -116,8 +144,8 @@ func newDBEntry(
 		priority:       mc.EntryPriority(cfg),
 		writeQueue:     writeQueue,
 		readQueue:      readQueue,
-		writeWorkerIdx: *NewAtomicWrapCounter(int64(len(writeQueue))),
-		readWorkerIdx:  *NewAtomicWrapCounter(int64(len(readQueue))),
+		writeWorkerIdx: writeWorkerIdxCounter,
+		readWorkerIdx:  readWorkerIdxCounter,
 	}
 	return dbe, nil
 }
@@ -385,6 +413,9 @@ func (de *DBEntry) sendResponseWithTimeout(
 
 // RoundRobinQueueWrite enqueues a write query to the appropriate worker queue based on round-robin distribution.
 func (de *DBEntry) roundRobinQueueWrite(ctx context.Context, qd *Query) error {
+	if de.writeWorkerIdx == nil {
+		return fmt.Errorf("roundRobinQueueWrite: no write workers available")
+	}
 	idx := de.writeWorkerIdx.Next()
 	w := de.writeQueue[idx]
 
@@ -398,6 +429,9 @@ func (de *DBEntry) roundRobinQueueWrite(ctx context.Context, qd *Query) error {
 
 // RoundRobinQueueRead enqueues a read query to the appropriate worker queue based on round-robin distribution.
 func (de *DBEntry) roundRobinQueueRead(ctx context.Context, qd *Query) error {
+	if de.readWorkerIdx == nil {
+		return fmt.Errorf("roundRobinQueueRead: no read workers available")
+	}
 	idx := de.readWorkerIdx.Next()
 	w := de.readQueue[idx]
 
