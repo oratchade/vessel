@@ -18,8 +18,6 @@ const (
 	DescDirection = "DESC"
 )
 
-const ascDirection = AscDirection //nolint:unused // Kept for backward compatibility
-
 // ValidateQueryOptions checks query options for validity and returns an error if invalid.
 // Returns nil if all options are valid.
 // This is exported for testing validation logic independently.

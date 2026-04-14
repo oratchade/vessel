@@ -28,12 +28,12 @@ func get(
 ) ([]map[string]any, error) {
 	query, args, err := getQuery(table, columns, joins, conditions, opts, dbOpts)
 	if err != nil {
-		return nil, fmt.Errorf("failed to build select query: %w", err)
+		return nil, fmt.Errorf("get: build query: %w", err)
 	}
 
 	rows, err := dbOpts.querier.QueryContext(ctx, query, args...)
 	if err != nil {
-		return nil, fmt.Errorf("failed to execute query: %w", err)
+		return nil, fmt.Errorf("get: execute query: %w", err)
 	}
 	defer func() {
 		_ = rows.Close()
@@ -41,12 +41,12 @@ func get(
 
 	cols, err := rows.Columns()
 	if err != nil {
-		return nil, fmt.Errorf("columns: %w", err)
+		return nil, fmt.Errorf("get: get columns: %w", err)
 	}
 
 	results, err := scanRows(rows, cols)
 	if err != nil {
-		return nil, fmt.Errorf("scan rows: %w", err)
+		return nil, fmt.Errorf("get: scan rows: %w", err)
 	}
 
 	return results, nil
@@ -64,17 +64,17 @@ func getRaw(
 ) (*RowsAdapter, error) {
 	query, args, err := getQuery(table, columns, joins, conditions, opts, dbOpts)
 	if err != nil {
-		return nil, fmt.Errorf("failed to build select query: %w", err)
+		return nil, fmt.Errorf("getRaw: build query: %w", err)
 	}
 
 	rows, err := dbOpts.querier.QueryContext(ctx, query, args...)
 	if err != nil {
-		return nil, fmt.Errorf("failed to execute query: %w", err)
+		return nil, fmt.Errorf("getRaw: execute query: %w", err)
 	}
 
 	ra, err := newRowsAdapter(rows)
 	if err != nil {
-		return nil, fmt.Errorf("failed to create RowsAdapter: %w", err)
+		return nil, fmt.Errorf("getRaw: create RowsAdapter: %w", err)
 	}
 
 	return ra, nil
@@ -91,7 +91,7 @@ func getQuery(
 ) (string, []any, error) {
 	query, args, err := dbOpts.builder.Select(table, columns, joins, opts, conditions)
 	if err != nil {
-		return "", nil, fmt.Errorf("failed to build select query: %w", err)
+		return "", nil, fmt.Errorf("getQuery: build query: %w", err)
 	}
 
 	return query, args, nil
@@ -108,12 +108,12 @@ func getByID(
 ) ([]map[string]any, error) {
 	query, args, err := getByIDQuery(table, id, joins, opts, dbOpts)
 	if err != nil {
-		return nil, fmt.Errorf("failed to build select query: %w", err)
+		return nil, fmt.Errorf("getByID: build query: %w", err)
 	}
 
 	rows, err := dbOpts.querier.QueryContext(ctx, query, args...)
 	if err != nil {
-		return nil, fmt.Errorf("failed to execute query: %w", err)
+		return nil, fmt.Errorf("getByID: execute query: %w", err)
 	}
 	defer func() {
 		_ = rows.Close()
@@ -121,12 +121,12 @@ func getByID(
 
 	cols, err := rows.Columns()
 	if err != nil {
-		return nil, fmt.Errorf("columns: %w", err)
+		return nil, fmt.Errorf("getByID: get columns: %w", err)
 	}
 
 	results, err := scanRows(rows, cols)
 	if err != nil {
-		return nil, fmt.Errorf("scan rows: %w", err)
+		return nil, fmt.Errorf("getByID: scan rows: %w", err)
 	}
 
 	return results, nil
@@ -143,17 +143,17 @@ func getByIDRaw(
 ) (*RowsAdapter, error) {
 	query, args, err := getByIDQuery(table, id, joins, opts, dbOpts)
 	if err != nil {
-		return nil, fmt.Errorf("failed to build select query: %w", err)
+		return nil, fmt.Errorf("getByIDRaw: build query: %w", err)
 	}
 
 	rows, err := dbOpts.querier.QueryContext(ctx, query, args...)
 	if err != nil {
-		return nil, fmt.Errorf("failed to execute query: %w", err)
+		return nil, fmt.Errorf("getByIDRaw: execute query: %w", err)
 	}
 
 	ra, err := newRowsAdapter(rows)
 	if err != nil {
-		return nil, fmt.Errorf("failed to create RowsAdapter: %w", err)
+		return nil, fmt.Errorf("getByIDRaw: create RowsAdapter: %w", err)
 	}
 
 	return ra, nil
@@ -171,7 +171,7 @@ func getByIDQuery(
 
 	query, args, err := dbOpts.builder.Select(table, []string{"*"}, joins, opts, cdt)
 	if err != nil {
-		return "", nil, fmt.Errorf("failed to build select query: %w", err)
+		return "", nil, fmt.Errorf("getByIDQuery: build query: %w", err)
 	}
 
 	return query, args, nil
@@ -187,12 +187,12 @@ func insert(
 ) (*ExecResult, error) {
 	query, args, err := insertQuery(table, data, opts, dbOpts)
 	if err != nil {
-		return nil, fmt.Errorf("failed to build insert query: %w", err)
+		return nil, fmt.Errorf("insert: build query: %w", err)
 	}
 
 	result, err := dbOpts.querier.ExecContext(ctx, query, args...)
 	if err != nil {
-		return nil, fmt.Errorf("failed to execute insert query: %w", err)
+		return nil, fmt.Errorf("insert: execute query: %w", err)
 	}
 
 	execResult := fromSQLResult(result)
@@ -224,12 +224,12 @@ func inserts(
 ) (*ExecResult, error) {
 	query, args, err := insertsQuery(table, data, opts, dbOpts)
 	if err != nil {
-		return nil, fmt.Errorf("failed to build insert query: %w", err)
+		return nil, fmt.Errorf("inserts: build query: %w", err)
 	}
 
 	result, err := dbOpts.querier.ExecContext(ctx, query, args...)
 	if err != nil {
-		return nil, fmt.Errorf("failed to execute insert query: %w", err)
+		return nil, fmt.Errorf("inserts: execute query: %w", err)
 	}
 
 	execResult := fromSQLResult(result)
@@ -263,12 +263,12 @@ func update(
 ) (*ExecResult, error) {
 	query, args, err := updateQuery(table, data, joins, conditions, opts, dbOpts)
 	if err != nil {
-		return nil, fmt.Errorf("failed to build update query: %w", err)
+		return nil, fmt.Errorf("update: build query: %w", err)
 	}
 
 	result, err := dbOpts.querier.ExecContext(ctx, query, args...)
 	if err != nil {
-		return nil, fmt.Errorf("failed to execute update query: %w", err)
+		return nil, fmt.Errorf("update: execute query: %w", err)
 	}
 
 	execResult := fromSQLResult(result)
@@ -303,12 +303,12 @@ func delete(
 ) (*ExecResult, error) {
 	query, args, err := deleteQuery(table, joins, conditions, opts, dbOpts)
 	if err != nil {
-		return nil, fmt.Errorf("failed to build delete query: %w", err)
+		return nil, fmt.Errorf("delete: build query: %w", err)
 	}
 
 	result, err := dbOpts.querier.ExecContext(ctx, query, args...)
 	if err != nil {
-		return nil, fmt.Errorf("failed to execute delete query: %w", err)
+		return nil, fmt.Errorf("delete: execute query: %w", err)
 	}
 
 	execResult := fromSQLResult(result)
@@ -325,7 +325,7 @@ func deleteQuery(
 ) (string, []any, error) {
 	query, args, err := dbOpts.builder.Delete(table, joins, conditions)
 	if err != nil {
-		return "", nil, fmt.Errorf("failed to build delete query: %w", err)
+		return "", nil, fmt.Errorf("deleteQuery: build query: %w", err)
 	}
 
 	return query, args, nil

@@ -71,7 +71,7 @@ func NewDB(cfg DBConfig, logger Logger) (DB, error) {
 		// Type assert the result to DB interface
 		db, ok := result.(DB)
 		if !ok {
-			return nil, fmt.Errorf("plugin driver %q returned invalid DB type: %T", driverName, result)
+			return nil, fmt.Errorf("NewDB: plugin driver %q returned invalid type: %T", driverName, result)
 		}
 		return db, nil
 	}
@@ -87,7 +87,7 @@ func NewDB(cfg DBConfig, logger Logger) (DB, error) {
 	case definition.DriverMSSQL, definition.DriverMSSQLAlias:
 		return mssqlCfgToDB(cfg, logger)
 	default:
-		return nil, fmt.Errorf("unsupported driver: %s", driverName)
+		return nil, fmt.Errorf("NewDB: unsupported driver: %s", driverName)
 	}
 }
 
