@@ -96,7 +96,17 @@ var (
 // Register registers a new database driver factory. Each driver name can only
 // be registered once; attempting to register a duplicate returns an error.
 //
+// Thread Safety:
 // This function is safe for concurrent use and typically called in init() functions.
+// The registry uses a read-write mutex to protect concurrent access during registration
+// (write) and driver instantiation (read). Multiple goroutines may safely register
+// drivers concurrently, and driver creation operations will not block registration.
+//
+// Runtime Registration:
+// While it is recommended to register drivers in init() functions (which run sequentially
+// before main), you may also register drivers at runtime as long as:
+// 1. All registrations complete before using Lookup() or NewDB() with that driver
+// 2. You do not attempt to register two drivers with the same name concurrently
 //
 // Parameters:
 //
