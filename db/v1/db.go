@@ -515,18 +515,35 @@ type Tx interface {
 	Rollback(ctx context.Context) error
 }
 
-// ScanRowsTo takes a RowsAdapter and scans the rows into a slice of T.
+// ScanRowsTo is a generic, type-safe function that scans rows into a slice of struct T.
 //
-// The slice of T is returned, and an error if the scan fails.
+// Type Safety:
+// ScanRowsTo uses reflection to map database columns to struct fields by name (case-insensitive).
+// This provides compile-time type checking while avoiding manual Scan() calls for each field.
 //
-// ScanRowsTo expects T to be a struct or pointer to a struct.
-// The Columns of the RowsAdapter are mapped to fields in T
-// by column name, ignoring case. If a column does not map to a field in T,
-// the value is skipped.
+// Struct Requirements:
+// T must be a struct or pointer-to-struct. Exported fields are mapped to columns;
+// unexported fields are ignored. If a column has no matching struct field, it is skipped.
+// If a struct field has no matching column, it retains its zero value.
 //
-// The order of the columns in the RowsAdapter does not affect the order of
-// the fields in T. The order of the fields in T is determined by the order of
-// the fields in the reflect.Struct.
+// Column Mapping:
+// Mapping is case-insensitive and by name only (no struct tags required, though they may be supported).
+// The order of columns in RowsAdapter does not affect the order in T; struct field order is preserved.
+//
+// Example:
+//
+//	type User struct {
+//		ID   int    `db:"id"`
+//		Name string `db:"name"`
+//	}
+//
+//	userList, err := ScanRowsTo[User](ctx, rows)
+//	if err != nil { return err }
+//	// userList is now a fully typed, safe slice of Users
+//
+// Error Handling:
+// Returns an error if column retrieval, reflection, or scanning fails.
+// Users should explicitly check errors to avoid partial scans.
 //
 //nolint:cyclop
 func ScanRowsTo[T any](ctx context.Context, ra *RowsAdapter) ([]T, error) {

@@ -10,7 +10,53 @@ import (
 	"tounilab.com/fabric/pkg/query/options"
 )
 
-const ascDirection = "ASC"
+// Direction constants for ORDER BY clauses.
+const (
+	// AscDirection specifies ascending sort order.
+	AscDirection = "ASC"
+	// DescDirection specifies descending sort order.
+	DescDirection = "DESC"
+)
+
+const ascDirection = AscDirection //nolint:unused // Kept for backward compatibility
+
+// ValidateQueryOptions checks query options for validity and returns an error if invalid.
+// Returns nil if all options are valid.
+// This is exported for testing validation logic independently.
+func ValidateQueryOptions(opts *options.QueryOptions) error {
+	if opts == nil {
+		return nil
+	}
+
+	// Validate Limit is non-negative
+	if opts.Limit != nil && *opts.Limit < 0 {
+		return fmt.Errorf("Limit: cannot be negative, got %d", *opts.Limit)
+	}
+
+	// Validate Offset is non-negative
+	if opts.Offset != nil && *opts.Offset < 0 {
+		return fmt.Errorf("Offset: cannot be negative, got %d", *opts.Offset)
+	}
+
+	// Validate OrderBy directions
+	if opts.OrderBy != nil {
+		for _, ob := range opts.OrderBy {
+			if ob.Direction != AscDirection && ob.Direction != DescDirection {
+				return fmt.Errorf(
+					"OrderBy: invalid direction %q for column %q, must be ASC or DESC",
+					ob.Direction, ob.Column,
+				)
+			}
+		}
+	}
+
+	return nil
+}
+
+// validateQueryOptions is the internal version of ValidateQueryOptions
+func validateQueryOptions(opts *options.QueryOptions) error {
+	return ValidateQueryOptions(opts)
+}
 
 // FluentDB provides a fluent/builder interface for constructing and executing database queries.
 // It acts as an entry point for building SELECT, INSERT, UPDATE, and DELETE operations
@@ -232,11 +278,14 @@ func (s *SelectBuilder) Joins(joins []cdt.Join) *SelectBuilder {
 // Parameters:
 //
 //	column: The column name to order by.
-//	direction: The sort direction ("ASC" or "DESC"). Defaults to "ASC" if empty.
+//	direction: The sort direction ("ASC" or "DESC", case-insensitive).
+//	           Defaults to "ASC" if empty.
 //
 // Returns:
 //
 //	*SelectBuilder: The builder for method chaining.
+//
+// Note: Direction validation is deferred to execution time (Get, GetRaw, etc.).
 func (s *SelectBuilder) OrderBy(column, direction string) *SelectBuilder {
 	if s.opts == nil {
 		s.opts = &options.QueryOptions{}
@@ -244,10 +293,9 @@ func (s *SelectBuilder) OrderBy(column, direction string) *SelectBuilder {
 	if s.opts.OrderBy == nil {
 		s.opts.OrderBy = make([]options.OrderBy, 0)
 	}
-	// Normalize direction to uppercase, default to ASC if empty
 	dir := direction
 	if dir == "" {
-		dir = ascDirection
+		dir = AscDirection
 	} else {
 		dir = strings.ToUpper(dir)
 	}
@@ -262,11 +310,13 @@ func (s *SelectBuilder) OrderBy(column, direction string) *SelectBuilder {
 //
 // Parameters:
 //
-//	limit: The maximum number of rows.
+//	limit: Maximum number of rows (can be any value; validation occurs at execution time).
 //
 // Returns:
 //
 //	*SelectBuilder: The builder for method chaining.
+//
+// Note: Limit validation is deferred to execution time (Get, GetRaw, etc.).
 func (s *SelectBuilder) Limit(limit int) *SelectBuilder {
 	if s.opts == nil {
 		s.opts = &options.QueryOptions{}
@@ -279,11 +329,13 @@ func (s *SelectBuilder) Limit(limit int) *SelectBuilder {
 //
 // Parameters:
 //
-//	offset: The number of rows to skip.
+//	offset: The number of rows to skip (can be any value; validation occurs at execution time).
 //
 // Returns:
 //
 //	*SelectBuilder: The builder for method chaining.
+//
+// Note: Offset validation is deferred to execution time (Get, GetRaw, etc.).
 func (s *SelectBuilder) Offset(offset int) *SelectBuilder {
 	if s.opts == nil {
 		s.opts = &options.QueryOptions{}
@@ -309,6 +361,9 @@ func (s *SelectBuilder) Get() ([]map[string]any, error) {
 	if s.table == "" {
 		return nil, fmt.Errorf("selectBuilder: table not specified")
 	}
+	if err := validateQueryOptions(s.opts); err != nil {
+		return nil, fmt.Errorf("selectBuilder: invalid query options: %w", err)
+	}
 	rows, err := s.db.Get(s.ctx, s.table, s.columns, s.joins, s.conditions, s.opts)
 	if err != nil {
 		return nil, fmt.Errorf("selectBuilder: failed to get rows: %w", err)
@@ -326,6 +381,9 @@ func (s *SelectBuilder) Get() ([]map[string]any, error) {
 func (s *SelectBuilder) GetRaw() (*RowsAdapter, error) {
 	if s.table == "" {
 		return nil, fmt.Errorf("selectBuilder: table not specified")
+	}
+	if err := validateQueryOptions(s.opts); err != nil {
+		return nil, fmt.Errorf("selectBuilder: invalid query options: %w", err)
 	}
 	rows, err := s.db.GetRaw(s.ctx, s.table, s.columns, s.joins, s.conditions, s.opts)
 	if err != nil {
@@ -351,6 +409,9 @@ func (s *SelectBuilder) GetRaw() (*RowsAdapter, error) {
 func (s *SelectBuilder) One() (map[string]any, error) {
 	if s.table == "" {
 		return nil, fmt.Errorf("selectBuilder: table not specified")
+	}
+	if err := validateQueryOptions(s.opts); err != nil {
+		return nil, fmt.Errorf("selectBuilder: invalid query options: %w", err)
 	}
 
 	// Clone options and set limit to 1
@@ -561,9 +622,6 @@ func (i *InsertBuilder) Exec() (*ExecResult, error) {
 
 	// Use bulk insert if data was provided via ValuesBulk
 	if len(i.bulk) > 0 {
-		if len(i.bulk) == 0 {
-			return nil, fmt.Errorf("insertBuilder: no bulk data provided")
-		}
 		result, err := i.db.Inserts(i.ctx, i.table, i.bulk, i.opts)
 		if err != nil {
 			return nil, fmt.Errorf("insertBuilder: failed to insert bulk data: %w", err)
@@ -723,6 +781,8 @@ func (u *UpdateBuilder) Joins(joins []cdt.Join) *UpdateBuilder {
 // Returns:
 //
 //	*UpdateBuilder: The builder for method chaining.
+//
+// Note: Direction validation is deferred to execution time (Exec, UpdateAll).
 func (u *UpdateBuilder) OrderBy(column, direction string) *UpdateBuilder {
 	if u.opts == nil {
 		u.opts = &options.QueryOptions{}
@@ -730,10 +790,9 @@ func (u *UpdateBuilder) OrderBy(column, direction string) *UpdateBuilder {
 	if u.opts.OrderBy == nil {
 		u.opts.OrderBy = make([]options.OrderBy, 0)
 	}
-	// Normalize direction to uppercase, default to ASC if empty
 	dir := direction
 	if dir == "" {
-		dir = ascDirection
+		dir = AscDirection
 	} else {
 		dir = strings.ToUpper(dir)
 	}
@@ -748,11 +807,13 @@ func (u *UpdateBuilder) OrderBy(column, direction string) *UpdateBuilder {
 //
 // Parameters:
 //
-//	limit: The maximum number of rows to update.
+//	limit: The maximum number of rows to update (can be any value; validation occurs at execution time).
 //
 // Returns:
 //
 //	*UpdateBuilder: The builder for method chaining.
+//
+// Note: Limit validation is deferred to execution time (Exec, UpdateAll).
 func (u *UpdateBuilder) Limit(limit int) *UpdateBuilder {
 	if u.opts == nil {
 		u.opts = &options.QueryOptions{}
@@ -787,6 +848,9 @@ func (u *UpdateBuilder) Exec() (*ExecResult, error) {
 		return nil, fmt.Errorf(
 			"updateBuilder: WHERE condition required (use Where method or call UpdateAll for unfiltered update)")
 	}
+	if err := validateQueryOptions(u.opts); err != nil {
+		return nil, fmt.Errorf("updateBuilder: invalid query options: %w", err)
+	}
 	result, err := u.db.Update(u.ctx, u.table, u.data, u.joins, u.conditions, u.opts)
 	if err != nil {
 		return nil, fmt.Errorf("updateBuilder: failed to update rows: %w", err)
@@ -813,6 +877,9 @@ func (u *UpdateBuilder) Exec() (*ExecResult, error) {
 func (u *UpdateBuilder) UpdateAll() (*ExecResult, error) {
 	if u.table == "" {
 		return nil, fmt.Errorf("updateBuilder: table not specified")
+	}
+	if err := validateQueryOptions(u.opts); err != nil {
+		return nil, fmt.Errorf("updateBuilder: invalid query options: %w", err)
 	}
 	if len(u.data) == 0 {
 		return nil, fmt.Errorf("updateBuilder: no data to update")
@@ -939,6 +1006,8 @@ func (d *DeleteBuilder) Joins(joins []cdt.Join) *DeleteBuilder {
 // Returns:
 //
 //	*DeleteBuilder: The builder for method chaining.
+//
+// Note: Direction validation is deferred to execution time (Exec, DeleteAll).
 func (d *DeleteBuilder) OrderBy(column, direction string) *DeleteBuilder {
 	if d.opts == nil {
 		d.opts = &options.QueryOptions{}
@@ -946,10 +1015,9 @@ func (d *DeleteBuilder) OrderBy(column, direction string) *DeleteBuilder {
 	if d.opts.OrderBy == nil {
 		d.opts.OrderBy = make([]options.OrderBy, 0)
 	}
-	// Normalize direction to uppercase, default to ASC if empty
 	dir := direction
 	if dir == "" {
-		dir = ascDirection
+		dir = AscDirection
 	} else {
 		dir = strings.ToUpper(dir)
 	}
@@ -964,11 +1032,13 @@ func (d *DeleteBuilder) OrderBy(column, direction string) *DeleteBuilder {
 //
 // Parameters:
 //
-//	limit: The maximum number of rows to delete.
+//	limit: The maximum number of rows to delete (can be any value; validation occurs at execution time).
 //
 // Returns:
 //
 //	*DeleteBuilder: The builder for method chaining.
+//
+// Note: Limit validation is deferred to execution time (Exec, DeleteAll).
 func (d *DeleteBuilder) Limit(limit int) *DeleteBuilder {
 	if d.opts == nil {
 		d.opts = &options.QueryOptions{}
@@ -998,6 +1068,9 @@ func (d *DeleteBuilder) Exec() (*ExecResult, error) {
 	if d.conditions == nil {
 		return nil, fmt.Errorf(
 			"deleteBuilder: WHERE condition required (use Where method or call DeleteAll for unfiltered delete)")
+	}
+	if err := validateQueryOptions(d.opts); err != nil {
+		return nil, fmt.Errorf("deleteBuilder: invalid query options: %w", err)
 	}
 	result, err := d.db.Delete(d.ctx, d.table, d.joins, d.conditions, d.opts)
 	if err != nil {
@@ -1031,6 +1104,9 @@ func (d *DeleteBuilder) Exec() (*ExecResult, error) {
 func (d *DeleteBuilder) DeleteAll() (*ExecResult, error) {
 	if d.table == "" {
 		return nil, fmt.Errorf("deleteBuilder: table not specified")
+	}
+	if err := validateQueryOptions(d.opts); err != nil {
+		return nil, fmt.Errorf("deleteBuilder: invalid query options: %w", err)
 	}
 	result, err := d.db.Delete(d.ctx, d.table, d.joins, d.conditions, d.opts)
 	if err != nil {

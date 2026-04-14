@@ -9,6 +9,7 @@ import (
 
 	"github.com/golang/mock/gomock"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	v1 "tounilab.com/fabric/db/v1"
 	cdt "tounilab.com/fabric/pkg/query/condition"
 	"tounilab.com/fabric/pkg/query/options"
@@ -371,6 +372,64 @@ func TestSelectBuilderLimitOffset(t *testing.T) {
 			_, _ = builder.Get()
 		})
 	}
+}
+
+// TestSelectBuilderValidation tests query option validation at execution time
+func TestSelectBuilderValidation(t *testing.T) {
+	// Test that ValidateQueryOptions properly rejects invalid directions
+	opts := &options.QueryOptions{
+		OrderBy: []options.OrderBy{
+			{Column: "id", Direction: "INVALID"},
+		},
+	}
+	err := v1.ValidateQueryOptions(opts)
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "invalid direction")
+
+	// Test that negative Limit is rejected
+	opts = &options.QueryOptions{
+		Limit: ptrInt(-1),
+	}
+	err = v1.ValidateQueryOptions(opts)
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "Limit")
+	require.Contains(t, err.Error(), "cannot be negative")
+
+	// Test that negative Offset is rejected
+	opts = &options.QueryOptions{
+		Offset: ptrInt(-5),
+	}
+	err = v1.ValidateQueryOptions(opts)
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "Offset")
+	require.Contains(t, err.Error(), "cannot be negative")
+
+	// Test that zero values are allowed
+	opts = &options.QueryOptions{
+		Limit:  ptrInt(0),
+		Offset: ptrInt(0),
+	}
+	err = v1.ValidateQueryOptions(opts)
+	require.NoError(t, err)
+
+	// Test that valid ASC/DESC directions are allowed
+	opts = &options.QueryOptions{
+		OrderBy: []options.OrderBy{
+			{Column: "id", Direction: "ASC"},
+			{Column: "name", Direction: "DESC"},
+		},
+	}
+	err = v1.ValidateQueryOptions(opts)
+	require.NoError(t, err)
+
+	// Test that nil options are allowed
+	err = v1.ValidateQueryOptions(nil)
+	require.NoError(t, err)
+}
+
+// ptrInt is a helper to create an int pointer
+func ptrInt(v int) *int {
+	return &v
 }
 
 // TestSelectBuilderGet tests Get execution
