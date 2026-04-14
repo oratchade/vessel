@@ -1,4 +1,19 @@
-// Package db provides database abstraction interfaces and implementations for multiple database engines.
+// Package v1 provides database abstraction interfaces and implementations for multiple database engines.
+//
+// The v1 package includes database connection management, query building, row scanning,
+// error handling, and logging. It supports multiple database engines (MySQL, PostgreSQL,
+// SQLite, MSSQL) with a unified API.
+//
+// Key types:
+//   - DB: Main database connection interface
+//   - FluentDB: Builder-style API for constructing queries
+//   - RowsAdapter: Unified row scanning interface across database drivers
+//
+// Note: RowsAdapter should always be properly closed to avoid connection leaks:
+//
+//	rows, err := db.Query(ctx, ...)
+//	if err != nil { ... }
+//	defer rows.Close()  // IMPORTANT: Always close rows when done
 package v1
 
 import (
@@ -53,8 +68,26 @@ func (fmc *fieldMapCache) get(tType reflect.Type) map[string]int {
 	return fieldMap
 }
 
-// RowsAdapter provides a small wrapper around driver-specific Rows types so
-// callers can use a unified API (Next, Scan, Err, Columns).
+// RowsAdapter provides a unified wrapper around driver-specific Rows types for a consistent API.
+//
+// It abstracts over both sql.Rows (MySQL, PostgreSQL, SQLite, MSSQL) and pgx.Rows (PostgreSQL pgx driver),
+// enabling the same iteration and scanning code to work with any supported database driver.
+//
+// Memory Management:
+// RowsAdapter holds references to database connections through the underlying Rows.
+// To prevent connection leaks, always call Close() before the adapter goes out of scope:
+//
+//	rows, err := db.GetRaw(ctx, ...)
+//	if err != nil { return err }
+//
+//	adapter, err := db.NewRowsAdapter(rows)
+//	if err != nil { return err }
+//	defer adapter.Close()  // CRITICAL: Always close
+//
+//	// Use adapter for iteration and scanning
+//	for adapter.Next() {
+//		if err := adapter.Scan(...); err != nil { ... }
+//	}
 type RowsAdapter struct {
 	sqlRows *sql.Rows
 	pgxRows pgx.Rows
@@ -133,7 +166,8 @@ func (r *RowsAdapter) err() error {
 	return nil
 }
 
-// err returns any error that occurred during row iteration.
+// Close releases the underlying database resources and prevents connection leaks.
+// Must be called before the adapter goes out of scope to return connections to the pool.
 func (r *RowsAdapter) Close() error {
 	if r.sqlRows != nil {
 		err := r.sqlRows.Close()
