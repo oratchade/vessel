@@ -268,9 +268,10 @@ type BatchQueryResult struct {
 	Attempt int
 }
 
-// BatchQueryWithRetry executes multiple queries in parallel with retry logic
+// BatchQueryWithRetry executes multiple queries in parallel with retry logic.
 //
 // Each query is retried independently according to the strategy.
+// If ctx lacks a deadline, a default 30-second timeout is added to prevent goroutine leaks.
 func (dm *DBManager) BatchQueryWithRetry(
 	ctx context.Context,
 	cfg *QueryWithRetryConfig,
@@ -278,6 +279,14 @@ func (dm *DBManager) BatchQueryWithRetry(
 ) []*BatchQueryResult {
 	if cfg == nil {
 		cfg = DefaultQueryRetryConfig()
+	}
+
+	// Ensure context has a deadline to prevent indefinite goroutine hangs.
+	// This is a safeguard against queries that may block forever.
+	if _, hasDeadline := ctx.Deadline(); !hasDeadline {
+		var cancel context.CancelFunc
+		ctx, cancel = context.WithTimeout(ctx, 30*time.Second)
+		defer cancel()
 	}
 
 	results := make([]*BatchQueryResult, len(jobs))

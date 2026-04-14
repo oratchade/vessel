@@ -272,15 +272,40 @@ func getRoundRobinCounters(
 	return writeWorkerIdxCounter, readWorkerIdxCounter, readEntryIdxCounter, writeEntryIdxCounter, nil
 }
 
-// loadConfig loads the configuration from the specified path.
-func loadConfig(path string, envOpts []EnvOption) (*config.ManagerConfig, error) {
-	// Prevent directory traversal
-	cleanPath := filepath.Clean(path)
-	if strings.Contains(cleanPath, "..") {
-		return nil, fmt.Errorf("loadConfig: invalid config path: contains directory traversal")
+// validateConfigPath validates and resolves the config path to prevent directory traversal.
+func validateConfigPath(path string) (string, error) {
+	// Resolve the path to absolute and ensure it's within the working directory
+	wd, err := os.Getwd()
+	if err != nil {
+		return "", fmt.Errorf("loadConfig: failed to get working directory: %w", err)
 	}
 
-	data, err := os.ReadFile(cleanPath)
+	// Resolve the config path relative to current directory
+	absPath, err := filepath.Abs(filepath.Join(wd, path))
+	if err != nil {
+		return "", fmt.Errorf("loadConfig: failed to resolve config path: %w", err)
+	}
+
+	// Verify the resolved path is within the working directory (no directory traversal)
+	rel, err := filepath.Rel(wd, absPath)
+	if err != nil || strings.HasPrefix(rel, "..") {
+		return "", fmt.Errorf("loadConfig: invalid config path: path escapes working directory")
+	}
+
+	return absPath, nil
+}
+
+// loadConfig loads the configuration from the specified path.
+// Security: Path must not escape the current working directory (prevents directory traversal).
+func loadConfig(path string, envOpts []EnvOption) (*config.ManagerConfig, error) {
+	// Validate and resolve the config path
+	absPath, err := validateConfigPath(path)
+	if err != nil {
+		return nil, err
+	}
+
+	//nolint:gosec // G304: Path is validated above to prevent directory traversal
+	data, err := os.ReadFile(absPath)
 	if err != nil {
 		return nil, fmt.Errorf("loadConfig: failed to read config file: %w", err)
 	}
@@ -289,7 +314,7 @@ func loadConfig(path string, envOpts []EnvOption) (*config.ManagerConfig, error)
 	data = expandEnvVars(data, newEnvResolver(envOpts))
 
 	cfg := &config.ManagerConfig{}
-	ext := filepath.Ext(cleanPath)
+	ext := filepath.Ext(absPath)
 
 	switch ext {
 	case ".json":

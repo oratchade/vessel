@@ -28,7 +28,7 @@ type DBEntry struct {
 	db     db.DB
 	logger db.Logger
 
-	healthy        *atomic.Bool
+	healthy        atomic.Bool
 	healthInterval time.Duration
 	priority       int
 
@@ -140,7 +140,7 @@ func newDBEntry(
 		db:             dbInstance,
 		logger:         logger,
 		healthInterval: mc.EntryHealthInterval(cfg),
-		healthy:        &atomic.Bool{},
+		healthy:        atomic.Bool{},
 		priority:       mc.EntryPriority(cfg),
 		writeQueue:     writeQueue,
 		readQueue:      readQueue,
