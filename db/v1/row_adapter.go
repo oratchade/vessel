@@ -166,9 +166,9 @@ func (r *RowsAdapter) err() error {
 	return nil
 }
 
-// Close releases the underlying database resources and prevents connection leaks.
+// close releases the underlying database resources and prevents connection leaks.
 // Must be called before the adapter goes out of scope to return connections to the pool.
-func (r *RowsAdapter) Close() error {
+func (r *RowsAdapter) close() error {
 	if r.sqlRows != nil {
 		err := r.sqlRows.Close()
 		if err != nil {

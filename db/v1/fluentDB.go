@@ -359,14 +359,14 @@ func (s *SelectBuilder) Offset(offset int) *SelectBuilder {
 //	    Get()
 func (s *SelectBuilder) Get() ([]map[string]any, error) {
 	if s.table == "" {
-		return nil, fmt.Errorf("selectBuilder: table not specified")
+		return nil, fmt.Errorf("SelectBuilder.Get: table not specified")
 	}
 	if err := validateQueryOptions(s.opts); err != nil {
-		return nil, fmt.Errorf("selectBuilder: invalid query options: %w", err)
+		return nil, fmt.Errorf("SelectBuilder.Get: invalid query options: %w", err)
 	}
 	rows, err := s.db.Get(s.ctx, s.table, s.columns, s.joins, s.conditions, s.opts)
 	if err != nil {
-		return nil, fmt.Errorf("selectBuilder: failed to get rows: %w", err)
+		return nil, fmt.Errorf("SelectBuilder.Get: failed to get rows: %w", err)
 	}
 	return rows, nil
 }
@@ -380,14 +380,14 @@ func (s *SelectBuilder) Get() ([]map[string]any, error) {
 //	error: An error if the query fails or the table/columns are invalid.
 func (s *SelectBuilder) GetRaw() (*RowsAdapter, error) {
 	if s.table == "" {
-		return nil, fmt.Errorf("selectBuilder: table not specified")
+		return nil, fmt.Errorf("SelectBuilder.GetRaw: table not specified")
 	}
 	if err := validateQueryOptions(s.opts); err != nil {
-		return nil, fmt.Errorf("selectBuilder: invalid query options: %w", err)
+		return nil, fmt.Errorf("SelectBuilder.GetRaw: invalid query options: %w", err)
 	}
 	rows, err := s.db.GetRaw(s.ctx, s.table, s.columns, s.joins, s.conditions, s.opts)
 	if err != nil {
-		return nil, fmt.Errorf("selectBuilder: failed to get raw rows: %w", err)
+		return nil, fmt.Errorf("SelectBuilder.GetRaw: failed to get raw rows: %w", err)
 	}
 	return rows, nil
 }
@@ -408,10 +408,10 @@ func (s *SelectBuilder) GetRaw() (*RowsAdapter, error) {
 //	    One()
 func (s *SelectBuilder) One() (map[string]any, error) {
 	if s.table == "" {
-		return nil, fmt.Errorf("selectBuilder: table not specified")
+		return nil, fmt.Errorf("SelectBuilder.One: table not specified")
 	}
 	if err := validateQueryOptions(s.opts); err != nil {
-		return nil, fmt.Errorf("selectBuilder: invalid query options: %w", err)
+		return nil, fmt.Errorf("SelectBuilder.One: invalid query options: %w", err)
 	}
 
 	// Clone options and set limit to 1
@@ -429,10 +429,10 @@ func (s *SelectBuilder) One() (map[string]any, error) {
 
 	rows, err := s.db.Get(s.ctx, s.table, s.columns, s.joins, s.conditions, opts)
 	if err != nil {
-		return nil, fmt.Errorf("selectBuilder: failed to get row: %w", err)
+		return nil, fmt.Errorf("SelectBuilder.One: failed to get row: %w", err)
 	}
 	if len(rows) == 0 {
-		return nil, fmt.Errorf("selectBuilder: no rows found")
+		return nil, fmt.Errorf("SelectBuilder.One: no rows found")
 	}
 	return rows[0], nil
 }
@@ -453,12 +453,12 @@ func (s *SelectBuilder) One() (map[string]any, error) {
 //	    Count()
 func (s *SelectBuilder) Count() (int64, error) {
 	if s.table == "" {
-		return 0, fmt.Errorf("selectBuilder: table not specified")
+		return 0, fmt.Errorf("SelectBuilder.Count: table not specified")
 	}
 
 	rows, err := s.db.Get(s.ctx, s.table, []string{"COUNT(*) as count"}, s.joins, s.conditions, nil)
 	if err != nil {
-		return 0, fmt.Errorf("selectBuilder: failed to count rows: %w", err)
+		return 0, fmt.Errorf("SelectBuilder.Count: failed to count rows: %w", err)
 	}
 	if len(rows) == 0 {
 		return 0, nil
@@ -466,7 +466,7 @@ func (s *SelectBuilder) Count() (int64, error) {
 
 	countVal, exists := rows[0]["count"]
 	if !exists {
-		return 0, fmt.Errorf("selectBuilder: count query did not return a count value")
+		return 0, fmt.Errorf("SelectBuilder.Count: count query did not return a count value")
 	}
 
 	// Handle different database driver return types for COUNT (int64, int, etc.)
@@ -480,7 +480,7 @@ func (s *SelectBuilder) Count() (int64, error) {
 	case float64:
 		return int64(v), nil
 	default:
-		return 0, fmt.Errorf("selectBuilder: unexpected count type: %T", countVal)
+		return 0, fmt.Errorf("SelectBuilder.Count: unexpected count type: %T", countVal)
 	}
 }
 
@@ -617,25 +617,25 @@ func (i *InsertBuilder) SetMap(data map[string]any) *InsertBuilder {
 //	    Exec()
 func (i *InsertBuilder) Exec() (*ExecResult, error) {
 	if i.table == "" {
-		return nil, fmt.Errorf("insertBuilder: table not specified")
+		return nil, fmt.Errorf("InsertBuilder.Exec: table not specified")
 	}
 
 	// Use bulk insert if data was provided via ValuesBulk
 	if len(i.bulk) > 0 {
 		result, err := i.db.Inserts(i.ctx, i.table, i.bulk, i.opts)
 		if err != nil {
-			return nil, fmt.Errorf("insertBuilder: failed to insert bulk data: %w", err)
+			return nil, fmt.Errorf("InsertBuilder.Exec: failed to insert bulk data: %w", err)
 		}
 		return result, nil
 	}
 
 	// Use single insert
 	if len(i.data) == 0 {
-		return nil, fmt.Errorf("insertBuilder: no data provided")
+		return nil, fmt.Errorf("InsertBuilder.Exec: no data provided")
 	}
 	result, err := i.db.Insert(i.ctx, i.table, i.data, i.opts)
 	if err != nil {
-		return nil, fmt.Errorf("insertBuilder: failed to insert data: %w", err)
+		return nil, fmt.Errorf("InsertBuilder.Exec: failed to insert data: %w", err)
 	}
 	return result, nil
 }
@@ -839,21 +839,21 @@ func (u *UpdateBuilder) Limit(limit int) *UpdateBuilder {
 //	    Exec()
 func (u *UpdateBuilder) Exec() (*ExecResult, error) {
 	if u.table == "" {
-		return nil, fmt.Errorf("updateBuilder: table not specified")
+		return nil, fmt.Errorf("UpdateBuilder.Exec: table not specified")
 	}
 	if len(u.data) == 0 {
-		return nil, fmt.Errorf("updateBuilder: no data to update")
+		return nil, fmt.Errorf("UpdateBuilder.Exec: no data to update")
 	}
 	if u.conditions == nil {
 		return nil, fmt.Errorf(
-			"updateBuilder: WHERE condition required (use Where method or call UpdateAll for unfiltered update)")
+			"UpdateBuilder.Exec: WHERE condition required (use Where method or call UpdateAll for unfiltered update)")
 	}
 	if err := validateQueryOptions(u.opts); err != nil {
-		return nil, fmt.Errorf("updateBuilder: invalid query options: %w", err)
+		return nil, fmt.Errorf("UpdateBuilder.Exec: invalid query options: %w", err)
 	}
 	result, err := u.db.Update(u.ctx, u.table, u.data, u.joins, u.conditions, u.opts)
 	if err != nil {
-		return nil, fmt.Errorf("updateBuilder: failed to update rows: %w", err)
+		return nil, fmt.Errorf("UpdateBuilder.Exec: failed to update rows: %w", err)
 	}
 	return result, nil
 }
@@ -876,17 +876,17 @@ func (u *UpdateBuilder) Exec() (*ExecResult, error) {
 //	    UpdateAll()  // No WHERE clause
 func (u *UpdateBuilder) UpdateAll() (*ExecResult, error) {
 	if u.table == "" {
-		return nil, fmt.Errorf("updateBuilder: table not specified")
+		return nil, fmt.Errorf("UpdateBuilder.UpdateAll: table not specified")
 	}
 	if err := validateQueryOptions(u.opts); err != nil {
-		return nil, fmt.Errorf("updateBuilder: invalid query options: %w", err)
+		return nil, fmt.Errorf("UpdateBuilder.UpdateAll: invalid query options: %w", err)
 	}
 	if len(u.data) == 0 {
-		return nil, fmt.Errorf("updateBuilder: no data to update")
+		return nil, fmt.Errorf("UpdateBuilder.UpdateAll: no data to update")
 	}
 	result, err := u.db.Update(u.ctx, u.table, u.data, u.joins, u.conditions, u.opts)
 	if err != nil {
-		return nil, fmt.Errorf("updateBuilder: failed to update rows: %w", err)
+		return nil, fmt.Errorf("UpdateBuilder.UpdateAll: failed to update rows: %w", err)
 	}
 	return result, nil
 }
@@ -1063,18 +1063,18 @@ func (d *DeleteBuilder) Limit(limit int) *DeleteBuilder {
 //	    Exec()
 func (d *DeleteBuilder) Exec() (*ExecResult, error) {
 	if d.table == "" {
-		return nil, fmt.Errorf("deleteBuilder: table not specified")
+		return nil, fmt.Errorf("DeleteBuilder.Exec: table not specified")
 	}
 	if d.conditions == nil {
 		return nil, fmt.Errorf(
-			"deleteBuilder: WHERE condition required (use Where method or call DeleteAll for unfiltered delete)")
+			"DeleteBuilder.Exec: WHERE condition required (use Where method or call DeleteAll for unfiltered delete)")
 	}
 	if err := validateQueryOptions(d.opts); err != nil {
-		return nil, fmt.Errorf("deleteBuilder: invalid query options: %w", err)
+		return nil, fmt.Errorf("DeleteBuilder.Exec: invalid query options: %w", err)
 	}
 	result, err := d.db.Delete(d.ctx, d.table, d.joins, d.conditions, d.opts)
 	if err != nil {
-		return nil, fmt.Errorf("deleteBuilder: failed to delete rows: %w", err)
+		return nil, fmt.Errorf("DeleteBuilder.Exec: failed to delete rows: %w", err)
 	}
 	return result, nil
 }
@@ -1103,14 +1103,14 @@ func (d *DeleteBuilder) Exec() (*ExecResult, error) {
 //	    DeleteAll()  // No WHERE clause
 func (d *DeleteBuilder) DeleteAll() (*ExecResult, error) {
 	if d.table == "" {
-		return nil, fmt.Errorf("deleteBuilder: table not specified")
+		return nil, fmt.Errorf("DeleteBuilder.DeleteAll: table not specified")
 	}
 	if err := validateQueryOptions(d.opts); err != nil {
-		return nil, fmt.Errorf("deleteBuilder: invalid query options: %w", err)
+		return nil, fmt.Errorf("DeleteBuilder.DeleteAll: invalid query options: %w", err)
 	}
 	result, err := d.db.Delete(d.ctx, d.table, d.joins, d.conditions, d.opts)
 	if err != nil {
-		return nil, fmt.Errorf("deleteBuilder: failed to delete rows: %w", err)
+		return nil, fmt.Errorf("DeleteBuilder.DeleteAll: failed to delete rows: %w", err)
 	}
 	return result, nil
 }

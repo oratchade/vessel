@@ -4,11 +4,17 @@ package definition
 type QueryType = string
 
 const (
-	QueryTypeSelect   QueryType = "SELECT"
-	QueryTypeInsert   QueryType = "INSERT"
-	QueryTypeUpdate   QueryType = "UPDATE"
-	QueryTypeDelete   QueryType = "DELETE"
-	QueryTypeUpsert   QueryType = "UPSERT"
+	// QueryTypeSelect represents a SELECT query.
+	QueryTypeSelect QueryType = "SELECT"
+	// QueryTypeInsert represents an INSERT query.
+	QueryTypeInsert QueryType = "INSERT"
+	// QueryTypeUpdate represents an UPDATE query.
+	QueryTypeUpdate QueryType = "UPDATE"
+	// QueryTypeDelete represents a DELETE query.
+	QueryTypeDelete QueryType = "DELETE"
+	// QueryTypeUpsert represents an UPSERT query.
+	QueryTypeUpsert QueryType = "UPSERT"
+	// QueryTypeTruncate represents a TRUNCATE query.
 	QueryTypeTruncate QueryType = "TRUNCATE"
 )
 

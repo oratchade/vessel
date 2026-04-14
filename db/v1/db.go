@@ -564,7 +564,7 @@ func ScanRowsTo[T any](ctx context.Context, ra *RowsAdapter) ([]T, error) {
 
 	var out []T
 
-	defer func() { _ = ra.Close() }()
+	defer func() { _ = ra.close() }()
 
 	// prepare scan destinations
 	vals, ptrs := makeScanPtrs(len(cols))

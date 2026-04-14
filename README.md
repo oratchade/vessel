@@ -365,27 +365,30 @@ which you must explicitly close. This design allows you the flexibility to:
 - Use third-party row scanning libraries of your choice
 - Implement custom row processing logic
 
-**You are responsible for closing the RowsAdapter to prevent resource leaks.**
-Always use `defer` to ensure proper cleanup:
+**ScanRowsTo automatically closes the RowsAdapter.** Always use `ScanRowsTo[T]` for type-safe scanning:
 
 ```go
 rowsAdapter, err := database.GetRaw(ctx, "users", []string{"*"}, nil, nil, nil)
 if err != nil {
     log.Fatal(err)
 }
-// defer rowsAdapter.Close()
-// ⚠️ REQUIRED: Always close the adapter if you don't use ScanRowsTo
 
-// Now you can scan or process the rows
+// ScanRowsTo[T] handles opening and closing the adapter automatically
 users, err := db.ScanRowsTo[User](ctx, rowsAdapter)
-// ... your code
+if err != nil {
+    log.Fatal(err)
+}
+
+// Use typed results - resources are already cleaned up
+for _, user := range users {
+    log.Printf("User: %s <%s> (Age: %d)\n", user.Name, user.Email, user.Age)
+}
 ```
 
-Failure to close the adapter may result in:
-
-- Database connection pool exhaustion
-- Memory leaks (unclosed database cursors)
-- Degraded application performance
+⚠️ **Resource Management:** The `RowsAdapter` is a private implementation detail.
+You must use `ScanRowsTo[T](ctx, rowsAdapter)` to properly scan rows
+and release database resources.
+Direct manipulation of the adapter is not supported.
 
 **Benefits:**
 

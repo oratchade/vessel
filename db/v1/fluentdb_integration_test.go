@@ -1032,7 +1032,12 @@ func TestFluentDBSelectGetRaw(t *testing.T) {
 	require.NoError(t, err)
 	require.NotNil(t, rows)
 
-	// Close the adapter - should succeed
-	err = rows.Close()
+	// ScanRowsTo automatically closes the adapter
+	type User struct {
+		Name  string
+		Email string
+	}
+	users, err := v1.ScanRowsTo[User](it.ctx, rows)
 	require.NoError(t, err)
+	require.True(t, len(users) > 0, "should have scanned users")
 }
