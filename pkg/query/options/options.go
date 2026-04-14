@@ -15,21 +15,37 @@ type OrderBy struct {
 
 // QueryOptions holds optional parameters for SQL queries.
 // Each field is documented with its intended usage and applicable query types.
+//
+// Mutual Exclusivity & Interactions:
+//   - GroupBy and Having should be used together: Having without GroupBy is
+//     semantically invalid. (Some databases may tolerate this; others will error.
+//     Always pair them.)
+//   - Limit and Offset can be used independently, but Offset without Limit may
+//     behave unexpectedly on some engines (e.g., MySQL requires Limit to honor
+//     Offset).
+//   - OrderBy is optional and can be combined with any other clause.
+//   - Returning is database-specific: PostgreSQL and MSSQL support it; SQLite
+//     and MySQL ignore it.
 type QueryOptions struct {
 	// Limit specifies the maximum number of rows to return.
 	// Applies to: SELECT, UPDATE, DELETE.
+	// Must be non-negative (enforced at builder level).
 	Limit *int
 
 	// Offset specifies the number of rows to skip before starting to return rows.
 	// Applies to: SELECT.
+	// Must be non-negative (enforced at builder level).
+	// Note: Most engines require Limit when using Offset; refer to your database documentation.
 	Offset *int
 
 	// OrderBy specifies the columns and directions to order the results by.
 	// Applies to: SELECT, UPDATE, DELETE.
+	// Direction must be "ASC" or "DESC" (enforced at builder level, case-insensitive).
 	OrderBy []OrderBy
 
 	// Having specifies a HAVING clause for grouped queries.
 	// Applies to: SELECT (with GROUP BY).
+	// IMPORTANT: Should only be used in conjunction with GroupBy; using Having alone is invalid.
 	Having *string
 
 	// GroupBy specifies the columns to group the results by.
@@ -37,6 +53,7 @@ type QueryOptions struct {
 	GroupBy []string
 
 	// Returning specifies columns to return after INSERT, UPDATE, or DELETE.
-	// Applies to: INSERT, UPDATE, DELETE (supported by some databases, e.g., PostgreSQL).
+	// Applies to: INSERT, UPDATE, DELETE (database-specific, see query builder for details).
+	// Supported by: PostgreSQL, MSSQL. Ignored by: SQLite, MySQL.
 	Returning []string
 }
