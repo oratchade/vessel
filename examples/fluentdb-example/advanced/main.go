@@ -52,7 +52,7 @@ func main() {
 func selectWithJoinExample(conn db.DB, ctx context.Context) {
 	// SELECT with INNER JOIN: Get users and their roles
 	fmt.Println("\n1. Get users with their role details (INNER JOIN):")
-	fdb := db.NewFluentDB(conn, ctx)
+	fdb := db.NewFluentDB(conn)
 	rows, err := fdb.Select("users", "users.id", "users.name", "users.email", "roles.name as role_name").
 		Join(cdt.Join{
 			Type:  "INNER",
@@ -65,7 +65,7 @@ func selectWithJoinExample(conn db.DB, ctx context.Context) {
 		}).
 		Where(cdt.NewExpr().Column("users.active").Op("=").Value(true)).
 		OrderBy("users.name", "ASC").
-		Get()
+		Get(ctx)
 	if err != nil {
 		log.Printf("Error: %v", err)
 		return
@@ -77,7 +77,7 @@ func selectWithJoinExample(conn db.DB, ctx context.Context) {
 
 	// SELECT with LEFT JOIN: Get users and their profiles (if any)
 	fmt.Println("\n2. Get users with optional profile information (LEFT JOIN):")
-	fdb = db.NewFluentDB(conn, ctx)
+	fdb = db.NewFluentDB(conn)
 	rows, err = fdb.Select("users", "users.id", "users.name", "profiles.bio", "profiles.avatar_url").
 		Join(cdt.Join{
 			Type:  "LEFT",
@@ -90,7 +90,7 @@ func selectWithJoinExample(conn db.DB, ctx context.Context) {
 		}).
 		OrderBy("users.name", "ASC").
 		Limit(20).
-		Get()
+		Get(ctx)
 	if err != nil {
 		log.Printf("Error: %v", err)
 		return
@@ -101,7 +101,7 @@ func selectWithJoinExample(conn db.DB, ctx context.Context) {
 func updateWithJoinExample(conn db.DB, ctx context.Context) {
 	// UPDATE with JOIN: Update users based on role information
 	fmt.Println("\n1. Update users to premium status if they have 'vip' role:")
-	fdb := db.NewFluentDB(conn, ctx)
+	fdb := db.NewFluentDB(conn)
 	result, err := fdb.Update("users").
 		Set("is_premium", true).
 		Set("updated_at", "NOW()").
@@ -115,7 +115,7 @@ func updateWithJoinExample(conn db.DB, ctx context.Context) {
 			}},
 		}).
 		Where(cdt.NewExpr().Column("roles.name").Op("=").Value("vip")).
-		Exec()
+		Exec(ctx)
 	if err != nil {
 		log.Printf("Error: %v", err)
 		return
@@ -124,7 +124,7 @@ func updateWithJoinExample(conn db.DB, ctx context.Context) {
 
 	// UPDATE with multiple JOINs
 	fmt.Println("\n2. Update subscription status for users in specific departments:")
-	fdb = db.NewFluentDB(conn, ctx)
+	fdb = db.NewFluentDB(conn)
 	result, err = fdb.Update("users").
 		Set("subscription_active", true).
 		Join(cdt.Join{
@@ -147,7 +147,7 @@ func updateWithJoinExample(conn db.DB, ctx context.Context) {
 		}).
 		Where(cdt.NewExpr().Column("depts.name").Op("=").Value("engineering")).
 		Where(cdt.NewExpr().Column("subs.plan").Op("=").Value("professional")).
-		Exec()
+		Exec(ctx)
 	if err != nil {
 		log.Printf("Error: %v", err)
 		return
@@ -158,7 +158,7 @@ func updateWithJoinExample(conn db.DB, ctx context.Context) {
 func deleteWithJoinExample(conn db.DB, ctx context.Context) {
 	// DELETE with JOIN: Delete users from deleted accounts
 	fmt.Println("\n1. Delete users associated with deleted accounts:")
-	fdb := db.NewFluentDB(conn, ctx)
+	fdb := db.NewFluentDB(conn)
 	result, err := fdb.Delete().
 		From("users").
 		Join(cdt.Join{
@@ -172,7 +172,7 @@ func deleteWithJoinExample(conn db.DB, ctx context.Context) {
 		}).
 		Where(cdt.NewExpr().Column("accounts.deleted_at").Op("IS NOT").Value(nil)).
 		Limit(1000).
-		Exec()
+		Exec(ctx)
 	if err != nil {
 		log.Printf("Error: %v", err)
 		return
@@ -181,7 +181,7 @@ func deleteWithJoinExample(conn db.DB, ctx context.Context) {
 
 	// DELETE with ordered results: Delete oldest inactive users from specific teams
 	fmt.Println("\n2. Delete 50 oldest inactive users from tech team:")
-	fdb = db.NewFluentDB(conn, ctx)
+	fdb = db.NewFluentDB(conn)
 	result, err = fdb.Delete().
 		From("users").
 		Join(cdt.Join{
@@ -197,7 +197,7 @@ func deleteWithJoinExample(conn db.DB, ctx context.Context) {
 		Where(cdt.NewExpr().Column("users.last_login").Op("<").Value("2023-01-01")).
 		OrderBy("users.last_login", "ASC").
 		Limit(50).
-		Exec()
+		Exec(ctx)
 	if err != nil {
 		log.Printf("Error: %v", err)
 		return
@@ -211,13 +211,13 @@ func paginationExample(conn db.DB, ctx context.Context) {
 
 	for page := 1; page <= 3; page++ {
 		offset := (page - 1) * pageSize
-		fdb := db.NewFluentDB(conn, ctx)
+		fdb := db.NewFluentDB(conn)
 
 		rows, err := fdb.Select("users", "id", "name", "email").
 			OrderBy("id", "ASC").
 			Limit(pageSize).
 			Offset(offset).
-			Get()
+			Get(ctx)
 		if err != nil {
 			log.Printf("Error: %v", err)
 			return
@@ -236,13 +236,13 @@ func paginationExample(conn db.DB, ctx context.Context) {
 
 	// Pagination with filtering
 	fmt.Println("\n2. Paginate active users:")
-	fdb := db.NewFluentDB(conn, ctx)
+	fdb := db.NewFluentDB(conn)
 	rows, err := fdb.Select("users", "id", "name", "email").
 		Where(cdt.NewExpr().Column("active").Op("=").Value(true)).
 		OrderBy("created_at", "DESC").
 		Limit(pageSize).
 		Offset(0).
-		Get()
+		Get(ctx)
 	if err != nil {
 		log.Printf("Error: %v", err)
 		return

@@ -60,8 +60,7 @@ func validateQueryOptions(opts *options.QueryOptions) error {
 // It acts as an entry point for building SELECT, INSERT, UPDATE, and DELETE operations
 // with a chainable, ergonomic API while reusing the existing DBActions interface.
 type FluentDB struct {
-	db  DBActions
-	ctx context.Context
+	db DBActions
 }
 
 // NewFluentDB creates a new FluentDB instance that wraps the provided DBActions.
@@ -81,8 +80,8 @@ type FluentDB struct {
 //	    Select("users", "id", "name", "email").
 //	    Where(cdt.NewExpr().Column("age").Op(">").Value(18)).
 //	    Get()
-func NewFluentDB(db DBActions, ctx context.Context) *FluentDB {
-	return &FluentDB{db: db, ctx: ctx}
+func NewFluentDB(db DBActions) *FluentDB {
+	return &FluentDB{db: db}
 }
 
 // Select begins a SELECT query by specifying the table and columns to retrieve.
@@ -108,7 +107,6 @@ func (f *FluentDB) Select(table string, columns ...string) *SelectBuilder {
 	}
 	return &SelectBuilder{
 		db:      f.db,
-		ctx:     f.ctx,
 		table:   table,
 		columns: columns,
 	}
@@ -129,8 +127,7 @@ func (f *FluentDB) Select(table string, columns ...string) *SelectBuilder {
 //	    Exec()
 func (f *FluentDB) Insert() *InsertBuilder {
 	return &InsertBuilder{
-		db:  f.db,
-		ctx: f.ctx,
+		db: f.db,
 	}
 }
 
@@ -154,7 +151,6 @@ func (f *FluentDB) Insert() *InsertBuilder {
 func (f *FluentDB) Update(table string) *UpdateBuilder {
 	return &UpdateBuilder{
 		db:    f.db,
-		ctx:   f.ctx,
 		table: table,
 		data:  make(map[string]any),
 	}
@@ -175,8 +171,7 @@ func (f *FluentDB) Update(table string) *UpdateBuilder {
 //	    Exec()
 func (f *FluentDB) Delete() *DeleteBuilder {
 	return &DeleteBuilder{
-		db:  f.db,
-		ctx: f.ctx,
+		db: f.db,
 	}
 }
 
@@ -185,7 +180,6 @@ func (f *FluentDB) Delete() *DeleteBuilder {
 // joins, conditions, ordering, and pagination.
 type SelectBuilder struct {
 	db         DBActions
-	ctx        context.Context
 	table      string
 	columns    []string
 	joins      []cdt.Join
@@ -355,14 +349,14 @@ func (s *SelectBuilder) Offset(offset int) *SelectBuilder {
 //	    Select("users", "id", "name").
 //	    Where(cdt.NewExpr().Column("age").Op(">").Value(18)).
 //	    Get()
-func (s *SelectBuilder) Get() ([]map[string]any, error) {
+func (s *SelectBuilder) Get(ctx context.Context) ([]map[string]any, error) {
 	if s.table == "" {
 		return nil, fmt.Errorf("SelectBuilder.Get: table not specified")
 	}
 	if err := validateQueryOptions(s.opts); err != nil {
 		return nil, fmt.Errorf("SelectBuilder.Get: invalid query options: %w", err)
 	}
-	rows, err := s.db.Get(s.ctx, s.table, s.columns, s.joins, s.conditions, s.opts)
+	rows, err := s.db.Get(ctx, s.table, s.columns, s.joins, s.conditions, s.opts)
 	if err != nil {
 		return nil, fmt.Errorf("SelectBuilder.Get: failed to get rows: %w", err)
 	}
@@ -376,14 +370,14 @@ func (s *SelectBuilder) Get() ([]map[string]any, error) {
 //
 //	*RowsAdapter: An adapter for iterating over result rows.
 //	error: An error if the query fails or the table/columns are invalid.
-func (s *SelectBuilder) GetRaw() (*RowsAdapter, error) {
+func (s *SelectBuilder) GetRaw(ctx context.Context) (*RowsAdapter, error) {
 	if s.table == "" {
 		return nil, fmt.Errorf("SelectBuilder.GetRaw: table not specified")
 	}
 	if err := validateQueryOptions(s.opts); err != nil {
 		return nil, fmt.Errorf("SelectBuilder.GetRaw: invalid query options: %w", err)
 	}
-	rows, err := s.db.GetRaw(s.ctx, s.table, s.columns, s.joins, s.conditions, s.opts)
+	rows, err := s.db.GetRaw(ctx, s.table, s.columns, s.joins, s.conditions, s.opts)
 	if err != nil {
 		return nil, fmt.Errorf("SelectBuilder.GetRaw: failed to get raw rows: %w", err)
 	}
@@ -403,8 +397,8 @@ func (s *SelectBuilder) GetRaw() (*RowsAdapter, error) {
 //	user, err := NewFluentDB(db, ctx).
 //	    Select("users", "id", "name", "email").
 //	    Where(cdt.NewExpr().Column("id").Op("=").Value(42)).
-//	    One()
-func (s *SelectBuilder) One() (map[string]any, error) {
+//	    One(ctx)
+func (s *SelectBuilder) One(ctx context.Context) (map[string]any, error) {
 	if s.table == "" {
 		return nil, fmt.Errorf("SelectBuilder.One: table not specified")
 	}
@@ -425,7 +419,7 @@ func (s *SelectBuilder) One() (map[string]any, error) {
 		opts = &optsCopy
 	}
 
-	rows, err := s.db.Get(s.ctx, s.table, s.columns, s.joins, s.conditions, opts)
+	rows, err := s.db.Get(ctx, s.table, s.columns, s.joins, s.conditions, opts)
 	if err != nil {
 		return nil, fmt.Errorf("SelectBuilder.One: failed to get row: %w", err)
 	}
@@ -448,13 +442,13 @@ func (s *SelectBuilder) One() (map[string]any, error) {
 //	count, err := NewFluentDB(db, ctx).
 //	    Select("users").
 //	    Where(cdt.NewExpr().Column("active").Op("=").Value(true)).
-//	    Count()
-func (s *SelectBuilder) Count() (int64, error) {
+//	    Count(ctx)
+func (s *SelectBuilder) Count(ctx context.Context) (int64, error) {
 	if s.table == "" {
 		return 0, fmt.Errorf("SelectBuilder.Count: table not specified")
 	}
 
-	rows, err := s.db.Get(s.ctx, s.table, []string{"COUNT(*) as count"}, s.joins, s.conditions, nil)
+	rows, err := s.db.Get(ctx, s.table, []string{"COUNT(*) as count"}, s.joins, s.conditions, nil)
 	if err != nil {
 		return 0, fmt.Errorf("SelectBuilder.Count: failed to count rows: %w", err)
 	}
@@ -487,7 +481,6 @@ func (s *SelectBuilder) Count() (int64, error) {
 // single or bulk operations.
 type InsertBuilder struct {
 	db    DBActions
-	ctx   context.Context
 	table string
 	data  map[string]any
 	bulk  []map[string]any
@@ -612,15 +605,15 @@ func (i *InsertBuilder) SetMap(data map[string]any) *InsertBuilder {
 //	    Into("users").
 //	    Set("name", "John").
 //	    Set("email", "john@example.com").
-//	    Exec()
-func (i *InsertBuilder) Exec() (*ExecResult, error) {
+//	    Exec(ctx)
+func (i *InsertBuilder) Exec(ctx context.Context) (*ExecResult, error) {
 	if i.table == "" {
 		return nil, fmt.Errorf("InsertBuilder.Exec: table not specified")
 	}
 
 	// Use bulk insert if data was provided via ValuesBulk
 	if len(i.bulk) > 0 {
-		result, err := i.db.Inserts(i.ctx, i.table, i.bulk, i.opts)
+		result, err := i.db.Inserts(ctx, i.table, i.bulk, i.opts)
 		if err != nil {
 			return nil, fmt.Errorf("InsertBuilder.Exec: failed to insert bulk data: %w", err)
 		}
@@ -631,7 +624,7 @@ func (i *InsertBuilder) Exec() (*ExecResult, error) {
 	if len(i.data) == 0 {
 		return nil, fmt.Errorf("InsertBuilder.Exec: no data provided")
 	}
-	result, err := i.db.Insert(i.ctx, i.table, i.data, i.opts)
+	result, err := i.db.Insert(ctx, i.table, i.data, i.opts)
 	if err != nil {
 		return nil, fmt.Errorf("InsertBuilder.Exec: failed to insert data: %w", err)
 	}
@@ -643,7 +636,6 @@ func (i *InsertBuilder) Exec() (*ExecResult, error) {
 // and optional joins for complex updates.
 type UpdateBuilder struct {
 	db         DBActions
-	ctx        context.Context
 	table      string
 	data       map[string]any
 	joins      []cdt.Join
@@ -834,8 +826,8 @@ func (u *UpdateBuilder) Limit(limit int) *UpdateBuilder {
 //	    Set("age", 31).
 //	    Set("updated_at", time.Now()).
 //	    Where(cdt.NewExpr().Column("id").Op("=").Value(42)).
-//	    Exec()
-func (u *UpdateBuilder) Exec() (*ExecResult, error) {
+//	    Exec(ctx)
+func (u *UpdateBuilder) Exec(ctx context.Context) (*ExecResult, error) {
 	if u.table == "" {
 		return nil, fmt.Errorf("UpdateBuilder.Exec: table not specified")
 	}
@@ -849,7 +841,7 @@ func (u *UpdateBuilder) Exec() (*ExecResult, error) {
 	if err := validateQueryOptions(u.opts); err != nil {
 		return nil, fmt.Errorf("UpdateBuilder.Exec: invalid query options: %w", err)
 	}
-	result, err := u.db.Update(u.ctx, u.table, u.data, u.joins, u.conditions, u.opts)
+	result, err := u.db.Update(ctx, u.table, u.data, u.joins, u.conditions, u.opts)
 	if err != nil {
 		return nil, fmt.Errorf("UpdateBuilder.Exec: failed to update rows: %w", err)
 	}
@@ -871,8 +863,8 @@ func (u *UpdateBuilder) Exec() (*ExecResult, error) {
 //	result, err := NewFluentDB(db, ctx).
 //	    Update("users").
 //	    Set("status", "inactive").
-//	    UpdateAll()  // No WHERE clause
-func (u *UpdateBuilder) UpdateAll() (*ExecResult, error) {
+//	    UpdateAll(ctx)  // No WHERE clause
+func (u *UpdateBuilder) UpdateAll(ctx context.Context) (*ExecResult, error) {
 	if u.table == "" {
 		return nil, fmt.Errorf("UpdateBuilder.UpdateAll: table not specified")
 	}
@@ -882,7 +874,7 @@ func (u *UpdateBuilder) UpdateAll() (*ExecResult, error) {
 	if len(u.data) == 0 {
 		return nil, fmt.Errorf("UpdateBuilder.UpdateAll: no data to update")
 	}
-	result, err := u.db.Update(u.ctx, u.table, u.data, u.joins, u.conditions, u.opts)
+	result, err := u.db.Update(ctx, u.table, u.data, u.joins, u.conditions, u.opts)
 	if err != nil {
 		return nil, fmt.Errorf("UpdateBuilder.UpdateAll: failed to update rows: %w", err)
 	}
@@ -894,7 +886,6 @@ func (u *UpdateBuilder) UpdateAll() (*ExecResult, error) {
 // and optional joins for complex deletes.
 type DeleteBuilder struct {
 	db         DBActions
-	ctx        context.Context
 	table      string
 	joins      []cdt.Join
 	conditions cdt.Condition
@@ -1058,8 +1049,8 @@ func (d *DeleteBuilder) Limit(limit int) *DeleteBuilder {
 //	    Delete().
 //	    From("users").
 //	    Where(cdt.NewExpr().Column("id").Op("=").Value(42)).
-//	    Exec()
-func (d *DeleteBuilder) Exec() (*ExecResult, error) {
+//	    Exec(ctx)
+func (d *DeleteBuilder) Exec(ctx context.Context) (*ExecResult, error) {
 	if d.table == "" {
 		return nil, fmt.Errorf("DeleteBuilder.Exec: table not specified")
 	}
@@ -1070,7 +1061,7 @@ func (d *DeleteBuilder) Exec() (*ExecResult, error) {
 	if err := validateQueryOptions(d.opts); err != nil {
 		return nil, fmt.Errorf("DeleteBuilder.Exec: invalid query options: %w", err)
 	}
-	result, err := d.db.Delete(d.ctx, d.table, d.joins, d.conditions, d.opts)
+	result, err := d.db.Delete(ctx, d.table, d.joins, d.conditions, d.opts)
 	if err != nil {
 		return nil, fmt.Errorf("DeleteBuilder.Exec: failed to delete rows: %w", err)
 	}
@@ -1093,20 +1084,20 @@ func (d *DeleteBuilder) Exec() (*ExecResult, error) {
 //	    Delete().
 //	    From("users").
 //	    Where(cdt.NewExpr().Column("status").Op("=").Value("inactive")).
-//	    Exec()
+//	    Exec(ctx)
 //	// For truly unfiltered delete:
 //	result, err := NewFluentDB(db, ctx).
 //	    Delete().
 //	    From("users").
-//	    DeleteAll()  // No WHERE clause
-func (d *DeleteBuilder) DeleteAll() (*ExecResult, error) {
+//	    DeleteAll(ctx)  // No WHERE clause
+func (d *DeleteBuilder) DeleteAll(ctx context.Context) (*ExecResult, error) {
 	if d.table == "" {
 		return nil, fmt.Errorf("DeleteBuilder.DeleteAll: table not specified")
 	}
 	if err := validateQueryOptions(d.opts); err != nil {
 		return nil, fmt.Errorf("DeleteBuilder.DeleteAll: invalid query options: %w", err)
 	}
-	result, err := d.db.Delete(d.ctx, d.table, d.joins, d.conditions, d.opts)
+	result, err := d.db.Delete(ctx, d.table, d.joins, d.conditions, d.opts)
 	if err != nil {
 		return nil, fmt.Errorf("DeleteBuilder.DeleteAll: failed to delete rows: %w", err)
 	}

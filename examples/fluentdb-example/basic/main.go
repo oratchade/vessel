@@ -49,11 +49,11 @@ func main() {
 }
 
 func selectExample(conn db.DB, ctx context.Context) {
-	fdb := db.NewFluentDB(conn, ctx)
+	fdb := db.NewFluentDB(conn)
 
 	// Basic SELECT: Get all users
 	fmt.Println("\n1. Get all users:")
-	rows, err := fdb.Select("users", "id", "name", "email", "created_at").Get()
+	rows, err := fdb.Select("users", "id", "name", "email", "created_at").Get(ctx)
 	if err != nil {
 		log.Printf("Error: %v", err)
 		return
@@ -65,10 +65,10 @@ func selectExample(conn db.DB, ctx context.Context) {
 
 	// SELECT with WHERE: Get specific user
 	fmt.Println("\n2. Get user with ID = 1:")
-	fdb = db.NewFluentDB(conn, ctx)
+	fdb = db.NewFluentDB(conn)
 	row, err := fdb.Select("users", "id", "name", "email").
 		Where(cdt.NewExpr().Column("id").Op("=").Value(int64(1))).
-		One()
+		One(ctx)
 	if err != nil {
 		log.Printf("Error: %v", err)
 		return
@@ -79,11 +79,11 @@ func selectExample(conn db.DB, ctx context.Context) {
 
 	// SELECT with ORDER BY and LIMIT: Get first 10 users sorted by name
 	fmt.Println("\n3. Get first 10 users sorted by name:")
-	fdb = db.NewFluentDB(conn, ctx)
+	fdb = db.NewFluentDB(conn)
 	rows, err = fdb.Select("users", "id", "name").
 		OrderBy("name", "ASC").
 		Limit(10).
-		Get()
+		Get(ctx)
 	if err != nil {
 		log.Printf("Error: %v", err)
 		return
@@ -92,12 +92,12 @@ func selectExample(conn db.DB, ctx context.Context) {
 
 	// SELECT with multiple WHERE conditions
 	fmt.Println("\n4. Get active users with specific role:")
-	fdb = db.NewFluentDB(conn, ctx)
+	fdb = db.NewFluentDB(conn)
 	rows, err = fdb.Select("users", "id", "name", "role").
 		Where(cdt.NewExpr().Column("active").Op("=").Value(true)).
 		Where(cdt.NewExpr().Column("role").Op("=").Value("admin")).
 		OrderBy("name", "ASC").
-		Get()
+		Get(ctx)
 	if err != nil {
 		log.Printf("Error: %v", err)
 		return
@@ -106,8 +106,8 @@ func selectExample(conn db.DB, ctx context.Context) {
 
 	// COUNT: Get total number of users
 	fmt.Println("\n5. Count total users:")
-	fdb = db.NewFluentDB(conn, ctx)
-	count, err := fdb.Select("users").Count()
+	fdb = db.NewFluentDB(conn)
+	count, err := fdb.Select("users").Count(ctx)
 	if err != nil {
 		log.Printf("Error: %v", err)
 		return
@@ -118,14 +118,14 @@ func selectExample(conn db.DB, ctx context.Context) {
 func insertExample(conn db.DB, ctx context.Context) {
 	// INSERT single row
 	fmt.Println("\n1. Insert single user:")
-	fdb := db.NewFluentDB(conn, ctx)
+	fdb := db.NewFluentDB(conn)
 	result, err := fdb.Insert().
 		Into("users").
 		Set("name", "John Doe").
 		Set("email", "john@example.com").
 		Set("role", "user").
 		Set("active", true).
-		Exec()
+		Exec(ctx)
 	if err != nil {
 		log.Printf("Error: %v", err)
 		return
@@ -134,7 +134,7 @@ func insertExample(conn db.DB, ctx context.Context) {
 
 	// INSERT with map
 	fmt.Println("\n2. Insert user using SetMap:")
-	fdb = db.NewFluentDB(conn, ctx)
+	fdb = db.NewFluentDB(conn)
 	userData := map[string]any{
 		"name":   "Jane Smith",
 		"email":  "jane@example.com",
@@ -144,7 +144,7 @@ func insertExample(conn db.DB, ctx context.Context) {
 	result, err = fdb.Insert().
 		Into("users").
 		SetMap(userData).
-		Exec()
+		Exec(ctx)
 	if err != nil {
 		log.Printf("Error: %v", err)
 		return
@@ -153,7 +153,7 @@ func insertExample(conn db.DB, ctx context.Context) {
 
 	// BULK INSERT: Add multiple users at once
 	fmt.Println("\n3. Bulk insert multiple users:")
-	fdb = db.NewFluentDB(conn, ctx)
+	fdb = db.NewFluentDB(conn)
 	users := []map[string]any{
 		{"name": "Alice", "email": "alice@example.com", "role": "user", "active": true},
 		{"name": "Bob", "email": "bob@example.com", "role": "user", "active": true},
@@ -162,7 +162,7 @@ func insertExample(conn db.DB, ctx context.Context) {
 	result, err = fdb.Insert().
 		Into("users").
 		ValuesBulk(users).
-		Exec()
+		Exec(ctx)
 	if err != nil {
 		log.Printf("Error: %v", err)
 		return
@@ -173,11 +173,11 @@ func insertExample(conn db.DB, ctx context.Context) {
 func updateExample(conn db.DB, ctx context.Context) {
 	// UPDATE single field
 	fmt.Println("\n1. Update user name:")
-	fdb := db.NewFluentDB(conn, ctx)
+	fdb := db.NewFluentDB(conn)
 	result, err := fdb.Update("users").
 		Set("name", "Jonathan Doe").
 		Where(cdt.NewExpr().Column("id").Op("=").Value(int64(1))).
-		Exec()
+		Exec(ctx)
 	if err != nil {
 		log.Printf("Error: %v", err)
 		return
@@ -186,7 +186,7 @@ func updateExample(conn db.DB, ctx context.Context) {
 
 	// UPDATE multiple fields with SetMap
 	fmt.Println("\n2. Update multiple fields using SetMap:")
-	fdb = db.NewFluentDB(conn, ctx)
+	fdb = db.NewFluentDB(conn)
 	updates := map[string]any{
 		"name":   "Jane Smith Updated",
 		"role":   "super_admin",
@@ -195,7 +195,7 @@ func updateExample(conn db.DB, ctx context.Context) {
 	result, err = fdb.Update("users").
 		SetMap(updates).
 		Where(cdt.NewExpr().Column("email").Op("=").Value("jane@example.com")).
-		Exec()
+		Exec(ctx)
 	if err != nil {
 		log.Printf("Error: %v", err)
 		return
@@ -204,13 +204,13 @@ func updateExample(conn db.DB, ctx context.Context) {
 
 	// UPDATE with multiple WHERE conditions
 	fmt.Println("\n3. Activate all inactive users created before specific date:")
-	fdb = db.NewFluentDB(conn, ctx)
+	fdb = db.NewFluentDB(conn)
 	result, err = fdb.Update("users").
 		Set("active", true).
 		Where(cdt.NewExpr().Column("active").Op("=").Value(false)).
 		Where(cdt.NewExpr().Column("created_at").Op("<").Value("2024-01-01")).
 		Limit(100).
-		Exec()
+		Exec(ctx)
 	if err != nil {
 		log.Printf("Error: %v", err)
 		return
@@ -221,11 +221,11 @@ func updateExample(conn db.DB, ctx context.Context) {
 func deleteExample(conn db.DB, ctx context.Context) {
 	// DELETE single row
 	fmt.Println("\n1. Delete user by ID:")
-	fdb := db.NewFluentDB(conn, ctx)
+	fdb := db.NewFluentDB(conn)
 	result, err := fdb.Delete().
 		From("users").
 		Where(cdt.NewExpr().Column("id").Op("=").Value(int64(999))).
-		Exec()
+		Exec(ctx)
 	if err != nil {
 		log.Printf("Error: %v", err)
 		return
@@ -234,13 +234,13 @@ func deleteExample(conn db.DB, ctx context.Context) {
 
 	// DELETE with multiple conditions
 	fmt.Println("\n2. Delete inactive users not created recently:")
-	fdb = db.NewFluentDB(conn, ctx)
+	fdb = db.NewFluentDB(conn)
 	result, err = fdb.Delete().
 		From("users").
 		Where(cdt.NewExpr().Column("active").Op("=").Value(false)).
 		Where(cdt.NewExpr().Column("created_at").Op("<").Value("2023-01-01")).
 		Limit(50).
-		Exec()
+		Exec(ctx)
 	if err != nil {
 		log.Printf("Error: %v", err)
 		return
@@ -249,13 +249,13 @@ func deleteExample(conn db.DB, ctx context.Context) {
 
 	// DELETE with ORDER BY and LIMIT: Delete oldest inactive users
 	fmt.Println("\n3. Delete 10 oldest inactive users:")
-	fdb = db.NewFluentDB(conn, ctx)
+	fdb = db.NewFluentDB(conn)
 	result, err = fdb.Delete().
 		From("users").
 		Where(cdt.NewExpr().Column("active").Op("=").Value(false)).
 		OrderBy("created_at", "ASC").
 		Limit(10).
-		Exec()
+		Exec(ctx)
 	if err != nil {
 		log.Printf("Error: %v", err)
 		return

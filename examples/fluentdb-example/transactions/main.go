@@ -60,7 +60,7 @@ func simpleTransaction(conn db.DB, ctx context.Context) {
 	}
 
 	// Use FluentDB with transaction
-	fdb := db.NewFluentDB(tx, ctx)
+	fdb := db.NewFluentDB(tx)
 
 	// Insert user
 	_, err = fdb.Insert().
@@ -68,7 +68,7 @@ func simpleTransaction(conn db.DB, ctx context.Context) {
 		Set("name", "Transaction User").
 		Set("email", "tx@example.com").
 		Set("active", true).
-		Exec()
+		Exec(ctx)
 	if err != nil {
 		log.Printf("Error inserting user: %v", err)
 		if err := tx.Rollback(ctx); err != nil {
@@ -104,7 +104,7 @@ func transactionWithError(conn db.DB, ctx context.Context) {
 		}
 	}()
 
-	fdb := db.NewFluentDB(tx, ctx)
+	fdb := db.NewFluentDB(tx)
 
 	// Step 1: Insert user
 	fmt.Println("  Step 1: Inserting user...")
@@ -112,7 +112,7 @@ func transactionWithError(conn db.DB, ctx context.Context) {
 		Into("users").
 		Set("name", "Test User").
 		Set("email", "test@example.com").
-		Exec()
+		Exec(ctx)
 	if err != nil {
 		log.Printf("  Error at step 1: %v. Rolling back...", err)
 		if rollbackErr := tx.Rollback(ctx); rollbackErr != nil {
@@ -128,7 +128,7 @@ func transactionWithError(conn db.DB, ctx context.Context) {
 		Into("profiles").
 		Set("user_id", 1).
 		Set("bio", "Test bio").
-		Exec()
+		Exec(ctx)
 	if err != nil {
 		log.Printf("  Error at step 2: %v. Rolling back...", err)
 		if rollbackErr := tx.Rollback(ctx); rollbackErr != nil {
@@ -156,14 +156,14 @@ func complexTransaction(conn db.DB, ctx context.Context) {
 		return
 	}
 
-	fdb := db.NewFluentDB(tx, ctx)
+	fdb := db.NewFluentDB(tx)
 
 	// Step 1: Deduct credits from sender
 	fmt.Println("  Step 1: Deducting 100 credits from sender...")
 	_, err = fdb.Update("accounts").
 		Set("balance", `balance - 100`).
 		Where(cdt.NewExpr().Column("user_id").Op("=").Value(int64(1))).
-		Exec()
+		Exec(ctx)
 	if err != nil {
 		log.Printf("  Error at step 1: %v. Rolling back...", err)
 		_ = tx.Rollback(ctx)
@@ -175,7 +175,7 @@ func complexTransaction(conn db.DB, ctx context.Context) {
 	_, err = fdb.Update("accounts").
 		Set("balance", `balance + 100`).
 		Where(cdt.NewExpr().Column("user_id").Op("=").Value(int64(2))).
-		Exec()
+		Exec(ctx)
 	if err != nil {
 		log.Printf("  Error at step 2: %v. Rolling back...", err)
 		_ = tx.Rollback(ctx)
@@ -191,7 +191,7 @@ func complexTransaction(conn db.DB, ctx context.Context) {
 		Set("amount", 100).
 		Set("type", "transfer").
 		Set("timestamp", "NOW()").
-		Exec()
+		Exec(ctx)
 	if err != nil {
 		log.Printf("  Error at step 3: %v. Rolling back...", err)
 		_ = tx.Rollback(ctx)
@@ -216,13 +216,13 @@ func nestedOperations(conn db.DB, ctx context.Context) {
 		return
 	}
 
-	fdb := db.NewFluentDB(tx, ctx)
+	fdb := db.NewFluentDB(tx)
 
 	// Step 1: Check if user exists
 	fmt.Println("  Step 1: Checking if user exists...")
 	rows, err := fdb.Select("users", "id", "email").
 		Where(cdt.NewExpr().Column("email").Op("=").Value("batch@example.com")).
-		Get()
+		Get(ctx)
 	if err != nil {
 		log.Printf("  Error checking user: %v", err)
 		_ = tx.Rollback(ctx)
@@ -236,7 +236,7 @@ func nestedOperations(conn db.DB, ctx context.Context) {
 			Set("email", "batch@example.com").
 			Set("name", "Batch User").
 			Set("active", true).
-			Exec()
+			Exec(ctx)
 		if err != nil {
 			log.Printf("  Error creating user: %v", err)
 			_ = tx.Rollback(ctx)
@@ -246,7 +246,7 @@ func nestedOperations(conn db.DB, ctx context.Context) {
 		// Get newly created user ID
 		newRows, err := fdb.Select("users", "id").
 			Where(cdt.NewExpr().Column("email").Op("=").Value("batch@example.com")).
-			One()
+			One(ctx)
 		if err != nil {
 			log.Printf("  Error fetching new user: %v", err)
 			_ = tx.Rollback(ctx)
@@ -263,7 +263,7 @@ func nestedOperations(conn db.DB, ctx context.Context) {
 		_, err = fdb.Update("users").
 			Set("last_login", "NOW()").
 			Where(cdt.NewExpr().Column("id").Op("=").Value(userID)).
-			Exec()
+			Exec(ctx)
 		if err != nil {
 			log.Printf("  Error updating user: %v", err)
 			_ = tx.Rollback(ctx)
@@ -277,7 +277,7 @@ func nestedOperations(conn db.DB, ctx context.Context) {
 		From("audit_logs").
 		Where(cdt.NewExpr().Column("created_at").Op("<").Value("2023-01-01")).
 		Limit(10000).
-		Exec()
+		Exec(ctx)
 	if err != nil {
 		log.Printf("  Error deleting old records: %v", err)
 		_ = tx.Rollback(ctx)

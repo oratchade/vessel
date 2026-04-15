@@ -54,7 +54,7 @@ func (it *IntegrationTest) cleanup() error {
 
 // clearTable removes all records from a table
 func (it *IntegrationTest) clearTable(t *testing.T, table string) {
-	_, err := v1.NewFluentDB(it.db, it.ctx).Delete().From(table).Where(cdt.NewExpr().Column("id").Op(">").Value(0)).Exec()
+	_, err := v1.NewFluentDB(it.db).Delete().From(table).Where(cdt.NewExpr().Column("id").Op(">").Value(0)).Exec(it.ctx)
 	require.NoError(t, err, "failed to clear table %s", table)
 }
 
@@ -67,17 +67,17 @@ func TestFluentDBSelectBasic(t *testing.T) {
 	it.clearTable(t, "users")
 
 	// Insert test data
-	result, err := v1.NewFluentDB(it.db, it.ctx).Insert().
+	result, err := v1.NewFluentDB(it.db).Insert().
 		Into("users").
 		Set("name", "John Doe").
 		Set("email", "john@example.com").
 		Set("age", 30).
-		Exec()
+		Exec(it.ctx)
 	require.NoError(t, err)
 	require.NotNil(t, result)
 
 	// Test SELECT all columns
-	rows, err := v1.NewFluentDB(it.db, it.ctx).Select("users").Get()
+	rows, err := v1.NewFluentDB(it.db).Select("users").Get(it.ctx)
 	require.NoError(t, err)
 	assert.Len(t, rows, 1)
 	assert.Equal(t, "John Doe", rows[0]["name"])
@@ -94,34 +94,34 @@ func TestFluentDBSelectWithWhere(t *testing.T) {
 
 	// Insert multiple test users
 	for i, name := range []string{"Alice", "Bob", "Charlie"} {
-		_, err := v1.NewFluentDB(it.db, it.ctx).Insert().
+		_, err := v1.NewFluentDB(it.db).Insert().
 			Into("users").
 			Set("name", name).
 			Set("email", name+"@example.com").
 			Set("age", 25+i).
-			Exec()
+			Exec(it.ctx)
 		require.NoError(t, err)
 	}
 
 	// Test SELECT with WHERE condition
-	rows, err := v1.NewFluentDB(it.db, it.ctx).
+	rows, err := v1.NewFluentDB(it.db).
 		Select("users", "name", "age").
 		Where(cdt.NewExpr().Column("age").Op(">").Value(25)).
-		Get()
+		Get(it.ctx)
 	require.NoError(t, err)
 	assert.Len(t, rows, 2) // Bob (26) and Charlie (27)
 
 	// Test SELECT with exact match
-	rows, err = v1.NewFluentDB(it.db, it.ctx).
+	rows, err = v1.NewFluentDB(it.db).
 		Select("users", "name", "email").
 		Where(cdt.NewExpr().Column("name").Op("=").Value("Alice")).
-		Get()
+		Get(it.ctx)
 	require.NoError(t, err)
 	assert.Len(t, rows, 1)
 	assert.Equal(t, "Alice", rows[0]["name"])
 }
 
-// TestFluentDBSelectOne tests One() method
+// TestFluentDBSelectOne tests One(it.ctx) method
 func TestFluentDBSelectOne(t *testing.T) {
 	it := setupIntegration(t)
 	defer it.cleanup()
@@ -130,33 +130,33 @@ func TestFluentDBSelectOne(t *testing.T) {
 	it.clearTable(t, "users")
 
 	// Insert test data
-	_, err := v1.NewFluentDB(it.db, it.ctx).Insert().
+	_, err := v1.NewFluentDB(it.db).Insert().
 		Into("users").
 		Set("name", "Test User").
 		Set("email", "test@example.com").
 		Set("age", 35).
-		Exec()
+		Exec(it.ctx)
 	require.NoError(t, err)
 
-	// Test One() returns single row
-	row, err := v1.NewFluentDB(it.db, it.ctx).
+	// Test One(it.ctx) returns single row
+	row, err := v1.NewFluentDB(it.db).
 		Select("users").
 		Where(cdt.NewExpr().Column("name").Op("=").Value("Test User")).
-		One()
+		One(it.ctx)
 	require.NoError(t, err)
 	assert.NotNil(t, row)
 	assert.Equal(t, "Test User", row["name"])
 
-	// Test One() with no results returns error
-	_, err = v1.NewFluentDB(it.db, it.ctx).
+	// Test One(it.ctx) with no results returns error
+	_, err = v1.NewFluentDB(it.db).
 		Select("users").
 		Where(cdt.NewExpr().Column("name").Op("=").Value("NonExistent")).
-		One()
+		One(it.ctx)
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "no rows found")
 }
 
-// TestFluentDBSelectCount tests Count() method
+// TestFluentDBSelectCount tests Count(it.ctx) method
 func TestFluentDBSelectCount(t *testing.T) {
 	it := setupIntegration(t)
 	defer it.cleanup()
@@ -166,25 +166,25 @@ func TestFluentDBSelectCount(t *testing.T) {
 
 	// Insert multiple users
 	for i := 0; i < 5; i++ {
-		_, err := v1.NewFluentDB(it.db, it.ctx).Insert().
+		_, err := v1.NewFluentDB(it.db).Insert().
 			Into("users").
 			Set("name", "User "+string(rune('A'+i))).
 			Set("email", string(rune('a'+i))+"@example.com").
 			Set("age", 20+i).
-			Exec()
+			Exec(it.ctx)
 		require.NoError(t, err)
 	}
 
 	// Test COUNT all rows
-	count, err := v1.NewFluentDB(it.db, it.ctx).Select("users").Count()
+	count, err := v1.NewFluentDB(it.db).Select("users").Count(it.ctx)
 	require.NoError(t, err)
 	assert.Equal(t, int64(5), count)
 
 	// Test COUNT with WHERE condition
-	count, err = v1.NewFluentDB(it.db, it.ctx).
+	count, err = v1.NewFluentDB(it.db).
 		Select("users").
 		Where(cdt.NewExpr().Column("age").Op(">=").Value(23)).
-		Count()
+		Count(it.ctx)
 	require.NoError(t, err)
 	assert.Equal(t, int64(2), count) // Users with age 23, 24, 25
 }
@@ -200,20 +200,20 @@ func TestFluentDBSelectOrderBy(t *testing.T) {
 	// Insert users in random order
 	names := []string{"Charlie", "Alice", "Bob"}
 	for i, name := range names {
-		_, err := v1.NewFluentDB(it.db, it.ctx).Insert().
+		_, err := v1.NewFluentDB(it.db).Insert().
 			Into("users").
 			Set("name", name).
 			Set("email", name+"@example.com").
 			Set("age", 30-i).
-			Exec()
+			Exec(it.ctx)
 		require.NoError(t, err)
 	}
 
 	// Test ORDER BY ASC
-	rows, err := v1.NewFluentDB(it.db, it.ctx).
+	rows, err := v1.NewFluentDB(it.db).
 		Select("users", "name").
 		OrderBy("name", "ASC").
-		Get()
+		Get(it.ctx)
 	require.NoError(t, err)
 	assert.Len(t, rows, 3)
 	assert.Equal(t, "Alice", rows[0]["name"])
@@ -221,10 +221,10 @@ func TestFluentDBSelectOrderBy(t *testing.T) {
 	assert.Equal(t, "Charlie", rows[2]["name"])
 
 	// Test ORDER BY DESC
-	rows, err = v1.NewFluentDB(it.db, it.ctx).
+	rows, err = v1.NewFluentDB(it.db).
 		Select("users", "name").
 		OrderBy("name", "DESC").
-		Get()
+		Get(it.ctx)
 	require.NoError(t, err)
 	assert.Equal(t, "Charlie", rows[0]["name"])
 	assert.Equal(t, "Bob", rows[1]["name"])
@@ -241,31 +241,31 @@ func TestFluentDBSelectLimitOffset(t *testing.T) {
 
 	// Insert 10 users
 	for i := 0; i < 10; i++ {
-		_, err := v1.NewFluentDB(it.db, it.ctx).Insert().
+		_, err := v1.NewFluentDB(it.db).Insert().
 			Into("users").
 			Set("name", "User"+string(rune('A'+i))).
 			Set("email", string(rune('a'+i))+"@example.com").
 			Set("age", 20+i).
-			Exec()
+			Exec(it.ctx)
 		require.NoError(t, err)
 	}
 
 	// Test LIMIT only
-	rows, err := v1.NewFluentDB(it.db, it.ctx).
+	rows, err := v1.NewFluentDB(it.db).
 		Select("users", "name").
 		OrderBy("id", "ASC").
 		Limit(3).
-		Get()
+		Get(it.ctx)
 	require.NoError(t, err)
 	assert.Len(t, rows, 3)
 
 	// Test LIMIT with OFFSET
-	rows, err = v1.NewFluentDB(it.db, it.ctx).
+	rows, err = v1.NewFluentDB(it.db).
 		Select("users", "name").
 		OrderBy("id", "ASC").
 		Limit(3).
 		Offset(3).
-		Get()
+		Get(it.ctx)
 	require.NoError(t, err)
 	assert.Len(t, rows, 3)
 	// Verify we got different users (offset worked)
@@ -281,7 +281,7 @@ func TestFluentDBInsertSingle(t *testing.T) {
 	it.clearTable(t, "users")
 
 	// Test INSERT with Values()
-	result, err := v1.NewFluentDB(it.db, it.ctx).
+	result, err := v1.NewFluentDB(it.db).
 		Insert().
 		Into("users").
 		Values(map[string]any{
@@ -289,13 +289,13 @@ func TestFluentDBInsertSingle(t *testing.T) {
 			"email": "john@example.com",
 			"age":   30,
 		}).
-		Exec()
+		Exec(it.ctx)
 	require.NoError(t, err)
 	assert.NotNil(t, result)
 	assert.Equal(t, int64(1), result.RowsAffected)
 
 	// Verify data was inserted
-	rows, err := v1.NewFluentDB(it.db, it.ctx).Select("users").Get()
+	rows, err := v1.NewFluentDB(it.db).Select("users").Get(it.ctx)
 	require.NoError(t, err)
 	assert.Len(t, rows, 1)
 }
@@ -315,16 +315,16 @@ func TestFluentDBInsertBulk(t *testing.T) {
 		{"name": "Charlie", "email": "charlie.a@example.com", "age": 35},
 	}
 
-	result, err := v1.NewFluentDB(it.db, it.ctx).
+	result, err := v1.NewFluentDB(it.db).
 		Insert().
 		Into("users").
 		ValuesBulk(bulkData).
-		Exec()
+		Exec(it.ctx)
 	require.NoError(t, err)
 	assert.Equal(t, int64(3), result.RowsAffected)
 
 	// Verify all records were inserted
-	count, err := v1.NewFluentDB(it.db, it.ctx).Select("users").Count()
+	count, err := v1.NewFluentDB(it.db).Select("users").Count(it.ctx)
 	require.NoError(t, err)
 	assert.Equal(t, int64(3), count)
 }
@@ -338,21 +338,21 @@ func TestFluentDBInsertWithSet(t *testing.T) {
 	it.clearTable(t, "users")
 
 	// Test INSERT with multiple Set() calls
-	result, err := v1.NewFluentDB(it.db, it.ctx).
+	result, err := v1.NewFluentDB(it.db).
 		Insert().
 		Into("users").
 		Set("name", "Test User").
 		Set("email", "test@example.com").
 		Set("age", 25).
 		Set("status", "active").
-		Exec()
+		Exec(it.ctx)
 	require.NoError(t, err)
 	assert.Equal(t, int64(1), result.RowsAffected)
 
 	// Verify all fields were set
-	row, err := v1.NewFluentDB(it.db, it.ctx).
+	row, err := v1.NewFluentDB(it.db).
 		Select("users", "name", "email", "age", "status").
-		One()
+		One(it.ctx)
 	require.NoError(t, err)
 	assert.Equal(t, "Test User", row["name"])
 	assert.Equal(t, "test@example.com", row["email"])
@@ -369,30 +369,30 @@ func TestFluentDBUpdateBasic(t *testing.T) {
 	it.clearTable(t, "users")
 
 	// Insert test data
-	_, err := v1.NewFluentDB(it.db, it.ctx).
+	_, err := v1.NewFluentDB(it.db).
 		Insert().
 		Into("users").
 		Set("name", "John Doe").
 		Set("email", "john@example.com").
 		Set("age", 30).
-		Exec()
+		Exec(it.ctx)
 	require.NoError(t, err)
 
 	// Test UPDATE
-	result, err := v1.NewFluentDB(it.db, it.ctx).
+	result, err := v1.NewFluentDB(it.db).
 		Update("users").
 		Set("age", 31).
 		Set("status", "inactive").
 		Where(cdt.NewExpr().Column("name").Op("=").Value("John Doe")).
-		Exec()
+		Exec(it.ctx)
 	require.NoError(t, err)
 	assert.Equal(t, int64(1), result.RowsAffected)
 
 	// Verify update
-	row, err := v1.NewFluentDB(it.db, it.ctx).
+	row, err := v1.NewFluentDB(it.db).
 		Select("users", "age", "status").
 		Where(cdt.NewExpr().Column("name").Op("=").Value("John Doe")).
-		One()
+		One(it.ctx)
 	require.NoError(t, err)
 	assert.Equal(t, int32(31), row["age"])
 	assert.Equal(t, "inactive", row["status"])
@@ -408,31 +408,31 @@ func TestFluentDBUpdateMultiple(t *testing.T) {
 
 	// Insert multiple users
 	for i := 0; i < 5; i++ {
-		_, err := v1.NewFluentDB(it.db, it.ctx).
+		_, err := v1.NewFluentDB(it.db).
 			Insert().
 			Into("users").
 			Set("name", "User"+string(rune('A'+i))).
 			Set("email", string(rune('a'+i))+"@example.com").
 			Set("age", 20+i).
 			Set("status", "active").
-			Exec()
+			Exec(it.ctx)
 		require.NoError(t, err)
 	}
 
 	// Update multiple records
-	result, err := v1.NewFluentDB(it.db, it.ctx).
+	result, err := v1.NewFluentDB(it.db).
 		Update("users").
 		Set("status", "inactive").
 		Where(cdt.NewExpr().Column("age").Op(">").Value(21)).
-		Exec()
+		Exec(it.ctx)
 	require.NoError(t, err)
 	assert.Greater(t, result.RowsAffected, int64(1))
 
 	// Verify updates
-	count, err := v1.NewFluentDB(it.db, it.ctx).
+	count, err := v1.NewFluentDB(it.db).
 		Select("users").
 		Where(cdt.NewExpr().Column("status").Op("=").Value("inactive")).
-		Count()
+		Count(it.ctx)
 	require.NoError(t, err)
 	assert.Greater(t, count, int64(1))
 }
@@ -446,42 +446,42 @@ func TestFluentDBDeleteBasic(t *testing.T) {
 	it.clearTable(t, "users")
 
 	// Insert test data
-	_, err := v1.NewFluentDB(it.db, it.ctx).
+	_, err := v1.NewFluentDB(it.db).
 		Insert().
 		Into("users").
 		Set("name", "John Doe").
 		Set("email", "john@example.com").
-		Exec()
+		Exec(it.ctx)
 	require.NoError(t, err)
 
 	// Insert another user to ensure we only delete the right one
-	_, err = v1.NewFluentDB(it.db, it.ctx).
+	_, err = v1.NewFluentDB(it.db).
 		Insert().
 		Into("users").
 		Set("name", "Jane Doe").
 		Set("email", "jane@example.com").
-		Exec()
+		Exec(it.ctx)
 	require.NoError(t, err)
 
 	// Test DELETE
-	result, err := v1.NewFluentDB(it.db, it.ctx).
+	result, err := v1.NewFluentDB(it.db).
 		Delete().
 		From("users").
 		Where(cdt.NewExpr().Column("name").Op("=").Value("John Doe")).
-		Exec()
+		Exec(it.ctx)
 	require.NoError(t, err)
 	assert.Equal(t, int64(1), result.RowsAffected)
 
 	// Verify deletion
-	count, err := v1.NewFluentDB(it.db, it.ctx).
+	count, err := v1.NewFluentDB(it.db).
 		Select("users").
 		Where(cdt.NewExpr().Column("name").Op("=").Value("John Doe")).
-		Count()
+		Count(it.ctx)
 	require.NoError(t, err)
 	assert.Equal(t, int64(0), count)
 
 	// Verify other row still exists
-	count, err = v1.NewFluentDB(it.db, it.ctx).Select("users").Count()
+	count, err = v1.NewFluentDB(it.db).Select("users").Count(it.ctx)
 	require.NoError(t, err)
 	assert.Equal(t, int64(1), count)
 }
@@ -496,27 +496,27 @@ func TestFluentDBDeleteMultiple(t *testing.T) {
 
 	// Insert multiple users
 	for i := 0; i < 5; i++ {
-		_, err := v1.NewFluentDB(it.db, it.ctx).
+		_, err := v1.NewFluentDB(it.db).
 			Insert().
 			Into("users").
 			Set("name", "User"+string(rune('A'+i))).
 			Set("email", string(rune('a'+i))+"@example.com").
 			Set("age", 20+i).
-			Exec()
+			Exec(it.ctx)
 		require.NoError(t, err)
 	}
 
 	// Delete multiple records
-	result, err := v1.NewFluentDB(it.db, it.ctx).
+	result, err := v1.NewFluentDB(it.db).
 		Delete().
 		From("users").
 		Where(cdt.NewExpr().Column("age").Op("<").Value(23)).
-		Exec()
+		Exec(it.ctx)
 	require.NoError(t, err)
 	assert.Greater(t, result.RowsAffected, int64(0))
 
 	// Verify remaining records
-	count, err := v1.NewFluentDB(it.db, it.ctx).Select("users").Count()
+	count, err := v1.NewFluentDB(it.db).Select("users").Count(it.ctx)
 	require.NoError(t, err)
 	assert.Less(t, count, int64(5))
 }
@@ -534,13 +534,13 @@ func TestFluentDBTransactionCommit(t *testing.T) {
 	require.NoError(t, err)
 
 	// Insert within transaction
-	result, err := v1.NewFluentDB(it.db, it.ctx).
+	result, err := v1.NewFluentDB(it.db).
 		Insert().
 		Into("users").
 		WithTx(tx).
 		Set("name", "TX User 1").
 		Set("email", "tx1@example.com").
-		Exec()
+		Exec(it.ctx)
 	require.NoError(t, err)
 	assert.Equal(t, int64(1), result.RowsAffected)
 
@@ -549,7 +549,7 @@ func TestFluentDBTransactionCommit(t *testing.T) {
 	require.NoError(t, err)
 
 	// Verify data was committed
-	count, err := v1.NewFluentDB(it.db, it.ctx).Select("users").Count()
+	count, err := v1.NewFluentDB(it.db).Select("users").Count(it.ctx)
 	require.NoError(t, err)
 	assert.Equal(t, int64(1), count)
 }
@@ -563,12 +563,12 @@ func TestFluentDBTransactionRollback(t *testing.T) {
 	it.clearTable(t, "users")
 
 	// Insert outside transaction
-	_, err := v1.NewFluentDB(it.db, it.ctx).
+	_, err := v1.NewFluentDB(it.db).
 		Insert().
 		Into("users").
 		Set("name", "Before TX").
 		Set("email", "before@example.com").
-		Exec()
+		Exec(it.ctx)
 	require.NoError(t, err)
 
 	// Create a transaction and rollback
@@ -576,13 +576,13 @@ func TestFluentDBTransactionRollback(t *testing.T) {
 	require.NoError(t, err)
 
 	// Insert within transaction
-	_, err = v1.NewFluentDB(it.db, it.ctx).
+	_, err = v1.NewFluentDB(it.db).
 		Insert().
 		Into("users").
 		WithTx(tx).
 		Set("name", "TX User Rollback").
 		Set("email", "txrollback@example.com").
-		Exec()
+		Exec(it.ctx)
 	require.NoError(t, err)
 
 	// Rollback transaction
@@ -590,11 +590,11 @@ func TestFluentDBTransactionRollback(t *testing.T) {
 	require.NoError(t, err)
 
 	// Verify only original data exists
-	count, err := v1.NewFluentDB(it.db, it.ctx).Select("users").Count()
+	count, err := v1.NewFluentDB(it.db).Select("users").Count(it.ctx)
 	require.NoError(t, err)
 	assert.Equal(t, int64(1), count)
 
-	row, err := v1.NewFluentDB(it.db, it.ctx).Select("users").One()
+	row, err := v1.NewFluentDB(it.db).Select("users").One(it.ctx)
 	require.NoError(t, err)
 	assert.Equal(t, "Before TX", row["name"])
 }
@@ -613,20 +613,20 @@ func TestFluentDBTransactionNested(t *testing.T) {
 	require.NoError(t, err)
 
 	// Insert user
-	_, err = v1.NewFluentDB(it.db, it.ctx).
+	_, err = v1.NewFluentDB(it.db).
 		Insert().
 		Into("users").
 		WithTx(tx).
 		Set("name", "Blog Author").
 		Set("email", "author@example.com").
-		Exec()
+		Exec(it.ctx)
 	require.NoError(t, err)
 
-	userRow, err := v1.NewFluentDB(it.db, it.ctx).
+	userRow, err := v1.NewFluentDB(it.db).
 		Select("users", "id").
 		WithTx(tx).
 		Where(cdt.NewExpr().Column("email").Op("=").Value("author@example.com")).
-		One()
+		One(it.ctx)
 	require.NoError(t, err)
 	userID := userRow["id"]
 
@@ -636,12 +636,12 @@ func TestFluentDBTransactionNested(t *testing.T) {
 		{"user_id": userID, "title": "Post 2", "content": "Content 2", "published": true},
 	}
 
-	postResult, err := v1.NewFluentDB(it.db, it.ctx).
+	postResult, err := v1.NewFluentDB(it.db).
 		Insert().
 		Into("posts").
 		WithTx(tx).
 		ValuesBulk(postsToInsert).
-		Exec()
+		Exec(it.ctx)
 	require.NoError(t, err)
 	assert.Equal(t, int64(2), postResult.RowsAffected)
 
@@ -650,11 +650,11 @@ func TestFluentDBTransactionNested(t *testing.T) {
 	require.NoError(t, err)
 
 	// Verify all data was committed
-	userCount, err := v1.NewFluentDB(it.db, it.ctx).Select("users").Count()
+	userCount, err := v1.NewFluentDB(it.db).Select("users").Count(it.ctx)
 	require.NoError(t, err)
 	assert.Equal(t, int64(1), userCount)
 
-	postCount, err := v1.NewFluentDB(it.db, it.ctx).Select("posts").Count()
+	postCount, err := v1.NewFluentDB(it.db).Select("posts").Count(it.ctx)
 	require.NoError(t, err)
 	assert.Equal(t, int64(2), postCount)
 }
@@ -672,23 +672,23 @@ func TestFluentDBTransactionErrorHandling(t *testing.T) {
 	require.NoError(t, err)
 
 	// Insert first user
-	_, err = v1.NewFluentDB(it.db, it.ctx).
+	_, err = v1.NewFluentDB(it.db).
 		Insert().
 		Into("users").
 		WithTx(tx).
 		Set("name", "User 1").
 		Set("email", "user1@example.com").
-		Exec()
+		Exec(it.ctx)
 	require.NoError(t, err)
 
 	// Simulate error by trying to insert duplicate email (unique constraint)
-	_, err = v1.NewFluentDB(it.db, it.ctx).
+	_, err = v1.NewFluentDB(it.db).
 		Insert().
 		Into("users").
 		WithTx(tx).
 		Set("name", "User 2").
 		Set("email", "user1@example.com"). // Duplicate email
-		Exec()
+		Exec(it.ctx)
 	assert.Error(t, err) // Expected error
 
 	// Rollback transaction
@@ -696,7 +696,7 @@ func TestFluentDBTransactionErrorHandling(t *testing.T) {
 	// Rollback should succeed even after error
 
 	// Verify no users were inserted (entire transaction rolled back)
-	count, err := v1.NewFluentDB(it.db, it.ctx).Select("users").Count()
+	count, err := v1.NewFluentDB(it.db).Select("users").Count(it.ctx)
 	require.NoError(t, err)
 	assert.Equal(t, int64(0), count)
 }
@@ -711,30 +711,30 @@ func TestFluentDBSelectWithJoin(t *testing.T) {
 	it.clearTable(t, "users")
 
 	// Insert user
-	_, err := v1.NewFluentDB(it.db, it.ctx).
+	_, err := v1.NewFluentDB(it.db).
 		Insert().
 		Into("users").
 		Set("name", "John Doe").
 		Set("email", "john@example.com").
-		Exec()
+		Exec(it.ctx)
 	require.NoError(t, err)
 
-	userRow, err := v1.NewFluentDB(it.db, it.ctx).
+	userRow, err := v1.NewFluentDB(it.db).
 		Select("users", "id").
 		Where(cdt.NewExpr().Column("email").Op("=").Value("john@example.com")).
-		One()
+		One(it.ctx)
 	require.NoError(t, err)
 	userID := userRow["id"]
 
 	// Insert posts
-	_, err = v1.NewFluentDB(it.db, it.ctx).
+	_, err = v1.NewFluentDB(it.db).
 		Insert().
 		Into("posts").
 		ValuesBulk([]map[string]any{
 			{"user_id": userID, "title": "Post 1", "published": true},
 			{"user_id": userID, "title": "Post 2", "published": true},
 		}).
-		Exec()
+		Exec(it.ctx)
 	require.NoError(t, err)
 
 	// Test SELECT with JOIN
@@ -744,10 +744,10 @@ func TestFluentDBSelectWithJoin(t *testing.T) {
 		Conditions: cdt.JoinCdts{{Left: "id", Right: "user_id"}},
 	}
 
-	rows, err := v1.NewFluentDB(it.db, it.ctx).
+	rows, err := v1.NewFluentDB(it.db).
 		Select("users", "users.name", "posts.title").
 		Join(join).
-		Get()
+		Get(it.ctx)
 	require.NoError(t, err)
 	assert.Len(t, rows, 2) // Two posts from one user
 }
@@ -764,32 +764,32 @@ func TestFluentDBConcurrentOperations(t *testing.T) {
 	done := make(chan error, 3)
 
 	go func() {
-		_, err := v1.NewFluentDB(it.db, it.ctx).
+		_, err := v1.NewFluentDB(it.db).
 			Insert().
 			Into("users").
 			Set("name", "User A").
 			Set("email", "usera@example.com").
-			Exec()
+			Exec(it.ctx)
 		done <- err
 	}()
 
 	go func() {
-		_, err := v1.NewFluentDB(it.db, it.ctx).
+		_, err := v1.NewFluentDB(it.db).
 			Insert().
 			Into("users").
 			Set("name", "User B").
 			Set("email", "userb@example.com").
-			Exec()
+			Exec(it.ctx)
 		done <- err
 	}()
 
 	go func() {
-		_, err := v1.NewFluentDB(it.db, it.ctx).
+		_, err := v1.NewFluentDB(it.db).
 			Insert().
 			Into("users").
 			Set("name", "User C").
 			Set("email", "userc@example.com").
-			Exec()
+			Exec(it.ctx)
 		done <- err
 	}()
 
@@ -800,7 +800,7 @@ func TestFluentDBConcurrentOperations(t *testing.T) {
 	}
 
 	// Verify all were inserted
-	count, err := v1.NewFluentDB(it.db, it.ctx).Select("users").Count()
+	count, err := v1.NewFluentDB(it.db).Select("users").Count(it.ctx)
 	require.NoError(t, err)
 	assert.Equal(t, int64(3), count)
 }
@@ -822,20 +822,20 @@ func TestFluentDBSelectWithMultipleConditions(t *testing.T) {
 	}
 
 	for _, user := range testUsers {
-		_, err := v1.NewFluentDB(it.db, it.ctx).
+		_, err := v1.NewFluentDB(it.db).
 			Insert().
 			Into("users").
 			Values(user).
-			Exec()
+			Exec(it.ctx)
 		require.NoError(t, err)
 	}
 
 	// Test multiple conditions (age > 25 AND status = 'active')
-	rows, err := v1.NewFluentDB(it.db, it.ctx).
+	rows, err := v1.NewFluentDB(it.db).
 		Select("users", "name", "age").
 		Where(cdt.NewExpr().Column("age").Op(">").Value(25)).
 		Where(cdt.NewExpr().Column("status").Op("=").Value("active")).
-		Get()
+		Get(it.ctx)
 	require.NoError(t, err)
 
 	// Should return Bob (30) and Diana (28), but not Alice (25)
@@ -858,14 +858,14 @@ func TestFluentDBUpdateWithSetMap(t *testing.T) {
 	it.clearTable(t, "users")
 
 	// Insert test data
-	_, err := v1.NewFluentDB(it.db, it.ctx).
+	_, err := v1.NewFluentDB(it.db).
 		Insert().
 		Into("users").
 		Set("name", "John Doe").
 		Set("email", "john@example.com").
 		Set("age", 30).
 		Set("status", "active").
-		Exec()
+		Exec(it.ctx)
 	require.NoError(t, err)
 
 	// Update with SetMap
@@ -875,19 +875,19 @@ func TestFluentDBUpdateWithSetMap(t *testing.T) {
 		"name":   "Jane Doe",
 	}
 
-	result, err := v1.NewFluentDB(it.db, it.ctx).
+	result, err := v1.NewFluentDB(it.db).
 		Update("users").
 		SetMap(dataMap).
 		Where(cdt.NewExpr().Column("email").Op("=").Value("john@example.com")).
-		Exec()
+		Exec(it.ctx)
 	require.NoError(t, err)
 	assert.Equal(t, int64(1), result.RowsAffected)
 
 	// Verify all fields were updated
-	row, err := v1.NewFluentDB(it.db, it.ctx).
+	row, err := v1.NewFluentDB(it.db).
 		Select("users").
 		Where(cdt.NewExpr().Column("email").Op("=").Value("john@example.com")).
-		One()
+		One(it.ctx)
 	require.NoError(t, err)
 	assert.Equal(t, "Jane Doe", row["name"])
 	assert.Equal(t, int32(31), row["age"])
@@ -904,35 +904,35 @@ func TestFluentDBComplexWorkflow(t *testing.T) {
 	it.clearTable(t, "users")
 
 	// 1. Create users
-	_, err := v1.NewFluentDB(it.db, it.ctx).
+	_, err := v1.NewFluentDB(it.db).
 		Insert().
 		Into("users").
 		Set("name", "Alice").
 		Set("email", "alice.n@example.com").
 		Set("age", 28).
-		Exec()
+		Exec(it.ctx)
 	require.NoError(t, err)
 
-	_, err = v1.NewFluentDB(it.db, it.ctx).
+	_, err = v1.NewFluentDB(it.db).
 		Insert().
 		Into("users").
 		Set("name", "Bob").
 		Set("email", "bob.j@example.com").
 		Set("age", 32).
-		Exec()
+		Exec(it.ctx)
 	require.NoError(t, err)
 
-	aliceRow, err := v1.NewFluentDB(it.db, it.ctx).
+	aliceRow, err := v1.NewFluentDB(it.db).
 		Select("users", "id").
 		Where(cdt.NewExpr().Column("email").Op("=").Value("alice.n@example.com")).
-		One()
+		One(it.ctx)
 	require.NoError(t, err)
 	aliceID := aliceRow["id"]
 
-	bobRow, err := v1.NewFluentDB(it.db, it.ctx).
+	bobRow, err := v1.NewFluentDB(it.db).
 		Select("users", "id").
 		Where(cdt.NewExpr().Column("email").Op("=").Value("bob.j@example.com")).
-		One()
+		One(it.ctx)
 	require.NoError(t, err)
 	bobID := bobRow["id"]
 
@@ -940,7 +940,7 @@ func TestFluentDBComplexWorkflow(t *testing.T) {
 	tx, err := it.db.Begin(it.ctx)
 	require.NoError(t, err)
 
-	_, err = v1.NewFluentDB(it.db, it.ctx).
+	_, err = v1.NewFluentDB(it.db).
 		Insert().
 		Into("posts").
 		WithTx(tx).
@@ -948,10 +948,10 @@ func TestFluentDBComplexWorkflow(t *testing.T) {
 		Set("title", "Alice's First Post").
 		Set("content", "Hello World").
 		Set("published", true).
-		Exec()
+		Exec(it.ctx)
 	require.NoError(t, err)
 
-	_, err = v1.NewFluentDB(it.db, it.ctx).
+	_, err = v1.NewFluentDB(it.db).
 		Insert().
 		Into("posts").
 		WithTx(tx).
@@ -959,52 +959,52 @@ func TestFluentDBComplexWorkflow(t *testing.T) {
 		Set("title", "Bob's Post").
 		Set("content", "Hello from Bob").
 		Set("published", false).
-		Exec()
+		Exec(it.ctx)
 	require.NoError(t, err)
 
 	err = tx.Commit(it.ctx)
 	require.NoError(t, err)
 
 	// 3. Query published posts
-	publishedPosts, err := v1.NewFluentDB(it.db, it.ctx).
+	publishedPosts, err := v1.NewFluentDB(it.db).
 		Select("posts", "title", "user_id").
 		Where(cdt.NewExpr().Column("published").Op("=").Value(true)).
-		Get()
+		Get(it.ctx)
 	require.NoError(t, err)
 	assert.Len(t, publishedPosts, 1)
 
 	// 4. Update user age
-	_, err = v1.NewFluentDB(it.db, it.ctx).
+	_, err = v1.NewFluentDB(it.db).
 		Update("users").
 		Set("age", 29).
 		Where(cdt.NewExpr().Column("name").Op("=").Value("Alice")).
-		Exec()
+		Exec(it.ctx)
 	require.NoError(t, err)
 
 	// 5. Verify final state
-	users, err := v1.NewFluentDB(it.db, it.ctx).
+	users, err := v1.NewFluentDB(it.db).
 		Select("users", "name", "age").
 		OrderBy("name", "ASC").
-		Get()
+		Get(it.ctx)
 	require.NoError(t, err)
 	assert.Len(t, users, 2)
 	assert.Equal(t, int32(29), users[0]["age"].(int32))
 
 	// 6. Delete unpublished posts
-	_, err = v1.NewFluentDB(it.db, it.ctx).
+	_, err = v1.NewFluentDB(it.db).
 		Delete().
 		From("posts").
 		Where(cdt.NewExpr().Column("published").Op("=").Value(false)).
-		Exec()
+		Exec(it.ctx)
 	require.NoError(t, err)
 
 	// 7. Verify deletion
-	postCount, err := v1.NewFluentDB(it.db, it.ctx).Select("posts").Count()
+	postCount, err := v1.NewFluentDB(it.db).Select("posts").Count(it.ctx)
 	require.NoError(t, err)
 	assert.Equal(t, int64(1), postCount)
 }
 
-// TestFluentDBSelectGetRaw tests GetRaw() returns a valid RowsAdapter
+// TestFluentDBSelectGetRaw tests GetRaw(it.ctx) returns a valid RowsAdapter
 func TestFluentDBSelectGetRaw(t *testing.T) {
 	it := setupIntegration(t)
 	defer it.cleanup()
@@ -1014,21 +1014,21 @@ func TestFluentDBSelectGetRaw(t *testing.T) {
 
 	// Insert multiple users
 	for i := 0; i < 10; i++ {
-		_, err := v1.NewFluentDB(it.db, it.ctx).
+		_, err := v1.NewFluentDB(it.db).
 			Insert().
 			Into("users").
 			Set("name", "User"+string(rune('A'+i))).
 			Set("email", string(rune('a'+i))+"@example.com").
-			Exec()
+			Exec(it.ctx)
 		require.NoError(t, err)
 	}
 
-	// Test GetRaw() returns a valid RowsAdapter
-	rows, err := v1.NewFluentDB(it.db, it.ctx).
+	// Test GetRaw(it.ctx) returns a valid RowsAdapter
+	rows, err := v1.NewFluentDB(it.db).
 		Select("users", "name", "email").
 		OrderBy("id", "ASC").
 		Limit(5).
-		GetRaw()
+		GetRaw(it.ctx)
 	require.NoError(t, err)
 	require.NotNil(t, rows)
 

@@ -21,9 +21,8 @@ func TestNewFluentDB(t *testing.T) {
 	defer ctrl.Finish()
 
 	db := v1.NewMockDBActions(ctrl)
-	ctx := context.Background()
 
-	fluentDB := v1.NewFluentDB(db, ctx)
+	fluentDB := v1.NewFluentDB(db)
 
 	assert.NotNil(t, fluentDB)
 }
@@ -34,8 +33,7 @@ func TestSelectBuilderInitialization(t *testing.T) {
 	defer ctrl.Finish()
 
 	db := v1.NewMockDBActions(ctrl)
-	ctx := context.Background()
-	fluentDB := v1.NewFluentDB(db, ctx)
+	fluentDB := v1.NewFluentDB(db)
 
 	testCases := []struct {
 		name    string
@@ -75,14 +73,14 @@ func TestSelectBuilderInitialization(t *testing.T) {
 			assert.NotNil(t, builder)
 
 			// Get the columns from the built query by checking the internal state
-			// We'll do this by attempting a Get() and observing the call
-			db.EXPECT().Get(ctx, tc.table, gomock.Any(), nil, nil, nil).
+			// We'll do this by attempting a Get(context.Background()) and observing the call
+			db.EXPECT().Get(context.Background(), tc.table, gomock.Any(), nil, nil, nil).
 				DoAndReturn(func(ctx context.Context, table string, cols []string, joins []cdt.Join, cond cdt.Condition, opts *options.QueryOptions) ([]map[string]any, error) { //nolint:lll
 					tc.check(t, cols)
 					return []map[string]any{}, nil
 				}).Times(1)
 
-			_, _ = builder.Get()
+			_, _ = builder.Get(context.Background())
 		})
 	}
 }
@@ -93,8 +91,7 @@ func TestSelectBuilderChaining(t *testing.T) {
 	defer ctrl.Finish()
 
 	db := v1.NewMockDBActions(ctrl)
-	ctx := context.Background()
-	fluentDB := v1.NewFluentDB(db, ctx)
+	fluentDB := v1.NewFluentDB(db)
 
 	builder := fluentDB.Select("users", "id", "name")
 
@@ -109,8 +106,7 @@ func TestSelectBuilderWhere(t *testing.T) {
 	defer ctrl.Finish()
 
 	db := v1.NewMockDBActions(ctrl)
-	ctx := context.Background()
-	fluentDB := v1.NewFluentDB(db, ctx)
+	fluentDB := v1.NewFluentDB(db)
 
 	testCases := []struct {
 		name       string
@@ -152,12 +148,12 @@ func TestSelectBuilderWhere(t *testing.T) {
 			}
 
 			if tc.expectCall {
-				db.EXPECT().Get(ctx, "users", gomock.Any(), nil, gomock.Any(), nil).
+				db.EXPECT().Get(context.Background(), "users", gomock.Any(), nil, gomock.Any(), nil).
 					DoAndReturn(func(ctx context.Context, table string, cols []string, joins []cdt.Join, cond cdt.Condition, opts *options.QueryOptions) ([]map[string]any, error) { //nolint:lll
 						tc.checkCond(t, cond)
 						return []map[string]any{}, nil
 					}).Times(1)
-				_, _ = builder.Get()
+				_, _ = builder.Get(context.Background())
 			}
 		})
 	}
@@ -169,8 +165,7 @@ func TestSelectBuilderJoins(t *testing.T) {
 	defer ctrl.Finish()
 
 	db := v1.NewMockDBActions(ctrl)
-	ctx := context.Background()
-	fluentDB := v1.NewFluentDB(db, ctx)
+	fluentDB := v1.NewFluentDB(db)
 
 	testCases := []struct {
 		name        string
@@ -207,13 +202,13 @@ func TestSelectBuilderJoins(t *testing.T) {
 				builder = builder.Joins(tc.joins)
 			}
 
-			db.EXPECT().Get(ctx, "users", gomock.Any(), gomock.Any(), nil, nil).
+			db.EXPECT().Get(context.Background(), "users", gomock.Any(), gomock.Any(), nil, nil).
 				DoAndReturn(func(ctx context.Context, table string, cols []string, joins []cdt.Join, cond cdt.Condition, opts *options.QueryOptions) ([]map[string]any, error) { //nolint:lll
 					assert.Len(t, joins, tc.expectCount)
 					return []map[string]any{}, nil
 				}).Times(1)
 
-			_, _ = builder.Get()
+			_, _ = builder.Get(context.Background())
 		})
 	}
 }
@@ -224,8 +219,7 @@ func TestSelectBuilderOrderBy(t *testing.T) {
 	defer ctrl.Finish()
 
 	db := v1.NewMockDBActions(ctrl)
-	ctx := context.Background()
-	fluentDB := v1.NewFluentDB(db, ctx)
+	fluentDB := v1.NewFluentDB(db)
 
 	testCases := []struct {
 		name            string
@@ -280,14 +274,14 @@ func TestSelectBuilderOrderBy(t *testing.T) {
 				builder = builder.OrderBy(o.col, o.dir)
 			}
 
-			db.EXPECT().Get(ctx, "users", gomock.Any(), nil, nil, gomock.Any()).
+			db.EXPECT().Get(context.Background(), "users", gomock.Any(), nil, nil, gomock.Any()).
 				DoAndReturn(func(ctx context.Context, table string, cols []string, joins []cdt.Join, cond cdt.Condition, opts *options.QueryOptions) ([]map[string]any, error) { //nolint:lll
 					assert.NotNil(t, opts)
 					assert.Equal(t, tc.expectedOrderBy, opts.OrderBy)
 					return []map[string]any{}, nil
 				}).Times(1)
 
-			_, _ = builder.Get()
+			_, _ = builder.Get(context.Background())
 		})
 	}
 }
@@ -298,8 +292,7 @@ func TestSelectBuilderLimitOffset(t *testing.T) {
 	defer ctrl.Finish()
 
 	db := v1.NewMockDBActions(ctrl)
-	ctx := context.Background()
-	fluentDB := v1.NewFluentDB(db, ctx)
+	fluentDB := v1.NewFluentDB(db)
 
 	testCases := []struct {
 		name           string
@@ -348,7 +341,7 @@ func TestSelectBuilderLimitOffset(t *testing.T) {
 				builder = builder.Offset(*tc.offset)
 			}
 
-			db.EXPECT().Get(ctx, "users", gomock.Any(), nil, nil, gomock.Any()).
+			db.EXPECT().Get(context.Background(), "users", gomock.Any(), nil, nil, gomock.Any()).
 				DoAndReturn(func(ctx context.Context, table string, cols []string, joins []cdt.Join, cond cdt.Condition, opts *options.QueryOptions) ([]map[string]any, error) { //nolint:lll
 					if tc.expectedLimit == nil {
 						if opts != nil {
@@ -369,7 +362,7 @@ func TestSelectBuilderLimitOffset(t *testing.T) {
 					return []map[string]any{}, nil
 				}).Times(1)
 
-			_, _ = builder.Get()
+			_, _ = builder.Get(context.Background())
 		})
 	}
 }
@@ -438,8 +431,7 @@ func TestSelectBuilderGet(t *testing.T) {
 	defer ctrl.Finish()
 
 	db := v1.NewMockDBActions(ctrl)
-	ctx := context.Background()
-	fluentDB := v1.NewFluentDB(db, ctx)
+	fluentDB := v1.NewFluentDB(db)
 
 	testCases := []struct {
 		name         string
@@ -488,12 +480,12 @@ func TestSelectBuilderGet(t *testing.T) {
 			builder := fluentDB.Select(tc.table, "id", "name")
 
 			if tc.table != "" {
-				db.EXPECT().Get(ctx, tc.table, gomock.Any(), nil, nil, nil).
+				db.EXPECT().Get(context.Background(), tc.table, gomock.Any(), nil, nil, nil).
 					Return(tc.mockReturn, tc.mockError).
 					Times(1)
 			}
 
-			rows, err := builder.Get()
+			rows, err := builder.Get(context.Background())
 
 			if tc.expectError {
 				assert.Error(t, err)
@@ -511,8 +503,7 @@ func TestSelectBuilderOne(t *testing.T) {
 	defer ctrl.Finish()
 
 	db := v1.NewMockDBActions(ctrl)
-	ctx := context.Background()
-	fluentDB := v1.NewFluentDB(db, ctx)
+	fluentDB := v1.NewFluentDB(db)
 
 	testCases := []struct {
 		name        string
@@ -561,12 +552,12 @@ func TestSelectBuilderOne(t *testing.T) {
 			builder := fluentDB.Select(tc.table, "id", "name")
 
 			if tc.table != "" {
-				db.EXPECT().Get(ctx, tc.table, gomock.Any(), nil, nil, gomock.Any()).
+				db.EXPECT().Get(context.Background(), tc.table, gomock.Any(), nil, nil, gomock.Any()).
 					Return(tc.mockReturn, tc.mockError).
 					Times(1)
 			}
 
-			row, err := builder.One()
+			row, err := builder.One(context.Background())
 
 			if tc.expectError {
 				assert.Error(t, err)
@@ -585,8 +576,7 @@ func TestSelectBuilderCount(t *testing.T) {
 	defer ctrl.Finish()
 
 	db := v1.NewMockDBActions(ctrl)
-	ctx := context.Background()
-	fluentDB := v1.NewFluentDB(db, ctx)
+	fluentDB := v1.NewFluentDB(db)
 
 	testCases := []struct {
 		name          string
@@ -651,12 +641,12 @@ func TestSelectBuilderCount(t *testing.T) {
 			builder := fluentDB.Select(tc.table)
 
 			if tc.table != "" {
-				db.EXPECT().Get(ctx, tc.table, gomock.Any(), nil, nil, nil).
+				db.EXPECT().Get(context.Background(), tc.table, gomock.Any(), nil, nil, nil).
 					Return(tc.mockReturn, tc.mockError).
 					Times(1)
 			}
 
-			count, err := builder.Count()
+			count, err := builder.Count(context.Background())
 
 			if tc.expectError {
 				assert.Error(t, err)
@@ -675,20 +665,19 @@ func TestSelectBuilderWithTx(t *testing.T) {
 
 	db := v1.NewMockDBActions(ctrl)
 	tx := v1.NewMockTx(ctrl)
-	ctx := context.Background()
-	fluentDB := v1.NewFluentDB(db, ctx)
+	fluentDB := v1.NewFluentDB(db)
 
 	builder := fluentDB.Select("users")
 	result := builder.WithTx(tx)
 
 	assert.Equal(t, builder, result)
 
-	// Verify that subsequent Get() call uses tx instead of db
-	tx.EXPECT().Get(ctx, "users", gomock.Any(), nil, nil, nil).
+	// Verify that subsequent Get(context.Background()) call uses tx instead of db
+	tx.EXPECT().Get(context.Background(), "users", gomock.Any(), nil, nil, nil).
 		Return([]map[string]any{}, nil).
 		Times(1)
 
-	_, _ = result.Get()
+	_, _ = result.Get(context.Background())
 }
 
 // TestInsertBuilderInitialization tests that Insert properly initializes InsertBuilder
@@ -697,8 +686,7 @@ func TestInsertBuilderInitialization(t *testing.T) {
 	defer ctrl.Finish()
 
 	db := v1.NewMockDBActions(ctrl)
-	ctx := context.Background()
-	fluentDB := v1.NewFluentDB(db, ctx)
+	fluentDB := v1.NewFluentDB(db)
 
 	builder := fluentDB.Insert()
 	assert.NotNil(t, builder)
@@ -710,8 +698,7 @@ func TestInsertBuilderChaining(t *testing.T) {
 	defer ctrl.Finish()
 
 	db := v1.NewMockDBActions(ctrl)
-	ctx := context.Background()
-	fluentDB := v1.NewFluentDB(db, ctx)
+	fluentDB := v1.NewFluentDB(db)
 
 	builder := fluentDB.Insert()
 	result := builder.Into("users").Set("name", "John").Set("age", 30)
@@ -724,8 +711,7 @@ func TestInsertBuilderInto(t *testing.T) {
 	defer ctrl.Finish()
 
 	db := v1.NewMockDBActions(ctrl)
-	ctx := context.Background()
-	fluentDB := v1.NewFluentDB(db, ctx)
+	fluentDB := v1.NewFluentDB(db)
 
 	testCases := []struct {
 		name  string
@@ -750,8 +736,7 @@ func TestInsertBuilderValues(t *testing.T) {
 	defer ctrl.Finish()
 
 	db := v1.NewMockDBActions(ctrl)
-	ctx := context.Background()
-	fluentDB := v1.NewFluentDB(db, ctx)
+	fluentDB := v1.NewFluentDB(db)
 
 	testCases := []struct {
 		name         string
@@ -774,7 +759,7 @@ func TestInsertBuilderValues(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			builder := fluentDB.Insert().Into("users").Values(tc.data)
 
-			db.EXPECT().Insert(ctx, "users", gomock.Any(), nil).
+			db.EXPECT().Insert(context.Background(), "users", gomock.Any(), nil).
 				DoAndReturn(func(ctx context.Context, table string, data map[string]any, opts *options.QueryOptions) (*v1.ExecResult, error) { //nolint:lll
 					assert.Equal(t, "John", data["name"])
 					if len(tc.expectedKeys) > 1 {
@@ -784,7 +769,7 @@ func TestInsertBuilderValues(t *testing.T) {
 					return &v1.ExecResult{RowsAffected: 1}, nil
 				}).Times(1)
 
-			_, _ = builder.Exec()
+			_, _ = builder.Exec(context.Background())
 		})
 	}
 }
@@ -795,8 +780,7 @@ func TestInsertBuilderSetMap(t *testing.T) {
 	defer ctrl.Finish()
 
 	db := v1.NewMockDBActions(ctrl)
-	ctx := context.Background()
-	fluentDB := v1.NewFluentDB(db, ctx)
+	fluentDB := v1.NewFluentDB(db)
 
 	dataMap := map[string]any{
 		"name":  "John",
@@ -806,7 +790,7 @@ func TestInsertBuilderSetMap(t *testing.T) {
 
 	builder := fluentDB.Insert().Into("users").SetMap(dataMap)
 
-	db.EXPECT().Insert(ctx, "users", gomock.Any(), nil).
+	db.EXPECT().Insert(context.Background(), "users", gomock.Any(), nil).
 		DoAndReturn(func(ctx context.Context, table string, data map[string]any, opts *options.QueryOptions) (*v1.ExecResult, error) { //nolint:lll
 			assert.Equal(t, "John", data["name"])
 			assert.Equal(t, 30, data["age"])
@@ -814,7 +798,7 @@ func TestInsertBuilderSetMap(t *testing.T) {
 			return &v1.ExecResult{RowsAffected: 1}, nil
 		}).Times(1)
 
-	_, _ = builder.Exec()
+	_, _ = builder.Exec(context.Background())
 }
 
 // TestInsertBuilderValuesBulk tests ValuesBulk method
@@ -823,8 +807,7 @@ func TestInsertBuilderValuesBulk(t *testing.T) {
 	defer ctrl.Finish()
 
 	db := v1.NewMockDBActions(ctrl)
-	ctx := context.Background()
-	fluentDB := v1.NewFluentDB(db, ctx)
+	fluentDB := v1.NewFluentDB(db)
 
 	data := []map[string]any{
 		{"name": "John", "age": 30},
@@ -834,7 +817,7 @@ func TestInsertBuilderValuesBulk(t *testing.T) {
 
 	builder := fluentDB.Insert().Into("users").ValuesBulk(data)
 
-	db.EXPECT().Inserts(ctx, "users", gomock.Any(), nil).
+	db.EXPECT().Inserts(context.Background(), "users", gomock.Any(), nil).
 		DoAndReturn(func(ctx context.Context, table string, bulkData []map[string]any, opts *options.QueryOptions) (*v1.ExecResult, error) { //nolint:lll
 			assert.Len(t, bulkData, 3)
 			assert.Equal(t, "John", bulkData[0]["name"])
@@ -843,7 +826,7 @@ func TestInsertBuilderValuesBulk(t *testing.T) {
 			return &v1.ExecResult{RowsAffected: 3}, nil
 		}).Times(1)
 
-	_, _ = builder.Exec()
+	_, _ = builder.Exec(context.Background())
 }
 
 // TestInsertBuilderExec tests Exec execution
@@ -852,8 +835,7 @@ func TestInsertBuilderExec(t *testing.T) {
 	defer ctrl.Finish()
 
 	db := v1.NewMockDBActions(ctrl)
-	ctx := context.Background()
-	fluentDB := v1.NewFluentDB(db, ctx)
+	fluentDB := v1.NewFluentDB(db)
 
 	testCases := []struct {
 		name          string
@@ -868,7 +850,7 @@ func TestInsertBuilderExec(t *testing.T) {
 				return b.Into("users").Set("name", "John")
 			},
 			mockSetup: func() {
-				db.EXPECT().Insert(ctx, "users", gomock.Any(), nil).
+				db.EXPECT().Insert(context.Background(), "users", gomock.Any(), nil).
 					Return(&v1.ExecResult{RowsAffected: 1}, nil).
 					Times(1)
 			},
@@ -898,7 +880,7 @@ func TestInsertBuilderExec(t *testing.T) {
 				return b.Into("users").Set("name", "John")
 			},
 			mockSetup: func() {
-				db.EXPECT().Insert(ctx, "users", gomock.Any(), nil).
+				db.EXPECT().Insert(context.Background(), "users", gomock.Any(), nil).
 					Return(nil, errors.New("insert failed")).
 					Times(1)
 			},
@@ -910,7 +892,7 @@ func TestInsertBuilderExec(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			tc.mockSetup()
 			builder := tc.setup(fluentDB.Insert())
-			result, err := builder.Exec()
+			result, err := builder.Exec(context.Background())
 
 			if tc.expectError {
 				assert.Error(t, err)
@@ -933,20 +915,19 @@ func TestInsertBuilderWithTx(t *testing.T) {
 
 	db := v1.NewMockDBActions(ctrl)
 	tx := v1.NewMockTx(ctrl)
-	ctx := context.Background()
-	fluentDB := v1.NewFluentDB(db, ctx)
+	fluentDB := v1.NewFluentDB(db)
 
 	builder := fluentDB.Insert()
 	result := builder.WithTx(tx)
 
 	assert.Equal(t, builder, result)
 
-	// Verify that subsequent Exec() call uses tx instead of db
-	tx.EXPECT().Insert(ctx, "users", gomock.Any(), nil).
+	// Verify that subsequent Exec(context.Background()) call uses tx instead of db
+	tx.EXPECT().Insert(context.Background(), "users", gomock.Any(), nil).
 		Return(&v1.ExecResult{RowsAffected: 1}, nil).
 		Times(1)
 
-	_, _ = result.Into("users").Set("name", "John").Exec()
+	_, _ = result.Into("users").Set("name", "John").Exec(context.Background())
 }
 
 // TestUpdateBuilderInitialization tests that Update properly initializes UpdateBuilder
@@ -955,8 +936,7 @@ func TestUpdateBuilderInitialization(t *testing.T) {
 	defer ctrl.Finish()
 
 	db := v1.NewMockDBActions(ctrl)
-	ctx := context.Background()
-	fluentDB := v1.NewFluentDB(db, ctx)
+	fluentDB := v1.NewFluentDB(db)
 
 	builder := fluentDB.Update("users")
 	assert.NotNil(t, builder)
@@ -968,8 +948,7 @@ func TestUpdateBuilderChaining(t *testing.T) {
 	defer ctrl.Finish()
 
 	db := v1.NewMockDBActions(ctrl)
-	ctx := context.Background()
-	fluentDB := v1.NewFluentDB(db, ctx)
+	fluentDB := v1.NewFluentDB(db)
 
 	builder := fluentDB.Update("users")
 	result := builder.Set("name", "John").Where(cdt.NewExpr().Column("id").Op("=").Value(1))
@@ -982,22 +961,21 @@ func TestUpdateBuilderSet(t *testing.T) {
 	defer ctrl.Finish()
 
 	db := v1.NewMockDBActions(ctrl)
-	ctx := context.Background()
-	fluentDB := v1.NewFluentDB(db, ctx)
+	fluentDB := v1.NewFluentDB(db)
 
 	builder := fluentDB.Update("users").
 		Set("name", "John").
 		Set("age", 30).
 		Where(cdt.NewExpr().Column("id").Op("=").Value(1))
 
-	db.EXPECT().Update(ctx, "users", gomock.Any(), nil, gomock.Any(), nil).
+	db.EXPECT().Update(context.Background(), "users", gomock.Any(), nil, gomock.Any(), nil).
 		DoAndReturn(func(ctx context.Context, table string, data map[string]any, joins []cdt.Join, cond cdt.Condition, opts *options.QueryOptions) (*v1.ExecResult, error) { //nolint:lll
 			assert.Equal(t, "John", data["name"])
 			assert.Equal(t, 30, data["age"])
 			return &v1.ExecResult{RowsAffected: 1}, nil
 		}).Times(1)
 
-	_, _ = builder.Exec()
+	_, _ = builder.Exec(context.Background())
 }
 
 // TestUpdateBuilderSetMap tests SetMap method
@@ -1006,8 +984,7 @@ func TestUpdateBuilderSetMap(t *testing.T) {
 	defer ctrl.Finish()
 
 	db := v1.NewMockDBActions(ctrl)
-	ctx := context.Background()
-	fluentDB := v1.NewFluentDB(db, ctx)
+	fluentDB := v1.NewFluentDB(db)
 
 	dataMap := map[string]any{
 		"name": "John",
@@ -1018,14 +995,14 @@ func TestUpdateBuilderSetMap(t *testing.T) {
 		SetMap(dataMap).
 		Where(cdt.NewExpr().Column("id").Op("=").Value(1))
 
-	db.EXPECT().Update(ctx, "users", gomock.Any(), nil, gomock.Any(), nil).
+	db.EXPECT().Update(context.Background(), "users", gomock.Any(), nil, gomock.Any(), nil).
 		DoAndReturn(func(ctx context.Context, table string, data map[string]any, joins []cdt.Join, cond cdt.Condition, opts *options.QueryOptions) (*v1.ExecResult, error) { //nolint:lll
 			assert.Equal(t, "John", data["name"])
 			assert.Equal(t, 30, data["age"])
 			return &v1.ExecResult{RowsAffected: 1}, nil
 		}).Times(1)
 
-	_, _ = builder.Exec()
+	_, _ = builder.Exec(context.Background())
 }
 
 // TestUpdateBuilderWhere tests WHERE conditions
@@ -1034,8 +1011,7 @@ func TestUpdateBuilderWhere(t *testing.T) {
 	defer ctrl.Finish()
 
 	db := v1.NewMockDBActions(ctrl)
-	ctx := context.Background()
-	fluentDB := v1.NewFluentDB(db, ctx)
+	fluentDB := v1.NewFluentDB(db)
 
 	testCases := []struct {
 		name        string
@@ -1062,12 +1038,12 @@ func TestUpdateBuilderWhere(t *testing.T) {
 			}
 
 			if !tc.shouldError {
-				db.EXPECT().Update(ctx, "users", gomock.Any(), nil, gomock.Any(), nil).
+				db.EXPECT().Update(context.Background(), "users", gomock.Any(), nil, gomock.Any(), nil).
 					Return(&v1.ExecResult{RowsAffected: 1}, nil).
 					Times(1)
 			}
 
-			_, err := builder.Exec()
+			_, err := builder.Exec(context.Background())
 
 			if tc.shouldError {
 				assert.Error(t, err)
@@ -1085,8 +1061,7 @@ func TestUpdateBuilderExec(t *testing.T) {
 	defer ctrl.Finish()
 
 	db := v1.NewMockDBActions(ctrl)
-	ctx := context.Background()
-	fluentDB := v1.NewFluentDB(db, ctx)
+	fluentDB := v1.NewFluentDB(db)
 
 	testCases := []struct {
 		name          string
@@ -1101,7 +1076,7 @@ func TestUpdateBuilderExec(t *testing.T) {
 				return b.Set("name", "John").Where(cdt.NewExpr().Column("id").Op("=").Value(1))
 			},
 			mockSetup: func() {
-				db.EXPECT().Update(ctx, "users", gomock.Any(), nil, gomock.Any(), nil).
+				db.EXPECT().Update(context.Background(), "users", gomock.Any(), nil, gomock.Any(), nil).
 					Return(&v1.ExecResult{RowsAffected: 1}, nil).
 					Times(1)
 			},
@@ -1140,7 +1115,7 @@ func TestUpdateBuilderExec(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			tc.mockSetup()
 			builder := tc.setup(fluentDB.Update("users"))
-			result, err := builder.Exec()
+			result, err := builder.Exec(context.Background())
 
 			if tc.expectError {
 				assert.Error(t, err)
@@ -1161,20 +1136,19 @@ func TestUpdateBuilderWithTx(t *testing.T) {
 
 	db := v1.NewMockDBActions(ctrl)
 	tx := v1.NewMockTx(ctrl)
-	ctx := context.Background()
-	fluentDB := v1.NewFluentDB(db, ctx)
+	fluentDB := v1.NewFluentDB(db)
 
 	builder := fluentDB.Update("users")
 	result := builder.WithTx(tx)
 
 	assert.Equal(t, builder, result)
 
-	// Verify that subsequent Exec() call uses tx instead of db
-	tx.EXPECT().Update(ctx, "users", gomock.Any(), nil, gomock.Any(), nil).
+	// Verify that subsequent Exec(context.Background()) call uses tx instead of db
+	tx.EXPECT().Update(context.Background(), "users", gomock.Any(), nil, gomock.Any(), nil).
 		Return(&v1.ExecResult{RowsAffected: 1}, nil).
 		Times(1)
 
-	_, _ = result.Set("name", "John").Where(cdt.NewExpr().Column("id").Op("=").Value(1)).Exec()
+	_, _ = result.Set("name", "John").Where(cdt.NewExpr().Column("id").Op("=").Value(1)).Exec(context.Background())
 }
 
 // TestDeleteBuilderInitialization tests that Delete properly initializes DeleteBuilder
@@ -1183,8 +1157,7 @@ func TestDeleteBuilderInitialization(t *testing.T) {
 	defer ctrl.Finish()
 
 	db := v1.NewMockDBActions(ctrl)
-	ctx := context.Background()
-	fluentDB := v1.NewFluentDB(db, ctx)
+	fluentDB := v1.NewFluentDB(db)
 
 	builder := fluentDB.Delete()
 	assert.NotNil(t, builder)
@@ -1196,8 +1169,7 @@ func TestDeleteBuilderChaining(t *testing.T) {
 	defer ctrl.Finish()
 
 	db := v1.NewMockDBActions(ctrl)
-	ctx := context.Background()
-	fluentDB := v1.NewFluentDB(db, ctx)
+	fluentDB := v1.NewFluentDB(db)
 
 	builder := fluentDB.Delete()
 	result := builder.From("users").Where(cdt.NewExpr().Column("id").Op("=").Value(1))
@@ -1210,8 +1182,7 @@ func TestDeleteBuilderFrom(t *testing.T) {
 	defer ctrl.Finish()
 
 	db := v1.NewMockDBActions(ctrl)
-	ctx := context.Background()
-	fluentDB := v1.NewFluentDB(db, ctx)
+	fluentDB := v1.NewFluentDB(db)
 
 	builder := fluentDB.Delete().From("users")
 	assert.NotNil(t, builder)
@@ -1223,8 +1194,7 @@ func TestDeleteBuilderWhere(t *testing.T) {
 	defer ctrl.Finish()
 
 	db := v1.NewMockDBActions(ctrl)
-	ctx := context.Background()
-	fluentDB := v1.NewFluentDB(db, ctx)
+	fluentDB := v1.NewFluentDB(db)
 
 	testCases := []struct {
 		name        string
@@ -1251,12 +1221,12 @@ func TestDeleteBuilderWhere(t *testing.T) {
 			}
 
 			if !tc.shouldError {
-				db.EXPECT().Delete(ctx, "users", nil, gomock.Any(), nil).
+				db.EXPECT().Delete(context.Background(), "users", nil, gomock.Any(), nil).
 					Return(&v1.ExecResult{RowsAffected: 1}, nil).
 					Times(1)
 			}
 
-			_, err := builder.Exec()
+			_, err := builder.Exec(context.Background())
 
 			if tc.shouldError {
 				assert.Error(t, err)
@@ -1274,8 +1244,7 @@ func TestDeleteBuilderExec(t *testing.T) {
 	defer ctrl.Finish()
 
 	db := v1.NewMockDBActions(ctrl)
-	ctx := context.Background()
-	fluentDB := v1.NewFluentDB(db, ctx)
+	fluentDB := v1.NewFluentDB(db)
 
 	testCases := []struct {
 		name          string
@@ -1290,7 +1259,7 @@ func TestDeleteBuilderExec(t *testing.T) {
 				return b.From("users").Where(cdt.NewExpr().Column("id").Op("=").Value(1))
 			},
 			mockSetup: func() {
-				db.EXPECT().Delete(ctx, "users", nil, gomock.Any(), nil).
+				db.EXPECT().Delete(context.Background(), "users", nil, gomock.Any(), nil).
 					Return(&v1.ExecResult{RowsAffected: 1}, nil).
 					Times(1)
 			},
@@ -1320,7 +1289,7 @@ func TestDeleteBuilderExec(t *testing.T) {
 				return b.From("users").Where(cdt.NewExpr().Column("id").Op("=").Value(1))
 			},
 			mockSetup: func() {
-				db.EXPECT().Delete(ctx, "users", nil, gomock.Any(), nil).
+				db.EXPECT().Delete(context.Background(), "users", nil, gomock.Any(), nil).
 					Return(nil, errors.New("delete failed")).
 					Times(1)
 			},
@@ -1332,7 +1301,7 @@ func TestDeleteBuilderExec(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			tc.mockSetup()
 			builder := tc.setup(fluentDB.Delete())
-			result, err := builder.Exec()
+			result, err := builder.Exec(context.Background())
 
 			if tc.expectError {
 				assert.Error(t, err)
@@ -1353,20 +1322,19 @@ func TestDeleteBuilderWithTx(t *testing.T) {
 
 	db := v1.NewMockDBActions(ctrl)
 	tx := v1.NewMockTx(ctrl)
-	ctx := context.Background()
-	fluentDB := v1.NewFluentDB(db, ctx)
+	fluentDB := v1.NewFluentDB(db)
 
 	builder := fluentDB.Delete()
 	result := builder.WithTx(tx)
 
 	assert.Equal(t, builder, result)
 
-	// Verify that subsequent Exec() call uses tx instead of db
-	tx.EXPECT().Delete(ctx, "users", nil, gomock.Any(), nil).
+	// Verify that subsequent Exec(context.Background()) call uses tx instead of db
+	tx.EXPECT().Delete(context.Background(), "users", nil, gomock.Any(), nil).
 		Return(&v1.ExecResult{RowsAffected: 1}, nil).
 		Times(1)
 
-	_, _ = result.From("users").Where(cdt.NewExpr().Column("id").Op("=").Value(1)).Exec()
+	_, _ = result.From("users").Where(cdt.NewExpr().Column("id").Op("=").Value(1)).Exec(context.Background())
 }
 
 // TestUpdateBuilderUpdateAll tests the UpdateAll method for unfiltered updates
@@ -1375,8 +1343,7 @@ func TestUpdateBuilderUpdateAll(t *testing.T) {
 	defer ctrl.Finish()
 
 	db := v1.NewMockDBActions(ctrl)
-	ctx := context.Background()
-	fluentDB := v1.NewFluentDB(db, ctx)
+	fluentDB := v1.NewFluentDB(db)
 
 	testCases := []struct {
 		name          string
@@ -1391,7 +1358,7 @@ func TestUpdateBuilderUpdateAll(t *testing.T) {
 				return b.Set("status", "active")
 			},
 			mockSetup: func() {
-				db.EXPECT().Update(ctx, "users", gomock.Any(), nil, nil, nil).
+				db.EXPECT().Update(context.Background(), "users", gomock.Any(), nil, nil, nil).
 					Return(&v1.ExecResult{RowsAffected: 100}, nil).
 					Times(1)
 			},
@@ -1403,7 +1370,7 @@ func TestUpdateBuilderUpdateAll(t *testing.T) {
 				return b.Set("status", "inactive").Where(cdt.NewExpr().Column("id").Op(">").Value(50))
 			},
 			mockSetup: func() {
-				db.EXPECT().Update(ctx, "users", gomock.Any(), nil, gomock.Any(), nil).
+				db.EXPECT().Update(context.Background(), "users", gomock.Any(), nil, gomock.Any(), nil).
 					Return(&v1.ExecResult{RowsAffected: 100}, nil).
 					Times(1)
 			},
@@ -1433,7 +1400,7 @@ func TestUpdateBuilderUpdateAll(t *testing.T) {
 				return b.Set("status", "active")
 			},
 			mockSetup: func() {
-				db.EXPECT().Update(ctx, "users", gomock.Any(), nil, nil, nil).
+				db.EXPECT().Update(context.Background(), "users", gomock.Any(), nil, nil, nil).
 					Return(nil, errors.New("update failed")).
 					Times(1)
 			},
@@ -1445,7 +1412,7 @@ func TestUpdateBuilderUpdateAll(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			tc.mockSetup()
 			builder := tc.setup(fluentDB.Update("users"))
-			result, err := builder.UpdateAll()
+			result, err := builder.UpdateAll(context.Background())
 
 			if tc.expectError {
 				assert.Error(t, err)
@@ -1466,8 +1433,7 @@ func TestDeleteBuilderDeleteAll(t *testing.T) {
 	defer ctrl.Finish()
 
 	db := v1.NewMockDBActions(ctrl)
-	ctx := context.Background()
-	fluentDB := v1.NewFluentDB(db, ctx)
+	fluentDB := v1.NewFluentDB(db)
 
 	testCases := []struct {
 		name          string
@@ -1482,7 +1448,7 @@ func TestDeleteBuilderDeleteAll(t *testing.T) {
 				return b.From("users")
 			},
 			mockSetup: func() {
-				db.EXPECT().Delete(ctx, "users", nil, nil, nil).
+				db.EXPECT().Delete(context.Background(), "users", nil, nil, nil).
 					Return(&v1.ExecResult{RowsAffected: 100}, nil).
 					Times(1)
 			},
@@ -1494,7 +1460,7 @@ func TestDeleteBuilderDeleteAll(t *testing.T) {
 				return b.From("users").Where(cdt.NewExpr().Column("status").Op("=").Value("inactive"))
 			},
 			mockSetup: func() {
-				db.EXPECT().Delete(ctx, "users", nil, gomock.Any(), nil).
+				db.EXPECT().Delete(context.Background(), "users", nil, gomock.Any(), nil).
 					Return(&v1.ExecResult{RowsAffected: 100}, nil).
 					Times(1)
 			},
@@ -1515,7 +1481,7 @@ func TestDeleteBuilderDeleteAll(t *testing.T) {
 				return b.From("users")
 			},
 			mockSetup: func() {
-				db.EXPECT().Delete(ctx, "users", nil, nil, nil).
+				db.EXPECT().Delete(context.Background(), "users", nil, nil, nil).
 					Return(nil, errors.New("delete failed")).
 					Times(1)
 			},
@@ -1527,7 +1493,7 @@ func TestDeleteBuilderDeleteAll(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			tc.mockSetup()
 			builder := tc.setup(fluentDB.Delete())
-			result, err := builder.DeleteAll()
+			result, err := builder.DeleteAll(context.Background())
 
 			if tc.expectError {
 				assert.Error(t, err)
@@ -1555,8 +1521,7 @@ func BenchmarkSelectBuilderConstruction(b *testing.B) {
 	defer ctrl.Finish()
 
 	db := v1.NewMockDBActions(ctrl)
-	ctx := context.Background()
-	fluentDB := v1.NewFluentDB(db, ctx)
+	fluentDB := v1.NewFluentDB(db)
 
 	condition := cdt.NewExpr().Column("id").Op("=").Value(1)
 
@@ -1577,8 +1542,7 @@ func BenchmarkInsertBuilderConstruction(b *testing.B) {
 	defer ctrl.Finish()
 
 	db := v1.NewMockDBActions(ctrl)
-	ctx := context.Background()
-	fluentDB := v1.NewFluentDB(db, ctx)
+	fluentDB := v1.NewFluentDB(db)
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
@@ -1596,8 +1560,7 @@ func BenchmarkUpdateBuilderConstruction(b *testing.B) {
 	defer ctrl.Finish()
 
 	db := v1.NewMockDBActions(ctrl)
-	ctx := context.Background()
-	fluentDB := v1.NewFluentDB(db, ctx)
+	fluentDB := v1.NewFluentDB(db)
 
 	condition := cdt.NewExpr().Column("id").Op("=").Value(1)
 
@@ -1616,8 +1579,7 @@ func BenchmarkDeleteBuilderConstruction(b *testing.B) {
 	defer ctrl.Finish()
 
 	db := v1.NewMockDBActions(ctrl)
-	ctx := context.Background()
-	fluentDB := v1.NewFluentDB(db, ctx)
+	fluentDB := v1.NewFluentDB(db)
 
 	condition := cdt.NewExpr().Column("id").Op("=").Value(1)
 
@@ -1636,8 +1598,7 @@ func BenchmarkSelectBuilderWithMultipleJoins(b *testing.B) {
 	defer ctrl.Finish()
 
 	db := v1.NewMockDBActions(ctrl)
-	ctx := context.Background()
-	fluentDB := v1.NewFluentDB(db, ctx)
+	fluentDB := v1.NewFluentDB(db)
 
 	joins := []cdt.Join{
 		{Type: "INNER", Table: "orders", Conditions: cdt.JoinCdts{{Left: "users.id", Right: "orders.user_id"}}},
@@ -1660,8 +1621,7 @@ func BenchmarkSelectBuilderWithComplexConditions(b *testing.B) {
 	defer ctrl.Finish()
 
 	db := v1.NewMockDBActions(ctrl)
-	ctx := context.Background()
-	fluentDB := v1.NewFluentDB(db, ctx)
+	fluentDB := v1.NewFluentDB(db)
 
 	cond1 := cdt.NewExpr().Column("age").Op(">").Value(18)
 	cond2 := cdt.NewExpr().Column("active").Op("=").Value(true)
@@ -1686,8 +1646,7 @@ func BenchmarkInsertBuilderBulk(b *testing.B) {
 	defer ctrl.Finish()
 
 	db := v1.NewMockDBActions(ctrl)
-	ctx := context.Background()
-	fluentDB := v1.NewFluentDB(db, ctx)
+	fluentDB := v1.NewFluentDB(db)
 
 	bulkData := []map[string]any{
 		{"name": "John", "email": "john@example.com", "age": 30},
@@ -1709,8 +1668,7 @@ func BenchmarkSelectBuilderExecution(b *testing.B) {
 	defer ctrl.Finish()
 
 	db := v1.NewMockDBActions(ctrl)
-	ctx := context.Background()
-	fluentDB := v1.NewFluentDB(db, ctx)
+	fluentDB := v1.NewFluentDB(db)
 
 	// Mock the Get method to return immediately
 	db.EXPECT().Get(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).
@@ -1722,7 +1680,7 @@ func BenchmarkSelectBuilderExecution(b *testing.B) {
 		_, _ = fluentDB.
 			Select("users", "id", "name").
 			Where(cdt.NewExpr().Column("id").Op("=").Value(1)).
-			Get()
+			Get(context.Background())
 	}
 }
 
@@ -1732,8 +1690,7 @@ func BenchmarkInsertBuilderExecution(b *testing.B) {
 	defer ctrl.Finish()
 
 	db := v1.NewMockDBActions(ctrl)
-	ctx := context.Background()
-	fluentDB := v1.NewFluentDB(db, ctx)
+	fluentDB := v1.NewFluentDB(db)
 
 	// Mock the Insert method to return immediately
 	db.EXPECT().Insert(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).
@@ -1746,7 +1703,7 @@ func BenchmarkInsertBuilderExecution(b *testing.B) {
 			Into("users").
 			Set("name", "John").
 			Set("email", "john@example.com").
-			Exec()
+			Exec(context.Background())
 	}
 }
 
@@ -1756,8 +1713,7 @@ func BenchmarkUpdateBuilderExecution(b *testing.B) {
 	defer ctrl.Finish()
 
 	db := v1.NewMockDBActions(ctrl)
-	ctx := context.Background()
-	fluentDB := v1.NewFluentDB(db, ctx)
+	fluentDB := v1.NewFluentDB(db)
 
 	// Mock the Update method to return immediately
 	db.EXPECT().Update(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).
@@ -1772,7 +1728,7 @@ func BenchmarkUpdateBuilderExecution(b *testing.B) {
 			Set("name", "Jane").
 			Set("age", 31).
 			Where(cond).
-			Exec()
+			Exec(context.Background())
 	}
 }
 
@@ -1782,8 +1738,7 @@ func BenchmarkDeleteBuilderExecution(b *testing.B) {
 	defer ctrl.Finish()
 
 	db := v1.NewMockDBActions(ctrl)
-	ctx := context.Background()
-	fluentDB := v1.NewFluentDB(db, ctx)
+	fluentDB := v1.NewFluentDB(db)
 
 	// Mock the Delete method to return immediately
 	db.EXPECT().Delete(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).
@@ -1797,6 +1752,6 @@ func BenchmarkDeleteBuilderExecution(b *testing.B) {
 		_, _ = fluentDB.Delete().
 			From("users").
 			Where(cond).
-			Exec()
+			Exec(context.Background())
 	}
 }
