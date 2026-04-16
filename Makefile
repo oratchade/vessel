@@ -16,12 +16,12 @@ HTML_FILE ?= $(OUT_HTML_DIR)/coverage.html
 
 # Pin tool versions by setting these variables when invoking make, e.g.
 # `make GOTESTSUM_VERSION=v1.9.0 GOCOVER_VERSION=v0.0.0-20220101 tools`
-GOTESTSUM_VERSION ?=
+GOTESTSUM_VERSION ?= v1.13.0
 GOCOVER_VERSION ?=
 
-GOFUMPT_VERSION ?=
-GOLANGCI_VERSION ?=
-MOCKGEN_VERSION ?=
+GOFUMPT_VERSION ?= v0.9.2
+GOLANGCI_VERSION ?= v1.64.8
+MOCKGEN_VERSION ?= v1.6.0
 
 ifeq ($(GOTESTSUM_VERSION),)
 GOTESTSUM_INSTALL = gotest.tools/gotestsum@latest
@@ -131,7 +131,7 @@ integration-test-mysql:
 	@echo "Running MySQL integration tests..."
 	@chmod +x scripts/run-integration-tests.sh
 	@docker-compose -f docker-compose.test.yml up -d mysql
-	@sleep 10
+	@docker-compose -f docker-compose.test.yml exec mysql mysqladmin ping -h localhost --wait=30 --silent
 	@DB_TYPE=mysql go test -timeout 300s -v ./tests -run "TestIntegration"
 	@docker-compose -f docker-compose.test.yml down mysql
 
@@ -139,7 +139,7 @@ integration-test-postgres:
 	@echo "Running PostgreSQL integration tests..."
 	@chmod +x scripts/run-integration-tests.sh
 	@docker-compose -f docker-compose.test.yml up -d postgres
-	@sleep 10
+	@docker-compose -f docker-compose.test.yml exec postgres pg_isready -U postgres --timeout 30
 	@DB_TYPE=postgres go test -timeout 300s -v ./tests -run "TestIntegration"
 	@docker-compose -f docker-compose.test.yml down postgres
 
@@ -147,7 +147,7 @@ integration-test-mssql:
 	@echo "Running MSSQL integration tests..."
 	@chmod +x scripts/run-integration-tests.sh
 	@docker-compose -f docker-compose.test.yml up -d mssql
-	@sleep 15
+	@docker-compose -f docker-compose.test.yml exec mssql /opt/mssql-tools/bin/sqlcmd -S localhost -U sa -P YourPassword123 -Q "SELECT 1" -l 30
 	@DB_TYPE=sqlserver go test -timeout 300s -v ./tests -run "TestIntegration"
 	@docker-compose -f docker-compose.test.yml down mssql
 

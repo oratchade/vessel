@@ -51,14 +51,7 @@ services:
       - ./dockerfiles/init-mssql.sql:/docker-entrypoint-initdb.d/01-schema.sql
       - ./dockerfiles/seed-mssql.sql:/docker-entrypoint-initdb.d/02-seed.sql
     healthcheck:
-      test:
-        [
-          "CMD-SHELL",
-          "/opt/mssql-tools/bin/sqlcmd -S localhost -U sa -P",
-          "YourPassword123",
-          "-Q",
-          "SELECT 1",
-        ]
+      test: ["CMD-SHELL", "/opt/mssql-tools/bin/sqlcmd -S localhost -U sa -P YourPassword123 -Q 'SELECT 1'"]
       timeout: 20s
       retries: 10
     networks:
