@@ -51,11 +51,6 @@ func ValidateQueryOptions(opts *options.QueryOptions) error {
 	return nil
 }
 
-// validateQueryOptions is the internal version of ValidateQueryOptions
-func validateQueryOptions(opts *options.QueryOptions) error {
-	return ValidateQueryOptions(opts)
-}
-
 // FluentDB provides a fluent/builder interface for constructing and executing database queries.
 // It acts as an entry point for building SELECT, INSERT, UPDATE, and DELETE operations
 // with a chainable, ergonomic API while reusing the existing DBActions interface.
@@ -353,7 +348,7 @@ func (s *SelectBuilder) Get(ctx context.Context) ([]map[string]any, error) {
 	if s.table == "" {
 		return nil, fmt.Errorf("SelectBuilder.Get: table not specified")
 	}
-	if err := validateQueryOptions(s.opts); err != nil {
+	if err := ValidateQueryOptions(s.opts); err != nil {
 		return nil, fmt.Errorf("SelectBuilder.Get: invalid query options: %w", err)
 	}
 	rows, err := s.db.Get(ctx, s.table, s.columns, s.joins, s.conditions, s.opts)
@@ -374,7 +369,7 @@ func (s *SelectBuilder) GetRaw(ctx context.Context) (*RowsAdapter, error) {
 	if s.table == "" {
 		return nil, fmt.Errorf("SelectBuilder.GetRaw: table not specified")
 	}
-	if err := validateQueryOptions(s.opts); err != nil {
+	if err := ValidateQueryOptions(s.opts); err != nil {
 		return nil, fmt.Errorf("SelectBuilder.GetRaw: invalid query options: %w", err)
 	}
 	rows, err := s.db.GetRaw(ctx, s.table, s.columns, s.joins, s.conditions, s.opts)
@@ -402,7 +397,7 @@ func (s *SelectBuilder) One(ctx context.Context) (map[string]any, error) {
 	if s.table == "" {
 		return nil, fmt.Errorf("SelectBuilder.One: table not specified")
 	}
-	if err := validateQueryOptions(s.opts); err != nil {
+	if err := ValidateQueryOptions(s.opts); err != nil {
 		return nil, fmt.Errorf("SelectBuilder.One: invalid query options: %w", err)
 	}
 
@@ -838,7 +833,7 @@ func (u *UpdateBuilder) Exec(ctx context.Context) (*ExecResult, error) {
 		return nil, fmt.Errorf(
 			"UpdateBuilder.Exec: WHERE condition required (use Where method or call UpdateAll for unfiltered update)")
 	}
-	if err := validateQueryOptions(u.opts); err != nil {
+	if err := ValidateQueryOptions(u.opts); err != nil {
 		return nil, fmt.Errorf("UpdateBuilder.Exec: invalid query options: %w", err)
 	}
 	result, err := u.db.Update(ctx, u.table, u.data, u.joins, u.conditions, u.opts)
@@ -868,7 +863,7 @@ func (u *UpdateBuilder) UpdateAll(ctx context.Context) (*ExecResult, error) {
 	if u.table == "" {
 		return nil, fmt.Errorf("UpdateBuilder.UpdateAll: table not specified")
 	}
-	if err := validateQueryOptions(u.opts); err != nil {
+	if err := ValidateQueryOptions(u.opts); err != nil {
 		return nil, fmt.Errorf("UpdateBuilder.UpdateAll: invalid query options: %w", err)
 	}
 	if len(u.data) == 0 {
@@ -1058,7 +1053,7 @@ func (d *DeleteBuilder) Exec(ctx context.Context) (*ExecResult, error) {
 		return nil, fmt.Errorf(
 			"DeleteBuilder.Exec: WHERE condition required (use Where method or call DeleteAll for unfiltered delete)")
 	}
-	if err := validateQueryOptions(d.opts); err != nil {
+	if err := ValidateQueryOptions(d.opts); err != nil {
 		return nil, fmt.Errorf("DeleteBuilder.Exec: invalid query options: %w", err)
 	}
 	result, err := d.db.Delete(ctx, d.table, d.joins, d.conditions, d.opts)
@@ -1094,7 +1089,7 @@ func (d *DeleteBuilder) DeleteAll(ctx context.Context) (*ExecResult, error) {
 	if d.table == "" {
 		return nil, fmt.Errorf("DeleteBuilder.DeleteAll: table not specified")
 	}
-	if err := validateQueryOptions(d.opts); err != nil {
+	if err := ValidateQueryOptions(d.opts); err != nil {
 		return nil, fmt.Errorf("DeleteBuilder.DeleteAll: invalid query options: %w", err)
 	}
 	result, err := d.db.Delete(ctx, d.table, d.joins, d.conditions, d.opts)

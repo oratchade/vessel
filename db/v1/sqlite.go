@@ -155,7 +155,7 @@ func (m *SQLITE) Ping(ctx context.Context) error {
 		err = fmt.Errorf("sqlite.Ping: failed to ping database: %w", err)
 		span.RecordError(err)
 		span.SetStatus(codes.Error, err.Error())
-		m.safeLogger.Error(fmt.Errorf("sqlite.Ping: failed to ping database: %w", err))
+		m.safeLogger.Error(err)
 		return err
 	}
 	span.SetStatus(codes.Ok, "ping successful")
@@ -195,6 +195,7 @@ func (m *SQLITE) Begin(ctx context.Context) (Tx, error) {
 
 		queryBuilder: m.queryBuilder,
 		safeLogger:   m.safeLogger,
+		errorMapper:  m.errorMapper,
 	}, nil
 }
 
@@ -605,7 +606,7 @@ func (m *SQLITE) Query(
 		err := fmt.Errorf("sqlite.Query: failed to execute query: %w", m.errorMapper.MapError(err))
 		span.RecordError(err)
 		span.SetStatus(codes.Error, err.Error())
-		m.safeLogger.Error(fmt.Errorf("sqlite.Query: failed to execute query: %w", err))
+		m.safeLogger.Error(err)
 		return nil, err
 	}
 	defer func() {
@@ -619,7 +620,7 @@ func (m *SQLITE) Query(
 		err := fmt.Errorf("sqlite.Query: failed to get columns: %w", err)
 		span.RecordError(err)
 		span.SetStatus(codes.Error, err.Error())
-		m.safeLogger.Error(fmt.Errorf("sqlite.Query: failed to get columns: %w", err))
+		m.safeLogger.Error(err)
 		return nil, err
 	}
 
@@ -653,7 +654,7 @@ func (m *SQLITE) QueryRaw(ctx context.Context, query string, args ...any) (*Rows
 		err := fmt.Errorf("sqlite.QueryRaw: failed to execute query: %w", m.errorMapper.MapError(err))
 		span.RecordError(err)
 		span.SetStatus(codes.Error, err.Error())
-		m.safeLogger.Error(fmt.Errorf("sqlite.QueryRaw: failed to execute query: %w", err))
+		m.safeLogger.Error(err)
 		return nil, err
 	}
 
@@ -662,7 +663,7 @@ func (m *SQLITE) QueryRaw(ctx context.Context, query string, args ...any) (*Rows
 		err := fmt.Errorf("sqlite.QueryRaw: failed to create RowsAdapter: %w", err)
 		span.RecordError(err)
 		span.SetStatus(codes.Error, err.Error())
-		m.safeLogger.Error(fmt.Errorf("sqlite.QueryRaw: failed to create rows adapter: %w", err))
+		m.safeLogger.Error(err)
 		return nil, err
 	}
 
@@ -690,11 +691,17 @@ func (m *SQLITE) Exec(
 		err := fmt.Errorf("sqlite.Exec: failed to execute query: %w", m.errorMapper.MapError(err))
 		span.RecordError(err)
 		span.SetStatus(codes.Error, err.Error())
-		m.safeLogger.Error(fmt.Errorf("sqlite.Exec: failed to execute query: %w", err))
+		m.safeLogger.Error(err)
 		return nil, err
 	}
 
-	execResult := fromSQLResult(result)
+	execResult, err := fromSQLResult(result)
+	if err != nil {
+		span.RecordError(err)
+		span.SetStatus(codes.Error, err.Error())
+		m.safeLogger.Error(err)
+		return nil, fmt.Errorf("sqlite.Exec: %w", err)
+	}
 	duration := time.Since(startTime)
 
 	span.SetStatus(codes.Ok, "exec completed")
@@ -724,7 +731,7 @@ func (m *SQLITE) Explain(
 		err := fmt.Errorf("sqlite.Explain: failed to execute explain query: %w", err)
 		span.RecordError(err)
 		span.SetStatus(codes.Error, err.Error())
-		m.safeLogger.Error(fmt.Errorf("sqlite.Explain: failed to execute explain query: %w", err))
+		m.safeLogger.Error(err)
 		return nil, err
 	}
 

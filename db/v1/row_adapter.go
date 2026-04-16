@@ -120,7 +120,7 @@ func (r *RowsAdapter) columns() ([]string, error) {
 		fds := r.pgxRows.FieldDescriptions()
 		cols := make([]string, len(fds))
 		for i, fd := range fds {
-			cols[i] = fmt.Sprint(fd.Name)
+			cols[i] = fd.Name
 		}
 		return cols, nil
 	}

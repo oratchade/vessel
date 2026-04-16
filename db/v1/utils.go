@@ -195,7 +195,10 @@ func insert(
 		return nil, fmt.Errorf("insert: execute query: %w", err)
 	}
 
-	execResult := fromSQLResult(result)
+	execResult, err := fromSQLResult(result)
+	if err != nil {
+		return nil, fmt.Errorf("insert: %w", err)
+	}
 
 	return execResult, nil
 }
@@ -232,7 +235,10 @@ func inserts(
 		return nil, fmt.Errorf("inserts: execute query: %w", err)
 	}
 
-	execResult := fromSQLResult(result)
+	execResult, err := fromSQLResult(result)
+	if err != nil {
+		return nil, fmt.Errorf("inserts: %w", err)
+	}
 
 	return execResult, nil
 }
@@ -271,7 +277,10 @@ func update(
 		return nil, fmt.Errorf("update: execute query: %w", err)
 	}
 
-	execResult := fromSQLResult(result)
+	execResult, err := fromSQLResult(result)
+	if err != nil {
+		return nil, fmt.Errorf("update: %w", err)
+	}
 
 	return execResult, nil
 }
@@ -311,7 +320,10 @@ func delete(
 		return nil, fmt.Errorf("delete: execute query: %w", err)
 	}
 
-	execResult := fromSQLResult(result)
+	execResult, err := fromSQLResult(result)
+	if err != nil {
+		return nil, fmt.Errorf("delete: %w", err)
+	}
 
 	return execResult, nil
 }

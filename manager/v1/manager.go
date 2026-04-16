@@ -274,6 +274,12 @@ func getRoundRobinCounters(
 
 // validateConfigPath validates and resolves the config path to prevent directory traversal.
 func validateConfigPath(path string) (string, error) {
+	// Reject absolute paths — only relative paths within the working directory are allowed.
+	// filepath.Join silently discards the base when path is absolute, defeating the traversal check below.
+	if filepath.IsAbs(path) {
+		return "", fmt.Errorf("loadConfig: config path must be relative, got absolute path: %s", path)
+	}
+
 	// Resolve the path to absolute and ensure it's within the working directory
 	wd, err := os.Getwd()
 	if err != nil {
@@ -456,7 +462,7 @@ func (dm *DBManager) readOnlyEntry() *DBEntry {
 	}
 
 	// First, try to select from healthy entries
-	selected := dm.selectHealthyEntry(entries)
+	selected := dm.selectHealthyEntry(entries, dm.readEntryIdx)
 	if selected != nil {
 		if dm.logger != nil {
 			dm.logger.Debug("Selected read-only entry from healthy entries",
@@ -534,7 +540,7 @@ func (dm *DBManager) readWriteEntry() *DBEntry {
 	}
 
 	// First, try to select from healthy entries
-	selected := dm.selectHealthyEntry(entries)
+	selected := dm.selectHealthyEntry(entries, dm.writeEntryIdx)
 	if selected != nil {
 		if dm.logger != nil {
 			dm.logger.Debug("Selected read-write entry from healthy entries",
@@ -581,7 +587,9 @@ func (dm *DBManager) healthyOnly(entries map[string]*DBEntry) []*DBEntry {
 
 // selectHealthyEntry selects an entry from the provided map using priority and round-robin,
 // considering only healthy entries. Returns nil if no healthy entries are available.
-func (dm *DBManager) selectHealthyEntry(entries map[string]*DBEntry) *DBEntry {
+// counter is used for round-robin distribution among equal-priority entries; callers must
+// pass the correct counter for their entry type (readEntryIdx for reads, writeEntryIdx for writes).
+func (dm *DBManager) selectHealthyEntry(entries map[string]*DBEntry, counter *AtomicWrapCounter) *DBEntry {
 	// Collect healthy entries only
 	healthyEntries := dm.healthyOnly(entries)
 
@@ -614,8 +622,8 @@ func (dm *DBManager) selectHealthyEntry(entries map[string]*DBEntry) *DBEntry {
 	}
 
 	// Multiple healthy entries with same max priority: use round-robin
-	// Uses entry-level counter for fair distribution across replicas
-	idx := dm.readEntryIdx.Next() % int64(len(priorityEntries))
+	// Uses the caller-supplied counter so reads and writes each track their own index.
+	idx := counter.Next() % int64(len(priorityEntries))
 	return priorityEntries[idx]
 }
 

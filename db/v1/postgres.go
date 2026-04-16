@@ -120,8 +120,14 @@ type Postgres struct {
 func newPostgres(cfg PostgresConfig, logger Logger) (*Postgres, error) {
 	dsn := cfg.DSN()
 
-	ctx, cancel := context.WithTimeout(context.Background(), cfg.ConnectTimeout)
-	defer cancel()
+	var ctx context.Context
+	var cancel context.CancelFunc
+	if cfg.ConnectTimeout > 0 {
+		ctx, cancel = context.WithTimeout(context.Background(), cfg.ConnectTimeout)
+		defer cancel()
+	} else {
+		ctx = context.Background()
+	}
 
 	poolConfig, err := pgxpool.ParseConfig(dsn)
 	if err != nil {
@@ -203,7 +209,7 @@ func (pg *Postgres) Ping(ctx context.Context) error {
 		err := fmt.Errorf("postgres.Ping: failed to ping database: %w", err)
 		span.RecordError(err)
 		span.SetStatus(codes.Error, err.Error())
-		pg.safeLogger.Error(fmt.Errorf("postgres.Ping: failed to ping database: %w", err))
+		pg.safeLogger.Error(err)
 		return err
 	}
 	span.SetStatus(codes.Ok, "ping successful")
@@ -241,6 +247,7 @@ func (pg *Postgres) Begin(ctx context.Context) (Tx, error) {
 		querier:      t,
 		queryBuilder: pg.queryBuilder,
 		safeLogger:   pg.safeLogger,
+		errorMapper:  pg.errorMapper,
 	}, nil
 }
 
@@ -297,7 +304,7 @@ func (pg *Postgres) Get(
 	fds := rows.FieldDescriptions()
 	cols := make([]string, len(fds))
 	for i, fd := range fds {
-		cols[i] = fmt.Sprint(fd.Name)
+		cols[i] = fd.Name
 	}
 
 	results, err := scanRows(rows, cols)
@@ -426,7 +433,7 @@ func (pg *Postgres) GetByID(
 	fds := rows.FieldDescriptions()
 	cols := make([]string, len(fds))
 	for i, fd := range fds {
-		cols[i] = fmt.Sprint(fd.Name)
+		cols[i] = fd.Name
 	}
 
 	results, err := scanRows(rows, cols)
@@ -756,7 +763,7 @@ func (pg *Postgres) Query(
 		err := fmt.Errorf("postgres.Query: failed to execute query: %w", pg.errorMapper.MapError(err))
 		span.RecordError(err)
 		span.SetStatus(codes.Error, err.Error())
-		pg.safeLogger.Error(fmt.Errorf("postgres.Query: failed to execute query: %w", err))
+		pg.safeLogger.Error(err)
 		return nil, err
 	}
 	defer rows.Close()
@@ -764,7 +771,7 @@ func (pg *Postgres) Query(
 	fds := rows.FieldDescriptions()
 	cols := make([]string, len(fds))
 	for i, fd := range fds {
-		cols[i] = fmt.Sprint(fd.Name)
+		cols[i] = fd.Name
 	}
 
 	results, err := scanRows(rows, cols)
@@ -796,7 +803,7 @@ func (pg *Postgres) QueryRaw(ctx context.Context, query string, args ...any) (*R
 		err := fmt.Errorf("postgres.QueryRaw: failed to execute query: %w", pg.errorMapper.MapError(err))
 		span.RecordError(err)
 		span.SetStatus(codes.Error, err.Error())
-		pg.safeLogger.Error(fmt.Errorf("postgres.QueryRaw: failed to execute query: %w", err))
+		pg.safeLogger.Error(err)
 		return nil, err
 	}
 
@@ -805,7 +812,7 @@ func (pg *Postgres) QueryRaw(ctx context.Context, query string, args ...any) (*R
 		err := fmt.Errorf("postgres.QueryRaw: failed to create rows adapter: %w", err)
 		span.RecordError(err)
 		span.SetStatus(codes.Error, err.Error())
-		pg.safeLogger.Error(fmt.Errorf("postgres.QueryRaw: failed to create rows adapter: %w", err))
+		pg.safeLogger.Error(err)
 		return nil, err
 	}
 
@@ -833,7 +840,7 @@ func (pg *Postgres) Exec(
 		err := fmt.Errorf("postgres.Exec: failed to execute query: %w", pg.errorMapper.MapError(err))
 		span.RecordError(err)
 		span.SetStatus(codes.Error, err.Error())
-		pg.safeLogger.Error(fmt.Errorf("postgres.Exec: failed to execute query: %w", err))
+		pg.safeLogger.Error(err)
 		return nil, err
 	}
 
@@ -868,7 +875,7 @@ func (pg *Postgres) Explain(
 		span.RecordError(err)
 		span.SetStatus(codes.Error, err.Error())
 
-		pg.safeLogger.Error(fmt.Errorf("postgres.Explain: failed to execute explain query: %w", err))
+		pg.safeLogger.Error(err)
 		return nil, err
 	}
 

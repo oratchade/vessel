@@ -170,7 +170,7 @@ func (m *MSSQL) Ping(ctx context.Context) error {
 		err := fmt.Errorf("mssql.Ping: failed to ping database: %w", err)
 		span.RecordError(err)
 		span.SetStatus(codes.Error, err.Error())
-		m.safeLogger.Error(fmt.Errorf("mssql.Ping: failed to ping database: %w", err))
+		m.safeLogger.Error(err)
 		return err
 	}
 	span.SetStatus(codes.Ok, "ping successful")
@@ -209,6 +209,7 @@ func (m *MSSQL) Begin(ctx context.Context) (Tx, error) {
 
 		queryBuilder: m.queryBuilder,
 		safeLogger:   m.safeLogger,
+		errorMapper:  m.errorMapper,
 	}, nil
 }
 
@@ -612,7 +613,7 @@ func (m *MSSQL) Query(
 		err := fmt.Errorf("mssql.Query: failed to execute query: %w", m.errorMapper.MapError(err))
 		span.RecordError(err)
 		span.SetStatus(codes.Error, err.Error())
-		m.safeLogger.Error(fmt.Errorf("mssql.Query: failed to execute query: %w", err))
+		m.safeLogger.Error(err)
 		return nil, err
 	}
 	defer func() {
@@ -626,7 +627,7 @@ func (m *MSSQL) Query(
 		err := fmt.Errorf("mssql.Query: failed to get columns: %w", err)
 		span.RecordError(err)
 		span.SetStatus(codes.Error, err.Error())
-		m.safeLogger.Error(fmt.Errorf("mssql.Query: failed to get columns: %w", err))
+		m.safeLogger.Error(err)
 		return nil, err
 	}
 
@@ -660,7 +661,7 @@ func (m *MSSQL) QueryRaw(ctx context.Context, query string, args ...any) (*RowsA
 		err := fmt.Errorf("mssql.QueryRaw: failed to execute query: %w", m.errorMapper.MapError(err))
 		span.RecordError(err)
 		span.SetStatus(codes.Error, err.Error())
-		m.safeLogger.Error(fmt.Errorf("mssql.QueryRaw: failed to execute query: %w", err))
+		m.safeLogger.Error(err)
 		return nil, err
 	}
 
@@ -669,7 +670,7 @@ func (m *MSSQL) QueryRaw(ctx context.Context, query string, args ...any) (*RowsA
 		err := fmt.Errorf("mssql.QueryRaw: failed to create rows adapter: %w", err)
 		span.RecordError(err)
 		span.SetStatus(codes.Error, err.Error())
-		m.safeLogger.Error(fmt.Errorf("mssql.QueryRaw: failed to create rows adapter: %w", err))
+		m.safeLogger.Error(err)
 		return nil, err
 	}
 
@@ -697,11 +698,17 @@ func (m *MSSQL) Exec(
 		err := fmt.Errorf("mssql.Exec: failed to execute query: %w", m.errorMapper.MapError(err))
 		span.RecordError(err)
 		span.SetStatus(codes.Error, err.Error())
-		m.safeLogger.Error(fmt.Errorf("mssql.Exec: failed to execute query: %w", err))
+		m.safeLogger.Error(err)
 		return nil, err
 	}
 
-	execResult := fromSQLResult(result)
+	execResult, err := fromSQLResult(result)
+	if err != nil {
+		span.RecordError(err)
+		span.SetStatus(codes.Error, err.Error())
+		m.safeLogger.Error(err)
+		return nil, fmt.Errorf("mssql.Exec: %w", err)
+	}
 	duration := time.Since(startTime)
 
 	span.SetStatus(codes.Ok, "exec completed")
@@ -731,7 +738,7 @@ func (m *MSSQL) Explain(
 		err := fmt.Errorf("mssql.Explain: failed to execute explain query: %w", err)
 		span.RecordError(err)
 		span.SetStatus(codes.Error, err.Error())
-		m.safeLogger.Error(fmt.Errorf("mssql.Explain: failed to execute explain query: %w", err))
+		m.safeLogger.Error(err)
 		return nil, err
 	}
 

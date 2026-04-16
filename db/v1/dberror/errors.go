@@ -32,6 +32,11 @@ import (
 	"errors"
 	"fmt"
 	"strings"
+
+	mssql "github.com/denisenkom/go-mssqldb"
+	mysql "github.com/go-sql-driver/mysql"
+	"github.com/jackc/pgx/v5/pgconn"
+	sqlite3 "github.com/mattn/go-sqlite3"
 )
 
 const (
@@ -86,13 +91,29 @@ func wrapError(prefix string, sentinel, original error) error {
 type MySQLErrorMapper struct{}
 
 // MapError maps MySQL error codes to sentinel errors with [mysql] prefix.
+// Typed detection via *mysql.MySQLError.Number takes precedence over string matching.
 func (m MySQLErrorMapper) MapError(err error) error {
 	if err == nil {
 		return nil
 	}
 
-	errMsg := err.Error()
+	var mysqlErr *mysql.MySQLError
+	if errors.As(err, &mysqlErr) {
+		switch mysqlErr.Number {
+		case 1062:
+			return wrapError(MySQLPrefix, ErrDuplicateKey, err)
+		case 1452:
+			return wrapError(MySQLPrefix, ErrForeignKeyViolation, err)
+		case 1064:
+			return wrapError(MySQLPrefix, ErrSyntaxError, err)
+		}
+	}
 
+	return mysqlMapErrorOnString(err)
+}
+
+func mysqlMapErrorOnString(err error) error {
+	errMsg := err.Error()
 	if checkMySQLDuplicateKey(errMsg) {
 		return wrapError(MySQLPrefix, ErrDuplicateKey, err)
 	}
@@ -120,11 +141,32 @@ func (m MySQLErrorMapper) MapError(err error) error {
 type PostgresErrorMapper struct{}
 
 // MapError maps PostgreSQL error codes to sentinel errors with [postgres] prefix.
+// Typed detection via *pgconn.PgError.Code (SQLSTATE) takes precedence over string matching.
 func (m PostgresErrorMapper) MapError(err error) error {
 	if err == nil {
 		return nil
 	}
 
+	var pgErr *pgconn.PgError
+	if errors.As(err, &pgErr) {
+		switch pgErr.Code {
+		case "23505":
+			return wrapError(PostgresPrefix, ErrDuplicateKey, err)
+		case "23503":
+			return wrapError(PostgresPrefix, ErrForeignKeyViolation, err)
+		case "42601":
+			return wrapError(PostgresPrefix, ErrSyntaxError, err)
+		case "08006", "08001", "08004", "08000":
+			return wrapError(PostgresPrefix, ErrConnectionFailed, err)
+		case "57014":
+			return wrapError(PostgresPrefix, ErrQueryTimeout, err)
+		}
+	}
+
+	return pgMapErrorOnString(err)
+}
+
+func pgMapErrorOnString(err error) error {
 	errMsg := err.Error()
 
 	if checkPostgresDuplicateKey(errMsg) {
@@ -153,15 +195,35 @@ func (m PostgresErrorMapper) MapError(err error) error {
 // SQLiteErrorMapper maps SQLite error messages to sentinel errors.
 type SQLiteErrorMapper struct{}
 
-// MapError maps SQLite error messages to sentinel errors with [sqlite] prefix.
+// MapError maps SQLite error codes to sentinel errors with [sqlite] prefix.
+// Typed detection via sqlite3.Error.ExtendedCode takes precedence over string matching.
 func (m SQLiteErrorMapper) MapError(err error) error {
 	if err == nil {
 		return nil
 	}
 
+	var sqliteErr sqlite3.Error
+	if errors.As(err, &sqliteErr) {
+		switch sqliteErr.ExtendedCode {
+		case sqlite3.ErrConstraintUnique, sqlite3.ErrConstraintPrimaryKey, sqlite3.ErrConstraintRowID:
+			return wrapError(SQLitePrefix, ErrDuplicateKey, err)
+		case sqlite3.ErrConstraintForeignKey:
+			return wrapError(SQLitePrefix, ErrForeignKeyViolation, err)
+		}
+		switch sqliteErr.Code {
+		case sqlite3.ErrCantOpen:
+			return wrapError(SQLitePrefix, ErrConnectionFailed, err)
+		case sqlite3.ErrError:
+			return wrapError(SQLitePrefix, ErrSyntaxError, err)
+		}
+	}
+
+	return sqliteMapErrorOnString(err)
+}
+
+func sqliteMapErrorOnString(err error) error {
 	errMsg := err.Error()
 
-	// SQLite uses string error messages
 	// UNIQUE constraint failed
 	if strings.Contains(errMsg, "UNIQUE constraint failed") {
 		return wrapError(SQLitePrefix, ErrDuplicateKey, err)
@@ -182,7 +244,7 @@ func (m SQLiteErrorMapper) MapError(err error) error {
 		return wrapError(SQLitePrefix, ErrSyntaxError, err)
 	}
 
-	// Query timeout
+	// Query timeout (context-level, not a sqlite3.Error)
 	if strings.Contains(errMsg, "deadline exceeded") || strings.Contains(errMsg, "query timeout") {
 		return wrapError(SQLitePrefix, ErrQueryTimeout, err)
 	}
@@ -246,11 +308,30 @@ func checkPostgresTimeout(errMsg string) bool {
 type MSSQLErrorMapper struct{}
 
 // MapError maps MSSQL error codes to sentinel errors with [mssql] prefix.
+// Typed detection via mssql.Error.Number takes precedence over string matching.
 func (m MSSQLErrorMapper) MapError(err error) error {
 	if err == nil {
 		return nil
 	}
 
+	var mssqlErr mssql.Error
+	if errors.As(err, &mssqlErr) {
+		switch mssqlErr.Number {
+		case 2627, 2601:
+			return wrapError(MSSQLPrefix, ErrDuplicateKey, err)
+		case 547:
+			return wrapError(MSSQLPrefix, ErrForeignKeyViolation, err)
+		case 102, 156:
+			return wrapError(MSSQLPrefix, ErrSyntaxError, err)
+		case -2:
+			return wrapError(MSSQLPrefix, ErrQueryTimeout, err)
+		}
+	}
+
+	return mssqlMapErrorOnString(err)
+}
+
+func mssqlMapErrorOnString(err error) error {
 	errMsg := err.Error()
 
 	if checkMSSQLDuplicateKey(errMsg) {

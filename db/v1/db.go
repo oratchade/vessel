@@ -37,11 +37,12 @@ type PoolStatistics struct {
 	MaxLifetimeClosed  int64         // Cumulative count of connections closed due to SetConnMaxLifetime
 }
 
-func fromSQLResult(res sql.Result) *ExecResult {
-	ra, _ := res.RowsAffected()
-	return &ExecResult{
-		RowsAffected: ra,
+func fromSQLResult(res sql.Result) (*ExecResult, error) {
+	ra, err := res.RowsAffected()
+	if err != nil {
+		return nil, fmt.Errorf("fromSQLResult: failed to get rows affected: %w", err)
 	}
+	return &ExecResult{RowsAffected: ra}, nil
 }
 
 //go:generate mockgen -source=db.go -destination=db_mocks.go -package=v1 DBConfig
