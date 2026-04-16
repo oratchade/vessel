@@ -369,13 +369,13 @@ func TestSelectBuilderLimitOffset(t *testing.T) {
 
 // TestSelectBuilderValidation tests query option validation at execution time
 func TestSelectBuilderValidation(t *testing.T) {
-	// Test that ValidateQueryOptions properly rejects invalid directions
+	// Test that ExportValidateQueryOptions properly rejects invalid directions
 	opts := &options.QueryOptions{
 		OrderBy: []options.OrderBy{
 			{Column: "id", Direction: "INVALID"},
 		},
 	}
-	err := v1.ValidateQueryOptions(opts)
+	err := v1.ExportValidateQueryOptions(opts)
 	require.Error(t, err)
 	require.Contains(t, err.Error(), "invalid direction")
 
@@ -383,7 +383,7 @@ func TestSelectBuilderValidation(t *testing.T) {
 	opts = &options.QueryOptions{
 		Limit: ptrInt(-1),
 	}
-	err = v1.ValidateQueryOptions(opts)
+	err = v1.ExportValidateQueryOptions(opts)
 	require.Error(t, err)
 	require.Contains(t, err.Error(), "Limit")
 	require.Contains(t, err.Error(), "cannot be negative")
@@ -392,7 +392,7 @@ func TestSelectBuilderValidation(t *testing.T) {
 	opts = &options.QueryOptions{
 		Offset: ptrInt(-5),
 	}
-	err = v1.ValidateQueryOptions(opts)
+	err = v1.ExportValidateQueryOptions(opts)
 	require.Error(t, err)
 	require.Contains(t, err.Error(), "Offset")
 	require.Contains(t, err.Error(), "cannot be negative")
@@ -402,7 +402,7 @@ func TestSelectBuilderValidation(t *testing.T) {
 		Limit:  ptrInt(0),
 		Offset: ptrInt(0),
 	}
-	err = v1.ValidateQueryOptions(opts)
+	err = v1.ExportValidateQueryOptions(opts)
 	require.NoError(t, err)
 
 	// Test that valid ASC/DESC directions are allowed
@@ -412,11 +412,11 @@ func TestSelectBuilderValidation(t *testing.T) {
 			{Column: "name", Direction: "DESC"},
 		},
 	}
-	err = v1.ValidateQueryOptions(opts)
+	err = v1.ExportValidateQueryOptions(opts)
 	require.NoError(t, err)
 
 	// Test that nil options are allowed
-	err = v1.ValidateQueryOptions(nil)
+	err = v1.ExportValidateQueryOptions(nil)
 	require.NoError(t, err)
 }
 
