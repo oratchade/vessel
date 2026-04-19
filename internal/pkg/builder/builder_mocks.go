@@ -36,9 +36,9 @@ func (m *MockQueryBuilder) EXPECT() *MockQueryBuilderMockRecorder {
 }
 
 // Delete mocks base method.
-func (m *MockQueryBuilder) Delete(table string, cond condition.Condition) (string, []any, error) {
+func (m *MockQueryBuilder) Delete(table string, joins []condition.Join, cond condition.Condition) (string, []any, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "Delete", table, cond)
+	ret := m.ctrl.Call(m, "Delete", table, joins, cond)
 	ret0, _ := ret[0].(string)
 	ret1, _ := ret[1].([]any)
 	ret2, _ := ret[2].(error)
@@ -46,9 +46,9 @@ func (m *MockQueryBuilder) Delete(table string, cond condition.Condition) (strin
 }
 
 // Delete indicates an expected call of Delete.
-func (mr *MockQueryBuilderMockRecorder) Delete(table, cond any) *gomock.Call {
+func (mr *MockQueryBuilderMockRecorder) Delete(table, joins, cond any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Delete", reflect.TypeOf((*MockQueryBuilder)(nil).Delete), table, cond)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Delete", reflect.TypeOf((*MockQueryBuilder)(nil).Delete), table, joins, cond)
 }
 
 // Insert mocks base method.
@@ -100,9 +100,9 @@ func (mr *MockQueryBuilderMockRecorder) Select(table, columns, joins, opts, cond
 }
 
 // Update mocks base method.
-func (m *MockQueryBuilder) Update(table string, data map[string]any, cond condition.Condition) (string, []any, error) {
+func (m *MockQueryBuilder) Update(table string, data map[string]any, joins []condition.Join, cond condition.Condition) (string, []any, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "Update", table, data, cond)
+	ret := m.ctrl.Call(m, "Update", table, data, joins, cond)
 	ret0, _ := ret[0].(string)
 	ret1, _ := ret[1].([]any)
 	ret2, _ := ret[2].(error)
@@ -110,7 +110,7 @@ func (m *MockQueryBuilder) Update(table string, data map[string]any, cond condit
 }
 
 // Update indicates an expected call of Update.
-func (mr *MockQueryBuilderMockRecorder) Update(table, data, cond any) *gomock.Call {
+func (mr *MockQueryBuilderMockRecorder) Update(table, data, joins, cond any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Update", reflect.TypeOf((*MockQueryBuilder)(nil).Update), table, data, cond)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Update", reflect.TypeOf((*MockQueryBuilder)(nil).Update), table, data, joins, cond)
 }

@@ -64,66 +64,31 @@ func (mr *MockDBConfigMockRecorder) Driver() *gomock.Call {
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Driver", reflect.TypeOf((*MockDBConfig)(nil).Driver))
 }
 
-// MockDBActions is a mock of DBActions interface.
-type MockDBActions struct {
+// Mockreader is a mock of reader interface.
+type Mockreader struct {
 	ctrl     *gomock.Controller
-	recorder *MockDBActionsMockRecorder
+	recorder *MockreaderMockRecorder
 }
 
-// MockDBActionsMockRecorder is the mock recorder for MockDBActions.
-type MockDBActionsMockRecorder struct {
-	mock *MockDBActions
+// MockreaderMockRecorder is the mock recorder for Mockreader.
+type MockreaderMockRecorder struct {
+	mock *Mockreader
 }
 
-// NewMockDBActions creates a new mock instance.
-func NewMockDBActions(ctrl *gomock.Controller) *MockDBActions {
-	mock := &MockDBActions{ctrl: ctrl}
-	mock.recorder = &MockDBActionsMockRecorder{mock}
+// NewMockreader creates a new mock instance.
+func NewMockreader(ctrl *gomock.Controller) *Mockreader {
+	mock := &Mockreader{ctrl: ctrl}
+	mock.recorder = &MockreaderMockRecorder{mock}
 	return mock
 }
 
 // EXPECT returns an object that allows the caller to indicate expected use.
-func (m *MockDBActions) EXPECT() *MockDBActionsMockRecorder {
+func (m *Mockreader) EXPECT() *MockreaderMockRecorder {
 	return m.recorder
 }
 
-// Delete mocks base method.
-func (m *MockDBActions) Delete(ctx context.Context, table string, joins []condition.Join, conditions condition.Condition, opts *options.QueryOptions) (*ExecResult, error) {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "Delete", ctx, table, joins, conditions, opts)
-	ret0, _ := ret[0].(*ExecResult)
-	ret1, _ := ret[1].(error)
-	return ret0, ret1
-}
-
-// Delete indicates an expected call of Delete.
-func (mr *MockDBActionsMockRecorder) Delete(ctx, table, joins, conditions, opts any) *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Delete", reflect.TypeOf((*MockDBActions)(nil).Delete), ctx, table, joins, conditions, opts)
-}
-
-// Exec mocks base method.
-func (m *MockDBActions) Exec(ctx context.Context, query string, args ...any) (*ExecResult, error) {
-	m.ctrl.T.Helper()
-	varargs := []any{ctx, query}
-	for _, a := range args {
-		varargs = append(varargs, a)
-	}
-	ret := m.ctrl.Call(m, "Exec", varargs...)
-	ret0, _ := ret[0].(*ExecResult)
-	ret1, _ := ret[1].(error)
-	return ret0, ret1
-}
-
-// Exec indicates an expected call of Exec.
-func (mr *MockDBActionsMockRecorder) Exec(ctx, query any, args ...any) *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	varargs := append([]any{ctx, query}, args...)
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Exec", reflect.TypeOf((*MockDBActions)(nil).Exec), varargs...)
-}
-
 // Get mocks base method.
-func (m *MockDBActions) Get(ctx context.Context, table string, columns []string, joins []condition.Join, conditions condition.Condition, opts *options.QueryOptions) ([]map[string]any, error) {
+func (m *Mockreader) Get(ctx context.Context, table string, columns []string, joins []condition.Join, conditions condition.Condition, opts *options.QueryOptions) ([]map[string]any, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "Get", ctx, table, columns, joins, conditions, opts)
 	ret0, _ := ret[0].([]map[string]any)
@@ -132,13 +97,13 @@ func (m *MockDBActions) Get(ctx context.Context, table string, columns []string,
 }
 
 // Get indicates an expected call of Get.
-func (mr *MockDBActionsMockRecorder) Get(ctx, table, columns, joins, conditions, opts any) *gomock.Call {
+func (mr *MockreaderMockRecorder) Get(ctx, table, columns, joins, conditions, opts any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Get", reflect.TypeOf((*MockDBActions)(nil).Get), ctx, table, columns, joins, conditions, opts)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Get", reflect.TypeOf((*Mockreader)(nil).Get), ctx, table, columns, joins, conditions, opts)
 }
 
 // GetByID mocks base method.
-func (m *MockDBActions) GetByID(ctx context.Context, table string, id any, joins []condition.Join, opts *options.QueryOptions) ([]map[string]any, error) {
+func (m *Mockreader) GetByID(ctx context.Context, table string, id any, joins []condition.Join, opts *options.QueryOptions) ([]map[string]any, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "GetByID", ctx, table, id, joins, opts)
 	ret0, _ := ret[0].([]map[string]any)
@@ -147,13 +112,13 @@ func (m *MockDBActions) GetByID(ctx context.Context, table string, id any, joins
 }
 
 // GetByID indicates an expected call of GetByID.
-func (mr *MockDBActionsMockRecorder) GetByID(ctx, table, id, joins, opts any) *gomock.Call {
+func (mr *MockreaderMockRecorder) GetByID(ctx, table, id, joins, opts any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetByID", reflect.TypeOf((*MockDBActions)(nil).GetByID), ctx, table, id, joins, opts)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetByID", reflect.TypeOf((*Mockreader)(nil).GetByID), ctx, table, id, joins, opts)
 }
 
 // GetByIDRaw mocks base method.
-func (m *MockDBActions) GetByIDRaw(ctx context.Context, table string, id any, joins []condition.Join, opts *options.QueryOptions) (*RowsAdapter, error) {
+func (m *Mockreader) GetByIDRaw(ctx context.Context, table string, id any, joins []condition.Join, opts *options.QueryOptions) (*RowsAdapter, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "GetByIDRaw", ctx, table, id, joins, opts)
 	ret0, _ := ret[0].(*RowsAdapter)
@@ -162,13 +127,13 @@ func (m *MockDBActions) GetByIDRaw(ctx context.Context, table string, id any, jo
 }
 
 // GetByIDRaw indicates an expected call of GetByIDRaw.
-func (mr *MockDBActionsMockRecorder) GetByIDRaw(ctx, table, id, joins, opts any) *gomock.Call {
+func (mr *MockreaderMockRecorder) GetByIDRaw(ctx, table, id, joins, opts any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetByIDRaw", reflect.TypeOf((*MockDBActions)(nil).GetByIDRaw), ctx, table, id, joins, opts)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetByIDRaw", reflect.TypeOf((*Mockreader)(nil).GetByIDRaw), ctx, table, id, joins, opts)
 }
 
 // GetRaw mocks base method.
-func (m *MockDBActions) GetRaw(ctx context.Context, table string, columns []string, joins []condition.Join, conditions condition.Condition, opts *options.QueryOptions) (*RowsAdapter, error) {
+func (m *Mockreader) GetRaw(ctx context.Context, table string, columns []string, joins []condition.Join, conditions condition.Condition, opts *options.QueryOptions) (*RowsAdapter, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "GetRaw", ctx, table, columns, joins, conditions, opts)
 	ret0, _ := ret[0].(*RowsAdapter)
@@ -177,43 +142,13 @@ func (m *MockDBActions) GetRaw(ctx context.Context, table string, columns []stri
 }
 
 // GetRaw indicates an expected call of GetRaw.
-func (mr *MockDBActionsMockRecorder) GetRaw(ctx, table, columns, joins, conditions, opts any) *gomock.Call {
+func (mr *MockreaderMockRecorder) GetRaw(ctx, table, columns, joins, conditions, opts any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetRaw", reflect.TypeOf((*MockDBActions)(nil).GetRaw), ctx, table, columns, joins, conditions, opts)
-}
-
-// Insert mocks base method.
-func (m *MockDBActions) Insert(ctx context.Context, table string, data map[string]any, opts *options.QueryOptions) (*ExecResult, error) {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "Insert", ctx, table, data, opts)
-	ret0, _ := ret[0].(*ExecResult)
-	ret1, _ := ret[1].(error)
-	return ret0, ret1
-}
-
-// Insert indicates an expected call of Insert.
-func (mr *MockDBActionsMockRecorder) Insert(ctx, table, data, opts any) *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Insert", reflect.TypeOf((*MockDBActions)(nil).Insert), ctx, table, data, opts)
-}
-
-// Inserts mocks base method.
-func (m *MockDBActions) Inserts(ctx context.Context, table string, data []map[string]any, opts *options.QueryOptions) (*ExecResult, error) {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "Inserts", ctx, table, data, opts)
-	ret0, _ := ret[0].(*ExecResult)
-	ret1, _ := ret[1].(error)
-	return ret0, ret1
-}
-
-// Inserts indicates an expected call of Inserts.
-func (mr *MockDBActionsMockRecorder) Inserts(ctx, table, data, opts any) *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Inserts", reflect.TypeOf((*MockDBActions)(nil).Inserts), ctx, table, data, opts)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetRaw", reflect.TypeOf((*Mockreader)(nil).GetRaw), ctx, table, columns, joins, conditions, opts)
 }
 
 // Query mocks base method.
-func (m *MockDBActions) Query(ctx context.Context, query string, args ...any) ([]map[string]any, error) {
+func (m *Mockreader) Query(ctx context.Context, query string, args ...any) ([]map[string]any, error) {
 	m.ctrl.T.Helper()
 	varargs := []any{ctx, query}
 	for _, a := range args {
@@ -226,14 +161,14 @@ func (m *MockDBActions) Query(ctx context.Context, query string, args ...any) ([
 }
 
 // Query indicates an expected call of Query.
-func (mr *MockDBActionsMockRecorder) Query(ctx, query any, args ...any) *gomock.Call {
+func (mr *MockreaderMockRecorder) Query(ctx, query any, args ...any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	varargs := append([]any{ctx, query}, args...)
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Query", reflect.TypeOf((*MockDBActions)(nil).Query), varargs...)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Query", reflect.TypeOf((*Mockreader)(nil).Query), varargs...)
 }
 
 // QueryRaw mocks base method.
-func (m *MockDBActions) QueryRaw(ctx context.Context, query string, args ...any) (*RowsAdapter, error) {
+func (m *Mockreader) QueryRaw(ctx context.Context, query string, args ...any) (*RowsAdapter, error) {
 	m.ctrl.T.Helper()
 	varargs := []any{ctx, query}
 	for _, a := range args {
@@ -246,14 +181,102 @@ func (m *MockDBActions) QueryRaw(ctx context.Context, query string, args ...any)
 }
 
 // QueryRaw indicates an expected call of QueryRaw.
-func (mr *MockDBActionsMockRecorder) QueryRaw(ctx, query any, args ...any) *gomock.Call {
+func (mr *MockreaderMockRecorder) QueryRaw(ctx, query any, args ...any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	varargs := append([]any{ctx, query}, args...)
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "QueryRaw", reflect.TypeOf((*MockDBActions)(nil).QueryRaw), varargs...)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "QueryRaw", reflect.TypeOf((*Mockreader)(nil).QueryRaw), varargs...)
+}
+
+// Mockwriter is a mock of writer interface.
+type Mockwriter struct {
+	ctrl     *gomock.Controller
+	recorder *MockwriterMockRecorder
+}
+
+// MockwriterMockRecorder is the mock recorder for Mockwriter.
+type MockwriterMockRecorder struct {
+	mock *Mockwriter
+}
+
+// NewMockwriter creates a new mock instance.
+func NewMockwriter(ctrl *gomock.Controller) *Mockwriter {
+	mock := &Mockwriter{ctrl: ctrl}
+	mock.recorder = &MockwriterMockRecorder{mock}
+	return mock
+}
+
+// EXPECT returns an object that allows the caller to indicate expected use.
+func (m *Mockwriter) EXPECT() *MockwriterMockRecorder {
+	return m.recorder
+}
+
+// Delete mocks base method.
+func (m *Mockwriter) Delete(ctx context.Context, table string, joins []condition.Join, conditions condition.Condition, opts *options.QueryOptions) (*ExecResult, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "Delete", ctx, table, joins, conditions, opts)
+	ret0, _ := ret[0].(*ExecResult)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// Delete indicates an expected call of Delete.
+func (mr *MockwriterMockRecorder) Delete(ctx, table, joins, conditions, opts any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Delete", reflect.TypeOf((*Mockwriter)(nil).Delete), ctx, table, joins, conditions, opts)
+}
+
+// Exec mocks base method.
+func (m *Mockwriter) Exec(ctx context.Context, query string, args ...any) (*ExecResult, error) {
+	m.ctrl.T.Helper()
+	varargs := []any{ctx, query}
+	for _, a := range args {
+		varargs = append(varargs, a)
+	}
+	ret := m.ctrl.Call(m, "Exec", varargs...)
+	ret0, _ := ret[0].(*ExecResult)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// Exec indicates an expected call of Exec.
+func (mr *MockwriterMockRecorder) Exec(ctx, query any, args ...any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	varargs := append([]any{ctx, query}, args...)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Exec", reflect.TypeOf((*Mockwriter)(nil).Exec), varargs...)
+}
+
+// Insert mocks base method.
+func (m *Mockwriter) Insert(ctx context.Context, table string, data map[string]any, opts *options.QueryOptions) (*ExecResult, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "Insert", ctx, table, data, opts)
+	ret0, _ := ret[0].(*ExecResult)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// Insert indicates an expected call of Insert.
+func (mr *MockwriterMockRecorder) Insert(ctx, table, data, opts any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Insert", reflect.TypeOf((*Mockwriter)(nil).Insert), ctx, table, data, opts)
+}
+
+// Inserts mocks base method.
+func (m *Mockwriter) Inserts(ctx context.Context, table string, data []map[string]any, opts *options.QueryOptions) (*ExecResult, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "Inserts", ctx, table, data, opts)
+	ret0, _ := ret[0].(*ExecResult)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// Inserts indicates an expected call of Inserts.
+func (mr *MockwriterMockRecorder) Inserts(ctx, table, data, opts any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Inserts", reflect.TypeOf((*Mockwriter)(nil).Inserts), ctx, table, data, opts)
 }
 
 // Update mocks base method.
-func (m *MockDBActions) Update(ctx context.Context, table string, data map[string]any, joins []condition.Join, conditions condition.Condition, opts *options.QueryOptions) (*ExecResult, error) {
+func (m *Mockwriter) Update(ctx context.Context, table string, data map[string]any, joins []condition.Join, conditions condition.Condition, opts *options.QueryOptions) (*ExecResult, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "Update", ctx, table, data, joins, conditions, opts)
 	ret0, _ := ret[0].(*ExecResult)
@@ -262,36 +285,36 @@ func (m *MockDBActions) Update(ctx context.Context, table string, data map[strin
 }
 
 // Update indicates an expected call of Update.
-func (mr *MockDBActionsMockRecorder) Update(ctx, table, data, joins, conditions, opts any) *gomock.Call {
+func (mr *MockwriterMockRecorder) Update(ctx, table, data, joins, conditions, opts any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Update", reflect.TypeOf((*MockDBActions)(nil).Update), ctx, table, data, joins, conditions, opts)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Update", reflect.TypeOf((*Mockwriter)(nil).Update), ctx, table, data, joins, conditions, opts)
 }
 
-// MockDBQueries is a mock of DBQueries interface.
-type MockDBQueries struct {
+// Mockintrospector is a mock of introspector interface.
+type Mockintrospector struct {
 	ctrl     *gomock.Controller
-	recorder *MockDBQueriesMockRecorder
+	recorder *MockintrospectorMockRecorder
 }
 
-// MockDBQueriesMockRecorder is the mock recorder for MockDBQueries.
-type MockDBQueriesMockRecorder struct {
-	mock *MockDBQueries
+// MockintrospectorMockRecorder is the mock recorder for Mockintrospector.
+type MockintrospectorMockRecorder struct {
+	mock *Mockintrospector
 }
 
-// NewMockDBQueries creates a new mock instance.
-func NewMockDBQueries(ctrl *gomock.Controller) *MockDBQueries {
-	mock := &MockDBQueries{ctrl: ctrl}
-	mock.recorder = &MockDBQueriesMockRecorder{mock}
+// NewMockintrospector creates a new mock instance.
+func NewMockintrospector(ctrl *gomock.Controller) *Mockintrospector {
+	mock := &Mockintrospector{ctrl: ctrl}
+	mock.recorder = &MockintrospectorMockRecorder{mock}
 	return mock
 }
 
 // EXPECT returns an object that allows the caller to indicate expected use.
-func (m *MockDBQueries) EXPECT() *MockDBQueriesMockRecorder {
+func (m *Mockintrospector) EXPECT() *MockintrospectorMockRecorder {
 	return m.recorder
 }
 
 // DeleteQuery mocks base method.
-func (m *MockDBQueries) DeleteQuery(table string, joins []condition.Join, conditions condition.Condition, opts *options.QueryOptions) (string, []any, error) {
+func (m *Mockintrospector) DeleteQuery(table string, joins []condition.Join, conditions condition.Condition, opts *options.QueryOptions) (string, []any, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "DeleteQuery", table, joins, conditions, opts)
 	ret0, _ := ret[0].(string)
@@ -301,13 +324,13 @@ func (m *MockDBQueries) DeleteQuery(table string, joins []condition.Join, condit
 }
 
 // DeleteQuery indicates an expected call of DeleteQuery.
-func (mr *MockDBQueriesMockRecorder) DeleteQuery(table, joins, conditions, opts any) *gomock.Call {
+func (mr *MockintrospectorMockRecorder) DeleteQuery(table, joins, conditions, opts any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DeleteQuery", reflect.TypeOf((*MockDBQueries)(nil).DeleteQuery), table, joins, conditions, opts)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DeleteQuery", reflect.TypeOf((*Mockintrospector)(nil).DeleteQuery), table, joins, conditions, opts)
 }
 
 // Explain mocks base method.
-func (m *MockDBQueries) Explain(ctx context.Context, query string, args ...any) (*RowsAdapter, error) {
+func (m *Mockintrospector) Explain(ctx context.Context, query string, args ...any) (*RowsAdapter, error) {
 	m.ctrl.T.Helper()
 	varargs := []any{ctx, query}
 	for _, a := range args {
@@ -320,14 +343,14 @@ func (m *MockDBQueries) Explain(ctx context.Context, query string, args ...any) 
 }
 
 // Explain indicates an expected call of Explain.
-func (mr *MockDBQueriesMockRecorder) Explain(ctx, query any, args ...any) *gomock.Call {
+func (mr *MockintrospectorMockRecorder) Explain(ctx, query any, args ...any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	varargs := append([]any{ctx, query}, args...)
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Explain", reflect.TypeOf((*MockDBQueries)(nil).Explain), varargs...)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Explain", reflect.TypeOf((*Mockintrospector)(nil).Explain), varargs...)
 }
 
 // GetByIDQuery mocks base method.
-func (m *MockDBQueries) GetByIDQuery(table string, id any, joins []condition.Join, opts *options.QueryOptions) (string, []any, error) {
+func (m *Mockintrospector) GetByIDQuery(table string, id any, joins []condition.Join, opts *options.QueryOptions) (string, []any, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "GetByIDQuery", table, id, joins, opts)
 	ret0, _ := ret[0].(string)
@@ -337,13 +360,13 @@ func (m *MockDBQueries) GetByIDQuery(table string, id any, joins []condition.Joi
 }
 
 // GetByIDQuery indicates an expected call of GetByIDQuery.
-func (mr *MockDBQueriesMockRecorder) GetByIDQuery(table, id, joins, opts any) *gomock.Call {
+func (mr *MockintrospectorMockRecorder) GetByIDQuery(table, id, joins, opts any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetByIDQuery", reflect.TypeOf((*MockDBQueries)(nil).GetByIDQuery), table, id, joins, opts)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetByIDQuery", reflect.TypeOf((*Mockintrospector)(nil).GetByIDQuery), table, id, joins, opts)
 }
 
 // GetQuery mocks base method.
-func (m *MockDBQueries) GetQuery(table string, columns []string, joins []condition.Join, conditions condition.Condition, opts *options.QueryOptions) (string, []any, error) {
+func (m *Mockintrospector) GetQuery(table string, columns []string, joins []condition.Join, conditions condition.Condition, opts *options.QueryOptions) (string, []any, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "GetQuery", table, columns, joins, conditions, opts)
 	ret0, _ := ret[0].(string)
@@ -353,13 +376,13 @@ func (m *MockDBQueries) GetQuery(table string, columns []string, joins []conditi
 }
 
 // GetQuery indicates an expected call of GetQuery.
-func (mr *MockDBQueriesMockRecorder) GetQuery(table, columns, joins, conditions, opts any) *gomock.Call {
+func (mr *MockintrospectorMockRecorder) GetQuery(table, columns, joins, conditions, opts any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetQuery", reflect.TypeOf((*MockDBQueries)(nil).GetQuery), table, columns, joins, conditions, opts)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetQuery", reflect.TypeOf((*Mockintrospector)(nil).GetQuery), table, columns, joins, conditions, opts)
 }
 
 // InsertQuery mocks base method.
-func (m *MockDBQueries) InsertQuery(table string, data map[string]any, opts *options.QueryOptions) (string, []any, error) {
+func (m *Mockintrospector) InsertQuery(table string, data map[string]any, opts *options.QueryOptions) (string, []any, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "InsertQuery", table, data, opts)
 	ret0, _ := ret[0].(string)
@@ -369,13 +392,13 @@ func (m *MockDBQueries) InsertQuery(table string, data map[string]any, opts *opt
 }
 
 // InsertQuery indicates an expected call of InsertQuery.
-func (mr *MockDBQueriesMockRecorder) InsertQuery(table, data, opts any) *gomock.Call {
+func (mr *MockintrospectorMockRecorder) InsertQuery(table, data, opts any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "InsertQuery", reflect.TypeOf((*MockDBQueries)(nil).InsertQuery), table, data, opts)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "InsertQuery", reflect.TypeOf((*Mockintrospector)(nil).InsertQuery), table, data, opts)
 }
 
 // InsertsQuery mocks base method.
-func (m *MockDBQueries) InsertsQuery(table string, data []map[string]any, opts *options.QueryOptions) (string, []any, error) {
+func (m *Mockintrospector) InsertsQuery(table string, data []map[string]any, opts *options.QueryOptions) (string, []any, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "InsertsQuery", table, data, opts)
 	ret0, _ := ret[0].(string)
@@ -385,13 +408,13 @@ func (m *MockDBQueries) InsertsQuery(table string, data []map[string]any, opts *
 }
 
 // InsertsQuery indicates an expected call of InsertsQuery.
-func (mr *MockDBQueriesMockRecorder) InsertsQuery(table, data, opts any) *gomock.Call {
+func (mr *MockintrospectorMockRecorder) InsertsQuery(table, data, opts any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "InsertsQuery", reflect.TypeOf((*MockDBQueries)(nil).InsertsQuery), table, data, opts)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "InsertsQuery", reflect.TypeOf((*Mockintrospector)(nil).InsertsQuery), table, data, opts)
 }
 
 // UpdateQuery mocks base method.
-func (m *MockDBQueries) UpdateQuery(table string, data map[string]any, joins []condition.Join, conditions condition.Condition, opts *options.QueryOptions) (string, []any, error) {
+func (m *Mockintrospector) UpdateQuery(table string, data map[string]any, joins []condition.Join, conditions condition.Condition, opts *options.QueryOptions) (string, []any, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "UpdateQuery", table, data, joins, conditions, opts)
 	ret0, _ := ret[0].(string)
@@ -401,9 +424,150 @@ func (m *MockDBQueries) UpdateQuery(table string, data map[string]any, joins []c
 }
 
 // UpdateQuery indicates an expected call of UpdateQuery.
-func (mr *MockDBQueriesMockRecorder) UpdateQuery(table, data, joins, conditions, opts any) *gomock.Call {
+func (mr *MockintrospectorMockRecorder) UpdateQuery(table, data, joins, conditions, opts any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "UpdateQuery", reflect.TypeOf((*MockDBQueries)(nil).UpdateQuery), table, data, joins, conditions, opts)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "UpdateQuery", reflect.TypeOf((*Mockintrospector)(nil).UpdateQuery), table, data, joins, conditions, opts)
+}
+
+// Mocktransactional is a mock of transactional interface.
+type Mocktransactional struct {
+	ctrl     *gomock.Controller
+	recorder *MocktransactionalMockRecorder
+}
+
+// MocktransactionalMockRecorder is the mock recorder for Mocktransactional.
+type MocktransactionalMockRecorder struct {
+	mock *Mocktransactional
+}
+
+// NewMocktransactional creates a new mock instance.
+func NewMocktransactional(ctrl *gomock.Controller) *Mocktransactional {
+	mock := &Mocktransactional{ctrl: ctrl}
+	mock.recorder = &MocktransactionalMockRecorder{mock}
+	return mock
+}
+
+// EXPECT returns an object that allows the caller to indicate expected use.
+func (m *Mocktransactional) EXPECT() *MocktransactionalMockRecorder {
+	return m.recorder
+}
+
+// Begin mocks base method.
+func (m *Mocktransactional) Begin(ctx context.Context) (Tx, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "Begin", ctx)
+	ret0, _ := ret[0].(Tx)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// Begin indicates an expected call of Begin.
+func (mr *MocktransactionalMockRecorder) Begin(ctx any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Begin", reflect.TypeOf((*Mocktransactional)(nil).Begin), ctx)
+}
+
+// WithTransaction mocks base method.
+func (m *Mocktransactional) WithTransaction(ctx context.Context, fn func(Tx) error) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "WithTransaction", ctx, fn)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// WithTransaction indicates an expected call of WithTransaction.
+func (mr *MocktransactionalMockRecorder) WithTransaction(ctx, fn any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "WithTransaction", reflect.TypeOf((*Mocktransactional)(nil).WithTransaction), ctx, fn)
+}
+
+// MockhealthCheck is a mock of healthCheck interface.
+type MockhealthCheck struct {
+	ctrl     *gomock.Controller
+	recorder *MockhealthCheckMockRecorder
+}
+
+// MockhealthCheckMockRecorder is the mock recorder for MockhealthCheck.
+type MockhealthCheckMockRecorder struct {
+	mock *MockhealthCheck
+}
+
+// NewMockhealthCheck creates a new mock instance.
+func NewMockhealthCheck(ctrl *gomock.Controller) *MockhealthCheck {
+	mock := &MockhealthCheck{ctrl: ctrl}
+	mock.recorder = &MockhealthCheckMockRecorder{mock}
+	return mock
+}
+
+// EXPECT returns an object that allows the caller to indicate expected use.
+func (m *MockhealthCheck) EXPECT() *MockhealthCheckMockRecorder {
+	return m.recorder
+}
+
+// Ping mocks base method.
+func (m *MockhealthCheck) Ping(ctx context.Context) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "Ping", ctx)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// Ping indicates an expected call of Ping.
+func (mr *MockhealthCheckMockRecorder) Ping(ctx any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Ping", reflect.TypeOf((*MockhealthCheck)(nil).Ping), ctx)
+}
+
+// PoolStats mocks base method.
+func (m *MockhealthCheck) PoolStats() (*PoolStatistics, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "PoolStats")
+	ret0, _ := ret[0].(*PoolStatistics)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// PoolStats indicates an expected call of PoolStats.
+func (mr *MockhealthCheckMockRecorder) PoolStats() *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "PoolStats", reflect.TypeOf((*MockhealthCheck)(nil).PoolStats))
+}
+
+// Mockcloser is a mock of closer interface.
+type Mockcloser struct {
+	ctrl     *gomock.Controller
+	recorder *MockcloserMockRecorder
+}
+
+// MockcloserMockRecorder is the mock recorder for Mockcloser.
+type MockcloserMockRecorder struct {
+	mock *Mockcloser
+}
+
+// NewMockcloser creates a new mock instance.
+func NewMockcloser(ctrl *gomock.Controller) *Mockcloser {
+	mock := &Mockcloser{ctrl: ctrl}
+	mock.recorder = &MockcloserMockRecorder{mock}
+	return mock
+}
+
+// EXPECT returns an object that allows the caller to indicate expected use.
+func (m *Mockcloser) EXPECT() *MockcloserMockRecorder {
+	return m.recorder
+}
+
+// Close mocks base method.
+func (m *Mockcloser) Close() error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "Close")
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// Close indicates an expected call of Close.
+func (mr *MockcloserMockRecorder) Close() *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Close", reflect.TypeOf((*Mockcloser)(nil).Close))
 }
 
 // MockDB is a mock of DB interface.
