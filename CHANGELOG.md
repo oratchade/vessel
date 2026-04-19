@@ -41,10 +41,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Health check support
 - Row scanning abstraction with universal Row interface
 - Type-safe field access and flexible scanning strategies
-- 829 comprehensive tests with 100% pass rate
+- Resource pooling for RowsAdapter with sync.Pool (98-99% allocation reduction)
+- ManagedRowsAdapter for automatic cleanup with finalizer fallback
+- ScanRowsTo[T] generic for type-safe automatic resource management
+- 7 comprehensive resource management examples with benchmarks
+- 829+ comprehensive tests with 100% pass rate
 
 ### Changed
 
+- **Interface Encapsulation**: Made reader, writer, introspector,
+  transactional, healthCheck, and closer interfaces private (lowercase names)
+  as they are internal implementation details. Public API surfaces
+  (DB, Tx, FluentDB) remain unchanged, providing better encapsulation and
+  cleaner public API surface.
+- **FluentDB API Simplification**: Simplified `NewFluentDB`
+  constructor to accept a single composed interface combining reader,
+  writer, and introspector operations. This reduces parameter passing
+  complexity and improves API ergonomics.
 - Fluent API redesigned for ergonomics with clear separation of concerns
 - OrderBy implementation restructured to support ASC/DESC direction control
 - SQL function support enhanced with better AS aliases

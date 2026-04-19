@@ -872,11 +872,18 @@ Execute DDL/DML without returning rows.
 type QueryResponse struct {
     RequestID string            // Unique request identifier
     Data      []map[string]any  // Rows (only for SELECT queries)
-    RawData   *db.RowsAdapter   // For GetRaw/QueryRaw (must close)
+    RawData   *db.RowsAdapter   // For GetRaw/QueryRaw - use ScanRowsTo[T], pool, or managed wrapper
     ExecData  *db.ExecResult    // For INSERT/UPDATE/DELETE
     Error     error             // Any error during execution
 }
 ```
+
+**Note on RawData usage:** When GetRaw/QueryRaw is called, use one of these patterns:
+1. **ScanRowsTo[T]** (recommended) - Automatic cleanup: `users, _ := db.ScanRowsTo[User](ctx, resp.RawData)`
+2. **RowsAdapterPool** (high-throughput) - Explicit pooling for tight loops
+3. **ManagedRowsAdapter** (explicit) - Managed cleanup with finalizer fallback
+
+See [Resource Pooling Guide](./RESOURCE_POOLING.md) for comprehensive examples.
 
 ### Lifecycle Methods
 

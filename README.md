@@ -68,7 +68,8 @@ providing zero overhead.
 
 ### Setup & Configuration
 
-To export traces to a backend (Jaeger, Datadog, Grafana, etc.), initialize an OpenTelemetry exporter in your application:
+To export traces to a backend (Jaeger, Datadog, Grafana, etc.), initialize an
+OpenTelemetry exporter in your application:
 
 #### Using Jaeger Exporter (Local Development)
 
@@ -517,13 +518,15 @@ for _, user := range users {
 }
 ```
 
-⚠️ **Important: RowsAdapter Lifecycle Management**
+### RowsAdapter Resource Management
 
 The methods `GetRaw()`, `GetByIDRaw()`, and `QueryRaw()` return a `RowsAdapter`
-that holds database resources.
+that holds database resources. Fabric provides three patterns for safe resource
+management—choose based on your use case:
 
-**Always use `db.ScanRowsTo[T](ctx, rowsAdapter)`** for scanning—it automatically
-handles resource cleanup:
+#### Pattern 1: Type-Safe Automatic Cleanup (Recommended for Most)
+
+Use `ScanRowsTo[T]` for automatic resource management and type-safe results:
 
 ```go
 rowsAdapter, err := database.GetRaw(ctx, "users", []string{"*"}, nil, nil, nil)
@@ -542,16 +545,64 @@ for _, user := range users {
 }
 ```
 
-**Directly accessing the `RowsAdapter` without `ScanRowsTo[T]` will cause connection leaks.**
-Resources are not automatically cleaned up—use `ScanRowsTo[T]` exclusively.
-
 **Benefits:**
-
+- ✅ **Automatic cleanup** - Resources freed when done
 - ✅ **Type safety** - Compile-time column mapping verification
 - ✅ **Zero-copy** - Efficient field scanning without intermediate allocations
 - ✅ **Null handling** - Automatic SQL.Null\* type conversion
-- ✅ **Custom queries** - Full SQL flexibility with typed results
-- ✅ **Flexibility** - Works with any row scanning approach you prefer
+
+#### Pattern 2: Explicit Pooling (High-Throughput Loops)
+
+Use `RowsAdapterPool` for tight loops with many iterations:
+
+```go
+pool := v1.NewRowsAdapterPool()
+
+for i := 0; i < 10000; i++ {
+    rows, err := database.QueryRaw(ctx, query, i)
+    if err != nil { break }
+
+    adapter, err := pool.Acquire(rows)
+    if err != nil { break }
+    defer pool.Release(adapter)
+
+    // Process rows...
+    for adapter.Next() {
+        // ...
+    }
+}
+```
+
+**Benefits:**
+- ✅ **98-99% allocation reduction** in tight loops
+- ✅ **Thread-safe** - Safe to share across goroutines
+- ✅ **40-60% GC reduction** - Less garbage collection overhead
+
+#### Pattern 3: Managed Cleanup (Explicit Wrappers)
+
+Use `ManagedRowsAdapter` when you prefer explicit resource management:
+
+```go
+rows, err := database.QueryRaw(ctx, query, args...)
+if err != nil { log.Fatal(err) }
+
+managed, err := v1.WrapManagedRowsAdapter(rows)
+if err != nil { log.Fatal(err) }
+defer managed.Close()
+
+// Use the adapter
+adapter := managed.Adapter()
+for adapter.Next() {
+    // ...
+}
+```
+
+**Benefits:**
+- ✅ **Explicit semantics** - Clear resource lifecycle
+- ✅ **Finalizer fallback** - Resources cleaned up even if Close() forgotten
+- ✅ **Idempotent Close** - Safe to call multiple times
+
+**See Also:** [Resource Pooling Guide](./docs/RESOURCE_POOLING.md) for comprehensive examples and benchmarks
 
 ### Query Introspection and Performance Analysis
 

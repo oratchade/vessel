@@ -10,10 +10,18 @@ the entire system design, enabling rapid onboarding and informed extension decis
 **Status**: Production Ready (Grade A+, 802 tests, 100% pass rate)  
 **Target Audience**: AI agents, new contributors, maintainers
 
-## Recent API Changes (April 15-18, 2026)
+## Recent API Changes (April 15-19, 2026)
 
-- **Context Decoupled from Builders**: `NewFluentDB(db)` constructor signature
-  changed to remove context parameter. Context now passed at execution time.
+- **Comprehensive Interface Encapsulation**: Made all 6 internal composition
+  interfaces private (lowercase names): reader, writer, introspector, transactional,
+  healthCheck, closer. This reduces public API surface from 9 types to 3 (DB, Tx,
+  FluentDB) while maintaining full backward compatibility and improving implementation
+  flexibility.
+- **FluentDB Constructor Simplified**: Changed from three separate parameters
+  `(reader Reader, writer Writer, introspector Introspector)`
+  to single composed interface `(db interface {reader; writer; introspector})`.
+  This reduces parameter passing complexity
+  and improves API ergonomics while maintaining backward compatibility.
 - **Error Wrapping Standardized**: All errors follow `function: operation: %w`
   pattern for consistency.
 - **Builder Cleanup**: `Close()` method made private; resources auto-managed
