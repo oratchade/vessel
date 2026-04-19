@@ -7,9 +7,9 @@ detailed changes, see [CHANGELOG.md](CHANGELOG.md).
 
 ## Current Release
 
-### [1.0.0](CHANGELOG.md#100---2026-04-03-initial-release) — Stable ✅
+### [1.0.0](CHANGELOG.md#100---2026-04-19) — Stable ✅
 
-**Release Date**: April 3, 2026
+**Release Date**: April 19, 2026
 
 **Status**: Stable, Production-Ready
 
