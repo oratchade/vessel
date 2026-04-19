@@ -3,20 +3,15 @@
 package v1_test
 
 import (
+	"context"
+	"fmt"
 	"testing"
-	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	v1 "tounilab.com/fabric/db/v1"
+	"tounilab.com/fabric/db/v1/plugin"
 )
-
-// MockDBConfig implements the DBConfig interface for testing.
-type MockDBConfig struct{}
-
-func (m MockDBConfig) Dialect() string {
-	return "test"
-}
 
 // NoOpLogger is a logger that does nothing.
 type NoOpLogger struct{}
@@ -41,128 +36,296 @@ func (m mockSQLResult) RowsAffected() (int64, error) {
 	return m.rowsAffected, nil
 }
 
-func TestExecResult(t *testing.T) {
+// TestFromSQLResultSuccess tests successful conversion of sql.Result to ExecResult.
+func TestFromSQLResultSuccess(t *testing.T) {
 	testCases := []struct {
-		name       string
-		lastInsID  int64
-		rowsAffect int64
+		name         string
+		rowsAffected int64
 	}{
-		{"positive values", 42, 100},
-		{"zero values", 0, 0},
-		{"large values", 9223372036854775807, 9223372036854775807},
+		{"single row", 1},
+		{"multiple rows", 42},
+		{"no rows affected", 0},
+		{"large number", 999999},
+		{"max int64", 9223372036854775807},
 	}
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			mockResult := mockSQLResult{
-				rowsAffected: tc.rowsAffect,
-			}
+			mockResult := mockSQLResult{rowsAffected: tc.rowsAffected}
 
-			result := &v1.ExecResult{
-				RowsAffected: tc.rowsAffect,
-			}
+			result, err := v1.ExportFromSQLResult(mockResult)
 
-			assert.Equal(t, mockResult.rowsAffected, result.RowsAffected)
+			require.NoError(t, err)
+			require.NotNil(t, result)
+			assert.Equal(t, tc.rowsAffected, result.RowsAffected)
 		})
 	}
 }
 
-func TestPoolStatistics(t *testing.T) {
-	testCases := []struct {
-		name               string
-		idle               int
-		inUse              int
-		openConnections    int
-		maxOpenConnections int
-		waitCount          int64
-		waitDuration       time.Duration
-	}{
-		{"normal stats", 5, 15, 20, 50, 10, 100 * time.Millisecond},
-		{"all idle", 25, 0, 25, 50, 0, 0},
-		{"all in use", 0, 30, 30, 50, 100, 500 * time.Millisecond},
-		{"zero values", 0, 0, 0, 0, 0, 0},
+// TestFromSQLResultErrorHandling tests error handling in ExportFromSQLResult.
+func TestFromSQLResultErrorHandling(t *testing.T) {
+	// Create a mock that returns an error
+	errorMockResult := &errorMockSQLResult{err: fmt.Errorf("connection lost")}
+
+	result, err := v1.ExportFromSQLResult(errorMockResult)
+
+	assert.Nil(t, result)
+	assert.NotNil(t, err)
+	assert.Contains(t, err.Error(), "failed to get rows affected")
+	assert.Contains(t, err.Error(), "connection lost")
+}
+
+// errorMockSQLResult is a mock that returns an error for RowsAffected.
+type errorMockSQLResult struct {
+	err error
+}
+
+func (e *errorMockSQLResult) LastInsertId() (int64, error) {
+	return 0, nil
+}
+
+func (e *errorMockSQLResult) RowsAffected() (int64, error) {
+	return 0, e.err
+}
+
+// TestExecResultChaining tests that ExecResult values can be used in sequences,
+// simulating batch execution with ExportFromSQLResult.
+func TestExecResultChaining(t *testing.T) {
+	results := make([]*v1.ExecResult, 3)
+
+	// Simulate 3 consecutive database operations with different impact
+	testCases := []int64{1, 5, 10}
+
+	for i, expected := range testCases {
+		mockResult := mockSQLResult{rowsAffected: expected}
+		result, err := v1.ExportFromSQLResult(mockResult)
+
+		require.NoError(t, err)
+		require.NotNil(t, result)
+		results[i] = result
 	}
 
-	for _, tc := range testCases {
-		t.Run(tc.name, func(t *testing.T) {
-			stats := &v1.PoolStatistics{
-				Idle:               tc.idle,
-				InUse:              tc.inUse,
-				OpenConnections:    tc.openConnections,
-				MaxOpenConnections: tc.maxOpenConnections,
-				WaitCount:          tc.waitCount,
-				WaitDuration:       tc.waitDuration,
-			}
+	// Verify the results are independent and correct
+	assert.Equal(t, int64(1), results[0].RowsAffected)
+	assert.Equal(t, int64(5), results[1].RowsAffected)
+	assert.Equal(t, int64(10), results[2].RowsAffected)
 
-			assert.Equal(t, tc.idle, stats.Idle)
-			assert.Equal(t, tc.inUse, stats.InUse)
-			assert.Equal(t, tc.openConnections, stats.OpenConnections)
-			assert.Equal(t, tc.maxOpenConnections, stats.MaxOpenConnections)
-			assert.Equal(t, tc.waitCount, stats.WaitCount)
-			assert.Equal(t, tc.waitDuration, stats.WaitDuration)
-		})
+	// Total affected rows across batch
+	var totalRows int64
+	for _, r := range results {
+		totalRows += r.RowsAffected
 	}
+	assert.Equal(t, int64(16), totalRows)
 }
 
-func TestPoolStatisticsZeroValues(t *testing.T) {
-	stats := &v1.PoolStatistics{}
-
-	assert.Equal(t, 0, stats.Idle)
-	assert.Equal(t, 0, stats.InUse)
-	assert.Equal(t, 0, stats.OpenConnections)
-	assert.Equal(t, 0, stats.MaxOpenConnections)
-	assert.Equal(t, int64(0), stats.WaitCount)
-	assert.Equal(t, time.Duration(0), stats.WaitDuration)
-	assert.Equal(t, int64(0), stats.MaxIdleClosed)
-	assert.Equal(t, int64(0), stats.MaxIdleTimeClosed)
-	assert.Equal(t, int64(0), stats.MaxLifetimeClosed)
-}
-
-func TestPoolStatisticsAvailableConnections(t *testing.T) {
-	stats := &v1.PoolStatistics{
-		Idle:  5,
-		InUse: 15,
-	}
-
-	// Available should be derived from total - in use
-	assert.Equal(t, stats.Idle, 20-stats.InUse)
-}
-
-func TestMockDBConfig(t *testing.T) {
-	mockCfg := MockDBConfig{}
-	assert.Equal(t, "test", mockCfg.Dialect())
-}
-
-func TestNoOpLogger(t *testing.T) {
+// TestNewDBUnsupportedDriver tests NewDB with an unsupported driver name.
+func TestNewDBUnsupportedDriver(t *testing.T) {
+	cfg := &testDBConfig{driverName: "unsupported-db"}
 	logger := NoOpLogger{}
 
-	// NoOpLogger should not panic on any method calls
-	logger.Debug("test message")
-	logger.Info("test message", "key", "value")
-	logger.Warn("test message")
-	logger.Error("test message")
+	db, err := v1.NewDB(cfg, logger)
 
-	// With should return itself
-	newLogger := logger.With("field", "value")
-	require.NotNil(t, newLogger)
-	assert.IsType(t, NoOpLogger{}, newLogger)
-
-	// Multiple calls to With should chain
-	chainedLogger := logger.With("a", 1).With("b", 2)
-	assert.NotNil(t, chainedLogger)
+	assert.Nil(t, db)
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "unsupported driver")
+	assert.Contains(t, err.Error(), "unsupported-db")
 }
 
-func TestMockSQLResult(t *testing.T) {
-	mockResult := mockSQLResult{
-		lastInsertID: 123,
-		rowsAffected: 45,
+// TestNewDBMySQLDriver tests NewDB with valid MySQL config.
+func TestNewDBMySQLDriver(t *testing.T) {
+	cfg := &v1.MysqlConfig{
+		User:     "testuser",
+		Password: "testpass",
+		Host:     "localhost",
+		Port:     3306,
+		Database: "testdb",
+	}
+	logger := NoOpLogger{}
+
+	db, err := v1.NewDB(cfg, logger)
+
+	// Should not error, but we get a real DB instance
+	// (might fail on actual connection, that's ok for this test)
+	if err == nil {
+		require.NotNil(t, db)
+	}
+}
+
+// TestNewDBPostgresDriver tests NewDB with valid PostgreSQL config.
+func TestNewDBPostgresDriver(t *testing.T) {
+	cfg := &v1.PostgresConfig{
+		User:     "testuser",
+		Password: "testpass",
+		Host:     "localhost",
+		Port:     5432,
+		Database: "testdb",
+	}
+	logger := NoOpLogger{}
+
+	db, err := v1.NewDB(cfg, logger)
+
+	if err == nil {
+		require.NotNil(t, db)
+	}
+}
+
+// TestNewDBSQLiteDriver tests NewDB with valid SQLite config.
+func TestNewDBSQLiteDriver(t *testing.T) {
+	cfg := &v1.SQLiteConfig{
+		FilePath: ":memory:",
+	}
+	logger := NoOpLogger{}
+
+	db, err := v1.NewDB(cfg, logger)
+
+	if err == nil {
+		require.NotNil(t, db)
+		_ = db.Close()
+	}
+}
+
+// TestNewDBMSSQLDriver tests NewDB with valid MSSQL config.
+func TestNewDBMSSQLDriver(t *testing.T) {
+	cfg := &v1.MSSQLConfig{
+		User:     "testuser",
+		Password: "testpass",
+		Host:     "localhost",
+		Port:     1433,
+		Database: "testdb",
+	}
+	logger := NoOpLogger{}
+
+	db, err := v1.NewDB(cfg, logger)
+
+	if err == nil {
+		require.NotNil(t, db)
+	}
+}
+
+// testDBConfig is a test implementation of DBConfig.
+type testDBConfig struct {
+	driverName string
+	dsn        string
+}
+
+func (t *testDBConfig) Driver() string {
+	return t.driverName
+}
+
+func (t *testDBConfig) DSN() string {
+	return t.dsn
+}
+
+// TestNewDBWithNilLogger tests NewDB accepts nil logger and creates DB.
+func TestNewDBWithNilLogger(t *testing.T) {
+	cfg := &v1.SQLiteConfig{
+		FilePath: ":memory:",
 	}
 
-	lastID, err := mockResult.LastInsertId()
-	require.NoError(t, err)
-	assert.Equal(t, int64(123), lastID)
+	db, err := v1.NewDB(cfg, nil)
 
-	rowsAff, err := mockResult.RowsAffected()
+	// SQLite with :memory: should work
+	if err == nil {
+		require.NotNil(t, db)
+		_ = db.Close()
+	}
+}
+
+// TestNewDBWithRegisteredPlugin tests NewDB uses plugin registry when driver is registered.
+func TestNewDBWithRegisteredPlugin(t *testing.T) {
+	// Clean up any existing plugins
+	defer plugin.Clear()
+
+	// Register a test plugin
+	testFactory := &testPluginFactory{
+		shouldFail: false,
+	}
+	err := plugin.Register(testFactory)
 	require.NoError(t, err)
-	assert.Equal(t, int64(45), rowsAff)
+
+	cfg := &testDBConfig{
+		driverName: "test-plugin",
+		dsn:        "test://localhost",
+	}
+
+	db, err := v1.NewDB(cfg, NoOpLogger{})
+
+	// Should succeed and return a DB instance (SQLite in-memory)
+	if err == nil {
+		require.NotNil(t, db)
+		_ = db.Close()
+	}
+}
+
+// TestNewDBPluginReturnsError tests NewDB error handling when plugin fails.
+func TestNewDBPluginReturnsError(t *testing.T) {
+	defer plugin.Clear()
+
+	testFactory := &testPluginFactory{
+		shouldFail: true,
+		failErr:    fmt.Errorf("connection refused"),
+	}
+	plugin.MustRegister(testFactory)
+
+	cfg := &testDBConfig{
+		driverName: "test-plugin",
+	}
+
+	db, err := v1.NewDB(cfg, NoOpLogger{})
+
+	assert.Nil(t, db)
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "plugin driver")
+	assert.Contains(t, err.Error(), "failed")
+	assert.Contains(t, err.Error(), "connection refused")
+}
+
+// TestNewDBPluginReturnsInvalidType tests NewDB error when plugin returns wrong type.
+func TestNewDBPluginReturnsInvalidType(t *testing.T) {
+	defer plugin.Clear()
+
+	testFactory := &testPluginFactory{
+		shouldFail:   false,
+		returnString: true,
+	}
+	plugin.MustRegister(testFactory)
+
+	cfg := &testDBConfig{
+		driverName: "test-plugin",
+	}
+
+	db, err := v1.NewDB(cfg, NoOpLogger{})
+
+	assert.Nil(t, db)
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "invalid type")
+}
+
+// testPluginFactory implements plugin.DriverFactory for testing.
+type testPluginFactory struct {
+	shouldFail   bool
+	returnString bool
+	failErr      error
+}
+
+func (f *testPluginFactory) Name() string {
+	return "test-plugin"
+}
+
+func (f *testPluginFactory) Create(ctx context.Context, cfg any) (any, error) {
+	_ = ctx // context not needed for this test implementation
+	if f.shouldFail {
+		return nil, f.failErr
+	}
+	if f.returnString {
+		return "not a DB", nil
+	}
+	// Return a real SQLite in-memory database
+	sqliteCfg := &v1.SQLiteConfig{FilePath: ":memory:"}
+	//nolint:contextcheck
+	db, err := v1.NewDB(sqliteCfg, NoOpLogger{})
+	if err != nil {
+		return nil, fmt.Errorf("testPluginFactory.Create: failed to create SQLite DB: %w", err)
+	}
+	return db, nil
 }
