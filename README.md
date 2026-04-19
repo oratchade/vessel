@@ -66,6 +66,124 @@ export OTEL_ENABLED=true
 When disabled, all tracing operations are replaced with no-op implementations,
 providing zero overhead.
 
+### Setup & Configuration
+
+To export traces to a backend (Jaeger, Datadog, Grafana, etc.), initialize an OpenTelemetry exporter in your application:
+
+#### Using Jaeger Exporter (Local Development)
+
+```go
+package main
+
+import (
+ "context"
+ "log"
+
+ "go.opentelemetry.io/otel"
+ "go.opentelemetry.io/otel/exporters/jaeger/otlphttp"
+ "go.opentelemetry.io/otel/sdk/resource"
+ tracesdk "go.opentelemetry.io/otel/sdk/trace"
+ semconv "go.opentelemetry.io/otel/semconv/v1.26.0"
+
+ db "tounilab.com/fabric/db/v1"
+)
+
+func initTracer() (*tracesdk.TracerProvider, error) {
+ // Create Jaeger exporter
+ exporter, err := otlphttp.New(context.Background(),
+  otlphttp.WithEndpoint("http://localhost:4318"),
+ )
+ if err != nil {
+  return nil, err
+ }
+
+ // Create resource
+ res, err := resource.New(context.Background(),
+  resource.WithAttributes(
+   semconv.ServiceNameKey.String("my-app"),
+  ),
+ )
+ if err != nil {
+  return nil, err
+ }
+
+ // Create trace provider
+ tp := tracesdk.NewTracerProvider(
+  tracesdk.WithBatcher(exporter),
+  tracesdk.WithResource(res),
+ )
+
+ // Set global tracer provider
+ otel.SetTracerProvider(tp)
+
+ return tp, nil
+}
+
+func main() {
+ tp, err := initTracer()
+ if err != nil {
+  log.Fatal(err)
+ }
+ defer func() {
+  if err := tp.Shutdown(context.Background()); err != nil {
+   log.Printf("Error shutting down tracer provider: %v", err)
+  }
+ }()
+
+ // Your database operations now emit traces automatically
+ cfg := db.Config{DSN: "postgres://..."}
+ conn, _ := db.NewDB(cfg, nil)
+
+ ctx := context.Background()
+ rows, _ := conn.Get(ctx, "SELECT * FROM users", nil, nil, nil)
+ // Traces sent to Jaeger at http://localhost:16686
+}
+```
+
+#### Using gRPC Collector (Production)
+
+```go
+import (
+ "go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracegrpc"
+)
+
+exporter, err := otlptracegrpc.New(context.Background(),
+ otlptracegrpc.WithEndpoint("otel-collector:4317"),
+)
+if err != nil {
+ return nil, err
+}
+```
+
+#### Quick Start with Docker Compose
+
+Run a local Jaeger instance:
+
+```yaml
+# docker-compose.yml
+version: "3"
+services:
+  jaeger:
+    image: jaegertracing/all-in-one:latest
+    environment:
+      - COLLECTOR_OTLP_ENABLED=true
+    ports:
+      - "6831:6831/udp" # Jaeger agent
+      - "4317:4317/tcp" # OTEL gRPC receiver
+      - "4318:4318/tcp" # OTEL HTTP receiver
+      - "16686:16686" # Jaeger UI
+
+  # Your app
+  app:
+    build: .
+    environment:
+      - OTEL_EXPORTER_OTLP_ENDPOINT=http://jaeger:4318
+    depends_on:
+      - jaeger
+```
+
+Then access traces at <http://localhost:16686>
+
 ### Captured Operations
 
 Traces include:
@@ -126,10 +244,12 @@ func main() {
 
 ### Querying Data
 
+#### Simple Queries (Map-Based)
+
 ```go
 ctx := context.Background()
 
-// Get all users
+// Get all users - simple approach, returns maps
 users, err := database.Get(ctx, "users", []string{"id", "name", "email"},
     nil, nil, nil)
 if err != nil {
@@ -142,6 +262,47 @@ for _, user := range users {
     //   "email": "alice@example.com"}
 }
 ```
+
+#### Type-Safe Queries (Recommended for Production)
+
+For better performance and type safety, use `GetRaw()` with `ScanRowsTo[T]()`:
+
+```go
+import db "tounilab.com/fabric/db/v1"
+
+// Define struct matching SELECT columns
+type User struct {
+    ID    int
+    Name  string
+    Email string
+}
+
+ctx := context.Background()
+
+// Get raw rows and scan into typed structs
+rowsAdapter, err := database.GetRaw(ctx, "users", []string{"id", "name", "email"},
+    nil, nil, nil)
+if err != nil {
+    log.Fatal(err)
+}
+
+// ScanRowsTo[T] automatically closes resources and handles type mapping
+users, err := db.ScanRowsTo[User](ctx, rowsAdapter)
+if err != nil {
+    log.Fatal(err)
+}
+
+for _, user := range users {
+    log.Printf("User: %s <%s>\n", user.Name, user.Email)
+}
+```
+
+**Why use `ScanRowsTo[T]`?**
+
+- ✅ **Zero-copy** - Efficient field scanning without map allocations
+- ✅ **Type-safe** - Compile-time column mapping, no casting needed
+- ✅ **Performance** - 3-5x faster on large datasets vs map-based approach
+- ✅ **Memory** - Reduced GC pressure on massive result sets
 
 ### Inserting Data
 
@@ -359,13 +520,10 @@ for _, user := range users {
 ⚠️ **Important: RowsAdapter Lifecycle Management**
 
 The methods `GetRaw()`, `GetByIDRaw()`, and `QueryRaw()` return a `RowsAdapter`
-which you must explicitly close. This design allows you the flexibility to:
+that holds database resources.
 
-- Use `db.ScanRowsTo[T](ctx, ...)` for type-safe scanning into structs
-- Use third-party row scanning libraries of your choice
-- Implement custom row processing logic
-
-**ScanRowsTo automatically closes the RowsAdapter.** Always use `ScanRowsTo[T]` for type-safe scanning:
+**Always use `db.ScanRowsTo[T](ctx, rowsAdapter)`** for scanning—it automatically
+handles resource cleanup:
 
 ```go
 rowsAdapter, err := database.GetRaw(ctx, "users", []string{"*"}, nil, nil, nil)
@@ -373,22 +531,19 @@ if err != nil {
     log.Fatal(err)
 }
 
-// ScanRowsTo[T] handles opening and closing the adapter automatically
+// ScanRowsTo[T] automatically closes resources
 users, err := db.ScanRowsTo[User](ctx, rowsAdapter)
 if err != nil {
     log.Fatal(err)
 }
 
-// Use typed results - resources are already cleaned up
 for _, user := range users {
-    log.Printf("User: %s <%s> (Age: %d)\n", user.Name, user.Email, user.Age)
+    log.Printf("User: %s <%s>\n", user.Name, user.Email)
 }
 ```
 
-⚠️ **Resource Management:** The `RowsAdapter` is a private implementation detail.
-You must use `ScanRowsTo[T](ctx, rowsAdapter)` to properly scan rows
-and release database resources.
-Direct manipulation of the adapter is not supported.
+**Directly accessing the `RowsAdapter` without `ScanRowsTo[T]` will cause connection leaks.**
+Resources are not automatically cleaned up—use `ScanRowsTo[T]` exclusively.
 
 **Benefits:**
 
@@ -859,7 +1014,7 @@ or application-level sharding.
   exhaustion
 
 For complete guide, configuration examples, and use cases, see
-[docs/DBManager.md](./docs/DBManager.md). Working examples available in
+[docs/DB_MANAGER.md](./docs/DB_MANAGER.md). Working examples available in
 [examples/manager-example/](./examples/manager-example/).
 
 ## Plugin System

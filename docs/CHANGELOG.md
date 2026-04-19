@@ -159,7 +159,7 @@ For a high-level overview of releases, see [RELEASES.md](./RELEASES.md).
 - Moved public API from `db` to `db/v1`
 - `Row` interface replaced with `RowsAdapter`
 - Error types moved from root to `dberror` subpackage
-- Some error codes changed (see [MIGRATION.md](./MIGRATION.md) for mapping)
+- Some error codes changed (detailed in migration notes)
 - `QueryOptions` struct signature changed
 
 ### Deprecated
@@ -302,5 +302,4 @@ specification with the following categories:
 **Last Updated:** March 3, 2026  
 **Maintained by:** [@oratchade](https://github.com/oratchade)
 
-For detailed migration information, see [MIGRATION.md](./MIGRATION.md).  
 For release information, see [RELEASES.md](./RELEASES.md).

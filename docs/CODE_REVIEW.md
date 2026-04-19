@@ -513,22 +513,22 @@ Database drivers (MySQL, PostgreSQL, SQLite, MSSQL)
 
 ```go
 // Simple SELECT
-users, err := NewFluentDB(db, ctx).
+users, err := NewFluentDB(db).
     Select("users", "id", "name", "email").
-    Get()
+    Get(ctx)
 
 // SELECT with conditions and pagination
-activeUsers, err := NewFluentDB(db, ctx).
+activeUsers, err := NewFluentDB(db).
     Select("users").
     Where(cdt.NewExpr().Column("status").Op("=").Value("active")).
     Where(cdt.NewExpr().Column("age").Op(">").Value(18)).  // AND'd together
     OrderBy("created_at", "DESC").
     Limit(10).
     Offset(20).
-    Get()
+    Get(ctx)
 
 // SELECT with JOINs
-userOrders, err := NewFluentDB(db, ctx).
+userOrders, err := NewFluentDB(db).
     Select("users", "users.id", "users.name", "orders.id", "orders.total").
     Join(cdt.Join{
         Type: "INNER",
@@ -538,22 +538,22 @@ userOrders, err := NewFluentDB(db, ctx).
         },
     }).
     Where(cdt.NewExpr().Column("orders.total").Op(">").Value(100)).
-    Get()
+    Get(ctx)
 
 // COUNT
-count, err := NewFluentDB(db, ctx).
+count, err := NewFluentDB(db).
     Select("users").
     Where(cdt.NewExpr().Column("status").Op("=").Value("active")).
-    Count()
+    Count(ctx)
 
 // Single row with One()
-user, err := NewFluentDB(db, ctx).
+user, err := NewFluentDB(db).
     Select("users").
     Where(cdt.NewExpr().Column("id").Op("=").Value(42)).
-    One()
+    One(ctx)
 
 // Bulk INSERT
-result, err := NewFluentDB(db, ctx).
+result, err := NewFluentDB(db).
     Insert().
     Into("users").
     ValuesBulk([]map[string]any{
@@ -561,19 +561,19 @@ result, err := NewFluentDB(db, ctx).
         {"id": 2, "name": "Bob", "email": "bob@example.com"},
         {"id": 3, "name": "Charlie", "email": "charlie@example.com"},
     }).
-    Exec()
+    Exec(ctx)
 // result.RowsAffected == 3
 
 // UPDATE with conditions
-result, err := NewFluentDB(db, ctx).
+result, err := NewFluentDB(db).
     Update("users").
     Set("status", "verified").
     Set("verified_at", time.Now()).
     Where(cdt.NewExpr().Column("email").Op("=").Value(email)).
-    Exec()
+    Exec(ctx)
 
 // UPDATE with JOIN
-result, err := NewFluentDB(db, ctx).
+result, err := NewFluentDB(db).
     Update("users").
     Set("last_order_date", time.Now()).
     Join(cdt.Join{
@@ -584,14 +584,14 @@ result, err := NewFluentDB(db, ctx).
         },
     }).
     Where(cdt.NewExpr().Column("orders.status").Op("=").Value("completed")).
-    Exec()
+    Exec(ctx)
 
 // DELETE with conditions
-result, err := NewFluentDB(db, ctx).
+result, err := NewFluentDB(db).
     Delete().
     From("users").
     Where(cdt.NewExpr().Column("status").Op("=").Value("inactive")).
-    Exec()
+    Exec(ctx)
 
 // Transactions
 tx, err := db.Begin(ctx)
@@ -601,12 +601,12 @@ if err != nil {
 defer tx.Rollback(ctx)
 
 // Use FluentDB with transaction
-result, err := NewFluentDB(tx, ctx).
+result, err := NewFluentDB(tx).
     Update("users").
     WithTx(tx).
     Set("status", "verified").
     Where(cdt.NewExpr().Column("id").Op("=").Value(userID)).
-    Exec()
+    Exec(ctx)
 
 if err != nil {
     return err
@@ -676,10 +676,10 @@ Users can now choose between two APIs:
 rows, err := db.Get(ctx, "users", []string{"*"}, nil, cond, opts)
 
 // High-level (NEW - ergonomic and chainable)
-rows, err := NewFluentDB(db, ctx).
+rows, err := NewFluentDB(db).
     Select("users").
     Where(cond).
-    Get()
+    Get(ctx)
 ```
 
 Both approaches are supported and can be mixed in the same application.
@@ -1430,10 +1430,10 @@ The following comprehensive documentation files are available in the repository:
   development setup, testing, code style, commit format, pull requests,
   GitHub template, and issue reporting
 - **[OPERATORS_COMPATIBILITY.md](./OPERATORS_COMPATIBILITY.md)** - Comprehensive
-  operator support matrix showing which SQL operators are supported by
-  each database dialect (MySQL, PostgreSQL, SQLite, MSSQL)
-- **[SQL_NULL_TYPES.md](./SQL_NULL_TYPES.md)** - Implementation guide
-  for SQL.Null\* type support
+  operator support matrix showing which SQL operators are supported
+  by each database dialect (MySQL, PostgreSQL, SQLite, MSSQL)
+- **[SQL_NULL_TYPES.md](./SQL_NULL_TYPES.md)** - Implementation guide for SQL.Null\*
+  type support
 
 ---
 

@@ -5,10 +5,19 @@ This document provides the definitive architectural reference for understanding
 the entire system design, enabling rapid onboarding and informed extension decisions.
 
 **Version**: 1.0+ (Post-Phase 5)  
-**Last Updated**: April 7, 2026  
+**Last Updated**: April 18, 2026  
 **Maintainer**: oratchade  
 **Status**: Production Ready (Grade A+, 802 tests, 100% pass rate)  
 **Target Audience**: AI agents, new contributors, maintainers
+
+## Recent API Changes (April 15-18, 2026)
+
+- **Context Decoupled from Builders**: `NewFluentDB(db)` constructor signature
+  changed to remove context parameter. Context now passed at execution time.
+- **Error Wrapping Standardized**: All errors follow `function: operation: %w`
+  pattern for consistency.
+- **Builder Cleanup**: `Close()` method made private; resources auto-managed
+  via defer patterns.
 
 ---
 
@@ -169,12 +178,12 @@ Builders are **fluent and type-safe**:
 
 ```go
 // Type-safe, readable, zero risk of SQL injection
-query := v1.NewFluentDB(db, ctx).
+rows, err := v1.NewFluentDB(db).
     Select("users", "id", "name", "email").
     Where(cdt.NewExpr().Column("age").Op(">").Value(18)).
     OrderBy("name ASC").
     Limit(10).
-    Execute()
+    Get(ctx)
 ```
 
 ### 5. Minimal Runtime Overhead
@@ -200,7 +209,7 @@ not runtime. Performance is predictable and consistent.
 │  Interfaces: DB, Tx, Logger, Row, FluentDB                    │
 │  Configs: MySQLConfig, PostgresConfig, SQLiteConfig, etc      │
 │  Adapters: SlogAdapter, LogrusAdapter, ZapAdapter, etc        │
-│  Entry points: NewDB(), NewFluentDB()                         │
+│  Entry points: NewDB(), NewFluentDB() (context-free)          │
 │                                                               │
 │  • All types are interfaces (testable, mockable)              │
 │  • Factories for each database configuration                  │
@@ -280,13 +289,13 @@ not runtime. Performance is predictable and consistent.
 │ (1) USER CODE: Build Query                                       │
 ├──────────────────────────────────────────────────────────────────┤
 │                                                                  │
-│ builder := v1.NewFluentDB(db, ctx)         ← Create builder      │
+│ builder := v1.NewFluentDB(db)              ← Create builder      │
 │ result := builder.                                               │
 │     Select("users", "id", "name").        ← Accumulate: table    │
 │     Where(cdt.Expr()...Op(">")...Value()). ← Accumulate: clause  │
 │     OrderBy("name ASC").                   ← Accumulate: order   │
 │     Limit(10).                             ← Accumulate: limit   │
-│     Execute()                               ← Trigger execution  │
+│     Get(ctx)                                ← Execute with ctx    │
 │                                                                  │
 └──────────────────────────────────────┬───────────────────────────┘
                                        │
@@ -1229,7 +1238,7 @@ func main() {
     ctx := context.Background()
 
     // 2. Query: Find active users over 18
-    rows, err := v1.NewFluentDB(db, ctx).
+    rows, err := v1.NewFluentDB(db).
         Select("users", "id", "name", "email", "age").
         Where(
             condition.And(
@@ -1240,7 +1249,7 @@ func main() {
         OrderBy("name ASC", "created_at DESC").
         Limit(100).
         Offset(0).
-        Execute()
+        Get(ctx)
 
     if err != nil {
         log.Printf("Query failed: %v", err)
@@ -1274,8 +1283,8 @@ Args: ["active", 18, 100, 0]
 ### Step-by-Step Internal Flow
 
 ```text
-1. NewFluentDB(db, ctx)
-   ↓ Returns FluentDB{db, ctx}
+1. NewFluentDB(db)
+   ↓ Returns FluentDB{db}
 
 2. FluentDB.Select("users", "id", "name", "email", "age")
    ↓ Creates SelectBuilder{
@@ -1860,10 +1869,10 @@ for _, userID := range userIDs {
 }
 
 // ✓ GOOD: Single batch query
-rows, _ := v1.NewFluentDB(db, ctx).
+rows, _ := v1.NewFluentDB(db).
     Select("users", "id", "name").
     Where(cdt.In("id", userIDs)).
-    Execute()
+    Get(ctx)
 // 1 query, N results
 ```
 
@@ -1875,18 +1884,18 @@ rows, _ := v1.NewFluentDB(db, ctx).
 
 ```go
 // ✗ BAD: SELECT all columns
-rows, _ := v1.NewFluentDB(db, ctx).
+rows, _ := v1.NewFluentDB(db).
     Select("users", "*").
     Where(cdt.NewExpr().Column("active").Op("=").Value(true)).
     Limit(1000).
-    Execute()
+    Get(ctx)
 
 // ✓ GOOD: SELECT only needed columns
-rows, _ := v1.NewFluentDB(db, ctx).
+rows, _ := v1.NewFluentDB(db).
     Select("users", "id", "name", "email").
     Where(cdt.NewExpr().Column("active").Op("=").Value(true)).
     Limit(1000).
-    Execute()
+    Get(ctx)
 ```
 
 ---
@@ -2030,12 +2039,12 @@ rowCountHist.Record(ctx, int64(len(rows)))
 Used for ergonomic query construction:
 
 ```go
-query := v1.NewFluentDB(db, ctx).
+rows, err := v1.NewFluentDB(db).
     Select("users", "id", "name").
     Where(condition).
     OrderBy("name").
     Limit(10).
-    Execute()
+    Get(ctx)
 ```
 
 ### 2. Adapter (Logger Adapters)
@@ -2131,10 +2140,10 @@ func (d *SQLiteDialect) SupportedOperators() []string {
 ```go
 // File: tests/integration_test.go
 func TestIntegration_GlobOperator(t *testing.T) {
-    rows, _ := v1.NewFluentDB(db, ctx).
+    rows, _ := v1.NewFluentDB(db).
         Select("files", "name").
         Where(cdt.NewExpr().Column("name").Op("GLOB").Value("*.pdf")).
-        Execute()
+        Get(ctx)
     assert.NotEmpty(t, rows)
 }
 ```
@@ -2583,10 +2592,10 @@ logger := v1.NewSlogAdapter(slog.Default())
 
 // Check for N+1 queries
 // Use IN instead of loop:
-rows, _ := v1.NewFluentDB(db, ctx).
+rows, _ := v1.NewFluentDB(db).
     Select("users", "id", "name").
     Where(cdt.In("id", userIDs)).  // Batch, not loop
-    Execute()
+    Get(ctx)
 
 // Enable query logging to see slow queries
 ```
@@ -2636,10 +2645,10 @@ if err := db.Insert(ctx, "users", userData); err != nil {
 
 ```go
 // Check if result is empty
-rows, err := v1.NewFluentDB(db, ctx).
+rows, err := v1.NewFluentDB(db).
     Select("users", "id", "name").
     Where(cdt.NewExpr().Column("id").Op("=").Value(userID)).
-    Execute()
+    Get(ctx)
 
 if err != nil {
     // Database error
@@ -2864,20 +2873,20 @@ type DeleteBuilder struct {
 cdt.NewExpr().Column("age").Op(">").Value(18)
 
 // Logical operators
-cdt.And(cond1, cond2)
-cdt.Or(cond1, cond2)
-cdt.Not(cond1)
+cdt.NewAnd().Conditions(cond1, cond2, ...)
+cdt.NewOr().Conditions(cond1, cond2, ...)
+cdt.NewNot().Condition(cond)
 
 // List operations
-cdt.In("status", []any{"active", "pending"})
-cdt.NotIn("category", []any{"deleted", "archived"})
+cdt.NewExpr().Column("status").Op("IN").Value("active", "pending", ...)
+cdt.NewExpr().Column("category").Op("NOT IN").Value("deleted", "archived", ...)
 
 // Range
-cdt.Between("price", 10.0, 100.0)
+cdt.NewExpr().Column("price").Op("BETWEEN").Value(10.0).Value(100.0)
 
 // NULL checks
-cdt.IsNull("deleted_at")
-cdt.IsNotNull("email")
+cdt.NewExpr().Column("deleted_at").Op("IS NULL")
+cdt.NewExpr().Column("email").Op("IS NOT NULL")
 
 // Pattern matching
 cdt.NewExpr().Column("email").Op("LIKE").Value("%@example.com")

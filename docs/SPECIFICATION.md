@@ -1,5 +1,26 @@
 # Fabric - Go SQL Builder and Multi-Database Abstraction Specification
 
+**Last Updated**: April 18, 2026
+
+## Recent API Changes (v1.0.0+)
+
+**April 15-18, 2026 - Quality & Stability Improvements:**
+
+- ✅ **Context Decoupled from FluentDB**: `NewFluentDB(db)` no longer takes context
+  as constructor parameter. Context is now passed at query execution time
+  (e.g., `.Get(ctx)`, `.Exec(ctx)`). This improves builder reusability and flexibility.
+- ✅ **Standardized Error Wrapping**: All errors now follow pattern
+  `function: operation: %w` (e.g., `Get: scan rows: connection lost`).
+  Enables consistent error handling and better debugging.
+- ✅ **Builder API Simplification**: The `Close()` method is now private.
+  Resources are automatically managed through proper `defer` patterns.
+- ✅ **Improved ScanRowsTo**: Enhanced type-safe row scanning with
+  better error handling and resource cleanup.
+- ✅ **Private validateQueryOptions**: Internal query validation is now private,
+  reducing API surface.
+
+---
+
 ## Executive Summary
 
 ### Problem Statement
@@ -94,31 +115,35 @@ with readable method chaining.
 **Examples**:
 
 ```go
-// SELECT
-v1.NewFluentDB(db, ctx).
+// SELECT (context passed at query time)
+v1.NewFluentDB(db).
     Select("users", "id", "name", "email").
     Where(cdt.NewExpr().Column("status").Op("=").Value("active")).
     OrderBy("created_at DESC").
     Limit(10).
-    Execute()
+    Get(ctx)
 
 // INSERT
-v1.NewFluentDB(db, ctx).
-    Insert("users", map[string]any{"name": "Alice", "age": 30}).
-    Execute()
+v1.NewFluentDB(db).
+    Insert().
+    Into("users").
+    Set("name", "Alice").
+    Set("age", 30).
+    Exec(ctx)
 
 // UPDATE
-v1.NewFluentDB(db, ctx).
+v1.NewFluentDB(db).
     Update("users").
-    Set(map[string]any{"last_login": time.Now()}).
+    Set("last_login", time.Now()).
     Where(cdt.NewExpr().Column("id").Op("=").Value(userID)).
-    Execute()
+    Exec(ctx)
 
 // DELETE
-v1.NewFluentDB(db, ctx).
-    Delete("users").
+v1.NewFluentDB(db).
+    Delete().
+    From("users").
     Where(cdt.NewExpr().Column("id").Op("=").Value(userID)).
-    Execute()
+    Exec(ctx)
 ```
 
 **Acceptance Criteria**:
@@ -246,7 +271,7 @@ db.WithTransaction(ctx, func(tx Tx) error {
 - Auto-managed per driver (pgxpool for PostgreSQL, custom for MySQL/SQLite/MSSQL)
 - `Ping()` for health checks
 - `PoolStats()` for observability (open, idle connections)
-- `Close()` for graceful shutdown
+- `close()` (private) for graceful shutdown - called automatically on cleanup
 
 **Acceptance Criteria**:
 
@@ -254,6 +279,7 @@ db.WithTransaction(ctx, func(tx Tx) error {
 - Pool size configurable per driver setup
 - Health checks work
 - Graceful shutdown drains pool
+- Resources properly cleaned up via `defer` patterns
 
 ### FR8: Plugin Registry for Custom Drivers
 
@@ -671,19 +697,19 @@ type Condition interface {
 cdt.NewExpr().Column("age").Op(">").Value(18)
 cdt.NewExpr().Column("status").Op("=").Value("active")
 
-cdt.And(
+cdt.NewAnd().Conditions(
     cdt.NewExpr().Column("age").Op(">").Value(18),
     cdt.NewExpr().Column("status").Op("=").Value("active"),
 )
 
-cdt.Or(
+cdt.NewOr().Conditions(
     cdt.NewExpr().Column("role").Op("=").Value("admin"),
     cdt.NewExpr().Column("role").Op("=").Value("moderator"),
 )
 
 cdt.NewExpr().Column("name").Op("IN").Value([]string{"alice", "bob"})
 
-cdt.NewExpr().Column("created_at").Op("BETWEEN").Value(start, end)
+cdt.NewExpr().Column("created_at").Op("BETWEEN").Value(start).Value(end)
 ```
 
 **Supported Operators**:
@@ -1074,14 +1100,14 @@ defer db.Close()
 
 ```go
 // All return errors (no silent failures)
-fluentDB := v1.NewFluentDB(db, ctx)
+fluentDB := v1.NewFluentDB(db)
 
 // SELECT
 rows, err := fluentDB.Select("users", "id", "name").
     Where(someCondition).
     OrderBy("name ASC").
     Limit(10).
-    Execute()
+    Get(ctx)
 
 // INSERT
 row, err := fluentDB.Insert("users", map[string]any{
@@ -1123,12 +1149,12 @@ err := db.WithTransaction(ctx, func(tx v1.Tx) error {
 ```go
 import "tounilab.com/fabric/pkg/query/condition"
 
-cdt.And(
+cdt.NewAnd().Conditions(
     cdt.NewExpr().Column("age").Op(">").Value(18),
     cdt.NewExpr().Column("status").Op("=").Value("active"),
 )
 
-cdt.Or(
+cdt.NewOr().Conditions(
     cdt.NewExpr().Column("role").Op("=").Value("admin"),
     cdt.NewExpr().Column("role").Op("=").Value("moderator"),
 )

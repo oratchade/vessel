@@ -116,19 +116,39 @@ Each database dialect maps its native errors to sentinel errors:
 
 ## Error Wrapping and Context
 
-All errors from fabric include context through error wrapping:
+All errors from fabric follow the standardized wrapping pattern:
+`function: operation: %w`
+
+This ensures consistent error messages across the library with full error context:
 
 ```go
 import "errors"
 
 result, err := database.Get(ctx, "users", cols, "", conds, nil)
 if err != nil {
-    // Unwrap to see the chain
-    err = errors.Unwrap(err)
-    // Original error: "driver: bad connection"
-    // Wrapped as: "failed to execute query: driver: bad connection"
+    // Error follows pattern: function: operation: %w
+    // Example: "Get: scan rows: driver: bad connection"
+    // Unwrap to see the original error
+    cause := errors.Unwrap(err)
+    // cause = "driver: bad connection"
 }
 ```
+
+### Error Message Format
+
+All errors use the format: **`function: operation: %w`**
+
+- **function**: The exported method that failed (Get, Insert, Update, Delete, etc.)
+- **operation**: The specific step that failed
+  (parse SQL, scan rows, bind params, etc.)
+- **%w**: The underlying error (always wrapped with `fmt.Errorf()` for proper chain)
+
+**Examples**:
+
+- `Get: scan rows: sql: Rows.Scan called after Close`
+- `Insert: execute: driver: duplicate key value violates unique constraint`
+- `Update: bind params: invalid value type int64`
+- `NewDB: parse config: invalid host address`
 
 ## Common Error Patterns
 
@@ -139,13 +159,16 @@ result, err := database.Insert(ctx, "users", map[string]any{
     "id":    uuid.New().String(),
     "email": email,
     "name":  name,
-})
+}, nil)
 
 if err != nil {
     if errors.Is(err, dberror.ErrDuplicateKey) {
         // User already exists, return meaningful error to client
+        // Error message format:
+        // "Insert: execute: duplicate key violates unique constraint"
         return fmt.Errorf("email already registered: %w", err)
     }
+    // Error message format: "Insert: bind params: invalid value type"
     return fmt.Errorf("failed to create user: %w", err)
 }
 
