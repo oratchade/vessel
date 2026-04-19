@@ -92,33 +92,11 @@ func NewDB(cfg DBConfig, logger Logger) (DB, error) {
 	}
 }
 
-//go:generate mockgen -source=db.go -destination=db_mocks.go -package=v1 DBActions
+//go:generate mockgen -source=db.go -destination=db_mocks.go -package=v1 reader
 
-// DBActions defines the core, context-aware data access operations that any
-// database connection or transaction must provide. It is an implementation-
-// agnostic contract used by higher-level code (builders and services) to perform
-// SQL operations without depending on driver details.
-//
-// Expectations:
-//   - Context propagation: every method accepts a context.Context for
-//     cancellation and deadlines.
-//   - Parameter ordering: implementations must preserve placeholder↔arg
-//     ordering (convention: condition args first, then option args).
-//   - Identifier handling: implementations should use dialect helpers to quote
-//     identifiers and avoid injection.
-//   - Mutation results: mutation methods return *ExecResult so callers can
-//     inspect execution metadata consistently across drivers.
-//   - Concurrency: implementations must be safe for concurrent use.
-//
-// Transactions:
-//   - Tx implementations embed DBActions and add Commit/Rollback lifecycle methods.
-//   - WithTransaction helpers should Begin, execute the provided function, and
-//     Commit on success or Rollback on error/panic.
-//
-// Testing guidance:
-//   - Keep DBActions small and mockable; add integration tests that verify
-//     SQL+args ordering and option rendering for each dialect.
-type DBActions interface {
+// reader provides context-aware read operations for querying data without modifying it.
+// Methods accept context.Context for cancellation and deadlines.
+type reader interface {
 	// Get retrieves multiple rows from the specified table, with optional SQL joins and query options.
 	//
 	// Parameters:
@@ -178,6 +156,37 @@ type DBActions interface {
 		opts *options.QueryOptions,
 	) (*RowsAdapter, error)
 
+	// Query executes a raw SQL query and returns multiple rows, with optional query options.
+	//
+	// Parameters:
+	//   ctx: Context for cancellation and deadlines.
+	//   query: Raw SQL query string.
+	//   args: Arguments for parameterized query.
+	//
+	// Returns:
+	//   *sql.Rows: Result rows from the query.
+	//   error: Error if the query fails.
+	Query(ctx context.Context, query string, args ...any) ([]map[string]any, error)
+
+	// QueryRaw executes a raw SQL query and returns a RowsAdapter for streaming access to result rows,
+	// without materializing all rows into memory. This is useful for large result sets.
+	//
+	// Parameters:
+	//   ctx: Context for cancellation and deadlines.
+	//   query: Raw SQL query string.
+	//   args: Arguments for parameterized query.
+	//
+	// Returns:
+	//   *RowsAdapter: Raw row adapter for streaming result access.
+	//   error: Error if the query fails.
+	QueryRaw(ctx context.Context, query string, args ...any) (*RowsAdapter, error)
+}
+
+//go:generate mockgen -source=db.go -destination=db_mocks.go -package=v1 writer
+
+// writer provides context-aware write operations for modifying data.
+// Methods accept context.Context for cancellation and deadlines.
+type writer interface {
 	// Insert adds a new row to the specified table, with optional query options.
 	//
 	// Parameters:
@@ -249,31 +258,6 @@ type DBActions interface {
 		opts *options.QueryOptions,
 	) (*ExecResult, error)
 
-	// Query executes a raw SQL query and returns multiple rows, with optional query options.
-	//
-	// Parameters:
-	//   ctx: Context for cancellation and deadlines.
-	//   query: Raw SQL query string.
-	//   args: Arguments for parameterized query.
-	//
-	// Returns:
-	//   *sql.Rows: Result rows from the query.
-	//   error: Error if the query fails.
-	Query(ctx context.Context, query string, args ...any) ([]map[string]any, error)
-
-	// QueryRaw executes a raw SQL query and returns a RowsAdapter for streaming access to result rows,
-	// without materializing all rows into memory. This is useful for large result sets.
-	//
-	// Parameters:
-	//   ctx: Context for cancellation and deadlines.
-	//   query: Raw SQL query string.
-	//   args: Arguments for parameterized query.
-	//
-	// Returns:
-	//   *RowsAdapter: Raw row adapter for streaming result access.
-	//   error: Error if the query fails.
-	QueryRaw(ctx context.Context, query string, args ...any) (*RowsAdapter, error)
-
 	// Exec executes a raw SQL statement (insert, update, delete, etc.), with optional query options.
 	//
 	// Parameters:
@@ -287,12 +271,11 @@ type DBActions interface {
 	Exec(ctx context.Context, query string, args ...any) (*ExecResult, error)
 }
 
-//go:generate mockgen -source=db.go -destination=db_mocks.go -package=v1 DBQueries
+//go:generate mockgen -source=db.go -destination=db_mocks.go -package=v1 introspector
 
-// DBQueries provides access to the SQL queries that would be executed by mutation and query operations,
-// without actually executing them. This is useful for query introspection, logging, validation,
-// and preview purposes.
-type DBQueries interface {
+// introspector provides access to SQL queries without executing them.
+// Useful for query introspection, logging, validation, and preview purposes.
+type introspector interface {
 	// GetQuery constructs and returns the SQL SELECT query and arguments that would be executed by Get,
 	// without actually executing the query. This allows callers to inspect or log the query before execution.
 	//
@@ -433,32 +416,10 @@ type DBQueries interface {
 	) (*RowsAdapter, error)
 }
 
-//go:generate mockgen -source=db.go -destination=db_mocks.go -package=v1 DB
+//go:generate mockgen -source=db.go -destination=db_mocks.go -package=v1 transactional
 
-// DB represents a database connection interface.
-// Each method is documented with its purpose, parameters, and expected return values.
-// Now supports SQL joins via the joins parameter and accepts options.QueryOptions for extensibility.
-type DB interface {
-	DBActions
-	DBQueries
-
-	// Ping checks the database connection.
-	//
-	// Parameters:
-	//   ctx: Context for cancellation and deadlines.
-	//
-	// Returns:
-	//   error: Error if the connection fails.
-	Ping(ctx context.Context) error
-
-	// PoolStats returns current connection pool statistics.
-	// Useful for monitoring and diagnosing connection pool issues.
-	//
-	// Returns:
-	//   *PoolStatistics: Current pool metrics including open, idle, and in-use connections.
-	//   error: Error if statistics cannot be retrieved.
-	PoolStats() (*PoolStatistics, error)
-
+// transactional provides transaction management operations.
+type transactional interface {
 	// Begin starts a new transaction and returns a Tx.
 	//
 	// Parameters:
@@ -482,7 +443,34 @@ type DB interface {
 	// Returns:
 	//   error: Error if the transaction fails or is rolled back.
 	WithTransaction(ctx context.Context, fn func(Tx) error) error
+}
 
+//go:generate mockgen -source=db.go -destination=db_mocks.go -package=v1 healthCheck
+
+// healthCheck provides connection health diagnostics and monitoring.
+type healthCheck interface {
+	// Ping checks the database connection.
+	//
+	// Parameters:
+	//   ctx: Context for cancellation and deadlines.
+	//
+	// Returns:
+	//   error: Error if the connection fails.
+	Ping(ctx context.Context) error
+
+	// PoolStats returns current connection pool statistics.
+	// Useful for monitoring and diagnosing connection pool issues.
+	//
+	// Returns:
+	//   *PoolStatistics: Current pool metrics including open, idle, and in-use connections.
+	//   error: Error if statistics cannot be retrieved.
+	PoolStats() (*PoolStatistics, error)
+}
+
+//go:generate mockgen -source=db.go -destination=db_mocks.go -package=v1 closer
+
+// closer provides resource cleanup.
+type closer interface {
 	// Close closes the database connection.
 	//
 	// Returns:
@@ -490,12 +478,26 @@ type DB interface {
 	Close() error
 }
 
+//go:generate mockgen -source=db.go -destination=db_mocks.go -package=v1 DB
+
+// DB represents a complete database connection interface combining read, write,
+// introspection, transaction management, health checks, and resource cleanup.
+type DB interface {
+	reader
+	writer
+	introspector
+	transactional
+	healthCheck
+	closer
+}
+
 //go:generate mockgen -source=db.go -destination=db_mocks.go -package=v1 Tx
 
-// Tx represents a database transaction. All methods accept context so deadlines and cancellations propagate.
+// Tx represents a database transaction supporting all query operations plus commit/rollback.
 type Tx interface {
-	DBActions
-	DBQueries
+	reader
+	writer
+	introspector
 
 	// Commit commits the transaction.
 	//
@@ -547,7 +549,7 @@ type Tx interface {
 // Users should explicitly check errors to avoid partial scans.
 //
 //nolint:cyclop
-func ScanRowsTo[T any](ctx context.Context, ra *RowsAdapter) ([]T, error) {
+func ScanRowsTo[T any](ctx context.Context, ra rowsAdapterLike) ([]T, error) {
 	_, span := otel.UseTracer(ctx, "db.ScanRowsTo",
 		trace.WithSpanKind(trace.SpanKindInternal))
 	defer span.End()
