@@ -90,7 +90,7 @@ func (sl *SafeLogger) QueryError(
 	durationMS := FormatDuration(duration)
 	errorType, level := ClassifyError(err)
 
-	fields := []interface{}{
+	fields := []any{
 		"db_driver", dbDriver,
 		"operation", operation,
 		"table", sanitizedTable,
@@ -140,7 +140,7 @@ func (sl *SafeLogger) QuerySuccess(
 	correlationID := ExtractCorrelationID(ctx)
 	durationMS := FormatDuration(duration)
 
-	fields := []interface{}{
+	fields := []any{
 		"db_driver", dbDriver,
 		"operation", operation,
 		"table", sanitizedTable,
@@ -172,7 +172,7 @@ func (sl *SafeLogger) TransactionSuccess(ctx context.Context, dbDriver, operatio
 	}
 
 	correlationID := ExtractCorrelationID(ctx)
-	fields := []interface{}{
+	fields := []any{
 		"db_driver", dbDriver,
 		"operation", operation,
 		"correlation_id", correlationID,

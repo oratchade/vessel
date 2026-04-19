@@ -72,7 +72,7 @@ type LogrusAdapter struct {
 
 // NewLogrusAdapter creates a new Fabric Logger adapter wrapping logrus.Logger or logrus.Entry.
 // If a *logrus.Logger is passed, it wraps it with a new Entry.
-func NewLogrusAdapter(logger interface{}) Logger {
+func NewLogrusAdapter(logger any) Logger {
 	var entry *logrus.Entry
 
 	// Handle both *logrus.Logger and *logrus.Entry
@@ -277,8 +277,8 @@ func (a *ApexAdapter) getEntry() *log.Entry {
 }
 
 // argsToFields converts alternating key-value pairs to a map for logging libraries.
-func argsToFields(args []any) map[string]interface{} {
-	fields := make(map[string]interface{})
+func argsToFields(args []any) map[string]any {
+	fields := make(map[string]any)
 	for i := 0; i < len(args); i += 2 {
 		if i+1 < len(args) {
 			if key, ok := args[i].(string); ok {

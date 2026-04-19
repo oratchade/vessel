@@ -33,7 +33,7 @@ func TestSlogAdapter_BasicLogging(t *testing.T) {
 	adapter.Info("test message", "key", "value")
 
 	// Verify JSON output contains the message and fields
-	var logEntry map[string]interface{}
+	var logEntry map[string]any
 	err := json.Unmarshal(buf.Bytes(), &logEntry)
 	require.NoError(t, err)
 	assert.Equal(t, "test message", logEntry["msg"])
@@ -49,7 +49,7 @@ func TestSlogAdapter_Debug(t *testing.T) {
 	adapter := v1.NewSlogAdapter(logger)
 	adapter.Debug("debug message", "level", "debug")
 
-	var logEntry map[string]interface{}
+	var logEntry map[string]any
 	err := json.Unmarshal(buf.Bytes(), &logEntry)
 	require.NoError(t, err)
 	assert.Equal(t, "debug message", logEntry["msg"])
@@ -64,7 +64,7 @@ func TestSlogAdapter_Info(t *testing.T) {
 	adapter := v1.NewSlogAdapter(logger)
 	adapter.Info("info message", "status", "ok")
 
-	var logEntry map[string]interface{}
+	var logEntry map[string]any
 	err := json.Unmarshal(buf.Bytes(), &logEntry)
 	require.NoError(t, err)
 	assert.Equal(t, "info message", logEntry["msg"])
@@ -79,7 +79,7 @@ func TestSlogAdapter_Warn(t *testing.T) {
 	adapter := v1.NewSlogAdapter(logger)
 	adapter.Warn("warning message", "code", 123)
 
-	var logEntry map[string]interface{}
+	var logEntry map[string]any
 	err := json.Unmarshal(buf.Bytes(), &logEntry)
 	require.NoError(t, err)
 	assert.Equal(t, "warning message", logEntry["msg"])
@@ -94,7 +94,7 @@ func TestSlogAdapter_Error(t *testing.T) {
 	adapter := v1.NewSlogAdapter(logger)
 	adapter.Error("error message", "error", "something went wrong")
 
-	var logEntry map[string]interface{}
+	var logEntry map[string]any
 	err := json.Unmarshal(buf.Bytes(), &logEntry)
 	require.NoError(t, err)
 	assert.Equal(t, "error message", logEntry["msg"])
@@ -119,14 +119,14 @@ func TestSlogAdapter_With(t *testing.T) {
 	adapterWithContext.Info("message with context", "action", "test")
 
 	// Verify first log doesn't have tenant_id
-	var logEntry1 map[string]interface{}
+	var logEntry1 map[string]any
 	err := json.Unmarshal(buf1.Bytes(), &logEntry1)
 	require.NoError(t, err)
 	_, hasTenantID1 := logEntry1["tenant_id"]
 	assert.False(t, hasTenantID1)
 
 	// Verify second log has tenant_id
-	var logEntry2 map[string]interface{}
+	var logEntry2 map[string]any
 	err = json.Unmarshal(buf2.Bytes(), &logEntry2)
 	require.NoError(t, err)
 	tenantID, hasTenantID2 := logEntry2["tenant_id"]
@@ -147,7 +147,7 @@ func TestSlogAdapter_MultipleFields(t *testing.T) {
 		"rows_affected", 5,
 		"duration_ms", 42.5)
 
-	var logEntry map[string]interface{}
+	var logEntry map[string]any
 	err := json.Unmarshal(buf.Bytes(), &logEntry)
 	require.NoError(t, err)
 
@@ -192,7 +192,7 @@ func TestSlogAdapter_ChainedWith(t *testing.T) {
 
 	chainedAdapter.Info("chained context message")
 
-	var logEntry map[string]interface{}
+	var logEntry map[string]any
 	err := json.Unmarshal(buf.Bytes(), &logEntry)
 	require.NoError(t, err)
 
@@ -212,7 +212,7 @@ func TestSlogAdapter_WithOddNumberOfArgs(t *testing.T) {
 	// slog handles this gracefully by logging the orphaned key
 	adapter.Info("test message", "key_without_value")
 
-	var logEntry map[string]interface{}
+	var logEntry map[string]any
 	err := json.Unmarshal(buf.Bytes(), &logEntry)
 	require.NoError(t, err)
 	assert.Equal(t, "test message", logEntry["msg"])
@@ -233,7 +233,7 @@ func TestLogrusAdapter_BasicLogging(t *testing.T) {
 	adapter.Info("test message", "key", "value")
 
 	// Verify JSON output contains the message
-	var logEntry map[string]interface{}
+	var logEntry map[string]any
 	err := json.Unmarshal(buf.Bytes(), &logEntry)
 	require.NoError(t, err)
 	assert.Equal(t, "test message", logEntry["msg"])
@@ -250,7 +250,7 @@ func TestLogrusAdapter_Debug(t *testing.T) {
 	adapter := v1.NewLogrusAdapter(logger)
 	adapter.Debug("debug message", "level", "debug")
 
-	var logEntry map[string]interface{}
+	var logEntry map[string]any
 	err := json.Unmarshal(buf.Bytes(), &logEntry)
 	require.NoError(t, err)
 	assert.Equal(t, "debug message", logEntry["msg"])
@@ -266,7 +266,7 @@ func TestLogrusAdapter_Warn(t *testing.T) {
 	adapter := v1.NewLogrusAdapter(logger)
 	adapter.Warn("warning message", "code", 123)
 
-	var logEntry map[string]interface{}
+	var logEntry map[string]any
 	err := json.Unmarshal(buf.Bytes(), &logEntry)
 	require.NoError(t, err)
 	assert.Equal(t, "warning message", logEntry["msg"])
@@ -282,7 +282,7 @@ func TestLogrusAdapter_Error(t *testing.T) {
 	adapter := v1.NewLogrusAdapter(logger)
 	adapter.Error("error message", "error", "something went wrong")
 
-	var logEntry map[string]interface{}
+	var logEntry map[string]any
 	err := json.Unmarshal(buf.Bytes(), &logEntry)
 	require.NoError(t, err)
 	assert.Equal(t, "error message", logEntry["msg"])
@@ -300,7 +300,7 @@ func TestLogrusAdapter_With(t *testing.T) {
 
 	adapterWithContext.Info("message with context", "action", "test")
 
-	var logEntry map[string]interface{}
+	var logEntry map[string]any
 	err := json.Unmarshal(buf.Bytes(), &logEntry)
 	require.NoError(t, err)
 	assert.Equal(t, "message with context", logEntry["msg"])
@@ -327,7 +327,7 @@ func TestLogrusAdapter_ChainedWith(t *testing.T) {
 
 	chainedAdapter.Info("chained context message")
 
-	var logEntry map[string]interface{}
+	var logEntry map[string]any
 	err := json.Unmarshal(buf.Bytes(), &logEntry)
 	require.NoError(t, err)
 
@@ -355,7 +355,7 @@ func TestZapAdapter_BasicLogging(t *testing.T) {
 	adapter.Info("test message", "key", "value")
 
 	// Verify JSON output contains the message
-	var logEntry map[string]interface{}
+	var logEntry map[string]any
 	err := json.Unmarshal(buf.Bytes(), &logEntry)
 	require.NoError(t, err)
 	assert.Equal(t, "test message", logEntry["msg"])
@@ -376,7 +376,7 @@ func TestZapAdapter_Debug(t *testing.T) {
 	adapter := v1.NewZapAdapter(logger)
 	adapter.Debug("debug message", "level", "debug")
 
-	var logEntry map[string]interface{}
+	var logEntry map[string]any
 	err := json.Unmarshal(buf.Bytes(), &logEntry)
 	require.NoError(t, err)
 	assert.Equal(t, "debug message", logEntry["msg"])
@@ -397,7 +397,7 @@ func TestZapAdapter_Warn(t *testing.T) {
 	adapter := v1.NewZapAdapter(logger)
 	adapter.Warn("warning message", "code", 123)
 
-	var logEntry map[string]interface{}
+	var logEntry map[string]any
 	err := json.Unmarshal(buf.Bytes(), &logEntry)
 	require.NoError(t, err)
 	assert.Equal(t, "warning message", logEntry["msg"])
@@ -418,7 +418,7 @@ func TestZapAdapter_Error(t *testing.T) {
 	adapter := v1.NewZapAdapter(logger)
 	adapter.Error("error message", "error", "something went wrong")
 
-	var logEntry map[string]interface{}
+	var logEntry map[string]any
 	err := json.Unmarshal(buf.Bytes(), &logEntry)
 	require.NoError(t, err)
 	assert.Equal(t, "error message", logEntry["msg"])
@@ -441,7 +441,7 @@ func TestZapAdapter_With(t *testing.T) {
 
 	adapterWithContext.Info("message with context", "action", "test")
 
-	var logEntry map[string]interface{}
+	var logEntry map[string]any
 	err := json.Unmarshal(buf.Bytes(), &logEntry)
 	require.NoError(t, err)
 	assert.Equal(t, "message with context", logEntry["msg"])
@@ -472,7 +472,7 @@ func TestZapAdapter_ChainedWith(t *testing.T) {
 
 	chainedAdapter.Info("chained context message")
 
-	var logEntry map[string]interface{}
+	var logEntry map[string]any
 	err := json.Unmarshal(buf.Bytes(), &logEntry)
 	require.NoError(t, err)
 	assert.Equal(t, "chained context message", logEntry["msg"])
