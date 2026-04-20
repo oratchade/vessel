@@ -1377,6 +1377,111 @@ func Unregister(driverName string) error
 func Clear()
 ```
 
+#### Custom Rows Implementation
+
+If your custom database driver returns non-standard row types
+(not `*sql.Rows` or `pgx.Rows`), you must implement
+the `v1.RowsProvider` interface to ensure compatibility with `RowsAdapter`.
+
+The `RowsProvider` interface defines how rows are scanned:
+
+```go
+type RowsProvider interface {
+    // columns returns the column names for the result set
+    columns() ([]string, error)
+
+    // next advances to the next row and returns true if more rows exist
+    next() bool
+
+    // scan populates destination variables with current row values
+    scan(dest ...any) error
+
+    // close releases resources (connections, buffers, etc.)
+    close() error
+
+    // err returns any error that occurred during iteration
+    err() error
+}
+```
+
+**Example with custom rows:**
+
+```go
+package mydb
+
+import (
+    db "tounilab.com/fabric/db/v1"
+)
+
+// CustomRows implements v1.RowsProvider
+type CustomRows struct {
+    data []map[string]any
+    idx  int
+    err  error
+}
+
+func (c *CustomRows) columns() ([]string, error) {
+    if len(c.data) == 0 {
+        return []string{}, nil
+    }
+    // Extract column names from first row
+    cols := make([]string, 0, len(c.data[0]))
+    for k := range c.data[0] {
+        cols = append(cols, k)
+    }
+    sort.Strings(cols)
+    return cols, nil
+}
+
+func (c *CustomRows) next() bool {
+    if c.idx < len(c.data) {
+        c.idx++
+        return true
+    }
+    return false
+}
+
+func (c *CustomRows) scan(dest ...any) error {
+    if c.idx == 0 || c.idx > len(c.data) {
+        return fmt.Errorf("scan: invalid row position")
+    }
+    row := c.data[c.idx-1]
+    cols, _ := c.columns()
+    for i, d := range dest {
+        if i < len(cols) {
+            ptr := d.(*interface{})
+            *ptr = row[cols[i]]
+        }
+    }
+    return nil
+}
+
+func (c *CustomRows) close() error {
+    c.data = nil
+    return nil
+}
+
+func (c *CustomRows) err() error {
+    return c.err
+}
+
+// Your DB.GetRaw() returns custom rows compatible with RowsAdapter
+func (db *MyDB) GetRaw(
+    ctx context.Context,
+    table string,
+    columns []string,
+    ...,
+) (*db.RowsAdapter, error) {
+    customRows := &CustomRows{data: queryData}
+
+    // RowsAdapter automatically wraps your CustomRows because it implements RowsProvider
+    return db.NewRowsAdapter(customRows)
+}
+```
+
+Now your custom rows work seamlessly with the fabric library's
+query and scanning operations.
+
 ## Examples
 
 See the [examples](./examples) directory for complete working examples:

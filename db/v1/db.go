@@ -549,7 +549,7 @@ type Tx interface {
 // Users should explicitly check errors to avoid partial scans.
 //
 //nolint:cyclop
-func ScanRowsTo[T any](ctx context.Context, ra rowsAdapterLike) ([]T, error) {
+func ScanRowsTo[T any](ctx context.Context, ra RowsProvider) ([]T, error) {
 	_, span := otel.UseTracer(ctx, "db.ScanRowsTo",
 		trace.WithSpanKind(trace.SpanKindInternal))
 	defer span.End()
