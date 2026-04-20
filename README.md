@@ -521,14 +521,28 @@ for _, user := range users {
 ### RowsAdapter Resource Management
 
 The methods `GetRaw()`, `GetByIDRaw()`, and `QueryRaw()` return a `RowsAdapter`
-that holds database resources. Fabric provides three patterns for safe resource
-management—choose based on your use case:
+that holds database resources (connections, prepared statements). Fabric provides
+three patterns for safe resource management—**choose based on your use case**:
+
+**Decision Tree:**
+
+- Single query, one-off result? → **Pattern 1 (ScanRowsTo[T])**
+- High-throughput loop (100+ queries)? → **Pattern 2 (RowsAdapterPool)**
+- Complex control flow, explicit semantics? → **Pattern 3 (ManagedRowsAdapter)**
 
 #### Pattern 1: Type-Safe Automatic Cleanup (Recommended for Most)
 
-Use `ScanRowsTo[T]` for automatic resource management and type-safe results:
+Use `ScanRowsTo[T]` for automatic resource management and type-safe results.
+**Best for:** Request handlers, simple queries, most production use cases.
 
 ```go
+type User struct {
+    ID    int
+    Name  string
+    Email string
+}
+
+ctx := context.Background()
 rowsAdapter, err := database.GetRaw(ctx, "users", []string{"*"}, nil, nil, nil)
 if err != nil {
     log.Fatal(err)
@@ -546,63 +560,221 @@ for _, user := range users {
 ```
 
 **Benefits:**
+
 - ✅ **Automatic cleanup** - Resources freed when done
 - ✅ **Type safety** - Compile-time column mapping verification
 - ✅ **Zero-copy** - Efficient field scanning without intermediate allocations
-- ✅ **Null handling** - Automatic SQL.Null\* type conversion
+- ✅ **Null handling** - Automatic `sql.Null*` type conversion
+- ✅ **Simplest code** - No explicit resource tracking needed
 
-#### Pattern 2: Explicit Pooling (High-Throughput Loops)
+#### Pattern 2: Resource Pooling (High-Throughput Loops)
 
-Use `RowsAdapterPool` for tight loops with many iterations:
+Use `RowsAdapterPool` for tight loops with many iterations.
+**Best for:** Batch processing, data pipelines, API bulk endpoints.
 
 ```go
+type Order struct {
+    ID     int
+    UserID int
+    Total  float64
+}
+
+// Initialize pool once (e.g., in app setup)
 pool := v1.NewRowsAdapterPool()
 
-for i := 0; i < 10000; i++ {
-    rows, err := database.QueryRaw(ctx, query, i)
-    if err != nil { break }
+// Tight loop processing many queries
+func ProcessOrdersInBatch(ctx context.Context, db v1.DB, orderIDs []int) error {
+    for _, orderID := range orderIDs {
+        // Get raw rows for this order
+        rows, err := db.QueryRaw(ctx, "SELECT * FROM orders WHERE id = ?", orderID)
+        if err != nil {
+            return err
+        }
 
-    adapter, err := pool.Acquire(rows)
-    if err != nil { break }
-    defer pool.Release(adapter)
+        // Acquire adapter from pool (reuses allocated memory)
+        adapter, err := pool.Acquire(rows)
+        if err != nil {
+            return err
+        }
 
-    // Process rows...
-    for adapter.Next() {
-        // ...
+        // Use with ScanRowsTo[T] for type-safe scanning
+        orders, err := v1.ScanRowsTo[Order](ctx, adapter)
+        if err != nil {
+            pool.Release(adapter)
+            return err
+        }
+
+        // Process orders...
+        for _, order := range orders {
+            log.Printf("Order %d: $%.2f\n", order.ID, order.Total)
+        }
+
+        // Return adapter to pool for reuse
+        pool.Release(adapter)
     }
+    return nil
 }
 ```
 
+**Why pooling helps:**
+
+- Without pooling: 10,000 queries = 10,000 allocations (1 per query)
+- With pooling: 10,000 queries = ~1-5 allocations (reuses same objects)
+
 **Benefits:**
+
 - ✅ **98-99% allocation reduction** in tight loops
+- ✅ **40-60% GC reduction** - Dramatically less garbage collection
 - ✅ **Thread-safe** - Safe to share across goroutines
-- ✅ **40-60% GC reduction** - Less garbage collection overhead
+- ✅ **Works with ScanRowsTo[T]** - Full type safety retained
+
+**Optional: Monitor Pool Health**
+
+```go
+// Enable statistics tracking
+pool := v1.NewRowsAdapterPoolWithStats()
+
+// ... process queries ...
+
+// Check pool efficiency
+stats := pool.Stats()
+log.Printf("Allocated: %d, Available: %d\n",
+    stats.Allocated, stats.Available)
+```
 
 #### Pattern 3: Managed Cleanup (Explicit Wrappers)
 
-Use `ManagedRowsAdapter` when you prefer explicit resource management:
+Use `ManagedRowsAdapter` for explicit resource management with fallback cleanup.
+**Best for:** Complex control flows, when you want finalizer safety guarantees.
 
 ```go
-rows, err := database.QueryRaw(ctx, query, args...)
-if err != nil { log.Fatal(err) }
-
-managed, err := v1.WrapManagedRowsAdapter(rows)
-if err != nil { log.Fatal(err) }
-defer managed.Close()
-
-// Use the adapter
-adapter := managed.Adapter()
-for adapter.Next() {
-    // ...
+rows, err := database.QueryRaw(ctx, "SELECT * FROM users WHERE active = true")
+if err != nil {
+    log.Fatal(err)
 }
+
+// Wrap for automatic cleanup
+managed, err := v1.WrapManagedRowsAdapter(rows)
+if err != nil {
+    log.Fatal(err)
+}
+defer managed.Close()  // Explicit, but will also cleanup via finalizer if forgotten
+
+// Get the underlying adapter
+adapter := managed.Adapter()
+
+// Use with ScanRowsTo[T]
+users, err := v1.ScanRowsTo[User](ctx, adapter)
+if err != nil {
+    return err
+}
+
+// Use typed results
+for _, user := range users {
+    process(user)
+}
+
+// Resources automatically cleaned up when managed.Close() called
 ```
 
 **Benefits:**
-- ✅ **Explicit semantics** - Clear resource lifecycle
+
+- ✅ **Explicit semantics** - Crystal-clear resource lifecycle
 - ✅ **Finalizer fallback** - Resources cleaned up even if Close() forgotten
 - ✅ **Idempotent Close** - Safe to call multiple times
+- ✅ **No panic** - Checks if already closed before cleanup
 
-**See Also:** [Resource Pooling Guide](./docs/RESOURCE_POOLING.md) for comprehensive examples and benchmarks
+#### Real-World Service Pattern
+
+Here's how to combine these patterns in a production service:
+
+```go
+type UserService struct {
+    db   v1.DB
+    pool *v1.RowsAdapterPool
+}
+
+func NewUserService(db v1.DB) *UserService {
+    return &UserService{
+        db:   db,
+        pool: v1.NewRowsAdapterPool(),
+    }
+}
+
+// Simple case: One-off request handler (Pattern 1)
+func (s *UserService) GetUserByID(ctx context.Context, id int) (*User, error) {
+    rows, err := s.db.GetRaw(ctx, "users", []string{"*"},
+        condition.NewExpr().Column("id").Op("=").Value(id), nil, nil)
+    if err != nil {
+        return nil, err
+    }
+
+    // ScanRowsTo automatically closes
+    users, err := db.ScanRowsTo[User](ctx, rows)
+    if err != nil || len(users) == 0 {
+        return nil, err
+    }
+    return &users[0], nil
+}
+
+// Bulk case: Batch processing (Pattern 2)
+func (s *UserService) GetUsersBatch(ctx context.Context, ids []int) ([]User, error) {
+    var allUsers []User
+
+    for _, id := range ids {
+        rows, err := s.db.GetRaw(ctx, "users", []string{"*"},
+            condition.NewExpr().Column("id").Op("=").Value(id), nil, nil)
+        if err != nil {
+            return nil, err
+        }
+
+        // Use pool to reduce allocations
+        adapter, err := s.pool.Acquire(rows)
+        if err != nil {
+            return nil, err
+        }
+
+        users, err := db.ScanRowsTo[User](ctx, adapter)
+        s.pool.Release(adapter)  // Return to pool
+
+        if err != nil {
+            return nil, err
+        }
+        allUsers = append(allUsers, users...)
+    }
+    return allUsers, nil
+}
+
+// Complex control flow (Pattern 3)
+func (s *UserService) SearchUsers(ctx context.Context, query string) ([]User, error) {
+    rows, err := s.db.QueryRaw(ctx,
+        "SELECT * FROM users WHERE name LIKE ? OR email LIKE ?",
+        "%"+query+"%", "%"+query+"%")
+    if err != nil {
+        return nil, err
+    }
+
+    // Explicit managed cleanup with finalizer fallback
+    managed, err := v1.WrapManagedRowsAdapter(rows)
+    if err != nil {
+        return nil, err
+    }
+    defer managed.Close()
+
+    // Guaranteed cleanup: defer call + finalizer
+    return db.ScanRowsTo[User](ctx, managed.Adapter())
+}
+```
+
+**Performance Comparison:**
+
+| Pattern                | Allocations         | GC Pressure | Best For                     |
+| ---------------------- | ------------------- | ----------- | ---------------------------- |
+| Pattern 1 (ScanRowsTo) | 1 per query         | Normal      | Single queries, most cases   |
+| Pattern 2 (Pool)       | 1-5 for 10K queries | 40-60% less | Bulk operations, tight loops |
+| Pattern 3 (Managed)    | 1 per query         | Normal      | Explicit semantics needed    |
+
+**See Also:** [Resource Pooling Guide](./docs/RESOURCE_POOLING.md) for comprehensive benchmarks and advanced pool tuning
 
 ### Query Introspection and Performance Analysis
 
