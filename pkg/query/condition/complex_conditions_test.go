@@ -1,6 +1,5 @@
 //go:build test
 
-//nolint:dupl // Table-driven tests naturally have duplicated structures
 package condition_test
 
 import (

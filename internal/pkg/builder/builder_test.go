@@ -195,7 +195,6 @@ func TestInserts_MySQL(t *testing.T) {
 	}
 }
 
-//nolint:dupl
 func TestInserts_Postgres(t *testing.T) {
 	dialect := sqldialect.PostgresDialect{}
 	qb := builder.NewPostgresQueryBuilder(dialect)
@@ -229,7 +228,6 @@ func TestInserts_Postgres(t *testing.T) {
 	}
 }
 
-//nolint:dupl
 func TestInserts_MSSQL(t *testing.T) {
 	dialect := sqldialect.MSSQLDialect{}
 	qb := builder.NewMSSQLQueryBuilder(dialect)

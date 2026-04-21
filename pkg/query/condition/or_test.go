@@ -1,4 +1,5 @@
-//nolint:dupl
+//go:build test
+
 package condition_test
 
 import (
