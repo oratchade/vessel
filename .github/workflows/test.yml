@@ -1,0 +1,238 @@
+name: Tests
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main, develop ]
+
+permissions:
+  contents: read
+  checks: write
+  pull-requests: write
+
+jobs:
+  setup-tools:
+    name: Setup Tools Cache
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Go
+        uses: actions/setup-go@v4
+        with:
+          go-version: "1.26.x"
+          cache: true
+
+      - name: Cache Go tools
+        uses: actions/cache@v4
+        with:
+          path: ~/go/bin
+          key: go-tools-${{ runner.os }}-${{ hashFiles('**/go.mod') }}
+          restore-keys: go-tools-${{ runner.os }}-
+
+      - name: Download Go dependencies
+        run: go mod download
+
+      - name: Install Go tools
+        run: make tools
+
+  unit-tests:
+    name: Unit Tests
+    needs: [ setup-tools ]
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        go-version: [ "1.26.x" ]
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Go
+        uses: actions/setup-go@v4
+        with:
+          go-version: ${{ matrix.go-version }}
+          cache: true
+
+      - name: Restore Go tools cache
+        uses: actions/cache@v4
+        with:
+          path: ~/go/bin
+          key: go-tools-${{ runner.os }}-${{ hashFiles('**/go.mod') }}
+          restore-keys: go-tools-${{ runner.os }}-
+
+      - name: Run unit tests with coverage
+        run: make coverage
+
+      - name: Upload coverage reports
+        uses: codecov/codecov-action@v4
+        with:
+          file: ./out/coverage/coverage.out
+          flags: unittests
+          name: codecov-umbrella
+          fail_ci_if_error: false
+
+      - name: Publish test results
+        uses: EnricoMi/publish-unit-test-result-action@v2
+        if: always()
+        with:
+          files: out/junit/junit.xml
+          check_name: Unit Test Results
+          comment_mode: always
+
+      - name: Generate coverage badge
+        if: github.event_name == 'pull_request'
+        run: make cobertura
+
+  integration-tests:
+    name: Integration Tests
+    needs: [ setup-tools ]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v4
+        with:
+          go-version: "1.26.x"
+          cache: true
+
+      - name: Restore Go tools cache
+        uses: actions/cache@v4
+        with:
+          path: ~/go/bin
+          key: go-tools-${{ runner.os }}-${{ hashFiles('**/go.mod') }}
+          restore-keys: go-tools-${{ runner.os }}-
+
+      - name: Run integration tests
+        run: make integration-test-all
+
+      - name: Publish integration test results
+        uses: EnricoMi/publish-unit-test-result-action@v2
+        if: always()
+        with:
+          files: out/junit/integration-*.xml
+          check_name: Integration Test Results
+
+  sqlite-tests:
+    name: SQLite Integration Tests
+    needs: [ setup-tools ]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v4
+        with:
+          go-version: "1.26.x"
+          cache: true
+
+      - name: Restore Go tools cache
+        uses: actions/cache@v4
+        with:
+          path: ~/go/bin
+          key: go-tools-${{ runner.os }}-${{ hashFiles('**/go.mod') }}
+          restore-keys: go-tools-${{ runner.os }}-
+
+      - name: Run SQLite integration tests
+        run: make integration-test-sqlite
+
+      - name: Publish test results
+        uses: EnricoMi/publish-unit-test-result-action@v2
+        if: always()
+        with:
+          files: out/junit/integration-sqlite.xml
+          check_name: SQLite Integration Tests
+
+  mysql-tests:
+    name: MySQL Integration Tests
+    needs: [ setup-tools ]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v4
+        with:
+          go-version: "1.26.x"
+          cache: true
+
+      - name: Restore Go tools cache
+        uses: actions/cache@v4
+        with:
+          path: ~/go/bin
+          key: go-tools-${{ runner.os }}-${{ hashFiles('**/go.mod') }}
+          restore-keys: go-tools-${{ runner.os }}-
+
+      - name: Run MySQL integration tests
+        run: make integration-test-mysql
+
+      - name: Publish test results
+        uses: EnricoMi/publish-unit-test-result-action@v2
+        if: always()
+        with:
+          files: out/junit/integration-mysql.xml
+          check_name: MySQL Integration Tests
+
+  postgres-tests:
+    name: PostgreSQL Integration Tests
+    needs: [ setup-tools ]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v4
+        with:
+          go-version: "1.26.x"
+          cache: true
+
+      - name: Restore Go tools cache
+        uses: actions/cache@v4
+        with:
+          path: ~/go/bin
+          key: go-tools-${{ runner.os }}-${{ hashFiles('**/go.mod') }}
+          restore-keys: go-tools-${{ runner.os }}-
+
+      - name: Run PostgreSQL integration tests
+        run: make integration-test-postgres
+
+      - name: Publish test results
+        uses: EnricoMi/publish-unit-test-result-action@v2
+        if: always()
+        with:
+          files: out/junit/integration-postgres.xml
+          check_name: PostgreSQL Integration Tests
+
+  mssql-tests:
+    name: MSSQL Integration Tests
+    needs: [ setup-tools ]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v4
+        with:
+          go-version: "1.26.x"
+          cache: true
+
+      - name: Restore Go tools cache
+        uses: actions/cache@v4
+        with:
+          path: ~/go/bin
+          key: go-tools-${{ runner.os }}-${{ hashFiles('**/go.mod') }}
+          restore-keys: go-tools-${{ runner.os }}-
+
+      - name: Run MSSQL integration tests
+        run: make integration-test-mssql
+
+      - name: Publish test results
+        uses: EnricoMi/publish-unit-test-result-action@v2
+        if: always()
+        with:
+          files: out/junit/integration-sqlserver.xml
+          check_name: MSSQL Integration Tests

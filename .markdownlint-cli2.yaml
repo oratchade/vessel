@@ -1,0 +1,9 @@
+# .markdownlint-cli2.yaml
+globs:
+  - "**/*.md"
+  - "!node_modules/**"
+  - "!vendor/**"
+  - "!.git/**"
+  - "!out/**"
+  - "!.vscode/**"
+  - "!.claude/**"

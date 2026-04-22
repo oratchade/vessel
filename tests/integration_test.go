@@ -120,6 +120,39 @@ var testDatabases = []TestDB{
 	},
 }
 
+// getFilteredDatabases returns test databases filtered by DB_TYPE environment variable
+// If DB_TYPE is not set, returns all databases
+// If DB_TYPE is set, returns only the matching database(s)
+func getFilteredDatabases() []TestDB {
+	dbType := os.Getenv("DB_TYPE")
+	if dbType == "" {
+		return testDatabases
+	}
+
+	filtered := []TestDB{}
+	for _, db := range testDatabases {
+		switch dbType {
+		case "sqlite", "sqlite3":
+			if db.driver == "sqlite3" {
+				filtered = append(filtered, db)
+			}
+		case "mysql":
+			if db.driver == "mysql" {
+				filtered = append(filtered, db)
+			}
+		case "postgres", "postgresql":
+			if db.driver == "postgres" {
+				filtered = append(filtered, db)
+			}
+		case "sqlserver", "mssql":
+			if db.driver == "sqlserver" {
+				filtered = append(filtered, db)
+			}
+		}
+	}
+	return filtered
+}
+
 // TestSimpleSQLite tests basic SQLite functionality in isolation
 func TestSimpleSQLite(t *testing.T) {
 	config := v1.SQLiteConfig{
@@ -186,7 +219,7 @@ func TestIntegration_GetAllUsers(t *testing.T) {
 		t.Skip("Skipping integration tests in short mode")
 	}
 
-	for _, testDB := range testDatabases {
+	for _, testDB := range getFilteredDatabases() {
 		t.Run(testDB.name, func(t *testing.T) {
 			database, err := v1.NewDB(testDB.config.(v1.DBConfig), nil)
 			if err != nil {
@@ -218,7 +251,7 @@ func TestIntegration_GetWithWhere(t *testing.T) {
 		t.Skip("Skipping integration tests in short mode")
 	}
 
-	for _, testDB := range testDatabases {
+	for _, testDB := range getFilteredDatabases() {
 		t.Run(testDB.name, func(t *testing.T) {
 			database, err := v1.NewDB(testDB.config.(v1.DBConfig), nil)
 			if err != nil {
@@ -269,7 +302,7 @@ func TestIntegration_BulkInsert(t *testing.T) {
 		t.Skip("Skipping integration tests in short mode")
 	}
 
-	for _, testDB := range testDatabases {
+	for _, testDB := range getFilteredDatabases() {
 		t.Run(testDB.name, func(t *testing.T) {
 			database, err := v1.NewDB(testDB.config.(v1.DBConfig), nil)
 			if err != nil {
@@ -316,7 +349,7 @@ func TestIntegration_Update(t *testing.T) {
 		t.Skip("Skipping integration tests in short mode")
 	}
 
-	for _, testDB := range testDatabases {
+	for _, testDB := range getFilteredDatabases() {
 		t.Run(testDB.name, func(t *testing.T) {
 			database, err := v1.NewDB(testDB.config.(v1.DBConfig), nil)
 			if err != nil {
@@ -351,7 +384,7 @@ func TestIntegration_MultipleConditions(t *testing.T) {
 		t.Skip("Skipping integration tests in short mode")
 	}
 
-	for _, testDB := range testDatabases {
+	for _, testDB := range getFilteredDatabases() {
 		t.Run(testDB.name, func(t *testing.T) {
 			database, err := v1.NewDB(testDB.config.(v1.DBConfig), nil)
 			if err != nil {
@@ -406,7 +439,7 @@ func TestIntegration_Delete(t *testing.T) {
 		t.Skip("Skipping integration tests in short mode")
 	}
 
-	for _, testDB := range testDatabases {
+	for _, testDB := range getFilteredDatabases() {
 		t.Run(testDB.name, func(t *testing.T) {
 			database, err := v1.NewDB(testDB.config.(v1.DBConfig), nil)
 			if err != nil {
@@ -439,7 +472,7 @@ func TestIntegration_TransactionCommit(t *testing.T) {
 		t.Skip("Skipping integration tests in short mode")
 	}
 
-	for _, testDB := range testDatabases {
+	for _, testDB := range getFilteredDatabases() {
 		t.Run(testDB.name, func(t *testing.T) {
 			database, err := v1.NewDB(testDB.config.(v1.DBConfig), nil)
 			if err != nil {
@@ -495,7 +528,7 @@ func TestIntegration_GetByID(t *testing.T) {
 		t.Skip("Skipping integration tests in short mode")
 	}
 
-	for _, testDB := range testDatabases {
+	for _, testDB := range getFilteredDatabases() {
 		t.Run(testDB.name, func(t *testing.T) {
 			database, err := v1.NewDB(testDB.config.(v1.DBConfig), nil)
 			if err != nil {
@@ -527,7 +560,7 @@ func TestIntegration_ConditionalQuery(t *testing.T) {
 		t.Skip("Skipping integration tests in short mode")
 	}
 
-	for _, testDB := range testDatabases {
+	for _, testDB := range getFilteredDatabases() {
 		t.Run(testDB.name, func(t *testing.T) {
 			database, err := v1.NewDB(testDB.config.(v1.DBConfig), nil)
 			if err != nil {
@@ -570,7 +603,7 @@ func TestIntegration_SingleInsert(t *testing.T) {
 		t.Skip("Skipping integration tests in short mode")
 	}
 
-	for _, testDB := range testDatabases {
+	for _, testDB := range getFilteredDatabases() {
 		t.Run(testDB.name, func(t *testing.T) {
 			database, err := v1.NewDB(testDB.config.(v1.DBConfig), nil)
 			if err != nil {
@@ -624,7 +657,7 @@ func TestIntegration_TransactionRollback(t *testing.T) {
 		t.Skip("Skipping integration tests in short mode")
 	}
 
-	for _, testDB := range testDatabases {
+	for _, testDB := range getFilteredDatabases() {
 		t.Run(testDB.name, func(t *testing.T) {
 			database, err := v1.NewDB(testDB.config.(v1.DBConfig), nil)
 			if err != nil {
@@ -686,7 +719,7 @@ func TestIntegration_RawQuery(t *testing.T) {
 		t.Skip("Skipping integration tests in short mode")
 	}
 
-	for _, testDB := range testDatabases {
+	for _, testDB := range getFilteredDatabases() {
 		t.Run(testDB.name, func(t *testing.T) {
 			database, err := v1.NewDB(testDB.config.(v1.DBConfig), nil)
 			if err != nil {
@@ -747,7 +780,7 @@ func TestIntegration_OrConditions(t *testing.T) {
 		t.Skip("Skipping integration tests in short mode")
 	}
 
-	for _, testDB := range testDatabases {
+	for _, testDB := range getFilteredDatabases() {
 		t.Run(testDB.name, func(t *testing.T) {
 			database, err := v1.NewDB(testDB.config.(v1.DBConfig), nil)
 			if err != nil {
@@ -796,7 +829,7 @@ func TestIntegration_ComplexNestedConditions(t *testing.T) {
 		t.Skip("Skipping integration tests in short mode")
 	}
 
-	for _, testDB := range testDatabases {
+	for _, testDB := range getFilteredDatabases() {
 		t.Run(testDB.name, func(t *testing.T) {
 			database, err := v1.NewDB(testDB.config.(v1.DBConfig), nil)
 			if err != nil {
@@ -849,7 +882,7 @@ func TestIntegration_UpdateMultipleRows(t *testing.T) {
 		t.Skip("Skipping integration tests in short mode")
 	}
 
-	for _, testDB := range testDatabases {
+	for _, testDB := range getFilteredDatabases() {
 		t.Run(testDB.name, func(t *testing.T) {
 			database, err := v1.NewDB(testDB.config.(v1.DBConfig), nil)
 			if err != nil {
@@ -903,7 +936,7 @@ func TestIntegration_DeleteMultipleRows(t *testing.T) {
 		t.Skip("Skipping integration tests in short mode")
 	}
 
-	for _, testDB := range testDatabases {
+	for _, testDB := range getFilteredDatabases() {
 		t.Run(testDB.name, func(t *testing.T) {
 			database, err := v1.NewDB(testDB.config.(v1.DBConfig), nil)
 			if err != nil {
@@ -952,7 +985,7 @@ func TestIntegration_GetByIDRaw(t *testing.T) {
 		t.Skip("Skipping integration tests in short mode")
 	}
 
-	for _, testDB := range testDatabases {
+	for _, testDB := range getFilteredDatabases() {
 		t.Run(testDB.name, func(t *testing.T) {
 			database, err := v1.NewDB(testDB.config.(v1.DBConfig), nil)
 			if err != nil {
@@ -1000,7 +1033,7 @@ func TestIntegration_NotEqualOperator(t *testing.T) {
 		t.Skip("Skipping integration tests in short mode")
 	}
 
-	for _, testDB := range testDatabases {
+	for _, testDB := range getFilteredDatabases() {
 		t.Run(testDB.name, func(t *testing.T) {
 			database, err := v1.NewDB(testDB.config.(v1.DBConfig), nil)
 			if err != nil {
@@ -1042,7 +1075,7 @@ func TestIntegration_InOperator(t *testing.T) {
 		t.Skip("Skipping integration tests in short mode")
 	}
 
-	for _, testDB := range testDatabases {
+	for _, testDB := range getFilteredDatabases() {
 		t.Run(testDB.name, func(t *testing.T) {
 			database, err := v1.NewDB(testDB.config.(v1.DBConfig), nil)
 			if err != nil {

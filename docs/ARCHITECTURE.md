@@ -90,7 +90,7 @@ the entire system design, enabling rapid onboarding and informed extension decis
 
 ## Executive Summary
 
-### What is Fabric?
+### What is Fabric
 
 Fabric is a **type-safe SQL query abstraction library** that unifies
 MySQL, PostgreSQL, SQLite, and MSSQL behind a single, ergonomic Go API.
@@ -2250,7 +2250,7 @@ go test ./... && make coverage
 
 ## Decision Trees for Modifications
 
-### Decision: Should I modify builder.go or dialect.go?
+### Decision: Should I modify builder.go or dialect.go
 
 ```text
 Does the change affect SQL generation logic?
@@ -2269,7 +2269,7 @@ Does the change affect SQL generation logic?
             └─→ Modify db/v1/db.go ✓
 ```
 
-### Decision: Unit test or integration test?
+### Decision: Unit test or integration test
 
 ```text
 Does the test require a real database?
@@ -2288,7 +2288,7 @@ Does the test require a real database?
                 (Requires Docker)
 ```
 
-### Decision: Add to which builder?
+### Decision: Add to which builder
 
 ```text
 Does your feature affect:

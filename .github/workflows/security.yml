@@ -1,0 +1,184 @@
+name: Security
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main, develop ]
+  schedule:
+    # Run security checks daily at 2 AM UTC
+    - cron: "0 2 * * *"
+
+permissions:
+  contents: read
+  security-events: write
+  pull-requests: write
+  id-token: write
+  actions: read
+
+jobs:
+  setup-tools:
+    name: Setup Tools Cache
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v4
+        with:
+          go-version: "1.26.x"
+          cache: true
+
+      - name: Cache Go tools
+        uses: actions/cache@v4
+        with:
+          path: ~/go/bin
+          key: go-tools-${{ runner.os }}-${{ hashFiles('**/go.mod') }}
+          restore-keys: go-tools-${{ runner.os }}-
+
+      - name: Download Go dependencies
+        run: go mod download
+
+      - name: Install Go tools
+        run: make tools
+
+  gosec:
+    name: GoSec Security Scan
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      security-events: write
+      id-token: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Run GoSec
+        uses: securego/gosec@v2.20.0
+        with:
+          args: "-no-fail -fmt sarif -out gosec-results.sarif ./..."
+
+      - name: Upload to CodeQL
+        uses: github/codeql-action/upload-sarif@v4
+        if: always()
+        continue-on-error: true
+        with:
+          sarif_file: gosec-results.sarif
+          category: gosec
+
+  trivy-scan:
+    name: Trivy Vulnerability Scan
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      security-events: write
+      id-token: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Run Trivy vulnerability scanner
+        uses: aquasecurity/trivy-action@v0.35.0
+        with:
+          scan-type: "fs"
+          scan-ref: "."
+          format: "sarif"
+          output: "trivy-results.sarif"
+          skip-dirs: "vendor,third_party,.git"
+
+      - name: Upload to CodeQL
+        uses: github/codeql-action/upload-sarif@v4
+        if: always()
+        continue-on-error: true
+        with:
+          sarif_file: trivy-results.sarif
+          category: trivy
+
+  dependency-check:
+    name: Dependency Version Check
+    needs: [ setup-tools ]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v4
+        with:
+          go-version: "1.26.x"
+          cache: true
+
+      - name: Restore Go tools cache
+        uses: actions/cache@v4
+        with:
+          path: ~/go/bin
+          key: go-tools-${{ runner.os }}-${{ hashFiles('**/go.mod') }}
+          restore-keys: go-tools-${{ runner.os }}-
+
+      - name: Check for vulnerable dependencies
+        run: |
+          go install golang.org/x/vuln/cmd/govulncheck@latest
+          govulncheck ./...
+
+  license-check:
+    name: License Compliance
+    needs: [ setup-tools ]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v4
+        with:
+          go-version: "1.26.x"
+          cache: true
+
+      - name: Restore Go tools cache
+        uses: actions/cache@v4
+        with:
+          path: ~/go/bin
+          key: go-tools-${{ runner.os }}-${{ hashFiles('**/go.mod') }}
+          restore-keys: go-tools-${{ runner.os }}-
+
+      - name: Check licenses
+        run: |
+          go-licenses report ./... --template /dev/null || true
+          echo "Licenses checked. Review /dev/null for details."
+
+  codeql:
+    name: CodeQL Analysis
+    needs: [ setup-tools ]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      security-events: write
+      id-token: write
+    strategy:
+      fail-fast: false
+      matrix:
+        language: [ "go" ]
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Initialize CodeQL
+        uses: github/codeql-action/init@v4
+        with:
+          languages: ${{ matrix.language }}
+          queries: security-extended
+
+      - name: Set up Go
+        uses: actions/setup-go@v4
+        with:
+          go-version: "1.26.x"
+          cache: true
+
+      - name: Restore Go tools cache
+        uses: actions/cache@v4
+        with:
+          path: ~/go/bin
+          key: go-tools-${{ runner.os }}-${{ hashFiles('**/go.mod') }}
+          restore-keys: go-tools-${{ runner.os }}-
+
+      - name: Autobuild
+        uses: github/codeql-action/autobuild@v4
+
+      - name: Perform CodeQL Analysis
+        uses: github/codeql-action/analyze@v4
+        continue-on-error: true

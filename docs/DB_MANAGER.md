@@ -879,6 +879,7 @@ type QueryResponse struct {
 ```
 
 **Note on RawData usage:** When GetRaw/QueryRaw is called, use one of these patterns:
+
 1. **ScanRowsTo[T]** (recommended) - Automatic cleanup: `users, _ := db.ScanRowsTo[User](ctx, resp.RawData)`
 2. **RowsAdapterPool** (high-throughput) - Explicit pooling for tight loops
 3. **ManagedRowsAdapter** (explicit) - Managed cleanup with finalizer fallback

@@ -2,7 +2,9 @@
 
 ## Overview
 
-The `RowsAdapter` is a critical resource that holds database connections. Fabric now provides **explicit resource pooling patterns** to improve lifecycle management and reduce allocation pressure in high-throughput scenarios.
+The `RowsAdapter` is a critical resource that holds database connections. Fabric now provides
+**explicit resource pooling patterns** to improve lifecycle management and reduce allocation pressure
+in high-throughput scenarios.
 
 ## The Problem (Before)
 
@@ -324,7 +326,7 @@ go func() { managed.IsClosed() }()
 
 ### Allocation Overhead (Before)
 
-```
+```text
 Query Loop (10,000 iterations):
 - 10,000 RowsAdapter allocations
 - 10,000 GC collections
@@ -333,7 +335,7 @@ Query Loop (10,000 iterations):
 
 ### Allocation Overhead (After - With Pool)
 
-```
+```text
 Query Loop (10,000 iterations):
 - ~1-2 RowsAdapter allocations (reused)
 - Minimal GC pressure

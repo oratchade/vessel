@@ -1,21 +1,35 @@
-version: "3.8"
-
 services:
   mysql:
     image: mysql:8.0
     container_name: test-mysql
     environment:
-      MYSQL_ROOT_PASSWORD: password
+      MYSQL_ROOT_PASSWORD: root_password
+      MYSQL_USER: test_user
+      MYSQL_PASSWORD: test_password
       MYSQL_DATABASE: test_db
+      MYSQL_INITDB_SKIP_TZINFO: 1
     ports:
       - "3306:3306"
     volumes:
-      - ./dockerfiles/init-mysql.sql:/docker-entrypoint-initdb.d/01-schema.sql
+      - ./dockerfiles/init-mysql.sql:/docker-entrypoint-initdb.d/01-init.sql
       - ./dockerfiles/seed-mysql.sql:/docker-entrypoint-initdb.d/02-seed.sql
+      - mysql_test_data:/var/lib/mysql
     healthcheck:
-      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
-      timeout: 20s
+      test:
+        [
+          "CMD",
+          "mysqladmin",
+          "ping",
+          "-h",
+          "localhost",
+          "-u",
+          "root",
+          "-proot_password",
+        ]
+      interval: 10s
+      timeout: 5s
       retries: 10
+      start_period: 30s
     networks:
       - test-network
 
@@ -23,62 +37,67 @@ services:
     image: postgres:15-alpine
     container_name: test-postgres
     environment:
-      POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: password
+      POSTGRES_USER: test_user
+      POSTGRES_PASSWORD: test_password
       POSTGRES_DB: test_db
+      PGDATA: /var/lib/postgresql/data/pgdata
     ports:
       - "5432:5432"
     volumes:
-      - ./dockerfiles/init-postgres.sql:/docker-entrypoint-initdb.d/01-schema.sql
+      - ./dockerfiles/init-postgres.sql:/docker-entrypoint-initdb.d/01-init.sql
       - ./dockerfiles/seed-postgres.sql:/docker-entrypoint-initdb.d/02-seed.sql
+      - postgres_test_data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U postgres"]
-      timeout: 20s
+      test: ["CMD-SHELL", "pg_isready -U test_user -d test_db"]
+      interval: 10s
+      timeout: 5s
       retries: 10
+      start_period: 30s
     networks:
       - test-network
 
   mssql:
+    platform: linux/amd64
     image: mcr.microsoft.com/mssql/server:2022-latest
     container_name: test-mssql
     environment:
-      SA_PASSWORD: YourPassword123
+      SA_PASSWORD: TestPassword123!
       ACCEPT_EULA: "Y"
-      MSSQL_SA_PASSWORD: YourPassword123
+      MSSQL_PID: "Developer"
     ports:
       - "1433:1433"
     volumes:
-      - ./dockerfiles/init-mssql.sql:/docker-entrypoint-initdb.d/01-schema.sql
-      - ./dockerfiles/seed-mssql.sql:/docker-entrypoint-initdb.d/02-seed.sql
+      - ./dockerfiles/init-sqlserver.sql:/tmp/init.sql
+      - ./dockerfiles/seed-sqlserver.sql:/tmp/seed.sql
+      - ./dockerfiles/entrypoint-sqlserver.sh:/entrypoint.sh
+      - ./mssql_test_data:/var/opt/mssql/data
     healthcheck:
-      test: ["CMD-SHELL", "/opt/mssql-tools/bin/sqlcmd -S localhost -U sa -P YourPassword123 -Q 'SELECT 1'"]
-      timeout: 20s
+      test:
+        [
+          "CMD",
+          "/opt/mssql-tools18/bin/sqlcmd",
+          "-S",
+          "localhost",
+          "-U",
+          "sa",
+          "-P",
+          "TestPassword123!",
+          "-C",
+          "-Q",
+          "SELECT 1",
+        ]
+      interval: 15s
+      timeout: 10s
       retries: 10
+      start_period: 60s
     networks:
       - test-network
+    entrypoint: /bin/bash /entrypoint.sh
 
-  test-runner:
-    build:
-      context: .
-      dockerfile: dockerfiles/Dockerfile.test
-    container_name: db-connector-tests
-    depends_on:
-      mysql:
-        condition: service_healthy
-      postgres:
-        condition: service_healthy
-      mssql:
-        condition: service_healthy
-    environment:
-      DB_TYPE: ${DB_TYPE:-sqlite3}
-      MYSQL_DSN: "root:password@tcp(mysql:3306)/test_db?parseTime=true"
-      POSTGRES_DSN: "host=postgres user=postgres password=password dbname=test_db sslmode=disable"
-      MSSQL_DSN: "sqlserver://sa:YourPassword123@mssql:1433?database=TestDB"
-    volumes:
-      - .:/app
-    working_dir: /app
-    networks:
-      - test-network
+volumes:
+  mysql_test_data:
+  postgres_test_data:
+  mssql_test_data:
 
 networks:
   test-network:

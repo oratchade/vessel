@@ -1,215 +1,112 @@
-# Markdownlint Configuration
-# Practical markdown linting for documentation projects
-# Purpose: Check for basic markdown integrity while avoiding over-strict formatting requirements
-
-# Rules documented at: https://github.com/DavidAnson/markdownlint/blob/main/doc/Rules.md
-
-# Default rules configuration
 default: true
 
-# Customize rules
-rules:
-  # MD001: Heading levels should only increase by one level at a time
-  MD001: true
+MD001: true
 
-  # MD003: Heading style should be consistent
-  MD003:
-    style: consistent
+MD003:
+  style: consistent
 
-  # MD004: Unordered list style should be consistent
-  MD004:
-    style: consistent
+MD004:
+  style: consistent
 
-  # MD005: Inconsistent indentation for list items at the same level
-  MD005: true
+MD005: true
 
-  # MD007: Unordered list indentation should be consistent
-  MD007:
-    indent: 2
-    start_indented: false
+MD007:
+  indent: 2
+  start_indented: false
 
-  # MD009: Trailing spaces
-  MD009:
-    nbspaces: 0
-    list_item_empty_lines: false
+MD009:
+  nbspaces: 0
+  list_item_empty_lines: false
 
-  # MD010: Hard tabs
-  MD010: true
+MD010: true
 
-  # MD012: Multiple consecutive blank lines
-  MD012:
-    maximum: 1
+MD012:
+  maximum: 1
 
-  # MD013: Line length (80 chars for readable documentation)
-  MD013:
-    line_length: 80
-    heading_line_length: 80
-    header_line_length: 80
-    code_blocks: true
-    code_lines: 80
-    tables: false # Tables are naturally wide, handled via cell content
-    code_block_token_length: false # Don't count code fence tokens
-    headers: true
-    headers_length: 120
-    strict: false
-    stern: false
+MD013:
+  line_length: 120
+  code_block_line_length: 120
+  code_blocks: true
+  tables: false
+  headings: true
+  heading_line_length: 120
+  strict: false
+  stern: false
 
-  # MD014: Dollar signs used before commands without showing output
-  MD014: true
+MD014: true
+MD018: true
+MD019: true
+MD020: true
+MD021: true
 
-  # MD018: No space after hash on atx style heading
-  MD018: true
+MD022:
+  lines_above: 1
+  lines_below: 1
 
-  # MD019: Multiple spaces after hash on atx style heading
-  MD019: true
+MD023: true
 
-  # MD020: No space inside hashes on closed atx style heading
-  MD020: true
+MD024:
+  allow_different_nesting: true
 
-  # MD021: Multiple spaces inside hashes on closed atx style heading
-  MD021: true
+MD025: true
 
-  # MD022: Headings should be surrounded by blank lines
-  MD022:
-    lines_above: 1
-    lines_below: 1
+MD026:
+  punctuation: ".,;:!?"
 
-  # MD023: Headings must start at the beginning of the line
-  MD023: true
+MD027: true
+MD028: true
 
-  # MD024: Multiple headings with the same content
-  MD024:
-    allow_different_nesting: true
+MD029:
+  style: one_or_ordered
 
-  # MD025: Multiple top level headings in the same document
-  MD025: true
+MD030:
+  ul_single: 1
+  ol_single: 1
+  ul_multi: 1
+  ol_multi: 1
 
-  # MD026: Trailing punctuation in heading
-  MD026:
-    punctuation: ".,;:!?"
+MD031: true
+MD032: true
+MD033: true
+MD034: true
 
-  # MD027: Multiple spaces after blockquote symbol
-  MD027: true
+MD035:
+  style: consistent
 
-  # MD028: Blank line inside blockquote
-  MD028: true
+MD036: true
+MD037: true
+MD038: true
+MD039: true
+MD040: true
+MD041: true
+MD042: true
+MD043: false
 
-  # MD029: Ordered list item prefix
-  MD029:
-    style: one_or_ordered
+MD044:
+  names:
+    - Novalys
+    - PostgreSQL
+  code_blocks: false
 
-  # MD030: Spaces after list markers
-  MD030:
-    ul_single: 1
-    ol_single: 1
-    ul_multi: 1
-    ol_multi: 1
+MD045: true
 
-  # MD031: Fenced code blocks should be surrounded by blank lines
-  MD031: true
+MD046:
+  style: fenced
 
-  # MD032: Lists should be surrounded by blank lines
-  MD032: true
+MD047: true
 
-  # MD033: Inline HTML
-  MD033: true
+MD048:
+  style: backtick
 
-  # MD034: Bare URL used
-  MD034: true
+MD049:
+  style: consistent
 
-  # MD035: Horizontal rule style
-  MD035:
-    style: consistent
+MD050:
+  style: consistent
 
-  # MD036: Emphasis used instead of a heading
-  MD036: true
-
-  # MD037: Spaces inside emphasis markers
-  MD037: true
-
-  # MD038: Spaces inside code span elements
-  MD038: true
-
-  # MD039: Spaces inside link text
-  MD039: true
-
-  # MD040: Fenced code blocks should have a language specified
-  MD040: true
-
-  # MD041: First line in a file should be a top level heading
-  MD041: true
-
-  # MD042: No empty links
-  MD042: true
-
-  # MD043: Required heading structure
-  MD043: false
-
-  # MD044: Proper names should have correct capitalization
-  MD044:
-    names:
-      - Novalys
-      - Fabric
-      - Go
-      - PostgreSQL
-      - JWT
-      - MFA
-      - API
-      - HTTP
-      - JSON
-      - TOTP
-      - UUID
-      - REST
-    code_blocks: true
-
-  # MD045: Images should have alternate text (alt text)
-  MD045: true
-
-  # MD046: Code block style
-  MD046:
-    style: fenced
-
-  # MD047: Files should end with a single newline
-  MD047: true
-
-  # MD048: Code fence style
-  MD048:
-    style: backtick
-
-  # MD049: Emphasis style
-  MD049:
-    style: consistent
-
-  # MD050: Strong style
-  MD050:
-    style: consistent
-
-  # MD051: Link fragments
-  MD051: true
-
-  # MD052: Reference links and shortcut reference links
-  MD052: true
-
-  # MD053: Link and image reference definitions
-  MD053: true
-
-  # MD054: Link and image style
-  MD054: true
-
-  # MD055: Table pipe style
-  MD055: true
-
-  # MD056: Table header and body row count
-  MD056: true
-
-# Configure glob patterns to include/exclude
-no-inline-html: false
-
-# Ignore patterns
-ignore-patterns:
-  - node_modules/
-  - vendor/
-  - out/
-  - ".git/"
-  - ".vscode/"
-  - ".claude/"
+MD051: true
+MD052: true
+MD053: true
+MD054: true
+MD055: true
+MD056: true

@@ -261,7 +261,7 @@ Fabric is licensed under the [MIT License](LICENSE.md).
 
 ## Release Notes Archive
 
-### What Happened to Previous Pre-Release Versions?
+### What Happened to Previous Pre-Release Versions
 
 Fabric v1.0.0 represents the **first official stable release** consolidating:
 

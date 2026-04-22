@@ -1,0 +1,193 @@
+name: Lint
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main, develop ]
+
+permissions:
+  contents: read
+  checks: write
+  pull-requests: write
+
+jobs:
+  setup-tools:
+    name: Setup Tools Cache
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v4
+        with:
+          go-version: "1.26.x"
+          cache: true
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "18"
+
+      - name: Cache Go tools
+        uses: actions/cache@v4
+        with:
+          path: ~/go/bin
+          key: go-tools-${{ runner.os }}-${{ hashFiles('**/go.mod') }}
+          restore-keys: go-tools-${{ runner.os }}-
+
+      - name: Download Go dependencies
+        run: go mod download
+
+      - name: Install Go tools
+        run: make tools
+
+  golangci-lint:
+    name: Go Linting
+    needs: [ setup-tools ]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v4
+        with:
+          go-version: "1.26.x"
+          cache: true
+
+      - name: Restore Go tools cache
+        uses: actions/cache@v4
+        with:
+          path: ~/go/bin
+          key: go-tools-${{ runner.os }}-${{ hashFiles('**/go.mod') }}
+          restore-keys: go-tools-${{ runner.os }}-
+
+      - name: Download dependencies
+        run: go mod download
+
+      - name: Run Go linting
+        run: make lint
+
+  go-fmt:
+    name: Go Format Check
+    needs: [ setup-tools ]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v4
+        with:
+          go-version: "1.26.x"
+          cache: true
+
+      - name: Restore Go tools cache
+        uses: actions/cache@v4
+        with:
+          path: ~/go/bin
+          key: go-tools-${{ runner.os }}-${{ hashFiles('**/go.mod') }}
+          restore-keys: go-tools-${{ runner.os }}-
+
+      - name: Download dependencies
+        run: go mod download
+
+      - name: Check Go format
+        run: make fmt-check
+
+  go-mod-tidy:
+    name: Go Module Tidiness
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v4
+        with:
+          go-version: "1.26.x"
+          cache: true
+
+      - name: Download dependencies
+        run: go mod download
+
+      - name: Validate module tidiness
+        run: make deps-validate
+
+  go-mocks-check:
+    name: Go Mocks Freshness
+    needs: [ setup-tools ]
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v4
+        with:
+          go-version: "1.26.x"
+          cache: true
+
+      - name: Restore Go tools cache
+        uses: actions/cache@v4
+        with:
+          path: ~/go/bin
+          key: go-tools-${{ runner.os }}-${{ hashFiles('**/go.mod') }}
+          restore-keys: go-tools-${{ runner.os }}-
+
+      - name: Download dependencies
+        run: go mod download
+
+      - name: Generate mocks
+        run: make mocks
+
+      - name: Check if mocks are up to date
+        run: |
+          if [ -n "$(git diff --exit-code)" ]; then
+            echo "❌ Mocks are out of date. Run 'make mocks' locally:"
+            git diff
+            exit 1
+          fi
+          echo "✅ All mocks are up to date"
+
+  markdown-lint:
+    name: Markdown Lint
+    needs: [ setup-tools ]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "18"
+
+      - name: Install markdownlint-cli2
+        run: npm install -g markdownlint-cli2
+
+      - name: Run markdown lint
+        run: make lint-markdown
+
+  docs-lint:
+    name: Documentation Lint (Vale)
+    needs: [ setup-tools ]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v4
+        with:
+          go-version: "1.26.x"
+          cache: true
+
+      - name: Restore Go tools cache
+        uses: actions/cache@v4
+        with:
+          path: ~/go/bin
+          key: go-tools-${{ runner.os }}-${{ hashFiles('**/go.mod') }}
+          restore-keys: go-tools-${{ runner.os }}-
+
+      - name: Download dependencies
+        run: go mod download
+
+      - name: Run documentation lint
+        run: make lint-docs

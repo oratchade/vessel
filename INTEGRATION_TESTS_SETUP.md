@@ -93,7 +93,9 @@ For now, run tests locally:
 - `make test` - Unit tests
 - `make integration-test-all` - All database tests with Docker Compose
 
-See the comprehensive test setup in the [Makefile](../fabric/Makefile) and [docker-compose.test.yml](../fabric/dockerfiles/docker-compose.yml) for local validation before creating pull requests.
+See the comprehensive test setup in the [Makefile](../fabric/Makefile) and
+[docker-compose.test.yml](../fabric/dockerfiles/docker-compose.yml) for local validation before
+creating pull requests.
 
 ## Quick Start
 

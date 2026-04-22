@@ -5,6 +5,7 @@ support for MySQL, PostgreSQL, SQLite, and MSSQL.
 
 [![GoDoc](https://godoc.org/tounilab.com/fabric?status.svg)](https://godoc.org/tounilab.com/fabric)
 [![Go Report Card](https://goreportcard.com/badge/tounilab.com/fabric)](https://goreportcard.com/report/tounilab.com/fabric)
+[![Tests](https://github.com/oratchade/fabric/actions/workflows/test.yml/badge.svg)](https://github.com/oratchade/fabric/actions/workflows/test.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
 ## Features
@@ -628,7 +629,7 @@ func ProcessOrdersInBatch(ctx context.Context, db v1.DB, orderIDs []int) error {
 - ✅ **Thread-safe** - Safe to share across goroutines
 - ✅ **Works with ScanRowsTo[T]** - Full type safety retained
 
-**Optional: Monitor Pool Health**
+## Optional: Monitor Pool Health
 
 ```go
 // Enable statistics tracking
@@ -642,7 +643,7 @@ log.Printf("Allocated: %d, Available: %d\n",
     stats.Allocated, stats.Available)
 ```
 
-#### Pattern 3: Managed Cleanup (Explicit Wrappers)
+### Pattern 3: Managed Cleanup (Explicit Wrappers)
 
 Use `ManagedRowsAdapter` for explicit resource management with fallback cleanup.
 **Best for:** Complex control flows, when you want finalizer safety guarantees.

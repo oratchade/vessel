@@ -20,7 +20,7 @@ GOTESTSUM_VERSION ?= v1.13.0
 GOCOVER_VERSION ?=
 
 GOFUMPT_VERSION ?= v0.9.2
-GOLANGCI_VERSION ?= v1.64.8
+GOLANGCI_VERSION ?= v2.11.4
 MOCKGEN_VERSION ?= v1.6.0
 
 ifeq ($(GOTESTSUM_VERSION),)
@@ -42,9 +42,9 @@ GOFUMPT_INSTALL = mvdan.cc/gofumpt@$(GOFUMPT_VERSION)
 endif
 
 ifeq ($(GOLANGCI_VERSION),)
-GOLANGCI_INSTALL = github.com/golangci/golangci-lint/cmd/golangci-lint@latest
+GOLANGCI_INSTALL = github.com/golangci/golangci-lint/v2/cmd/golangci-lint@latest
 else
-GOLANGCI_INSTALL = github.com/golangci/golangci-lint/cmd/golangci-lint@$(GOLANGCI_VERSION)
+GOLANGCI_INSTALL = github.com/golangci/golangci-lint/v2/cmd/golangci-lint@$(GOLANGCI_VERSION)
 endif
 
 ifeq ($(MOCKGEN_VERSION),)
@@ -64,9 +64,9 @@ MARKDOWNLINT_INSTALL = markdownlint-cli2@$(MARKDOWNLINT_VERSION)
 endif
 
 ifeq ($(VALE_VERSION),)
-VALE_INSTALL = github.com/errata-ai/vale/v3@latest
+VALE_INSTALL = github.com/errata-ai/vale/v3/cmd/vale@latest
 else
-VALE_INSTALL = github.com/errata-ai/vale/v3@$(VALE_VERSION)
+VALE_INSTALL = github.com/errata-ai/vale/v3/cmd/vale@$(VALE_VERSION)
 endif
 GOFLAGS ?= -tags=test
 CGO_ENABLED ?= 1
@@ -85,25 +85,29 @@ tools:
 
 test:
 	@mkdir -p $(OUT_JUNIT_DIR)
-	CGO_ENABLED=$(CGO_ENABLED) gotestsum --format=short-verbose --junitfile $(JUNIT_FILE) -- $(GOFLAGS) $(TEST_PKGS)
+	CGO_ENABLED=$(CGO_ENABLED) gotestsum --format=short-verbose --junitfile $(JUNIT_FILE) -- -count=1 -timeout 300s $(GOFLAGS) $(TEST_PKGS)
 
 test-integration: GOFLAGS = -tags=integration
 test-integration:
-	@mkdir -p $(OUT_JUNIT_DIR)
-	CGO_ENABLED=$(CGO_ENABLED) gotestsum --format=short-verbose --junitfile $(JUNIT_FILE) -- $(GOFLAGS) $(TEST_PKGS)
-
-test-non-verbose:
-	@mkdir -p $(OUT_JUNIT_DIR)
-	CGO_ENABLED=$(CGO_ENABLED) gotestsum --junitfile $(JUNIT_FILE) -- $(GOFLAGS) $(TEST_PKGS)
-
-test-integration-non-verbose: GOFLAGS = -tags=integration
-test-integration-non-verbose:
-	@mkdir -p $(OUT_JUNIT_DIR)
-	CGO_ENABLED=$(CGO_ENABLED) gotestsum --junitfile $(JUNIT_FILE) -- $(GOFLAGS) $(TEST_PKGS)
+	@echo "Running all integration tests..."
+	@mkdir -p ./mssql_test_data $(OUT_JUNIT_DIR)
+	@docker compose -f docker-compose.test.yml up -d
+	@echo "Waiting for all services to be healthy..."
+	@sleep 10
+	@docker compose -f docker-compose.test.yml exec -T mysql mysqladmin ping -h localhost -u root -proot_password -w 60 -c 10 || true
+	@docker compose -f docker-compose.test.yml exec -T postgres pg_isready -U test_user -d test_db -t 60 || true
+	@echo "Waiting for MSSQL to be ready (this takes longer)..."
+	@sleep 70
+	@docker compose -f docker-compose.test.yml exec -T mssql /opt/mssql-tools18/bin/sqlcmd -S localhost -U sa -P TestPassword123! -C -Q "SELECT 1" || true
+	@sleep 5
+	@echo "Services are ready, running tests..."
+	CGO_ENABLED=$(CGO_ENABLED) gotestsum --format=short-verbose --junitfile $(JUNIT_FILE) -- -count=1 -timeout 300s $(GOFLAGS) $(TEST_PKGS)
+	@docker compose -f docker-compose.test.yml down
+	@rm -rf ./mssql_test_data
 
 coverage:
 	@mkdir -p $(OUT_COVER_DIR) $(OUT_JUNIT_DIR)
-	CGO_ENABLED=$(CGO_ENABLED) gotestsum --format=short-verbose --junitfile $(JUNIT_FILE) -- $(GOFLAGS) $(TEST_FLAGS) $(TEST_PKGS)
+	CGO_ENABLED=$(CGO_ENABLED) gotestsum --format=short-verbose --junitfile $(JUNIT_FILE) -- -count=1 -timeout 300s $(GOFLAGS) $(TEST_FLAGS) $(TEST_PKGS)
 
 cobertura: coverage
 	@mkdir -p $(OUT_COBERTURA_DIR)
@@ -124,43 +128,92 @@ integration-test: integration-test-sqlite
 
 integration-test-sqlite:
 	@echo "Running SQLite integration tests..."
-	@chmod +x scripts/run-integration-tests.sh
-	@./scripts/run-integration-tests.sh sqlite
+	@mkdir -p $(OUT_JUNIT_DIR)
+	@DB_TYPE=sqlite CGO_ENABLED=$(CGO_ENABLED) gotestsum --format=short-verbose --junitfile $(OUT_JUNIT_DIR)/integration-sqlite.xml -- -count=1 -timeout 300s -tags=integration ./tests -run "TestIntegration"
 
 integration-test-mysql:
 	@echo "Running MySQL integration tests..."
-	@chmod +x scripts/run-integration-tests.sh
-	@docker-compose -f docker-compose.test.yml up -d mysql
-	@docker-compose -f docker-compose.test.yml exec mysql mysqladmin ping -h localhost --wait=30 --silent
-	@DB_TYPE=mysql go test -timeout 300s -v ./tests -run "TestIntegration"
-	@docker-compose -f docker-compose.test.yml down mysql
+	@docker compose -f docker-compose.test.yml up -d mysql
+	@echo "Waiting for MySQL to be healthy..."
+	@sleep 5
+	@docker compose -f docker-compose.test.yml exec -T mysql mysqladmin ping -h localhost -u root -proot_password -w 60 -c 10 || true
+	@sleep 5
+	@mkdir -p $(OUT_JUNIT_DIR)
+	@DB_TYPE=mysql \
+		DB_MYSQL_USER=root \
+		DB_MYSQL_PASSWORD=root_password \
+		DB_MYSQL_HOST=localhost \
+		DB_MYSQL_DATABASE=test_db \
+		CGO_ENABLED=$(CGO_ENABLED) gotestsum --format=short-verbose --junitfile $(OUT_JUNIT_DIR)/integration-mysql.xml -- -count=1 -timeout 300s -tags=integration ./tests -run "TestIntegration"
+	@docker compose -f docker-compose.test.yml down mysql
 
 integration-test-postgres:
 	@echo "Running PostgreSQL integration tests..."
-	@chmod +x scripts/run-integration-tests.sh
-	@docker-compose -f docker-compose.test.yml up -d postgres
-	@docker-compose -f docker-compose.test.yml exec postgres pg_isready -U postgres --timeout 30
-	@DB_TYPE=postgres go test -timeout 300s -v ./tests -run "TestIntegration"
-	@docker-compose -f docker-compose.test.yml down postgres
+	@docker compose -f docker-compose.test.yml up -d postgres
+	@echo "Waiting for PostgreSQL to be healthy..."
+	@sleep 5
+	@docker compose -f docker-compose.test.yml exec -T postgres pg_isready -U test_user -d test_db -t 60 || true
+	@sleep 5
+	@mkdir -p $(OUT_JUNIT_DIR)
+	@DB_TYPE=postgres \
+		DB_POSTGRES_USER=test_user \
+		DB_POSTGRES_PASSWORD=test_password \
+		DB_POSTGRES_HOST=localhost \
+		DB_POSTGRES_DATABASE=test_db \
+		CGO_ENABLED=$(CGO_ENABLED) gotestsum --format=short-verbose --junitfile $(OUT_JUNIT_DIR)/integration-postgres.xml -- -count=1 -timeout 300s -tags=integration ./tests -run "TestIntegration"
+	@docker compose -f docker-compose.test.yml down postgres
 
 integration-test-mssql:
 	@echo "Running MSSQL integration tests..."
-	@chmod +x scripts/run-integration-tests.sh
-	@docker-compose -f docker-compose.test.yml up -d mssql
-	@docker-compose -f docker-compose.test.yml exec mssql /opt/mssql-tools/bin/sqlcmd -S localhost -U sa -P YourPassword123 -Q "SELECT 1" -l 30
-	@DB_TYPE=sqlserver go test -timeout 300s -v ./tests -run "TestIntegration"
-	@docker-compose -f docker-compose.test.yml down mssql
+	@mkdir -p ./mssql_test_data $(OUT_JUNIT_DIR)
+	@docker compose -f docker-compose.test.yml up -d mssql
+	@echo "Waiting for MSSQL to be healthy (this takes ~60-90 seconds)..."
+	@sleep 70
+	@docker compose -f docker-compose.test.yml exec -T mssql /opt/mssql-tools18/bin/sqlcmd -S localhost -U sa -P TestPassword123! -C -Q "SELECT 1" || true
+	@sleep 5
+	@DB_TYPE=sqlserver \
+		DB_MSSQL_USER=sa \
+		DB_MSSQL_PASSWORD=TestPassword123! \
+		DB_MSSQL_HOST=localhost \
+		DB_MSSQL_DATABASE=test_db \
+		CGO_ENABLED=$(CGO_ENABLED) gotestsum --format=short-verbose --junitfile $(OUT_JUNIT_DIR)/integration-sqlserver.xml -- -count=1 -timeout 300s -tags=integration ./tests -run "TestIntegration"
+	@docker compose -f docker-compose.test.yml down mssql
+	@rm -rf ./mssql_test_data
 
 integration-test-all:
 	@echo "Running all integration tests..."
-	@chmod +x scripts/run-integration-tests.sh
-	@docker-compose -f docker-compose.test.yml up -d
-	@sleep 15
-	@$(MAKE) integration-test-sqlite
-	@$(MAKE) integration-test-mysql
-	@$(MAKE) integration-test-postgres
-	@$(MAKE) integration-test-mssql
-	@docker-compose -f docker-compose.test.yml down
+	@mkdir -p ./mssql_test_data $(OUT_JUNIT_DIR)
+	@docker compose -f docker-compose.test.yml up -d
+	@echo "Waiting for all services to be healthy..."
+	@sleep 10
+	@docker compose -f docker-compose.test.yml exec -T mysql mysqladmin ping -h localhost -u root -proot_password -w 60 -c 10 || true
+	@docker compose -f docker-compose.test.yml exec -T postgres pg_isready -U test_user -d test_db -t 60 || true
+	@echo "Waiting for MSSQL to be ready (this takes longer)..."
+	@sleep 70
+	@docker compose -f docker-compose.test.yml exec -T mssql /opt/mssql-tools18/bin/sqlcmd -S localhost -U sa -P TestPassword123! -C -Q "SELECT 1" || true
+	@sleep 5
+	@echo "Services are ready, running tests..."
+	@DB_TYPE=sqlite CGO_ENABLED=$(CGO_ENABLED) gotestsum --format=short-verbose --junitfile $(OUT_JUNIT_DIR)/integration-sqlite.xml -- -count=1 -timeout 300s -tags=integration ./tests -run "TestIntegration"
+	@DB_TYPE=mysql \
+		DB_MYSQL_USER=root \
+		DB_MYSQL_PASSWORD=root_password \
+		DB_MYSQL_HOST=localhost \
+		DB_MYSQL_DATABASE=test_db \
+		CGO_ENABLED=$(CGO_ENABLED) gotestsum --format=short-verbose --junitfile $(OUT_JUNIT_DIR)/integration-mysql.xml -- -count=1 -timeout 300s -tags=integration ./tests -run "TestIntegration"
+	@DB_TYPE=postgres \
+		DB_POSTGRES_USER=test_user \
+		DB_POSTGRES_PASSWORD=test_password \
+		DB_POSTGRES_HOST=localhost \
+		DB_POSTGRES_DATABASE=test_db \
+		CGO_ENABLED=$(CGO_ENABLED) gotestsum --format=short-verbose --junitfile $(OUT_JUNIT_DIR)/integration-postgres.xml -- -count=1 -timeout 300s -tags=integration ./tests -run "TestIntegration"
+	@DB_TYPE=sqlserver \
+		DB_MSSQL_USER=sa \
+		DB_MSSQL_PASSWORD=TestPassword123! \
+		DB_MSSQL_HOST=localhost \
+		DB_MSSQL_DATABASE=test_db \
+		CGO_ENABLED=$(CGO_ENABLED) gotestsum --format=short-verbose --junitfile $(OUT_JUNIT_DIR)/integration-sqlserver.xml -- -count=1 -timeout 300s -tags=integration ./tests -run "TestIntegration"
+	@docker compose -f docker-compose.test.yml down
+	@rm -rf ./mssql_test_data
 
 
 # Formatting
@@ -181,9 +234,9 @@ lint:
 
 # Markdown linting with markdownlint
 lint-markdown:
-	@echo "Running markdownlint-cli2 using .markdownlint.yaml"
+	@echo "Running markdownlint-cli2"
 	@if command -v markdownlint-cli2 >/dev/null 2>&1; then \
-		markdownlint-cli2 "**/*.md" "#node_modules" "#vendor" "#.git" "#out"; \
+		markdownlint-cli2; \
 	else \
 		echo "markdownlint-cli2 not found. Install with: npm install -g markdownlint-cli2"; exit 1; \
 	fi

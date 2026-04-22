@@ -54,7 +54,10 @@ type TestRowsAdapter struct {
 
 func (tra *TestRowsAdapter) Columns() ([]string, error) {
 	cols, err := tra.rows.Columns()
-	return cols, fmt.Errorf("TestRowsAdapter.Columns: %w", err)
+	if err != nil {
+		return cols, fmt.Errorf("TestRowsAdapter.Columns: %w", err)
+	}
+	return cols, nil
 }
 
 func (tra *TestRowsAdapter) Next() bool {
@@ -88,7 +91,10 @@ func (tra *TestRowsAdapter) Err() error {
 // Private methods to satisfy ScanRowsTo requirements
 func (tra *TestRowsAdapter) columns() ([]string, error) {
 	cols, err := tra.rows.Columns()
-	return cols, fmt.Errorf("TestRowsAdapter.columns: %w", err)
+	if err != nil {
+		return cols, fmt.Errorf("TestRowsAdapter.columns: %w", err)
+	}
+	return cols, nil
 }
 
 func (tra *TestRowsAdapter) next() bool {

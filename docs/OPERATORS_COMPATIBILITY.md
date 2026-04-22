@@ -335,7 +335,7 @@ expr := cdt.NewExpr().Column("email").Op("IS NOT NULL")
 - In SQL, `column = NULL` is always false; use `IS NULL` instead
 - All databases support `IS NULL` and `IS NOT NULL` uniformly
 
-**Common Pattern: Soft Deletes**
+## Common Pattern: Soft Deletes
 
 ```go
 // Find active records (not soft-deleted)

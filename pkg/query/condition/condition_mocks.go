@@ -46,7 +46,7 @@ func (m *MockCondition) ToSQL(dialect SQLDialect, paramBase int) (string, []any,
 }
 
 // ToSQL indicates an expected call of ToSQL.
-func (mr *MockConditionMockRecorder) ToSQL(dialect, paramBase any) *gomock.Call {
+func (mr *MockConditionMockRecorder) ToSQL(dialect, paramBase interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ToSQL", reflect.TypeOf((*MockCondition)(nil).ToSQL), dialect, paramBase)
 }
@@ -83,7 +83,7 @@ func (m *MockSQLDialect) Operator(op string) string {
 }
 
 // Operator indicates an expected call of Operator.
-func (mr *MockSQLDialectMockRecorder) Operator(op any) *gomock.Call {
+func (mr *MockSQLDialectMockRecorder) Operator(op interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Operator", reflect.TypeOf((*MockSQLDialect)(nil).Operator), op)
 }
@@ -97,7 +97,7 @@ func (m *MockSQLDialect) Placeholder(index int) string {
 }
 
 // Placeholder indicates an expected call of Placeholder.
-func (mr *MockSQLDialectMockRecorder) Placeholder(index any) *gomock.Call {
+func (mr *MockSQLDialectMockRecorder) Placeholder(index interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Placeholder", reflect.TypeOf((*MockSQLDialect)(nil).Placeholder), index)
 }
@@ -111,7 +111,7 @@ func (m *MockSQLDialect) QuoteIdentifier(value string) string {
 }
 
 // QuoteIdentifier indicates an expected call of QuoteIdentifier.
-func (mr *MockSQLDialectMockRecorder) QuoteIdentifier(value any) *gomock.Call {
+func (mr *MockSQLDialectMockRecorder) QuoteIdentifier(value interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "QuoteIdentifier", reflect.TypeOf((*MockSQLDialect)(nil).QuoteIdentifier), value)
 }
@@ -125,7 +125,7 @@ func (m *MockSQLDialect) QuoteString(value string) string {
 }
 
 // QuoteString indicates an expected call of QuoteString.
-func (mr *MockSQLDialectMockRecorder) QuoteString(value any) *gomock.Call {
+func (mr *MockSQLDialectMockRecorder) QuoteString(value interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "QuoteString", reflect.TypeOf((*MockSQLDialect)(nil).QuoteString), value)
 }
@@ -141,7 +141,7 @@ func (m *MockSQLDialect) SupportedOptions(queryType definition.QueryType, opts *
 }
 
 // SupportedOptions indicates an expected call of SupportedOptions.
-func (mr *MockSQLDialectMockRecorder) SupportedOptions(queryType, opts, paramBase any) *gomock.Call {
+func (mr *MockSQLDialectMockRecorder) SupportedOptions(queryType, opts, paramBase interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SupportedOptions", reflect.TypeOf((*MockSQLDialect)(nil).SupportedOptions), queryType, opts, paramBase)
 }

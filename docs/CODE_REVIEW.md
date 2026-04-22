@@ -149,9 +149,12 @@ type DB interface {
 - **Before:** DB interface appeared to combine multiple concerns (could violate ISP)
 - **After:** 6 focused private interfaces with clear single responsibilities, unified at the right public boundary
 
-This approach follows Go's philosophy: "interfaces should be small" (implementation interfaces are private + focused), while still providing "package-level interfaces" (public DB interface) that users actually depend on.
+This approach follows Go's philosophy: "interfaces should be small" (implementation interfaces are
+private + focused), while still providing "package-level interfaces" (public DB interface) that users
+actually depend on.
 
-The public API surface was reduced from 9 types to just 3 (DB, Tx, FluentDB), significantly improving encapsulation and maintainability.
+The public API surface was reduced from 9 types to just 3 (DB, Tx, FluentDB), significantly
+improving encapsulation and maintainability.
 
 ---
 
@@ -614,7 +617,7 @@ Fabric is a **professional-grade Go database abstraction library** that
 demonstrates strong architectural thinking, adherence to Go idioms,
 and production-ready engineering. The codebase is maintainable, extensible, and well-tested.
 
-**Final Grade: A (92/100)**
+### Final Grade: A (92/100)
 
 The library is production-ready for mission-critical applications.
 Minor suggestions for enhancement do not impact stability or functionality.

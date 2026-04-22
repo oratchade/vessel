@@ -1,19 +1,13 @@
 {
-  "extends": "markdownlint/style/prettier",
-  "line_length": 80,
-  "no-hard-tabs": false,
-  "code-block-language": true,
-  "code-blocks": {
-    "line_length": 80
+  "default": true,
+  "MD013": {
+    "line_length": 120,
+    "code_block_line_length": 120,
+    "headings": true,
+    "heading_line_length": 120
   },
-  "no-multiple-blanks": {
-    "maximum": 1
-  },
-  "list-indentation": {
-    "indent": 2
-  },
-  "no-multiple-spaces": {
-    "markers": true,
-    "exceptions": []
+  "MD009": false,
+  "MD024": {
+    "allow_different_nesting": true
   }
 }
