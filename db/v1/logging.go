@@ -19,6 +19,16 @@ type contextKey string
 // contextKeyCorrelationID is the key for storing correlation IDs in context.
 const contextKeyCorrelationID contextKey = "correlation-id"
 
+// errLogKey is the structured log field key used when attaching error values.
+// logFieldDB, logFieldOp, and logFieldCorrelation are structured log field keys shared
+// across QueryError, QuerySuccess, and TransactionSuccess to satisfy goconst requirements.
+const (
+	errLogKey           = "error"
+	logFieldDB          = "db_driver"
+	logFieldOp          = "operation"
+	logFieldCorrelation = "correlation_id"
+)
+
 // Error type constants define categories for error classification and logging.
 const (
 	// WARN level errors - user/application errors
@@ -91,13 +101,13 @@ func (sl *SafeLogger) QueryError(
 	errorType, level := ClassifyError(err)
 
 	fields := []any{
-		"db_driver", dbDriver,
-		"operation", operation,
+		logFieldDB, dbDriver,
+		logFieldOp, operation,
 		"table", sanitizedTable,
 		"duration_ms", durationMS,
 		"error_type", errorType,
-		"correlation_id", correlationID,
-		"error", err,
+		logFieldCorrelation, correlationID,
+		errLogKey, err,
 	}
 
 	if level == LogLevelError {
@@ -112,7 +122,7 @@ func (sl *SafeLogger) Error(err error) {
 		return
 	}
 
-	sl.logger.Error("database error", "error", err)
+	sl.logger.Error("database error", errLogKey, err)
 }
 
 func (sl *SafeLogger) Debug(msg ...string) {
@@ -141,12 +151,12 @@ func (sl *SafeLogger) QuerySuccess(
 	durationMS := FormatDuration(duration)
 
 	fields := []any{
-		"db_driver", dbDriver,
-		"operation", operation,
+		logFieldDB, dbDriver,
+		logFieldOp, operation,
 		"table", sanitizedTable,
 		"rows_returned", rowsReturned,
 		"duration_ms", durationMS,
-		"correlation_id", correlationID,
+		logFieldCorrelation, correlationID,
 	}
 
 	isSlowQuery := IsSlowQuery(duration, 500)
@@ -173,9 +183,9 @@ func (sl *SafeLogger) TransactionSuccess(ctx context.Context, dbDriver, operatio
 
 	correlationID := ExtractCorrelationID(ctx)
 	fields := []any{
-		"db_driver", dbDriver,
-		"operation", operation,
-		"correlation_id", correlationID,
+		logFieldDB, dbDriver,
+		logFieldOp, operation,
+		logFieldCorrelation, correlationID,
 	}
 
 	sl.logger.Debug(fmt.Sprintf("%s.%s: transaction started", dbDriver, strings.ToUpper(operation)), fields...)

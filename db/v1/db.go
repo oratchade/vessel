@@ -575,7 +575,7 @@ func ScanRowsTo[T any](ctx context.Context, ra RowsProvider) ([]T, error) {
 	// reflect type information for T
 	tType := reflect.TypeOf((*T)(nil)).Elem()
 	isPtr := false
-	if tType.Kind() == reflect.Ptr {
+	if tType.Kind() == reflect.Pointer {
 		isPtr = true
 		tType = tType.Elem()
 	}
@@ -617,8 +617,8 @@ func ScanRowsTo[T any](ctx context.Context, ra RowsProvider) ([]T, error) {
 				continue
 			}
 			colKey := lowerCols[i]
-			if fi, ok := fieldMap[colKey]; ok {
-				f := itemVal.Field(fi)
+			if path, ok := fieldMap[colKey]; ok {
+				f := itemVal.FieldByIndex(path)
 				if !f.CanSet() {
 					continue
 				}

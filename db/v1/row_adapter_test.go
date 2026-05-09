@@ -5,9 +5,11 @@ package v1_test
 import (
 	"context"
 	"database/sql"
+	"encoding/json"
 	"fmt"
 	"reflect"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -424,6 +426,208 @@ func TestBuildFieldMap_CaseInsensitivity(t *testing.T) {
 	assert.Contains(t, fm, "lastname")
 }
 
+// TestBuildFieldMap_OmitemptyAndIgnore verifies two json tag conventions:
+//   - "col,omitempty" strips the option so the key is just "col"
+//   - "-" marks a field as ignored and excludes it from the map
+func TestBuildFieldMap_OmitemptyAndIgnore(t *testing.T) {
+	type Event struct {
+		ID        int    `json:"event_id,omitempty"`
+		Title     string `json:"title"`
+		Internal  string `json:"-"`
+		DBIgnored string `db:"-"`
+	}
+
+	fm := v1.BuildFieldMapForTest(reflect.TypeOf(Event{}))
+
+	assert.Contains(t, fm, "event_id", "omitempty suffix must be stripped")
+	assert.NotContains(t, fm, "event_id,omitempty", "raw tag with comma must not appear as key")
+	assert.Contains(t, fm, "title")
+	assert.NotContains(t, fm, "-", "json:\"-\" field must be excluded")
+	assert.NotContains(t, fm, "internal", "json:\"-\" field must be excluded by name too")
+	assert.NotContains(t, fm, "dbignored", "db:\"-\" field must be excluded")
+}
+
+// TestBuildFieldMap_EmbeddedStruct verifies that fields from anonymous embedded
+// structs are flattened into the field map with the correct index paths.
+// This is the core requirement that allows ScanRowsTo to populate embedded
+// fields like `type Row struct { models.Company; Role string `db:"role"` }`.
+func TestBuildFieldMap_EmbeddedStruct(t *testing.T) {
+	type Address struct {
+		Street string `db:"street"`
+		City   string `db:"city"`
+	}
+	type Person struct {
+		Address        // embedded with no tag — should be recursed into
+		Name    string `db:"name"`
+	}
+
+	fm := v1.BuildFieldMapForTest(reflect.TypeOf(Person{}))
+	require.NotNil(t, fm)
+
+	// Embedded fields must be visible at the top level.
+	assert.Contains(t, fm, "street")
+	assert.Contains(t, fm, "city")
+	assert.Contains(t, fm, "name")
+	// The embedded struct itself must NOT appear as a standalone column key.
+	assert.NotContains(t, fm, "address", "embedded struct name must not leak as a column key")
+
+	// Index paths must reflect the correct depth:
+	//   Person[0] = Address, Address[0] = Street → path {0, 0}
+	//   Person[0] = Address, Address[1] = City   → path {0, 1}
+	//   Person[1] = Name                         → path {1}
+	assert.Equal(t, []int{0, 0}, fm["street"], "street index path")
+	assert.Equal(t, []int{0, 1}, fm["city"], "city index path")
+	assert.Equal(t, []int{1}, fm["name"], "name index path")
+}
+
+// TestScanRowsTo_EmbeddedStruct is an end-to-end test that confirms ScanRowsTo
+// correctly populates an anonymous embedded struct from SQL columns.
+func TestScanRowsTo_EmbeddedStruct(t *testing.T) {
+	type Tenant struct {
+		ID   int    `db:"id"`
+		Name string `db:"name"`
+	}
+	type Row struct {
+		Tenant        // embedded
+		Role   string `db:"role"`
+	}
+
+	mockRows := NewMockRows(
+		[]string{"id", "name", "role"},
+		[][]any{
+			{int64(42), "Acme Corp", "admin"},
+		},
+	)
+
+	adapter := v1.NewRowsAdapterWithMockRows(mockRows)
+	defer adapter.Close() //nolint:errcheck
+
+	rows, err := v1.ScanRowsTo[Row](context.Background(), adapter)
+	require.NoError(t, err)
+	require.Len(t, rows, 1)
+
+	r := rows[0]
+	assert.Equal(t, 42, r.ID, "embedded ID must be populated")
+	assert.Equal(t, "Acme Corp", r.Name, "embedded Name must be populated")
+	assert.Equal(t, "admin", r.Role, "direct Role field must be populated")
+}
+
+// TestScanRowsTo_DeepEmbeddedStruct verifies three levels of anonymous embedding.
+func TestScanRowsTo_DeepEmbeddedStruct(t *testing.T) {
+	type Base struct {
+		CreatedBy string `db:"created_by"`
+	}
+	type Meta struct {
+		Base
+		Version int `db:"version"`
+	}
+	type Record struct {
+		Meta
+		Title string `db:"title"`
+	}
+
+	mockRows := NewMockRows(
+		[]string{"created_by", "version", "title"},
+		[][]any{
+			{"alice", int64(3), "My Record"},
+		},
+	)
+
+	adapter := v1.NewRowsAdapterWithMockRows(mockRows)
+	defer adapter.Close() //nolint:errcheck
+
+	records, err := v1.ScanRowsTo[Record](context.Background(), adapter)
+	require.NoError(t, err)
+	require.Len(t, records, 1)
+
+	rec := records[0]
+	assert.Equal(t, "alice", rec.CreatedBy, "3-level embedded CreatedBy must be populated")
+	assert.Equal(t, 3, rec.Version, "2-level embedded Version must be populated")
+	assert.Equal(t, "My Record", rec.Title, "direct Title must be populated")
+}
+
+// TestScanRowsTo_NullTimeFromTimeDotTime verifies that a time.Time value delivered
+// by the driver (the most common case with pgx and lib/pq) correctly populates a
+// sql.NullTime field. The old setSQLNullTimeField tried json.Unmarshal(fmt.Sprint(...))
+// which always failed silently, leaving every NullTime field as {Valid: false}.
+func TestScanRowsTo_NullTimeFromTimeDotTime(t *testing.T) {
+	type Event struct {
+		ID        int          `db:"id"`
+		CreatedAt sql.NullTime `db:"created_at"`
+		DeletedAt sql.NullTime `db:"deleted_at"`
+	}
+
+	now := time.Now().UTC().Truncate(time.Second)
+
+	mockRows := NewMockRows(
+		[]string{"id", "created_at", "deleted_at"},
+		[][]any{
+			{int64(1), now, nil},
+		},
+	)
+
+	adapter := v1.NewRowsAdapterWithMockRows(mockRows)
+	defer adapter.Close() //nolint:errcheck
+
+	events, err := v1.ScanRowsTo[Event](context.Background(), adapter)
+	require.NoError(t, err)
+	require.Len(t, events, 1)
+
+	assert.True(t, events[0].CreatedAt.Valid, "time.Time driver value must produce Valid=true NullTime")
+	assert.Equal(t, now, events[0].CreatedAt.Time)
+	assert.False(t, events[0].DeletedAt.Valid, "SQL NULL must produce Valid=false NullTime")
+}
+
+// TestScanRowsTo_NullFieldParseError verifies that a value that cannot be coerced
+// into a sql.Null* field's underlying type returns a descriptive error rather than
+// silently scanning as {Valid: false} (which is indistinguishable from SQL NULL).
+func TestScanRowsTo_NullFieldParseError(t *testing.T) {
+	type Record struct {
+		ID    int           `db:"id"`
+		Count sql.NullInt64 `db:"count"`
+	}
+
+	mockRows := NewMockRows(
+		[]string{"id", "count"},
+		[][]any{
+			{int64(1), "not-a-number"},
+		},
+	)
+
+	adapter := v1.NewRowsAdapterWithMockRows(mockRows)
+	defer adapter.Close() //nolint:errcheck
+
+	_, err := v1.ScanRowsTo[Record](context.Background(), adapter)
+	require.Error(t, err, "unparseable string for NullInt64 must return an error, not silently become {Valid:false}")
+	assert.Contains(t, err.Error(), "not-a-number")
+}
+
+// TestScanRowsTo_UUIDBytes16ToStringField verifies that pgx v5 binary UUID values
+// ([16]byte) are reformatted to "xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx" when the
+// destination struct field is a string.  A [16]byte destination field must be
+// unaffected (handled earlier by AssignableTo).
+func TestScanRowsTo_UUIDBytes16ToStringField(t *testing.T) {
+	// 550e8400-e29b-41d4-a716-446655440001
+	raw := [16]byte{0x55, 0x0e, 0x84, 0x00, 0xe2, 0x9b, 0x41, 0xd4, 0xa7, 0x16, 0x44, 0x66, 0x55, 0x44, 0x00, 0x01}
+
+	type Record struct {
+		ID string `db:"id"`
+	}
+
+	mockRows := NewMockRows(
+		[]string{"id"},
+		[][]any{{raw}},
+	)
+
+	adapter := v1.NewRowsAdapterWithMockRows(mockRows)
+	defer adapter.Close() //nolint:errcheck
+
+	records, err := v1.ScanRowsTo[Record](context.Background(), adapter)
+	require.NoError(t, err)
+	require.Len(t, records, 1)
+	assert.Equal(t, "550e8400-e29b-41d4-a716-446655440001", records[0].ID)
+}
+
 // TestScanRowsTo_ErrorHandling tests error propagation from scanning.
 func TestScanRowsTo_ErrorHandling(t *testing.T) {
 	type User struct {
@@ -467,4 +671,116 @@ func TestScanRowsTo_StructWithPointer(t *testing.T) {
 	require.Len(t, users, 1)
 	assert.Equal(t, 1, users[0].ID)
 	assert.Equal(t, "Alice", users[0].Name)
+}
+
+// TestScanRowsTo_SQLScannerInterface verifies that setFieldFromValue delegates to
+// sql.Scanner when a field implements it, instead of falling through to json.Unmarshal.
+// This mirrors the real-world case of types like Permissions or NotificationPreferences
+// that receive a postgres JSON column as []byte.
+func TestScanRowsTo_SQLScannerInterface(t *testing.T) {
+	type Row struct {
+		ID   int      `db:"id"`
+		Data JSONData `db:"data"`
+	}
+
+	tests := []struct {
+		name    string
+		dbValue any // what the driver delivers
+	}{
+		{
+			name:    "[]byte (lib/pq convention)",
+			dbValue: []byte(`{"value":"hello"}`),
+		},
+		{
+			name:    "string (pgx v5 text protocol)",
+			dbValue: `{"value":"hello"}`,
+		},
+		{
+			name:    "map[string]interface{} (pgx v5 JSON codec pre-decoded)",
+			dbValue: map[string]interface{}{"value": "hello"},
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			mockRows := NewMockRows(
+				[]string{"id", "data"},
+				[][]any{
+					{int64(42), tc.dbValue},
+				},
+			)
+
+			adapter := v1.NewRowsAdapterWithMockRows(mockRows)
+			defer adapter.Close() //nolint:errcheck
+
+			rows, err := v1.ScanRowsTo[Row](context.Background(), adapter)
+			require.NoError(t, err)
+			require.Len(t, rows, 1)
+
+			assert.Equal(t, 42, rows[0].ID)
+			assert.True(t, rows[0].Data.ScannedByInterface, "expected sql.Scanner.Scan to be called, not json.Unmarshal fallback")
+			assert.Equal(t, "hello", rows[0].Data.Value)
+		})
+	}
+}
+
+// JSONData is a test helper type that implements sql.Scanner.
+// It tracks whether Scan was called via the interface (not json.Unmarshal fallback).
+type JSONData struct {
+	Value              string `json:"value"`
+	ScannedByInterface bool   `json:"-"`
+}
+
+func (j *JSONData) Scan(value any) error {
+	j.ScannedByInterface = true
+	b, ok := value.([]byte)
+	if !ok {
+		return fmt.Errorf("JSONData.Scan: expected []byte, got %T", value)
+	}
+	return json.Unmarshal(b, j)
+}
+
+// ScalarData is a test helper type that implements sql.Scanner for scalar DB columns.
+// It records whatever src value was passed so tests can assert the pass-through.
+type ScalarData struct {
+	Value any
+}
+
+func (s *ScalarData) Scan(value any) error {
+	s.Value = value
+	return nil
+}
+
+// TestToScannerBytes_ScalarPassThrough verifies that standard database/sql scalar
+// types (int64, float64, bool, time.Time) are passed through to sql.Scanner
+// unchanged and are NOT marshaled to JSON []byte.
+func TestToScannerBytes_ScalarPassThrough(t *testing.T) {
+	now := time.Now().UTC().Truncate(time.Second)
+
+	type Row struct {
+		Count   ScalarData `db:"count"`
+		Score   ScalarData `db:"score"`
+		Active  ScalarData `db:"active"`
+		Created ScalarData `db:"created"`
+	}
+
+	mockRows := NewMockRows(
+		[]string{"count", "score", "active", "created"},
+		[][]any{
+			{int64(7), float64(3.14), true, now},
+		},
+	)
+
+	adapter := v1.NewRowsAdapterWithMockRows(mockRows)
+	defer adapter.Close() //nolint:errcheck
+
+	rows, err := v1.ScanRowsTo[Row](context.Background(), adapter)
+	require.NoError(t, err)
+	require.Len(t, rows, 1)
+
+	r := rows[0]
+	assert.Equal(t, int64(7), r.Count.Value, "int64 should pass through unchanged, not be JSON-marshaled")
+	assert.Equal(t, float64(3.14), r.Score.Value, "float64 should pass through unchanged")
+	assert.Equal(t, true, r.Active.Value, "bool should pass through unchanged")
+	assert.Equal(t, now, r.Created.Value, "time.Time should pass through unchanged")
 }

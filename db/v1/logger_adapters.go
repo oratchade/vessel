@@ -9,6 +9,14 @@ import (
 	"go.uber.org/zap"
 )
 
+// logLevel constants are used by adapter logWithFields dispatch switches.
+const (
+	logLevelDebug = "debug"
+	logLevelInfo  = "info"
+	logLevelWarn  = "warn"
+	logLevelError = "error"
+)
+
 // SlogAdapter adapts Go's standard library log/slog.Logger to the Fabric Logger interface.
 // This allows using slog with Fabric's database manager without modification.
 type SlogAdapter struct {
@@ -91,22 +99,22 @@ func NewLogrusAdapter(logger any) Logger {
 
 // Debug logs a debug-level message with key-value pairs.
 func (a *LogrusAdapter) Debug(msg string, args ...any) {
-	a.logWithFields(msg, args, "debug")
+	a.logWithFields(msg, args, logLevelDebug)
 }
 
 // Info logs an info-level message with key-value pairs.
 func (a *LogrusAdapter) Info(msg string, args ...any) {
-	a.logWithFields(msg, args, "info")
+	a.logWithFields(msg, args, logLevelInfo)
 }
 
 // Warn logs a warning-level message with key-value pairs.
 func (a *LogrusAdapter) Warn(msg string, args ...any) {
-	a.logWithFields(msg, args, "warn")
+	a.logWithFields(msg, args, logLevelWarn)
 }
 
 // Error logs an error-level message with key-value pairs.
 func (a *LogrusAdapter) Error(msg string, args ...any) {
-	a.logWithFields(msg, args, "error")
+	a.logWithFields(msg, args, logLevelError)
 }
 
 // With returns a new Logger with additional context fields.
@@ -122,13 +130,13 @@ func (a *LogrusAdapter) logWithFields(msg string, args []any, level string) {
 	fieldsMap := argsToFields(args)
 	entry := a.entry.WithFields(fieldsMap)
 	switch level {
-	case "debug":
+	case logLevelDebug:
 		entry.Debug(msg)
-	case "info":
+	case logLevelInfo:
 		entry.Info(msg)
-	case "warn":
+	case logLevelWarn:
 		entry.Warn(msg)
-	case "error":
+	case logLevelError:
 		entry.Error(msg)
 	}
 }
@@ -153,22 +161,22 @@ func NewZapAdapter(logger *zap.Logger) Logger {
 
 // Debug logs a debug-level message with key-value pairs.
 func (a *ZapAdapter) Debug(msg string, args ...any) {
-	a.logWithFields(msg, args, "debug")
+	a.logWithFields(msg, args, logLevelDebug)
 }
 
 // Info logs an info-level message with key-value pairs.
 func (a *ZapAdapter) Info(msg string, args ...any) {
-	a.logWithFields(msg, args, "info")
+	a.logWithFields(msg, args, logLevelInfo)
 }
 
 // Warn logs a warning-level message with key-value pairs.
 func (a *ZapAdapter) Warn(msg string, args ...any) {
-	a.logWithFields(msg, args, "warn")
+	a.logWithFields(msg, args, logLevelWarn)
 }
 
 // Error logs an error-level message with key-value pairs.
 func (a *ZapAdapter) Error(msg string, args ...any) {
-	a.logWithFields(msg, args, "error")
+	a.logWithFields(msg, args, logLevelError)
 }
 
 // With returns a new Logger with additional context fields.
@@ -183,13 +191,13 @@ func (a *ZapAdapter) With(fields ...any) Logger {
 func (a *ZapAdapter) logWithFields(msg string, args []any, level string) {
 	zapFields := argsToZapFields(args)
 	switch level {
-	case "debug":
+	case logLevelDebug:
 		a.logger.Debug(msg, zapFields...)
-	case "info":
+	case logLevelInfo:
 		a.logger.Info(msg, zapFields...)
-	case "warn":
+	case logLevelWarn:
 		a.logger.Warn(msg, zapFields...)
-	case "error":
+	case logLevelError:
 		a.logger.Error(msg, zapFields...)
 	}
 }

@@ -147,6 +147,7 @@ func newDBEntry(
 		writeWorkerIdx: writeWorkerIdxCounter,
 		readWorkerIdx:  readWorkerIdxCounter,
 	}
+	dbe.healthy.Store(true) // Start as healthy
 	return dbe, nil
 }
 

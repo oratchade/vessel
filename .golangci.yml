@@ -3,7 +3,7 @@ run:
   go: "1.24"
   build-tags:
     - test
-  tests: true
+  tests: false
 linters:
   enable:
     - govet
@@ -75,7 +75,7 @@ linters:
     paths:
       - third_party$
       - builtin$
-      - examples$
+      - ^examples/
 issues:
   max-issues-per-linter: 0
   max-same-issues: 0

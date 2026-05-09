@@ -26,7 +26,7 @@ func ExportScanRows(rows any, cols []string) ([]map[string]any, error) {
 }
 
 // BuildFieldMapForTest exposes the buildFieldMap function for testing.
-func BuildFieldMapForTest(tType reflect.Type) map[string]int {
+func BuildFieldMapForTest(tType reflect.Type) map[string][]int {
 	return buildFieldMap(tType)
 }
 
