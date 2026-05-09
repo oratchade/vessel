@@ -5,17 +5,17 @@ go 1.26.0
 require (
 	github.com/apex/log v1.9.0
 	github.com/denisenkom/go-mssqldb v0.12.3
-	github.com/go-sql-driver/mysql v1.9.3
+	github.com/go-sql-driver/mysql v1.10.0
 	github.com/golang/mock v1.6.0
-	github.com/jackc/pgx/v5 v5.9.1
+	github.com/jackc/pgx/v5 v5.9.2
 	github.com/lib/pq v1.11.2
-	github.com/mattn/go-sqlite3 v1.14.42
-	github.com/pelletier/go-toml/v2 v2.3.0
+	github.com/mattn/go-sqlite3 v1.14.44
+	github.com/pelletier/go-toml/v2 v2.3.1
 	github.com/sirupsen/logrus v1.9.4
 	github.com/stretchr/testify v1.11.1
 	go.opentelemetry.io/otel v1.43.0
 	go.opentelemetry.io/otel/trace v1.43.0
-	go.uber.org/zap v1.27.1
+	go.uber.org/zap v1.28.0
 	gopkg.in/yaml.v3 v3.0.1
 )
 
