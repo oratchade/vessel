@@ -81,13 +81,13 @@ func TestReturningOutput_PrefixQuoting(t *testing.T) {
 			name:     "postgres-insert",
 			dialect:  sd.PostgresDialect{},
 			qt:       definition.QueryTypeInsert,
-			wantFrag: `RETURNING inserted."id", inserted."name"`,
+			wantFrag: `RETURNING "id", "name"`,
 		},
 		{
 			name:     "postgres-delete",
 			dialect:  sd.PostgresDialect{},
 			qt:       definition.QueryTypeDelete,
-			wantFrag: `RETURNING deleted."id", deleted."name"`,
+			wantFrag: `RETURNING "id", "name"`,
 		},
 		{
 			name:     "mssql-insert",
@@ -116,7 +116,7 @@ func TestReturningOutput_PrefixQuoting(t *testing.T) {
 }
 
 func TestSupportedOptions_GroupByHavingAndMultipleOrderBy(t *testing.T) {
-	count := "count>10"
+	count := "COUNT(*) > 10"
 	cases := []struct {
 		name     string
 		dialect  condition.SQLDialect
@@ -134,7 +134,7 @@ func TestSupportedOptions_GroupByHavingAndMultipleOrderBy(t *testing.T) {
 					{Column: "city", Direction: "ASC"},
 				},
 			},
-			wantFrag: "GROUP BY `country`, `city` HAVING `count>10` ORDER BY `country` ASC, `city` ASC",
+			wantFrag: "GROUP BY `country`, `city` HAVING COUNT(*) > 10 ORDER BY `country` ASC, `city` ASC",
 		},
 		{
 			name:    "postgres-groupby-having-orderby",
@@ -147,7 +147,7 @@ func TestSupportedOptions_GroupByHavingAndMultipleOrderBy(t *testing.T) {
 					{Column: "city", Direction: "ASC"},
 				},
 			},
-			wantFrag: "GROUP BY \"country\", \"city\" HAVING \"count>10\" ORDER BY \"country\" ASC, \"city\" ASC",
+			wantFrag: "GROUP BY \"country\", \"city\" HAVING COUNT(*) > 10 ORDER BY \"country\" ASC, \"city\" ASC",
 		},
 		{
 			name:    "mssql-groupby-having-orderby",
@@ -160,7 +160,7 @@ func TestSupportedOptions_GroupByHavingAndMultipleOrderBy(t *testing.T) {
 					{Column: "city", Direction: "ASC"},
 				},
 			},
-			wantFrag: "GROUP BY [country], [city] HAVING [count>10] ORDER BY [country] ASC, [city] ASC",
+			wantFrag: "GROUP BY [country], [city] HAVING COUNT(*) > 10 ORDER BY [country] ASC, [city] ASC",
 		},
 	}
 
@@ -176,12 +176,12 @@ func TestSupportedOptions_GroupByHavingAndMultipleOrderBy(t *testing.T) {
 }
 
 func TestReturningOutput_UpdateCase(t *testing.T) {
-	// Ensure Update uses inserted. prefix for returning when applicable
+	// Ensure Postgres Update uses unprefixed RETURNING columns.
 	d := sd.PostgresDialect{}
 	opts := &options.QueryOptions{Returning: []string{"id"}}
 	frag, args, err := d.SupportedOptions(definition.QueryTypeUpdate, opts, 1)
 	assert.NoError(t, err)
-	assert.Equal(t, "RETURNING inserted.\"id\"", frag)
+	assert.Equal(t, "RETURNING \"id\"", frag)
 	assert.Empty(t, args)
 }
 
@@ -231,10 +231,24 @@ func TestMSSQLOffsetRequiresOrderBy(t *testing.T) {
 			_, _, err := d.SupportedOptions(definition.QueryTypeSelect, tc.opts, 1)
 			if tc.expectErr {
 				assert.Error(t, err)
-				assert.Equal(t, "MSSQL OFFSET requires ORDER BY clause", err.Error())
+				assert.Equal(t, "MSSQL pagination requires ORDER BY clause", err.Error())
 			} else {
 				assert.NoError(t, err)
 			}
 		})
 	}
+}
+
+func TestMSSQLLimitWithoutOffsetAddsZeroOffset(t *testing.T) {
+	d := sd.MSSQLDialect{}
+	opts := &options.QueryOptions{
+		Limit:   intPtr(5),
+		OrderBy: []options.OrderBy{{Column: "id", Direction: "ASC"}},
+	}
+
+	frag, args, err := d.SupportedOptions(definition.QueryTypeSelect, opts, 1)
+
+	assert.NoError(t, err)
+	assert.Equal(t, "ORDER BY [id] ASC OFFSET 0 ROWS FETCH NEXT @p1 ROWS ONLY", frag)
+	assert.Equal(t, []any{5}, args)
 }

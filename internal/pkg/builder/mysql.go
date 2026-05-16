@@ -38,8 +38,12 @@ func (m *MySQLQueryBuilder) Select(
 }
 
 // Insert implements the QueryBuilder interface for MySQL.
-func (m *MySQLQueryBuilder) Insert(table string, data map[string]any) (string, []any, error) {
-	q, v, err := insert(m.dialect, table, data)
+func (m *MySQLQueryBuilder) Insert(
+	table string,
+	data map[string]any,
+	opts *options.QueryOptions,
+) (string, []any, error) {
+	q, v, err := insert(m.dialect, table, data, opts)
 	if err != nil {
 		return "", nil, fmt.Errorf("insert mysqlSQL Builder: error building insert query: %w", err)
 	}
@@ -47,8 +51,12 @@ func (m *MySQLQueryBuilder) Insert(table string, data map[string]any) (string, [
 }
 
 // Inserts implements the QueryBuilder interface for MySQL.
-func (m *MySQLQueryBuilder) Inserts(table string, data []map[string]any) (string, []any, error) {
-	q, v, err := inserts(m.dialect, table, data)
+func (m *MySQLQueryBuilder) Inserts(
+	table string,
+	data []map[string]any,
+	opts *options.QueryOptions,
+) (string, []any, error) {
+	q, v, err := inserts(m.dialect, table, data, opts)
 	if err != nil {
 		return "", nil, fmt.Errorf("inserts mysqlSQL Builder: error building insert query: %w", err)
 	}
@@ -61,8 +69,9 @@ func (m *MySQLQueryBuilder) Update(
 	data map[string]any,
 	joins []cdt.Join,
 	cond cdt.Condition,
+	opts *options.QueryOptions,
 ) (string, []any, error) {
-	q, v, err := update(m.dialect, table, data, joins, cond, m.join)
+	q, v, err := update(m.dialect, table, data, joins, cond, opts, m.join)
 	if err != nil {
 		return "", nil, fmt.Errorf("update mysqlSQL Builder: error building update query: %w", err)
 	}
@@ -70,8 +79,13 @@ func (m *MySQLQueryBuilder) Update(
 }
 
 // Delete implements the QueryBuilder interface for MySQL.
-func (m *MySQLQueryBuilder) Delete(table string, joins []cdt.Join, cond cdt.Condition) (string, []any, error) {
-	q, v, err := delete(m.dialect, table, joins, cond, m.join)
+func (m *MySQLQueryBuilder) Delete(
+	table string,
+	joins []cdt.Join,
+	cond cdt.Condition,
+	opts *options.QueryOptions,
+) (string, []any, error) {
+	q, v, err := delete(m.dialect, table, joins, cond, opts, m.join)
 	if err != nil {
 		return "", nil, fmt.Errorf("delete mysqlSQL Builder: error building delete query: %w", err)
 	}

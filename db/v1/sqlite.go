@@ -90,7 +90,7 @@ func newSQLLite(cfg SQLiteConfig, logger Logger) (*SQLITE, error) {
 
 	return &SQLITE{
 		querier:      db,
-		queryBuilder: builder.NewSQLiteQueryBuilder(sqldialect.MySQLDialect{}),
+		queryBuilder: builder.NewSQLiteQueryBuilder(sqldialect.SQLiteDialect{}),
 		errorMapper:  dberror.GetMapper(definition.DriverSQLLite),
 		safeLogger:   NewSafeLogger(logger),
 	}, nil

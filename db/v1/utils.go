@@ -16,6 +16,17 @@ type dbOpts struct {
 	querier sqlQuerier
 }
 
+func rejectExecutingReturning(operation string, opts *options.QueryOptions) error {
+	if opts == nil || len(opts.Returning) == 0 {
+		return nil
+	}
+	return fmt.Errorf(
+		"%s: RETURNING/OUTPUT execution is not supported; use %sQuery to preview the SQL",
+		operation,
+		operation,
+	)
+}
+
 // get executes a SELECT query and returns results as a slice of maps.
 func get(
 	ctx context.Context,
@@ -185,6 +196,9 @@ func insert(
 	opts *options.QueryOptions,
 	dbOpts dbOpts,
 ) (*ExecResult, error) {
+	if err := rejectExecutingReturning("Insert", opts); err != nil {
+		return nil, err
+	}
 	query, args, err := insertQuery(table, data, opts, dbOpts)
 	if err != nil {
 		return nil, fmt.Errorf("insert: build query: %w", err)
@@ -206,10 +220,10 @@ func insert(
 func insertQuery(
 	table string,
 	data map[string]any,
-	_ *options.QueryOptions,
+	opts *options.QueryOptions,
 	dbOpts dbOpts,
 ) (string, []any, error) {
-	query, args, err := dbOpts.builder.Insert(table, data)
+	query, args, err := dbOpts.builder.Insert(table, data, opts)
 	if err != nil {
 		return "", nil, fmt.Errorf("failed to build insert query: %w", err)
 	}
@@ -225,6 +239,9 @@ func inserts(
 	opts *options.QueryOptions,
 	dbOpts dbOpts,
 ) (*ExecResult, error) {
+	if err := rejectExecutingReturning("Inserts", opts); err != nil {
+		return nil, err
+	}
 	query, args, err := insertsQuery(table, data, opts, dbOpts)
 	if err != nil {
 		return nil, fmt.Errorf("inserts: build query: %w", err)
@@ -246,10 +263,10 @@ func inserts(
 func insertsQuery(
 	table string,
 	data []map[string]any,
-	_ *options.QueryOptions,
+	opts *options.QueryOptions,
 	dbOpts dbOpts,
 ) (string, []any, error) {
-	query, args, err := dbOpts.builder.Inserts(table, data)
+	query, args, err := dbOpts.builder.Inserts(table, data, opts)
 	if err != nil {
 		return "", nil, fmt.Errorf("failed to build insert query: %w", err)
 	}
@@ -267,6 +284,9 @@ func update(
 	opts *options.QueryOptions,
 	dbOpts dbOpts,
 ) (*ExecResult, error) {
+	if err := rejectExecutingReturning("Update", opts); err != nil {
+		return nil, err
+	}
 	query, args, err := updateQuery(table, data, joins, conditions, opts, dbOpts)
 	if err != nil {
 		return nil, fmt.Errorf("update: build query: %w", err)
@@ -290,10 +310,10 @@ func updateQuery(
 	data map[string]any,
 	joins []cdt.Join,
 	conditions cdt.Condition,
-	_ *options.QueryOptions,
+	opts *options.QueryOptions,
 	dbOpts dbOpts,
 ) (string, []any, error) {
-	query, args, err := dbOpts.builder.Update(table, data, joins, conditions)
+	query, args, err := dbOpts.builder.Update(table, data, joins, conditions, opts)
 	if err != nil {
 		return "", nil, fmt.Errorf("failed to build update query: %w", err)
 	}
@@ -310,6 +330,9 @@ func delete(
 	opts *options.QueryOptions,
 	dbOpts dbOpts,
 ) (*ExecResult, error) {
+	if err := rejectExecutingReturning("Delete", opts); err != nil {
+		return nil, err
+	}
 	query, args, err := deleteQuery(table, joins, conditions, opts, dbOpts)
 	if err != nil {
 		return nil, fmt.Errorf("delete: build query: %w", err)
@@ -332,10 +355,10 @@ func deleteQuery(
 	table string,
 	joins []cdt.Join,
 	conditions cdt.Condition,
-	_ *options.QueryOptions,
+	opts *options.QueryOptions,
 	dbOpts dbOpts,
 ) (string, []any, error) {
-	query, args, err := dbOpts.builder.Delete(table, joins, conditions)
+	query, args, err := dbOpts.builder.Delete(table, joins, conditions, opts)
 	if err != nil {
 		return "", nil, fmt.Errorf("deleteQuery: build query: %w", err)
 	}

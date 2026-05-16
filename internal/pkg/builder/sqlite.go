@@ -37,8 +37,12 @@ func (s *SQLiteQueryBuilder) Select(
 }
 
 // Insert implements the QueryBuilder interface for SQLite.
-func (s *SQLiteQueryBuilder) Insert(table string, data map[string]any) (string, []any, error) {
-	q, v, err := insert(s.dialect, table, data)
+func (s *SQLiteQueryBuilder) Insert(
+	table string,
+	data map[string]any,
+	opts *options.QueryOptions,
+) (string, []any, error) {
+	q, v, err := insert(s.dialect, table, data, opts)
 	if err != nil {
 		return "", nil, fmt.Errorf("insert sqliteSQL Builder: error building insert query: %w", err)
 	}
@@ -46,8 +50,12 @@ func (s *SQLiteQueryBuilder) Insert(table string, data map[string]any) (string, 
 }
 
 // Inserts implements the QueryBuilder interface for SQLite.
-func (s *SQLiteQueryBuilder) Inserts(table string, data []map[string]any) (string, []any, error) {
-	q, v, err := inserts(s.dialect, table, data)
+func (s *SQLiteQueryBuilder) Inserts(
+	table string,
+	data []map[string]any,
+	opts *options.QueryOptions,
+) (string, []any, error) {
+	q, v, err := inserts(s.dialect, table, data, opts)
 	if err != nil {
 		return "", nil, fmt.Errorf("inserts sqliteSQL Builder: error building insert query: %w", err)
 	}
@@ -60,8 +68,9 @@ func (s *SQLiteQueryBuilder) Update(
 	data map[string]any,
 	joins []cdt.Join,
 	cond cdt.Condition,
+	opts *options.QueryOptions,
 ) (string, []any, error) {
-	q, v, err := update(s.dialect, table, data, joins, cond, s.join)
+	q, v, err := update(s.dialect, table, data, joins, cond, opts, s.join)
 	if err != nil {
 		return "", nil, fmt.Errorf("update sqliteSQL Builder: error building update query: %w", err)
 	}
@@ -69,8 +78,13 @@ func (s *SQLiteQueryBuilder) Update(
 }
 
 // Delete implements the QueryBuilder interface for SQLite.
-func (s *SQLiteQueryBuilder) Delete(table string, joins []cdt.Join, cond cdt.Condition) (string, []any, error) {
-	q, v, err := delete(s.dialect, table, joins, cond, s.join)
+func (s *SQLiteQueryBuilder) Delete(
+	table string,
+	joins []cdt.Join,
+	cond cdt.Condition,
+	opts *options.QueryOptions,
+) (string, []any, error) {
+	q, v, err := delete(s.dialect, table, joins, cond, opts, s.join)
 	if err != nil {
 		return "", nil, fmt.Errorf("delete sqliteSQL Builder: error building delete query: %w", err)
 	}

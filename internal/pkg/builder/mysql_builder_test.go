@@ -60,7 +60,7 @@ func TestMysqlInsert(t *testing.T) {
 		"email": "john@example.com",
 	}
 
-	query, args, err := qb.Insert("users", data)
+	query, args, err := qb.Insert("users", data, nil)
 
 	require.NoError(t, err)
 	assert.Contains(t, query, "INSERT INTO `users`")
@@ -79,7 +79,7 @@ func TestMysqlUpdate(t *testing.T) {
 	}
 	condition := cdt.NewExpr().Column("id").Op("=").Value(1)
 
-	query, args, err := qb.Update("users", data, nil, condition)
+	query, args, err := qb.Update("users", data, nil, condition, nil)
 
 	require.NoError(t, err)
 	assert.Contains(t, query, "UPDATE `users`")
@@ -95,7 +95,7 @@ func TestMysqlDelete(t *testing.T) {
 
 	condition := cdt.NewExpr().Column("id").Op("=").Value(1)
 
-	query, args, err := qb.Delete("users", nil, condition)
+	query, args, err := qb.Delete("users", nil, condition, nil)
 
 	require.NoError(t, err)
 	assert.Contains(t, query, "DELETE FROM `users`")
@@ -221,7 +221,7 @@ func TestMysqlUpdateWithoutJoin(t *testing.T) {
 	}
 	condition := cdt.NewExpr().Column("id").Op("=").Value(1)
 
-	query, args, err := qb.Update("users", data, nil, condition)
+	query, args, err := qb.Update("users", data, nil, condition, nil)
 
 	require.NoError(t, err)
 	assert.Contains(t, query, "UPDATE `users`")
@@ -249,7 +249,7 @@ func TestMysqlUpdateWithSingleJoin(t *testing.T) {
 	}
 	condition := cdt.NewExpr().Column("orders.status").Op("=").Value("completed")
 
-	query, args, err := qb.Update("users", data, joins, condition)
+	query, args, err := qb.Update("users", data, joins, condition, nil)
 
 	require.NoError(t, err)
 	assert.Contains(t, query, "UPDATE `users`")
@@ -285,7 +285,7 @@ func TestMysqlUpdateWithMultipleJoins(t *testing.T) {
 	}
 	condition := cdt.NewExpr().Column("orders.total").Op(">").Value(1000)
 
-	query, args, err := qb.Update("users", data, joins, condition)
+	query, args, err := qb.Update("users", data, joins, condition, nil)
 
 	require.NoError(t, err)
 	assert.Contains(t, query, "INNER JOIN `orders`")
@@ -300,7 +300,7 @@ func TestMysqlDeleteWithoutJoin(t *testing.T) {
 
 	condition := cdt.NewExpr().Column("status").Op("=").Value("deleted")
 
-	query, args, err := qb.Delete("users", nil, condition)
+	query, args, err := qb.Delete("users", nil, condition, nil)
 
 	require.NoError(t, err)
 	assert.Contains(t, query, "DELETE FROM `users`")
@@ -324,10 +324,10 @@ func TestMysqlDeleteWithSingleJoin(t *testing.T) {
 	}
 	condition := cdt.NewExpr().Column("orders.status").Op("=").Value("canceled")
 
-	query, args, err := qb.Delete("users", joins, condition)
+	query, args, err := qb.Delete("users", joins, condition, nil)
 
 	require.NoError(t, err)
-	assert.Contains(t, query, "DELETE FROM `users`")
+	assert.Contains(t, query, "DELETE `users` FROM `users`")
 	assert.Contains(t, query, "INNER JOIN")
 	assert.Contains(t, query, "WHERE")
 	assert.Len(t, args, 1)
@@ -356,7 +356,7 @@ func TestMysqlDeleteWithMultipleJoins(t *testing.T) {
 	}
 	condition := cdt.NewExpr().Column("orders.status").Op("=").Value("refunded")
 
-	query, args, err := qb.Delete("users", joins, condition)
+	query, args, err := qb.Delete("users", joins, condition, nil)
 
 	require.NoError(t, err)
 	assert.Contains(t, query, "INNER JOIN `orders`")

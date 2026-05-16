@@ -15,7 +15,7 @@ import (
 // supportedOptions builds SQL fragments for query options like ORDER BY, LIMIT, OFFSET, and RETURNING
 // according to the specified query type and dialect-specific implementations.
 //
-//nolint:cyclop
+//nolint:cyclop,gocognit
 func supportedOptions(
 	dialect condition.SQLDialect,
 	queryType definition.QueryType,
@@ -45,7 +45,7 @@ func supportedOptions(
 			parts = append(parts, fmt.Sprintf(
 				"%s %s",
 				dialect.Operator(operator.Having),
-				dialect.QuoteIdentifier(*opts.Having),
+				*opts.Having,
 			))
 		}
 
@@ -62,14 +62,16 @@ func supportedOptions(
 		// MSSQL requires OFFSET before FETCH (limit), so handle dialect-specific ordering.
 		switch dialect.(type) {
 		case MSSQLDialect:
-			// MSSQL requires ORDER BY when using OFFSET
-			if opts.Offset != nil && len(opts.OrderBy) == 0 {
-				return "", nil, fmt.Errorf("MSSQL OFFSET requires ORDER BY clause")
+			// MSSQL requires ORDER BY when using OFFSET/FETCH pagination.
+			if (opts.Offset != nil || opts.Limit != nil) && len(opts.OrderBy) == 0 {
+				return "", nil, fmt.Errorf("MSSQL pagination requires ORDER BY clause")
 			}
 			if opts.Offset != nil {
 				parts = append(parts, formatOperator(dialect, dialect.Operator(operator.Offset), next))
 				args = append(args, *opts.Offset)
 				next++
+			} else if opts.Limit != nil {
+				parts = append(parts, "OFFSET 0 ROWS")
 			}
 			if opts.Limit != nil {
 				parts = append(parts, formatOperator(dialect, dialect.Operator(operator.Limit), next))
@@ -88,10 +90,17 @@ func supportedOptions(
 		}
 	case definition.QueryTypeInsert, definition.QueryTypeUpdate, definition.QueryTypeDelete:
 		if len(opts.Returning) > 0 {
+			op := dialect.Operator(operator.Returning)
+			if op == "" {
+				return "", nil, nil
+			}
 			parts = append(parts, fmt.Sprintf(
 				"%s %s",
-				dialect.Operator(operator.Returning),
-				strings.Join(helpers.QuoteIdentifierSlice(dialect, opts.Returning, getPrefix(queryType)), ", "),
+				op,
+				strings.Join(
+					helpers.QuoteIdentifierSlice(dialect, opts.Returning, getPrefix(dialect, queryType)),
+					", ",
+				),
 			))
 		}
 	}
@@ -115,7 +124,10 @@ func getOrderByFragment(dialect condition.SQLDialect, orderBy []options.OrderBy)
 
 // getPrefix returns the prefix to use for column names in RETURNING/OUTPUT clauses
 // based on the query type (e.g., "inserted." for INSERT, "deleted." for DELETE).
-func getPrefix(qt definition.QueryType) string {
+func getPrefix(dialect condition.SQLDialect, qt definition.QueryType) string {
+	if _, ok := dialect.(MSSQLDialect); !ok {
+		return ""
+	}
 	switch qt {
 	case definition.QueryTypeInsert, definition.QueryTypeUpdate:
 		return "inserted."

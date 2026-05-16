@@ -15,6 +15,11 @@ func ExportValidateQueryOptions(opts *options.QueryOptions) error {
 	return validateQueryOptions(opts)
 }
 
+// ExportRejectExecutingReturning allows tests to verify mutation execution RETURNING guards.
+func ExportRejectExecutingReturning(operation string, opts *options.QueryOptions) error {
+	return rejectExecutingReturning(operation, opts)
+}
+
 // ExportFromSQLResult allows tests to call the unexported fromSQLResult function.
 func ExportFromSQLResult(res sql.Result) (*ExecResult, error) {
 	return fromSQLResult(res)

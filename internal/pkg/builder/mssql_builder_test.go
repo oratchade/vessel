@@ -60,7 +60,7 @@ func TestMSSQLInsert(t *testing.T) {
 		"email": "john@example.com",
 	}
 
-	query, args, err := qb.Insert("users", data)
+	query, args, err := qb.Insert("users", data, nil)
 
 	require.NoError(t, err)
 	assert.Contains(t, query, "INSERT INTO [users]")
@@ -79,7 +79,7 @@ func TestMSSQLUpdate(t *testing.T) {
 	}
 	condition := cdt.NewExpr().Column("id").Op("=").Value(1)
 
-	query, args, err := qb.Update("users", data, nil, condition)
+	query, args, err := qb.Update("users", data, nil, condition, nil)
 
 	require.NoError(t, err)
 	assert.Contains(t, query, "UPDATE [users]")
@@ -95,7 +95,7 @@ func TestMSSQLDelete(t *testing.T) {
 
 	condition := cdt.NewExpr().Column("id").Op("=").Value(1)
 
-	query, args, err := qb.Delete("users", nil, condition)
+	query, args, err := qb.Delete("users", nil, condition, nil)
 
 	require.NoError(t, err)
 	assert.Contains(t, query, "DELETE FROM [users]")

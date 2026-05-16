@@ -511,7 +511,7 @@ func (pg *Postgres) InsertQuery(
 	data map[string]any,
 	opts *options.QueryOptions,
 ) (string, []any, error) {
-	query, args, err := pg.queryBuilder.Insert(table, data)
+	query, args, err := pg.queryBuilder.Insert(table, data, opts)
 	if err != nil {
 		return "", nil, fmt.Errorf("postgres.Insert: failed to build insert query: %w", err)
 	}
@@ -534,7 +534,13 @@ func (pg *Postgres) Insert(
 			semconv.DBCollectionName(table),
 		))
 	defer span.End()
-	query, args, err := pg.queryBuilder.Insert(table, data)
+	if err := rejectExecutingReturning("Insert", opts); err != nil {
+		span.RecordError(err)
+		span.SetStatus(codes.Error, err.Error())
+		pg.safeLogger.QueryError(c, "postgres", "insert", table, 0, err)
+		return nil, err
+	}
+	query, args, err := pg.queryBuilder.Insert(table, data, nil)
 	if err != nil {
 		err := fmt.Errorf("postgres.Insert: failed to build insert query: %w", err)
 		span.RecordError(err)
@@ -570,7 +576,7 @@ func (pg *Postgres) InsertsQuery(
 	data []map[string]any,
 	opts *options.QueryOptions,
 ) (string, []any, error) {
-	query, args, err := pg.queryBuilder.Inserts(table, data)
+	query, args, err := pg.queryBuilder.Inserts(table, data, opts)
 	if err != nil {
 		return "", nil, fmt.Errorf("postgres.Inserts: failed to build insert query: %w", err)
 	}
@@ -593,7 +599,13 @@ func (pg *Postgres) Inserts(
 			semconv.DBCollectionName(table),
 		))
 	defer span.End()
-	query, args, err := pg.queryBuilder.Inserts(table, data)
+	if err := rejectExecutingReturning("Inserts", opts); err != nil {
+		span.RecordError(err)
+		span.SetStatus(codes.Error, err.Error())
+		pg.safeLogger.QueryError(c, "postgres", "insert", table, 0, err)
+		return nil, err
+	}
+	query, args, err := pg.queryBuilder.Inserts(table, data, nil)
 	if err != nil {
 		err := fmt.Errorf("postgres.Inserts: failed to build insert query: %w", err)
 		span.RecordError(err)
@@ -630,7 +642,7 @@ func (pg *Postgres) UpdateQuery(
 	conditions cdt.Condition,
 	opts *options.QueryOptions,
 ) (string, []any, error) {
-	query, args, err := pg.queryBuilder.Update(table, data, joins, conditions)
+	query, args, err := pg.queryBuilder.Update(table, data, joins, conditions, opts)
 	if err != nil {
 		return "", nil, fmt.Errorf("postgres.Update: failed to build update query: %w", err)
 	}
@@ -655,7 +667,13 @@ func (pg *Postgres) Update(
 			semconv.DBCollectionName(table),
 		))
 	defer span.End()
-	query, args, err := pg.queryBuilder.Update(table, data, joins, conditions)
+	if err := rejectExecutingReturning("Update", opts); err != nil {
+		span.RecordError(err)
+		span.SetStatus(codes.Error, err.Error())
+		pg.safeLogger.QueryError(c, "postgres", "update", table, 0, err)
+		return nil, err
+	}
+	query, args, err := pg.queryBuilder.Update(table, data, joins, conditions, nil)
 	if err != nil {
 		err := fmt.Errorf("postgres.Update: failed to build update query: %w", err)
 		span.RecordError(err)
@@ -691,7 +709,7 @@ func (pg *Postgres) DeleteQuery(
 	conditions cdt.Condition,
 	opts *options.QueryOptions,
 ) (string, []any, error) {
-	query, args, err := pg.queryBuilder.Delete(table, joins, conditions)
+	query, args, err := pg.queryBuilder.Delete(table, joins, conditions, opts)
 	if err != nil {
 		return "", nil, fmt.Errorf("postgres.Delete: failed to build delete query: %w", err)
 	}
@@ -715,7 +733,13 @@ func (pg *Postgres) Delete(
 			semconv.DBCollectionName(table),
 		))
 	defer span.End()
-	query, args, err := pg.queryBuilder.Delete(table, joins, conditions)
+	if err := rejectExecutingReturning("Delete", opts); err != nil {
+		span.RecordError(err)
+		span.SetStatus(codes.Error, err.Error())
+		pg.safeLogger.QueryError(c, "postgres", "delete", table, 0, err)
+		return nil, err
+	}
+	query, args, err := pg.queryBuilder.Delete(table, joins, conditions, nil)
 	if err != nil {
 		err := fmt.Errorf("postgres.Delete: failed to build delete query: %w", err)
 		span.RecordError(err)

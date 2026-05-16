@@ -187,7 +187,7 @@ func TestInserts_MySQL(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			query, args, err := qb.Inserts(tt.table, tt.data)
+			query, args, err := qb.Inserts(tt.table, tt.data, nil)
 			assert.NoError(t, err)
 			assert.Equal(t, tt.expectedQuery, query)
 			assert.Equal(t, tt.expectedArgs, args)
@@ -220,7 +220,7 @@ func TestInserts_Postgres(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			query, args, err := qb.Inserts(tt.table, tt.data)
+			query, args, err := qb.Inserts(tt.table, tt.data, nil)
 			assert.NoError(t, err)
 			assert.Equal(t, tt.expectedQuery, query)
 			assert.Equal(t, tt.expectedArgs, args)
@@ -253,7 +253,7 @@ func TestInserts_MSSQL(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			query, args, err := qb.Inserts(tt.table, tt.data)
+			query, args, err := qb.Inserts(tt.table, tt.data, nil)
 			assert.NoError(t, err)
 			assert.Equal(t, tt.expectedQuery, query)
 			assert.Equal(t, tt.expectedArgs, args)
@@ -265,7 +265,7 @@ func TestInserts_EmptyDataError(t *testing.T) {
 	dialect := sqldialect.MySQLDialect{}
 	qb := builder.NewMySQLQueryBuilder(dialect)
 
-	_, _, err := qb.Inserts("users", []map[string]any{})
+	_, _, err := qb.Inserts("users", []map[string]any{}, nil)
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "no data provided")
 }
@@ -299,13 +299,14 @@ func TestMysqlUpdateWithJoinAndCondition(t *testing.T) {
 	}
 	condition := cdt.NewExpr().Column("orders.amount").Op(">").Value(100)
 
-	query, args, err := qb.Update("users", data, joins, condition)
+	query, args, err := qb.Update("users", data, joins, condition, nil)
 
 	require.NoError(t, err)
-	assert.Contains(t, query, "UPDATE `users`")
-	assert.Contains(t, query, "SET `status` = ?")
-	assert.Contains(t, query, "INNER JOIN `orders` ON `users`.`id` = `orders`.`user_id`")
-	assert.Contains(t, query, "WHERE")
+	assert.Equal(
+		t,
+		"UPDATE `users` INNER JOIN `orders` ON `users`.`id` = `orders`.`user_id` SET `status` = ? WHERE `orders`.`amount` > ?;",
+		query,
+	)
 	assert.Len(t, args, 2) // 1 for SET, 1 for WHERE condition
 }
 
@@ -325,12 +326,14 @@ func TestMysqlDeleteWithJoinAndCondition(t *testing.T) {
 	}
 	condition := cdt.NewExpr().Column("subscriptions.status").Op("=").Value("canceled")
 
-	query, args, err := qb.Delete("users", joins, condition)
+	query, args, err := qb.Delete("users", joins, condition, nil)
 
 	require.NoError(t, err)
-	assert.Contains(t, query, "DELETE FROM `users`")
-	assert.Contains(t, query, "LEFT JOIN `subscriptions`")
-	assert.Contains(t, query, "WHERE")
+	assert.Equal(
+		t,
+		"DELETE `users` FROM `users` LEFT JOIN `subscriptions` ON `users`.`id` = `subscriptions`.`user_id` WHERE `subscriptions`.`status` = ?;",
+		query,
+	)
 	assert.Len(t, args, 1)
 }
 
@@ -355,13 +358,14 @@ func TestPostgresUpdateWithJoin(t *testing.T) {
 	}
 	condition := cdt.NewExpr().Column("accounts.verified").Op("=").Value(true)
 
-	query, args, err := qb.Update("users", data, joins, condition)
+	query, args, err := qb.Update("users", data, joins, condition, nil)
 
 	require.NoError(t, err)
-	assert.Contains(t, query, "UPDATE \"users\"")
-	assert.Contains(t, query, "SET \"status\" = $1")
-	assert.Contains(t, query, "FROM") // PostgreSQL uses FROM for JOINs
-	assert.Contains(t, query, "WHERE")
+	assert.Equal(
+		t,
+		`UPDATE "users" SET "status" = $1 FROM "accounts" WHERE "users"."id" = "accounts"."user_id" AND "accounts"."verified" = $2;`,
+		query,
+	)
 	assert.Len(t, args, 2)
 }
 
@@ -381,12 +385,14 @@ func TestPostgresDeleteWithJoin(t *testing.T) {
 	}
 	condition := cdt.NewExpr().Column("logs.action").Op("=").Value("delete_request")
 
-	query, args, err := qb.Delete("users", joins, condition)
+	query, args, err := qb.Delete("users", joins, condition, nil)
 
 	require.NoError(t, err)
-	assert.Contains(t, query, "DELETE FROM \"users\"")
-	assert.Contains(t, query, "USING") // PostgreSQL uses USING for JOINs in DELETE
-	assert.Contains(t, query, "WHERE")
+	assert.Equal(
+		t,
+		`DELETE FROM "users" USING "logs" WHERE "users"."id" = "logs"."user_id" AND "logs"."action" = $1;`,
+		query,
+	)
 	assert.Len(t, args, 1)
 }
 
@@ -411,13 +417,14 @@ func TestMSSQLUpdateWithJoin(t *testing.T) {
 	}
 	condition := cdt.NewExpr().Column("teams.active").Op("=").Value(true)
 
-	query, args, err := qb.Update("users", data, joins, condition)
+	query, args, err := qb.Update("users", data, joins, condition, nil)
 
 	require.NoError(t, err)
-	assert.Contains(t, query, "UPDATE")
-	assert.Contains(t, query, "SET")
-	assert.Contains(t, query, "INNER JOIN [teams]")
-	assert.Contains(t, query, "WHERE")
+	assert.Equal(
+		t,
+		"UPDATE [users] SET [department] = @p1 FROM [users] INNER JOIN [teams] ON [users].[id] = [teams].[user_id] WHERE [teams].[active] = @p2;",
+		query,
+	)
 	assert.Len(t, args, 2)
 }
 
@@ -437,12 +444,14 @@ func TestMSSQLDeleteWithJoin(t *testing.T) {
 	}
 	condition := cdt.NewExpr().Column("departments.status").Op("=").Value("inactive")
 
-	query, args, err := qb.Delete("users", joins, condition)
+	query, args, err := qb.Delete("users", joins, condition, nil)
 
 	require.NoError(t, err)
-	assert.Contains(t, query, "DELETE FROM")
-	assert.Contains(t, query, "LEFT JOIN [departments]")
-	assert.Contains(t, query, "WHERE")
+	assert.Equal(
+		t,
+		"DELETE [users] FROM [users] LEFT JOIN [departments] ON [users].[id] = [departments].[dept_id] WHERE [departments].[status] = @p1;",
+		query,
+	)
 	assert.Len(t, args, 1)
 }
 
@@ -450,7 +459,7 @@ func TestMSSQLDeleteWithJoin(t *testing.T) {
 
 // TestSQLiteUpdateWithJoin tests SQLite UPDATE with JOIN (should work)
 func TestSQLiteUpdateWithJoin(t *testing.T) {
-	dialect := &sqldialect.MySQLDialect{}
+	dialect := &sqldialect.SQLiteDialect{}
 	qb := builder.NewSQLiteQueryBuilder(dialect)
 
 	data := map[string]any{
@@ -467,12 +476,14 @@ func TestSQLiteUpdateWithJoin(t *testing.T) {
 	}
 	condition := cdt.NewExpr().Column("profiles.verified").Op("=").Value(1)
 
-	query, args, err := qb.Update("users", data, joins, condition)
+	query, args, err := qb.Update("users", data, joins, condition, nil)
 
 	require.NoError(t, err)
-	assert.Contains(t, query, "UPDATE `users`")
-	assert.Contains(t, query, "SET")
-	assert.Contains(t, query, "INNER JOIN `profiles`")
+	assert.Equal(
+		t,
+		"UPDATE `users` SET `active` = ? FROM `profiles` WHERE `users`.`id` = `profiles`.`user_id` AND `profiles`.`verified` = ?;",
+		query,
+	)
 	assert.Len(t, args, 2)
 }
 
@@ -492,7 +503,7 @@ func TestSQLiteDeleteWithJoinReturnsError(t *testing.T) {
 	}
 	condition := cdt.NewExpr().Column("archive.status").Op("=").Value("old")
 
-	query, args, err := qb.Delete("users", joins, condition)
+	query, args, err := qb.Delete("users", joins, condition, nil)
 
 	// Should return an error for SQLite
 	require.Error(t, err)
@@ -503,12 +514,12 @@ func TestSQLiteDeleteWithJoinReturnsError(t *testing.T) {
 
 // TestSQLiteDeleteWithoutJoinWorks tests SQLite DELETE without JOINs still works
 func TestSQLiteDeleteWithoutJoinWorks(t *testing.T) {
-	dialect := &sqldialect.MySQLDialect{}
+	dialect := &sqldialect.SQLiteDialect{}
 	qb := builder.NewSQLiteQueryBuilder(dialect)
 
 	condition := cdt.NewExpr().Column("id").Op("=").Value(123)
 
-	query, args, err := qb.Delete("users", nil, condition)
+	query, args, err := qb.Delete("users", nil, condition, nil)
 
 	require.NoError(t, err)
 	assert.Contains(t, query, "DELETE FROM `users`")
@@ -528,7 +539,7 @@ func TestUpdateBackwardsCompatibilityWithNilJoins(t *testing.T) {
 	}
 	condition := cdt.NewExpr().Column("id").Op("=").Value(42)
 
-	query, args, err := qb.Update("users", data, nil, condition)
+	query, args, err := qb.Update("users", data, nil, condition, nil)
 
 	require.NoError(t, err)
 	assert.Contains(t, query, "UPDATE `users`")
@@ -543,7 +554,7 @@ func TestDeleteBackwardsCompatibilityWithNilJoins(t *testing.T) {
 
 	condition := cdt.NewExpr().Column("status").Op("=").Value("inactive")
 
-	query, args, err := qb.Delete("users", nil, condition)
+	query, args, err := qb.Delete("users", nil, condition, nil)
 
 	require.NoError(t, err)
 	assert.Contains(t, query, "DELETE FROM `users`")

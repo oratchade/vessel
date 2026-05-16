@@ -50,7 +50,7 @@ type QueryBuilder interface {
 	//   string: The generated SQL query.
 	//   []any: Arguments for parameterized query.
 	//   error: Error if query building fails.
-	Insert(table string, data map[string]any) (string, []any, error)
+	Insert(table string, data map[string]any, opts *options.QueryOptions) (string, []any, error)
 
 	// Inserts builds an INSERT query for the given table and multiple rows of data.
 	//
@@ -62,7 +62,7 @@ type QueryBuilder interface {
 	//   string: The generated SQL query.
 	//   []any: Arguments for parameterized query.
 	//   error: Error if query building fails.
-	Inserts(table string, data []map[string]any) (string, []any, error)
+	Inserts(table string, data []map[string]any, opts *options.QueryOptions) (string, []any, error)
 
 	// Update builds an UPDATE query for the given table, data, joins, and conditions.
 	//
@@ -79,7 +79,13 @@ type QueryBuilder interface {
 	//
 	// Note: JOIN support varies by database driver. SQLite UPDATE with JOINs is supported,
 	// but not all complex join patterns may be supported across all drivers.
-	Update(table string, data map[string]any, joins []cdt.Join, cond cdt.Condition) (string, []any, error)
+	Update(
+		table string,
+		data map[string]any,
+		joins []cdt.Join,
+		cond cdt.Condition,
+		opts *options.QueryOptions,
+	) (string, []any, error)
 
 	// Delete builds a DELETE query for the given table, joins, and conditions.
 	//
@@ -93,7 +99,7 @@ type QueryBuilder interface {
 	//   string: The generated SQL query.
 	//   []any: Arguments for parameterized query.
 	//   error: Error if query building fails, or if DELETE with JOINs is attempted on unsupported databases.
-	Delete(table string, joins []cdt.Join, cond cdt.Condition) (string, []any, error)
+	Delete(table string, joins []cdt.Join, cond cdt.Condition, opts *options.QueryOptions) (string, []any, error)
 }
 
 // selectQ builds a SELECT query with support for columns, joins, conditions, and options.
@@ -199,7 +205,12 @@ func sanitizeColumn(dialect cdt.SQLDialect, column string) string {
 }
 
 // insert builds an INSERT query for the given table and data.
-func insert(dialect cdt.SQLDialect, table string, data map[string]any) (string, []any, error) {
+func insert(
+	dialect cdt.SQLDialect,
+	table string,
+	data map[string]any,
+	opts *options.QueryOptions,
+) (string, []any, error) {
 	if len(data) == 0 {
 		return "", nil, fmt.Errorf("builder.insert: no data provided for insertion")
 	}
@@ -226,16 +237,35 @@ func insert(dialect cdt.SQLDialect, table string, data map[string]any) (string, 
 		quotedColumns = append(quotedColumns, dialect.QuoteIdentifier(col))
 	}
 
+	outputFragment, _, err := dialect.SupportedOptions(definition.QueryTypeInsert, opts, index)
+	if err != nil {
+		return "", nil, fmt.Errorf("builder.insert: %w", err)
+	}
+
+	outputPrefix, outputSuffix := "", ""
+	if outputFragment != "" && isMSSQLDialect(dialect) {
+		outputPrefix = " " + outputFragment
+	} else if outputFragment != "" {
+		outputSuffix = " " + outputFragment
+	}
+
 	return fmt.Sprintf(
-		"INSERT INTO %s (%s) VALUES (%s);",
+		"INSERT INTO %s (%s)%s VALUES (%s)%s;",
 		dialect.QuoteIdentifier(table),
 		strings.Join(quotedColumns, ", "),
+		outputPrefix,
 		strings.Join(placeholders, ", "),
+		outputSuffix,
 	), values, nil
 }
 
 // insert builds an INSERT query for the given table and multiple rows of data.
-func inserts(dialect cdt.SQLDialect, table string, data []map[string]any) (string, []any, error) {
+func inserts(
+	dialect cdt.SQLDialect,
+	table string,
+	data []map[string]any,
+	opts *options.QueryOptions,
+) (string, []any, error) {
 	if len(data) == 0 {
 		return "", nil, fmt.Errorf("builder.inserts: no data provided for insertion")
 	}
@@ -265,11 +295,25 @@ func inserts(dialect cdt.SQLDialect, table string, data []map[string]any) (strin
 		quotedColumns = append(quotedColumns, dialect.QuoteIdentifier(col))
 	}
 
+	outputFragment, _, err := dialect.SupportedOptions(definition.QueryTypeInsert, opts, index)
+	if err != nil {
+		return "", nil, fmt.Errorf("builder.inserts: %w", err)
+	}
+
+	outputPrefix, outputSuffix := "", ""
+	if outputFragment != "" && isMSSQLDialect(dialect) {
+		outputPrefix = " " + outputFragment
+	} else if outputFragment != "" {
+		outputSuffix = " " + outputFragment
+	}
+
 	return fmt.Sprintf(
-		"INSERT INTO %s (%s) VALUES %s;",
+		"INSERT INTO %s (%s)%s VALUES %s%s;",
 		dialect.QuoteIdentifier(table),
 		strings.Join(quotedColumns, ", "),
+		outputPrefix,
 		strings.Join(rowPlaceholders, ", "),
+		outputSuffix,
 	), values, nil
 }
 
@@ -289,50 +333,17 @@ func rowValues(dialect cdt.SQLDialect, row map[string]any, columns []string, ind
 	return index, rowValues, values
 }
 
-// buildJoinClause builds the JOIN clause string for UPDATE queries based on dialect.
-// For PostgreSQL, JOINs go in FROM clause.
-// For MySQL/MSSQL, JOINs go directly after SET clause.
-func buildJoinClause(dialect cdt.SQLDialect, joinParts []string) string {
-	if len(joinParts) == 0 {
-		return ""
-	}
-
-	dialectName := fmt.Sprintf("%T", dialect)
-	if strings.Contains(dialectName, "Postgres") {
-		// PostgreSQL: UPDATE ... SET ... FROM joins WHERE ...
-		return " FROM " + strings.Join(joinParts, " ")
-	}
-	// MySQL/MSSQL: UPDATE ... SET ... JOIN ... WHERE ...
-	return " " + strings.Join(joinParts, " ")
-}
-
-// buildDeleteJoinClause builds the JOIN clause string for DELETE queries based on dialect.
-// For PostgreSQL, JOINs go in USING clause.
-// For MySQL/MSSQL, JOINs go directly after DELETE FROM clause.
-func buildDeleteJoinClause(dialect cdt.SQLDialect, joinParts []string) string {
-	if len(joinParts) == 0 {
-		return ""
-	}
-
-	dialectName := fmt.Sprintf("%T", dialect)
-	if strings.Contains(dialectName, "Postgres") {
-		// PostgreSQL: DELETE FROM table USING joins WHERE ...
-		return " USING " + strings.Join(joinParts, " ")
-	}
-	// MySQL/MSSQL: DELETE FROM table JOIN ... WHERE ...
-	return " " + strings.Join(joinParts, " ")
-}
-
 // update builds an UPDATE query for the given table, data, joins, and conditions.
 // The joins parameter is optional and may be nil or empty.
 //
-//nolint:prealloc
+//nolint:prealloc,cyclop
 func update(
 	dialect cdt.SQLDialect,
 	table string,
 	data map[string]any,
 	joins []cdt.Join,
 	cond cdt.Condition,
+	opts *options.QueryOptions,
 	joinFn func(table string, join *cdt.Join) string,
 ) (string, []any, error) {
 	// Extract and sort column names for deterministic ordering
@@ -351,7 +362,7 @@ func update(
 		index++
 	}
 
-	sql := fmt.Sprintf("UPDATE %s SET %s", dialect.QuoteIdentifier(table), strings.Join(sets, ", "))
+	sql := fmt.Sprintf("UPDATE %s", dialect.QuoteIdentifier(table))
 
 	// Build JOIN clauses if provided
 	var joinParts []string
@@ -359,6 +370,11 @@ func update(
 		for _, j := range joins {
 			joinParts = append(joinParts, joinFn(table, &j))
 		}
+	}
+
+	outputFragment, _, err := dialect.SupportedOptions(definition.QueryTypeUpdate, opts, index)
+	if err != nil {
+		return "", nil, fmt.Errorf("builder.update: %w", err)
 	}
 
 	// Build the WHERE clause and its arguments
@@ -374,14 +390,54 @@ func update(
 
 	// Assemble the final query
 	var b strings.Builder
-	b.WriteString(sql)
-
-	// Add JOIN clause if provided (dialect-specific handling)
-	b.WriteString(buildJoinClause(dialect, joinParts))
+	switch {
+	case isMySQLDialect(dialect):
+		b.WriteString(sql)
+		if len(joinParts) > 0 {
+			b.WriteString(" ")
+			b.WriteString(strings.Join(joinParts, " "))
+		}
+		b.WriteString(" SET ")
+		b.WriteString(strings.Join(sets, ", "))
+	case isMSSQLDialect(dialect):
+		b.WriteString(sql)
+		b.WriteString(" SET ")
+		b.WriteString(strings.Join(sets, ", "))
+		if outputFragment != "" {
+			b.WriteString(" ")
+			b.WriteString(outputFragment)
+		}
+		if len(joinParts) > 0 {
+			b.WriteString(" FROM ")
+			b.WriteString(dialect.QuoteIdentifier(table))
+			b.WriteString(" ")
+			b.WriteString(strings.Join(joinParts, " "))
+		}
+	default:
+		b.WriteString(sql)
+		b.WriteString(" SET ")
+		b.WriteString(strings.Join(sets, ", "))
+		if len(joins) > 0 {
+			b.WriteString(" FROM ")
+			b.WriteString(strings.Join(joinTableRefs(dialect, joins), ", "))
+		}
+	}
 
 	if whereClause != "" {
 		b.WriteString(" WHERE ")
+		if len(joins) > 0 && (isPostgresDialect(dialect) || isSQLiteDialect(dialect)) {
+			b.WriteString(strings.Join(joinPredicates(dialect, table, joins), " AND "))
+			b.WriteString(" AND ")
+		}
 		b.WriteString(whereClause)
+	} else if len(joins) > 0 && (isPostgresDialect(dialect) || isSQLiteDialect(dialect)) {
+		b.WriteString(" WHERE ")
+		b.WriteString(strings.Join(joinPredicates(dialect, table, joins), " AND "))
+	}
+
+	if outputFragment != "" && !isMSSQLDialect(dialect) {
+		b.WriteString(" ")
+		b.WriteString(outputFragment)
 	}
 
 	b.WriteString(";")
@@ -392,11 +448,14 @@ func update(
 // delete builds a DELETE query for the given table, joins, and conditions.
 // The joins parameter is optional and may be nil or empty.
 // Note: SQLite does not support DELETE with JOINs and will return an error.
+//
+//nolint:cyclop,gocognit
 func delete(
 	dialect cdt.SQLDialect,
 	table string,
 	joins []cdt.Join,
 	cond cdt.Condition,
+	opts *options.QueryOptions,
 	joinFn func(table string, join *cdt.Join) string,
 ) (string, []any, error) {
 	// Check if SQLite is trying to use DELETE with JOINs
@@ -406,14 +465,17 @@ func delete(
 		}
 	}
 
-	sql := fmt.Sprintf("DELETE FROM %s", dialect.QuoteIdentifier(table))
-
 	// Build JOIN clauses if provided
 	var joinParts []string
 	if len(joins) > 0 {
 		for _, j := range joins {
 			joinParts = append(joinParts, joinFn(table, &j))
 		}
+	}
+
+	outputFragment, _, err := dialect.SupportedOptions(definition.QueryTypeDelete, opts, 1)
+	if err != nil {
+		return "", nil, fmt.Errorf("builder.delete: %w", err)
 	}
 
 	var values []any
@@ -431,17 +493,116 @@ func delete(
 
 	// Assemble the final query
 	var b strings.Builder
-	b.WriteString(sql)
-
-	// Add JOIN clause if provided (dialect-specific handling)
-	b.WriteString(buildDeleteJoinClause(dialect, joinParts))
+	switch {
+	case isMySQLDialect(dialect):
+		if len(joinParts) > 0 {
+			b.WriteString("DELETE ")
+			b.WriteString(dialect.QuoteIdentifier(table))
+			b.WriteString(" FROM ")
+			b.WriteString(dialect.QuoteIdentifier(table))
+			b.WriteString(" ")
+			b.WriteString(strings.Join(joinParts, " "))
+		} else {
+			b.WriteString("DELETE FROM ")
+			b.WriteString(dialect.QuoteIdentifier(table))
+		}
+	case isMSSQLDialect(dialect):
+		if len(joinParts) > 0 {
+			b.WriteString("DELETE ")
+			b.WriteString(dialect.QuoteIdentifier(table))
+			if outputFragment != "" {
+				b.WriteString(" ")
+				b.WriteString(outputFragment)
+			}
+			b.WriteString(" FROM ")
+			b.WriteString(dialect.QuoteIdentifier(table))
+			b.WriteString(" ")
+			b.WriteString(strings.Join(joinParts, " "))
+		} else {
+			b.WriteString("DELETE FROM ")
+			b.WriteString(dialect.QuoteIdentifier(table))
+			if outputFragment != "" {
+				b.WriteString(" ")
+				b.WriteString(outputFragment)
+			}
+		}
+	default:
+		b.WriteString("DELETE FROM ")
+		b.WriteString(dialect.QuoteIdentifier(table))
+		if len(joins) > 0 {
+			b.WriteString(" USING ")
+			b.WriteString(strings.Join(joinTableRefs(dialect, joins), ", "))
+		}
+	}
 
 	if whereClause != "" {
 		b.WriteString(" WHERE ")
+		if len(joins) > 0 && isPostgresDialect(dialect) {
+			b.WriteString(strings.Join(joinPredicates(dialect, table, joins), " AND "))
+			b.WriteString(" AND ")
+		}
 		b.WriteString(whereClause)
+	} else if len(joins) > 0 && isPostgresDialect(dialect) {
+		b.WriteString(" WHERE ")
+		b.WriteString(strings.Join(joinPredicates(dialect, table, joins), " AND "))
+	}
+
+	if outputFragment != "" && !isMSSQLDialect(dialect) {
+		b.WriteString(" ")
+		b.WriteString(outputFragment)
 	}
 
 	b.WriteString(";")
 
 	return b.String(), values, nil
+}
+
+func dialectTypeName(dialect cdt.SQLDialect) string {
+	return fmt.Sprintf("%T", dialect)
+}
+
+func isMySQLDialect(dialect cdt.SQLDialect) bool {
+	return strings.Contains(dialectTypeName(dialect), "MySQL")
+}
+
+func isPostgresDialect(dialect cdt.SQLDialect) bool {
+	return strings.Contains(dialectTypeName(dialect), "Postgres")
+}
+
+func isSQLiteDialect(dialect cdt.SQLDialect) bool {
+	return strings.Contains(dialectTypeName(dialect), "SQLite")
+}
+
+func isMSSQLDialect(dialect cdt.SQLDialect) bool {
+	return strings.Contains(dialectTypeName(dialect), "MSSQL")
+}
+
+func joinTableRefs(dialect cdt.SQLDialect, joins []cdt.Join) []string {
+	refs := make([]string, 0, len(joins))
+	for _, join := range joins {
+		ref := dialect.QuoteIdentifier(join.Table)
+		if join.Alias != "" {
+			ref += " AS " + dialect.QuoteIdentifier(join.Alias)
+		}
+		refs = append(refs, ref)
+	}
+	return refs
+}
+
+func joinPredicates(dialect cdt.SQLDialect, table string, joins []cdt.Join) []string {
+	predicates := make([]string, 0)
+	for _, join := range joins {
+		rightTable := join.Table
+		if join.Alias != "" {
+			rightTable = join.Alias
+		}
+		for _, cdt := range join.Conditions {
+			predicates = append(predicates, fmt.Sprintf(
+				"%s.%s = %s.%s",
+				dialect.QuoteIdentifier(table), dialect.QuoteIdentifier(cdt.Left),
+				dialect.QuoteIdentifier(rightTable), dialect.QuoteIdentifier(cdt.Right),
+			))
+		}
+	}
+	return predicates
 }
