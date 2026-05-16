@@ -1965,7 +1965,7 @@ No critical production blockers identified. All existing issues have been addres
 | ------------ | -------- | ----------- | -------- | ------------- |
 | Placeholder  | `?`      | `$1, $2...` | `?`      | `@p1, @p2...` |
 | Quote        | `` ` ``  | `"`         | `` ` ``  | `[` `]`       |
-| RETURNING    | ✅\*     | ✅          | ❌       | ✅\*          |
+| RETURNING    | ❌       | ✅ preview  | ❌       | ✅ preview    |
 | LIMIT/OFFSET | Standard | Standard    | Standard | OFFSET/FETCH  |
 | Connection   | sql.DB   | pgxpool     | sql.DB   | sql.DB        |
 | JOIN         | ✅       | ✅          | ✅       | ✅            |
@@ -1974,7 +1974,8 @@ No critical production blockers identified. All existing issues have been addres
 
 **Notes:**
 
-- RETURNING: MySQL 8.0.20+, MSSQL requires special handling
+- RETURNING/OUTPUT: supported for query preview only; mutation execution
+  returns `ExecResult` and rejects `Returning` options.
 - All support parameterized queries ✅
 - All support context propagation ✅
 

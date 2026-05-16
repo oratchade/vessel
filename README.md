@@ -956,6 +956,16 @@ usage.
 | Connection Pool Stats | ✅    | ✅         | ✅     | ✅    |
 | Error Mapping         | ✅    | ✅         | ✅     | ✅    |
 
+Dialect notes:
+
+- `QueryOptions.Returning` is supported for query preview only. PostgreSQL
+  renders `RETURNING`, MSSQL renders `OUTPUT`, and MySQL/SQLite ignore it.
+  Mutation `Exec` methods return `ExecResult` and reject `Returning` so rows
+  are not silently discarded.
+- MSSQL pagination uses `ORDER BY ... OFFSET ... FETCH NEXT`; `Limit` requires
+  `OrderBy`, and Fabric emits `OFFSET 0 ROWS` when only `Limit` is set.
+- `Having` is rendered as a raw SQL clause string. Use trusted SQL fragments.
+
 All operators are documented in the [Architecture Guide](./docs/ARCHITECTURE.md).
 
 ## Database Configuration

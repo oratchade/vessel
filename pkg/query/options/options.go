@@ -24,8 +24,10 @@ type OrderBy struct {
 //     behave unexpectedly on some engines (e.g., MySQL requires Limit to honor
 //     Offset).
 //   - OrderBy is optional and can be combined with any other clause.
-//   - Returning is database-specific: PostgreSQL and MSSQL support it; SQLite
-//     and MySQL ignore it.
+//   - Returning is database-specific and is used for query preview only:
+//     PostgreSQL renders RETURNING, MSSQL renders OUTPUT, and SQLite/MySQL
+//     ignore it. Mutation execution methods return ExecResult and reject
+//     Returning to avoid silently dropping returned rows.
 type QueryOptions struct {
 	// Limit specifies the maximum number of rows to return.
 	// Applies to: SELECT, UPDATE, DELETE.
@@ -52,8 +54,9 @@ type QueryOptions struct {
 	// Applies to: SELECT.
 	GroupBy []string
 
-	// Returning specifies columns to return after INSERT, UPDATE, or DELETE.
-	// Applies to: INSERT, UPDATE, DELETE (database-specific, see query builder for details).
-	// Supported by: PostgreSQL, MSSQL. Ignored by: SQLite, MySQL.
+	// Returning specifies columns to return after INSERT, UPDATE, or DELETE in query preview.
+	// Supported in generated SQL by: PostgreSQL (RETURNING), MSSQL (OUTPUT).
+	// Ignored in generated SQL by: SQLite, MySQL.
+	// Mutation Exec methods reject Returning because they return ExecResult, not rows.
 	Returning []string
 }
