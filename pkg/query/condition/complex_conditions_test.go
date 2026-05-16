@@ -259,14 +259,14 @@ func TestNullConditions(t *testing.T) {
 			builder: func() cdt.Condition {
 				return cdt.NewExpr().Column("deleted_at").Op("IS NULL")
 			},
-			expectedSQL: "deleted_at IS NULL",
+			expectedSQL: "`deleted_at` IS NULL",
 		},
 		{
 			name: "is not null",
 			builder: func() cdt.Condition {
 				return cdt.NewExpr().Column("email").Op("IS NOT NULL")
 			},
-			expectedSQL: "email IS NOT NULL",
+			expectedSQL: "`email` IS NOT NULL",
 		},
 	}
 

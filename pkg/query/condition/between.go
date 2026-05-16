@@ -41,11 +41,20 @@ func (b *Between) ToSQL(dialect SQLDialect, paramBase int) (string, []any, error
 		return "", nil, fmt.Errorf("invalid expression")
 	}
 
+	op, err := requireOperator(dialect, b.operator)
+	if err != nil {
+		return "", nil, err
+	}
+	andOp, err := requireOperator(dialect, "AND")
+	if err != nil {
+		return "", nil, err
+	}
+
 	fromPlaceholder := dialect.Placeholder(paramBase)
 	toPlaceholder := dialect.Placeholder(paramBase + 1)
 	sql := fmt.Sprintf(
 		"%s %s %s %s %s",
-		b.column, dialect.Operator(b.operator), fromPlaceholder, dialect.Operator("AND"), toPlaceholder,
+		quoteColumn(dialect, b.column), op, fromPlaceholder, andOp, toPlaceholder,
 	)
 
 	return sql, []any{b.from, b.to}, nil

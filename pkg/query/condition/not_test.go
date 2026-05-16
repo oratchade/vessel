@@ -15,7 +15,7 @@ func TestNot_ToSQL_Valid(t *testing.T) {
 	not := condition.NewNot().Condition(condition.NewExpr().Column("active").Op("=").Value(false))
 	sql, args, err := not.ToSQL(dialect, 1)
 	assert.NoError(t, err)
-	assert.Equal(t, "NOT (active = ?)", sql)
+	assert.Equal(t, "NOT (`active` = ?)", sql)
 	assert.Equal(t, []any{false}, args)
 }
 

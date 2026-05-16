@@ -44,9 +44,14 @@ func (i *In) ToSQL(dialect SQLDialect, paramBase int) (string, []any, error) {
 		paramBase++
 	}
 
+	op, err := requireOperator(dialect, i.operator)
+	if err != nil {
+		return "", nil, err
+	}
+
 	sql := fmt.Sprintf(
 		"%s %s (%s)",
-		i.column, dialect.Operator(i.operator), strings.Join(placeholder, ", "),
+		quoteColumn(dialect, i.column), op, strings.Join(placeholder, ", "),
 	)
 
 	return sql, i.values, nil

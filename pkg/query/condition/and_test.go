@@ -19,7 +19,7 @@ func TestAnd_ToSQL_AllValid(t *testing.T) {
 		)
 	sql, args, err := and.ToSQL(dialect, 1)
 	assert.NoError(t, err)
-	assert.Equal(t, "(age > ?) AND (score >= ?)", sql)
+	assert.Equal(t, "(`age` > ?) AND (`score` >= ?)", sql)
 	assert.Equal(t, []any{18, 100}, args)
 }
 

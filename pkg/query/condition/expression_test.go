@@ -15,7 +15,7 @@ func TestExpr_ToSQL_AllFieldsSet(t *testing.T) {
 	expr := condition.NewExpr().Column("age").Op(">").Value(18)
 	sql, args, err := expr.ToSQL(dialect, 1)
 	assert.NoError(t, err)
-	assert.Equal(t, "age > ?", sql)
+	assert.Equal(t, "`age` > ?", sql)
 	assert.Equal(t, []any{18}, args)
 }
 
@@ -69,12 +69,42 @@ func TestExpr_ToSQL_DifferentOperators(t *testing.T) {
 	expr := condition.NewExpr().Column("salary").Op(">=").Value(5000)
 	sql, args, err := expr.ToSQL(dialect, 1)
 	assert.NoError(t, err)
-	assert.Equal(t, "salary >= ?", sql)
+	assert.Equal(t, "`salary` >= ?", sql)
 	assert.Equal(t, []any{5000}, args)
 
 	expr2 := condition.NewExpr().Column("status").Op("!=").Value("inactive")
 	sql2, args2, err2 := expr2.ToSQL(dialect, 1)
 	assert.NoError(t, err2)
-	assert.Equal(t, "status != ?", sql2)
+	assert.Equal(t, "`status` != ?", sql2)
 	assert.Equal(t, []any{"inactive"}, args2)
+}
+
+func TestExpr_ToSQL_QualifiedColumn(t *testing.T) {
+	dialect := tests.MockDialect{}
+	expr := condition.NewExpr().Column("users.age").Op(">").Value(18)
+	sql, args, err := expr.ToSQL(dialect, 1)
+	assert.NoError(t, err)
+	assert.Equal(t, "`users`.`age` > ?", sql)
+	assert.Equal(t, []any{18}, args)
+}
+
+func TestExpr_ToSQL_UnsupportedOperator(t *testing.T) {
+	dialect := unsupportedOperatorDialect{MockDialect: tests.MockDialect{}}
+	expr := condition.NewExpr().Column("name").Op("~").Value("bob")
+	sql, args, err := expr.ToSQL(dialect, 1)
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "unsupported operator")
+	assert.Empty(t, sql)
+	assert.Nil(t, args)
+}
+
+type unsupportedOperatorDialect struct {
+	tests.MockDialect
+}
+
+func (u unsupportedOperatorDialect) Operator(op string) string {
+	if op == "~" {
+		return ""
+	}
+	return u.MockDialect.Operator(op)
 }

@@ -15,7 +15,7 @@ func TestBetween_ToSQL_AllFieldsSet(t *testing.T) {
 	between := condition.NewBetween().Column("age").From(18).To(30)
 	sql, args, err := between.ToSQL(dialect, 1)
 	assert.NoError(t, err)
-	assert.Equal(t, "age BETWEEN ? AND ?", sql)
+	assert.Equal(t, "`age` BETWEEN ? AND ?", sql)
 	assert.Equal(t, []any{18, 30}, args)
 }
 

@@ -19,7 +19,7 @@ func TestOr_ToSQL_AllValid(t *testing.T) {
 		)
 	sql, args, err := or.ToSQL(dialect, 1)
 	assert.NoError(t, err)
-	assert.Equal(t, "(status = ?) OR (status = ?)", sql)
+	assert.Equal(t, "(`status` = ?) OR (`status` = ?)", sql)
 	assert.Equal(t, []any{"active", "pending"}, args)
 }
 
