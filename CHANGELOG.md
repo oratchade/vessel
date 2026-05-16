@@ -77,6 +77,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - PostgreSQL hanging connection tests resolved
 - Error handling improved with `ErrQueryTimeout` and comprehensive error wrapping
 - Linting infrastructure added with markdown linting and CI/CD integration
+- Condition identifiers are now quoted consistently in `Expr`, `In`, and `Between`
+  SQL generation
+- Dialect-specific joined `UPDATE` and `DELETE` SQL generation fixed for MySQL,
+  PostgreSQL, SQLite, and MSSQL
+- MSSQL `Limit` pagination now emits valid `ORDER BY ... OFFSET ... FETCH` SQL
+- `HAVING` clauses now render as raw SQL clauses instead of incorrectly quoting
+  the whole clause as one identifier
+- Unsupported dialect operators now return builder errors instead of malformed SQL
+- Mutation `RETURNING`/`OUTPUT` behavior clarified and guarded: query preview is
+  supported, while execution rejects returned-row options to avoid silently
+  discarding rows
 
 ## Documentation
 
