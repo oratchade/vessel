@@ -143,6 +143,87 @@ func TestManagerConfigEntryWriteQueueSize(t *testing.T) {
 	}
 }
 
+func TestManagerConfigEntryWriteBatchingEnabled(t *testing.T) {
+	enabled := true
+	disabled := false
+
+	tests := []struct {
+		name     string
+		global   bool
+		entry    *bool
+		expected bool
+	}{
+		{name: "default disabled"},
+		{name: "global enabled", global: true, expected: true},
+		{name: "entry override enabled", entry: &enabled, expected: true},
+		{name: "entry override disabled", global: true, entry: &disabled, expected: false},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			mc := &config.ManagerConfig{WriteBatchingEnabled: tt.global}
+			entry := &config.ConfigEntry{WriteBatchingEnabled: tt.entry}
+
+			assert.Equal(t, tt.expected, mc.EntryWriteBatchingEnabled(entry))
+		})
+	}
+}
+
+func TestManagerConfigEntryWriteBatchMaxRows(t *testing.T) {
+	entryRows := 25
+
+	tests := []struct {
+		name     string
+		global   int
+		entry    *int
+		expected int
+	}{
+		{name: "default", expected: config.DefaultWriteBatchRows},
+		{name: "global", global: 50, expected: 50},
+		{name: "entry override", global: 50, entry: &entryRows, expected: 25},
+		{name: "ignore negative entry", global: 50, entry: func() *int { v := -1; return &v }(), expected: 50},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			mc := &config.ManagerConfig{WriteBatchMaxRows: tt.global}
+			entry := &config.ConfigEntry{WriteBatchMaxRows: tt.entry}
+
+			assert.Equal(t, tt.expected, mc.EntryWriteBatchMaxRows(entry))
+		})
+	}
+}
+
+func TestManagerConfigEntryWriteBatchMaxDelay(t *testing.T) {
+	entryDelay := 2 * time.Millisecond
+
+	tests := []struct {
+		name     string
+		global   time.Duration
+		entry    *time.Duration
+		expected time.Duration
+	}{
+		{name: "default", expected: config.DefaultWriteBatchDelay},
+		{name: "global", global: 10 * time.Millisecond, expected: 10 * time.Millisecond},
+		{name: "entry override", global: 10 * time.Millisecond, entry: &entryDelay, expected: entryDelay},
+		{
+			name:     "ignore negative entry",
+			global:   10 * time.Millisecond,
+			entry:    func() *time.Duration { v := -time.Millisecond; return &v }(),
+			expected: 10 * time.Millisecond,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			mc := &config.ManagerConfig{WriteBatchMaxDelay: tt.global}
+			entry := &config.ConfigEntry{WriteBatchMaxDelay: tt.entry}
+
+			assert.Equal(t, tt.expected, mc.EntryWriteBatchMaxDelay(entry))
+		})
+	}
+}
+
 func TestManagerConfigEntryReadQueueSize(t *testing.T) {
 	testCases := []struct {
 		name          string

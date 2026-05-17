@@ -35,6 +35,10 @@ type ConfigEntry struct {
 	ReadWorkers    *int           `json:"read_workers,omitempty" yaml:"read_workers,omitempty" toml:"read_workers,omitempty"`
 	HealthInterval *time.Duration `json:"health_interval,omitempty" yaml:"health_interval,omitempty" toml:"health_interval,omitempty"`
 	Priority       *int           `json:"priority,omitempty" yaml:"priority,omitempty" toml:"priority,omitempty"`
+
+	WriteBatchingEnabled *bool          `json:"write_batching_enabled,omitempty" yaml:"write_batching_enabled,omitempty" toml:"write_batching_enabled,omitempty"` //nolint:lll
+	WriteBatchMaxRows    *int           `json:"write_batch_max_rows,omitempty" yaml:"write_batch_max_rows,omitempty" toml:"write_batch_max_rows,omitempty"`       //nolint:lll
+	WriteBatchMaxDelay   *time.Duration `json:"write_batch_max_delay,omitempty" yaml:"write_batch_max_delay,omitempty" toml:"write_batch_max_delay,omitempty"`    //nolint:lll
 }
 
 // Config returns the database configuration interface if one is set.

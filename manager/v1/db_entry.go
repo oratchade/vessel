@@ -38,6 +38,10 @@ type DBEntry struct {
 	writeWorkerIdx *AtomicWrapCounter
 	readWorkerIdx  *AtomicWrapCounter
 
+	writeBatchingEnabled bool
+	writeBatchMaxRows    int
+	writeBatchMaxDelay   time.Duration
+
 	lifecycle lifecycle
 	wg        sync.WaitGroup
 	stopOnce  sync.Once
@@ -83,6 +87,9 @@ func newDBEntry(
 		"read_workers", len(readQueue),
 		"write_queue_size", mc.EntryWriteQueueSize(cfg),
 		"read_queue_size", mc.EntryReadQueueSize(cfg),
+		"write_batching_enabled", mc.EntryWriteBatchingEnabled(cfg),
+		"write_batch_max_rows", mc.EntryWriteBatchMaxRows(cfg),
+		"write_batch_max_delay_ms", mc.EntryWriteBatchMaxDelay(cfg).Milliseconds(),
 	)
 
 	//nolint:contextcheck
@@ -138,19 +145,22 @@ func newDBEntry(
 
 	c, cancel := context.WithCancel(ctx)
 	dbe := &DBEntry{
-		ctx:            c,
-		cancel:         cancel,
-		name:           cfg.Name,
-		dbType:         cfg.Type,
-		db:             dbInstance,
-		logger:         logger,
-		healthInterval: mc.EntryHealthInterval(cfg),
-		healthy:        atomic.Bool{},
-		priority:       mc.EntryPriority(cfg),
-		writeQueue:     writeQueue,
-		readQueue:      readQueue,
-		writeWorkerIdx: writeWorkerIdxCounter,
-		readWorkerIdx:  readWorkerIdxCounter,
+		ctx:                  c,
+		cancel:               cancel,
+		name:                 cfg.Name,
+		dbType:               cfg.Type,
+		db:                   dbInstance,
+		logger:               logger,
+		healthInterval:       mc.EntryHealthInterval(cfg),
+		healthy:              atomic.Bool{},
+		priority:             mc.EntryPriority(cfg),
+		writeQueue:           writeQueue,
+		readQueue:            readQueue,
+		writeWorkerIdx:       writeWorkerIdxCounter,
+		readWorkerIdx:        readWorkerIdxCounter,
+		writeBatchingEnabled: mc.EntryWriteBatchingEnabled(cfg),
+		writeBatchMaxRows:    mc.EntryWriteBatchMaxRows(cfg),
+		writeBatchMaxDelay:   mc.EntryWriteBatchMaxDelay(cfg),
 	}
 	dbe.healthy.Store(true) // Start as healthy
 	return dbe, nil
@@ -316,6 +326,11 @@ func (de *DBEntry) processWriteRequest(ctx context.Context, qd *Query) *QueryRes
 func (de *DBEntry) writeWorker(ctx context.Context, w *dbEntryWorker) {
 	defer de.wg.Done()
 
+	if de.writeBatchingEnabled {
+		de.writeBatchingWorker(ctx, w)
+		return
+	}
+
 	for {
 		select {
 		case qd, ok := <-w.queue:
@@ -327,6 +342,85 @@ func (de *DBEntry) writeWorker(ctx context.Context, w *dbEntryWorker) {
 			de.sendResponseWithTimeout(ctx, qd, response)
 		case <-ctx.Done():
 			return
+		}
+	}
+}
+
+func (de *DBEntry) writeBatchingWorker(ctx context.Context, w *dbEntryWorker) {
+	batch := &insertBatch{}
+	var timer *time.Timer
+	var timerC <-chan time.Time
+	defer stopBatchTimer(timer)
+
+	startTimer := func() {
+		if timer != nil {
+			stopBatchTimer(timer)
+		}
+		timer = time.NewTimer(de.writeBatchMaxDelay)
+		timerC = timer.C
+	}
+	stopTimer := func() {
+		if timer != nil {
+			stopBatchTimer(timer)
+			timer = nil
+		}
+		timerC = nil
+	}
+	flush := func(flushCtx context.Context) {
+		stopTimer()
+		batch.flush(flushCtx, de)
+	}
+
+	for {
+		select {
+		case qd, ok := <-w.queue:
+			if !ok {
+				flush(context.WithoutCancel(ctx))
+				return
+			}
+			de.handleBatchingWrite(ctx, qd, batch, startTimer, flush)
+		case <-timerC:
+			flush(ctx)
+		case <-ctx.Done():
+			flush(context.WithoutCancel(ctx))
+			return
+		}
+	}
+}
+
+func (de *DBEntry) handleBatchingWrite(
+	ctx context.Context,
+	qd *Query,
+	batch *insertBatch,
+	startTimer func(),
+	flush func(context.Context),
+) {
+	if qd.Request != ReqInsert {
+		flush(ctx)
+		response := de.processWriteRequest(ctx, qd)
+		de.sendResponseWithTimeout(ctx, qd, response)
+		return
+	}
+	if !batch.compatible(qd) {
+		flush(ctx)
+	}
+	if batch.empty() {
+		startTimer()
+	}
+	batch.add(qd)
+	if batch.len() >= de.writeBatchMaxRows {
+		flush(ctx)
+	}
+}
+
+func stopBatchTimer(timer *time.Timer) {
+	if timer == nil {
+		return
+	}
+	if !timer.Stop() {
+		select {
+		case <-timer.C:
+		default:
 		}
 	}
 }
