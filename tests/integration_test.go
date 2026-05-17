@@ -5,8 +5,12 @@ package tests
 
 import (
 	"context"
+	"database/sql"
 	"fmt"
 	"os"
+	"strconv"
+	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -27,6 +31,16 @@ func getEnv(key, defaultVal string) string {
 	return defaultVal
 }
 
+func getEnvUint16(key string, defaultVal uint16) uint16 {
+	if val := os.Getenv(key); val != "" {
+		parsed, err := strconv.Atoi(val)
+		if err == nil {
+			return uint16(parsed)
+		}
+	}
+	return defaultVal
+}
+
 const (
 	inactiveStatus = "inactive"
 	activeStatus   = "active"
@@ -37,6 +51,11 @@ type TestDB struct {
 	config  any
 	driver  string
 	setupFn func(*testing.T, any) // Function to setup DB-specific schema
+}
+
+type integrationAvailability struct {
+	checked bool
+	err     error
 }
 
 type User struct {
@@ -72,7 +91,7 @@ var testDatabases = []TestDB{
 			User:            getEnv("DB_MYSQL_USER", "root"),
 			Password:        getEnv("DB_MYSQL_PASSWORD", "root_password"),
 			Host:            getEnv("DB_MYSQL_HOST", "localhost"),
-			Port:            3306,
+			Port:            getEnvUint16("DB_MYSQL_PORT", 3306),
 			Database:        getEnv("DB_MYSQL_DATABASE", "test_db"),
 			Charset:         "utf8mb4",
 			ParseTime:       true,
@@ -93,7 +112,7 @@ var testDatabases = []TestDB{
 			User:           getEnv("DB_POSTGRES_USER", "test_user"),
 			Password:       getEnv("DB_POSTGRES_PASSWORD", "test_password"),
 			Host:           getEnv("DB_POSTGRES_HOST", "localhost"),
-			Port:           5432,
+			Port:           getEnvUint16("DB_POSTGRES_PORT", 5432),
 			Database:       getEnv("DB_POSTGRES_DATABASE", "test_db"),
 			SSLMode:        "disable",
 			ConnectTimeout: 10 * time.Second,
@@ -109,7 +128,7 @@ var testDatabases = []TestDB{
 			User:            getEnv("DB_MSSQL_USER", "sa"),
 			Password:        getEnv("DB_MSSQL_PASSWORD", "TestPassword123!"),
 			Host:            getEnv("DB_MSSQL_HOST", "localhost"),
-			Port:            1433,
+			Port:            getEnvUint16("DB_MSSQL_PORT", 1433),
 			Database:        getEnv("DB_MSSQL_DATABASE", "test_db"),
 			Encrypt:         "disable",
 			TrustServerCert: true,
@@ -118,6 +137,14 @@ var testDatabases = []TestDB{
 		},
 		setupFn: setupMSSQLTestDB,
 	},
+}
+
+//nolint:gochecknoglobals
+var integrationAvailabilityCache = struct {
+	sync.Mutex
+	byDriver map[string]integrationAvailability
+}{
+	byDriver: make(map[string]integrationAvailability),
 }
 
 // getFilteredDatabases returns test databases filtered by DB_TYPE environment variable
@@ -151,6 +178,118 @@ func getFilteredDatabases() []TestDB {
 		}
 	}
 	return filtered
+}
+
+func integrationStrict() bool {
+	switch strings.ToLower(os.Getenv("FABRIC_INTEGRATION_STRICT")) {
+	case "1", "true", "yes", "on":
+		return true
+	default:
+		return false
+	}
+}
+
+func integrationDBExplicitlyRequested() bool {
+	return os.Getenv("DB_TYPE") != ""
+}
+
+func connectIntegrationDB(t *testing.T, testDB TestDB) v1.DB {
+	t.Helper()
+
+	if testing.Short() {
+		t.Skip("Skipping integration tests in short mode")
+	}
+
+	integrationAvailabilityCache.Lock()
+	cached := integrationAvailabilityCache.byDriver[testDB.driver]
+	integrationAvailabilityCache.Unlock()
+	if cached.checked && cached.err != nil {
+		handleIntegrationUnavailable(t, testDB, cached.err)
+	}
+
+	if testDB.driver == "sqlserver" {
+		if err := ensureMSSQLTestDatabase(testDB.config.(v1.MSSQLConfig)); err != nil {
+			cacheIntegrationAvailability(testDB.driver, err)
+			handleIntegrationUnavailable(t, testDB, err)
+		}
+	}
+
+	var database v1.DB
+	var err error
+	for attempt := 1; attempt <= 10; attempt++ {
+		database, err = v1.NewDB(testDB.config.(v1.DBConfig), nil)
+		if err == nil {
+			if pingErr := database.Ping(context.Background()); pingErr == nil {
+				cacheIntegrationAvailability(testDB.driver, nil)
+				return database
+			} else {
+				_ = database.Close()
+				err = pingErr
+			}
+		}
+		time.Sleep(time.Duration(attempt) * 200 * time.Millisecond)
+	}
+
+	cacheIntegrationAvailability(testDB.driver, err)
+	handleIntegrationUnavailable(t, testDB, err)
+	return nil
+}
+
+func cacheIntegrationAvailability(driver string, err error) {
+	integrationAvailabilityCache.Lock()
+	defer integrationAvailabilityCache.Unlock()
+	integrationAvailabilityCache.byDriver[driver] = integrationAvailability{
+		checked: true,
+		err:     err,
+	}
+}
+
+func handleIntegrationUnavailable(t *testing.T, testDB TestDB, err error) {
+	t.Helper()
+
+	envPrefix := strings.ToUpper(testDB.driver)
+	if testDB.driver == "sqlserver" {
+		envPrefix = "MSSQL"
+	}
+	msg := fmt.Sprintf(
+		"%s integration database unavailable: %v. Set DB_%s_* env vars or start the local test service",
+		testDB.name,
+		err,
+		envPrefix,
+	)
+	if integrationStrict() || integrationDBExplicitlyRequested() {
+		t.Fatalf("%s", msg)
+	}
+	t.Skip(msg)
+}
+
+func ensureMSSQLTestDatabase(cfg v1.MSSQLConfig) error {
+	masterCfg := cfg
+	masterCfg.Database = "master"
+
+	masterDB, err := sql.Open(masterCfg.Driver(), masterCfg.DSN())
+	if err != nil {
+		return fmt.Errorf("open MSSQL master connection: %w", err)
+	}
+	defer func() { _ = masterDB.Close() }()
+
+	for attempt := 1; attempt <= 10; attempt++ {
+		if err = masterDB.Ping(); err == nil {
+			break
+		}
+		time.Sleep(time.Duration(attempt) * 250 * time.Millisecond)
+	}
+	if err != nil {
+		return fmt.Errorf("ping MSSQL master: %w", err)
+	}
+
+	dbName := strings.ReplaceAll(cfg.Database, "'", "''")
+	identifier := strings.ReplaceAll(cfg.Database, "]", "]]")
+	stmt := fmt.Sprintf("IF DB_ID(N'%s') IS NULL CREATE DATABASE [%s]", dbName, identifier)
+	if _, err := masterDB.Exec(stmt); err != nil {
+		return fmt.Errorf("ensure MSSQL database %q exists: %w", cfg.Database, err)
+	}
+	return nil
 }
 
 // TestSimpleSQLite tests basic SQLite functionality in isolation
@@ -221,10 +360,7 @@ func TestIntegration_GetAllUsers(t *testing.T) {
 
 	for _, testDB := range getFilteredDatabases() {
 		t.Run(testDB.name, func(t *testing.T) {
-			database, err := v1.NewDB(testDB.config.(v1.DBConfig), nil)
-			if err != nil {
-				t.Skipf("Failed to connect to %s: %v", testDB.name, err)
-			}
+			database := connectIntegrationDB(t, testDB)
 			defer database.Close()
 
 			// Setup test data
@@ -253,10 +389,7 @@ func TestIntegration_GetWithWhere(t *testing.T) {
 
 	for _, testDB := range getFilteredDatabases() {
 		t.Run(testDB.name, func(t *testing.T) {
-			database, err := v1.NewDB(testDB.config.(v1.DBConfig), nil)
-			if err != nil {
-				t.Skipf("Failed to connect to %s: %v", testDB.name, err)
-			}
+			database := connectIntegrationDB(t, testDB)
 			defer database.Close()
 
 			// Setup test data
@@ -304,10 +437,7 @@ func TestIntegration_BulkInsert(t *testing.T) {
 
 	for _, testDB := range getFilteredDatabases() {
 		t.Run(testDB.name, func(t *testing.T) {
-			database, err := v1.NewDB(testDB.config.(v1.DBConfig), nil)
-			if err != nil {
-				t.Skipf("Failed to connect to %s: %v", testDB.name, err)
-			}
+			database := connectIntegrationDB(t, testDB)
 			defer database.Close()
 
 			// Setup test data
@@ -351,10 +481,7 @@ func TestIntegration_Update(t *testing.T) {
 
 	for _, testDB := range getFilteredDatabases() {
 		t.Run(testDB.name, func(t *testing.T) {
-			database, err := v1.NewDB(testDB.config.(v1.DBConfig), nil)
-			if err != nil {
-				t.Skipf("Failed to connect to %s: %v", testDB.name, err)
-			}
+			database := connectIntegrationDB(t, testDB)
 			defer database.Close()
 
 			// Setup test data
@@ -386,10 +513,7 @@ func TestIntegration_MultipleConditions(t *testing.T) {
 
 	for _, testDB := range getFilteredDatabases() {
 		t.Run(testDB.name, func(t *testing.T) {
-			database, err := v1.NewDB(testDB.config.(v1.DBConfig), nil)
-			if err != nil {
-				t.Skipf("Failed to connect to %s: %v", testDB.name, err)
-			}
+			database := connectIntegrationDB(t, testDB)
 			defer database.Close()
 
 			// Setup test data
@@ -441,10 +565,7 @@ func TestIntegration_Delete(t *testing.T) {
 
 	for _, testDB := range getFilteredDatabases() {
 		t.Run(testDB.name, func(t *testing.T) {
-			database, err := v1.NewDB(testDB.config.(v1.DBConfig), nil)
-			if err != nil {
-				t.Skipf("Failed to connect to %s: %v", testDB.name, err)
-			}
+			database := connectIntegrationDB(t, testDB)
 			defer database.Close()
 
 			// Setup test data
@@ -474,17 +595,14 @@ func TestIntegration_TransactionCommit(t *testing.T) {
 
 	for _, testDB := range getFilteredDatabases() {
 		t.Run(testDB.name, func(t *testing.T) {
-			database, err := v1.NewDB(testDB.config.(v1.DBConfig), nil)
-			if err != nil {
-				t.Skipf("Failed to connect to %s: %v", testDB.name, err)
-			}
+			database := connectIntegrationDB(t, testDB)
 			defer database.Close()
 
 			// Setup test data
 			testDB.setupFn(t, database)
 
 			ctx := context.Background()
-			err = database.WithTransaction(ctx, func(tx v1.Tx) error {
+			err := database.WithTransaction(ctx, func(tx v1.Tx) error {
 				_, err := tx.Insert(ctx, "users", map[string]any{
 					"name":   "Iris Taylor",
 					"email":  "iris@example.com",
@@ -530,10 +648,7 @@ func TestIntegration_GetByID(t *testing.T) {
 
 	for _, testDB := range getFilteredDatabases() {
 		t.Run(testDB.name, func(t *testing.T) {
-			database, err := v1.NewDB(testDB.config.(v1.DBConfig), nil)
-			if err != nil {
-				t.Skipf("Failed to connect to %s: %v", testDB.name, err)
-			}
+			database := connectIntegrationDB(t, testDB)
 			defer database.Close()
 
 			// Setup test data
@@ -562,10 +677,7 @@ func TestIntegration_ConditionalQuery(t *testing.T) {
 
 	for _, testDB := range getFilteredDatabases() {
 		t.Run(testDB.name, func(t *testing.T) {
-			database, err := v1.NewDB(testDB.config.(v1.DBConfig), nil)
-			if err != nil {
-				t.Skipf("Failed to connect to %s: %v", testDB.name, err)
-			}
+			database := connectIntegrationDB(t, testDB)
 			defer database.Close()
 
 			// Setup test data
@@ -605,10 +717,7 @@ func TestIntegration_SingleInsert(t *testing.T) {
 
 	for _, testDB := range getFilteredDatabases() {
 		t.Run(testDB.name, func(t *testing.T) {
-			database, err := v1.NewDB(testDB.config.(v1.DBConfig), nil)
-			if err != nil {
-				t.Skipf("Failed to connect to %s: %v", testDB.name, err)
-			}
+			database := connectIntegrationDB(t, testDB)
 			defer database.Close()
 
 			// Setup test data
@@ -659,10 +768,7 @@ func TestIntegration_TransactionRollback(t *testing.T) {
 
 	for _, testDB := range getFilteredDatabases() {
 		t.Run(testDB.name, func(t *testing.T) {
-			database, err := v1.NewDB(testDB.config.(v1.DBConfig), nil)
-			if err != nil {
-				t.Skipf("Failed to connect to %s: %v", testDB.name, err)
-			}
+			database := connectIntegrationDB(t, testDB)
 			defer database.Close()
 
 			// Setup test data
@@ -721,10 +827,7 @@ func TestIntegration_RawQuery(t *testing.T) {
 
 	for _, testDB := range getFilteredDatabases() {
 		t.Run(testDB.name, func(t *testing.T) {
-			database, err := v1.NewDB(testDB.config.(v1.DBConfig), nil)
-			if err != nil {
-				t.Skipf("Failed to connect to %s: %v", testDB.name, err)
-			}
+			database := connectIntegrationDB(t, testDB)
 			defer database.Close()
 
 			// Setup test data
@@ -782,10 +885,7 @@ func TestIntegration_OrConditions(t *testing.T) {
 
 	for _, testDB := range getFilteredDatabases() {
 		t.Run(testDB.name, func(t *testing.T) {
-			database, err := v1.NewDB(testDB.config.(v1.DBConfig), nil)
-			if err != nil {
-				t.Skipf("Failed to connect to %s: %v", testDB.name, err)
-			}
+			database := connectIntegrationDB(t, testDB)
 			defer database.Close()
 
 			// Setup test data
@@ -831,10 +931,7 @@ func TestIntegration_ComplexNestedConditions(t *testing.T) {
 
 	for _, testDB := range getFilteredDatabases() {
 		t.Run(testDB.name, func(t *testing.T) {
-			database, err := v1.NewDB(testDB.config.(v1.DBConfig), nil)
-			if err != nil {
-				t.Skipf("Failed to connect to %s: %v", testDB.name, err)
-			}
+			database := connectIntegrationDB(t, testDB)
 			defer database.Close()
 
 			// Setup test data
@@ -884,10 +981,7 @@ func TestIntegration_UpdateMultipleRows(t *testing.T) {
 
 	for _, testDB := range getFilteredDatabases() {
 		t.Run(testDB.name, func(t *testing.T) {
-			database, err := v1.NewDB(testDB.config.(v1.DBConfig), nil)
-			if err != nil {
-				t.Skipf("Failed to connect to %s: %v", testDB.name, err)
-			}
+			database := connectIntegrationDB(t, testDB)
 			defer database.Close()
 
 			// Setup test data
@@ -938,10 +1032,7 @@ func TestIntegration_DeleteMultipleRows(t *testing.T) {
 
 	for _, testDB := range getFilteredDatabases() {
 		t.Run(testDB.name, func(t *testing.T) {
-			database, err := v1.NewDB(testDB.config.(v1.DBConfig), nil)
-			if err != nil {
-				t.Skipf("Failed to connect to %s: %v", testDB.name, err)
-			}
+			database := connectIntegrationDB(t, testDB)
 			defer database.Close()
 
 			// Setup test data
@@ -987,10 +1078,7 @@ func TestIntegration_GetByIDRaw(t *testing.T) {
 
 	for _, testDB := range getFilteredDatabases() {
 		t.Run(testDB.name, func(t *testing.T) {
-			database, err := v1.NewDB(testDB.config.(v1.DBConfig), nil)
-			if err != nil {
-				t.Skipf("Failed to connect to %s: %v", testDB.name, err)
-			}
+			database := connectIntegrationDB(t, testDB)
 			defer database.Close()
 
 			// Setup test data
@@ -1035,10 +1123,7 @@ func TestIntegration_NotEqualOperator(t *testing.T) {
 
 	for _, testDB := range getFilteredDatabases() {
 		t.Run(testDB.name, func(t *testing.T) {
-			database, err := v1.NewDB(testDB.config.(v1.DBConfig), nil)
-			if err != nil {
-				t.Skipf("Failed to connect to %s: %v", testDB.name, err)
-			}
+			database := connectIntegrationDB(t, testDB)
 			defer database.Close()
 
 			// Setup test data
@@ -1077,10 +1162,7 @@ func TestIntegration_InOperator(t *testing.T) {
 
 	for _, testDB := range getFilteredDatabases() {
 		t.Run(testDB.name, func(t *testing.T) {
-			database, err := v1.NewDB(testDB.config.(v1.DBConfig), nil)
-			if err != nil {
-				t.Skipf("Failed to connect to %s: %v", testDB.name, err)
-			}
+			database := connectIntegrationDB(t, testDB)
 			defer database.Close()
 
 			// Setup test data

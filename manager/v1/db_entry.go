@@ -4,6 +4,7 @@ package v1
 import (
 	"context"
 	"fmt"
+	"sync"
 	"sync/atomic"
 	"time"
 
@@ -36,6 +37,10 @@ type DBEntry struct {
 	readQueue      []*dbEntryWorker
 	writeWorkerIdx *AtomicWrapCounter
 	readWorkerIdx  *AtomicWrapCounter
+
+	lifecycle lifecycle
+	wg        sync.WaitGroup
+	stopOnce  sync.Once
 }
 
 // newDBEntry creates a new DBEntry instance.
@@ -163,6 +168,10 @@ func (de *DBEntry) Health() bool {
 
 // start launches worker goroutines for processing read and write queries.
 func (de *DBEntry) start() {
+	if !de.lifecycle.compareAndSwap(lifecycleCreated, lifecycleStarted) {
+		return
+	}
+
 	de.logger.Info("Starting database entry workers",
 		"name", de.name,
 		"write_workers", len(de.writeQueue),
@@ -170,12 +179,15 @@ func (de *DBEntry) start() {
 	)
 
 	for i := range de.writeQueue {
+		de.wg.Add(1)
 		go de.writeWorker(de.ctx, de.writeQueue[i])
 	}
 	for i := range de.readQueue {
+		de.wg.Add(1)
 		go de.readWorker(de.ctx, de.readQueue[i])
 	}
 
+	de.wg.Add(1)
 	go de.healthCheck(de.ctx)
 
 	de.logger.Debug("Database entry workers started and health check initiated",
@@ -187,31 +199,34 @@ func (de *DBEntry) start() {
 // It cancels the context first to allow workers to exit via ctx.Done(),
 // then closes channels and the database.
 func (de *DBEntry) stop() {
-	de.logger.Info("Stopping database entry",
-		"name", de.name,
-	)
+	de.stopOnce.Do(func() {
+		de.logger.Info("Stopping database entry",
+			"name", de.name,
+		)
 
-	// Allow workers to detect ctx.Done() and exit cleanly
-	de.cancel()
+		state := de.lifecycle.load()
+		if state == lifecycleCreated {
+			de.lifecycle.store(lifecycleStopping)
+		} else if !de.lifecycle.compareAndSwap(lifecycleStarted, lifecycleStopping) &&
+			de.lifecycle.load() != lifecycleStopping {
+			return
+		}
 
-	// Then close channels for cleanup
-	for i := range de.writeQueue {
-		close(de.writeQueue[i].queue)
-	}
-	for i := range de.readQueue {
-		close(de.readQueue[i].queue)
-	}
+		de.cancel()
+		de.wg.Wait()
+		_ = de.db.Close()
+		de.lifecycle.store(lifecycleStopped)
 
-	// Finally close database
-	_ = de.db.Close()
-
-	de.logger.Debug("Database entry stopped",
-		"name", de.name,
-	)
+		de.logger.Debug("Database entry stopped",
+			"name", de.name,
+		)
+	})
 }
 
 // healthCheck periodically checks the health status of the database connection.
 func (de *DBEntry) healthCheck(ctx context.Context) {
+	defer de.wg.Done()
+
 	ticker := time.NewTicker(de.healthInterval)
 	defer ticker.Stop()
 
@@ -299,6 +314,8 @@ func (de *DBEntry) processWriteRequest(ctx context.Context, qd *Query) *QueryRes
 
 // writeWorker processes write queries from its queue and executes them against the database.
 func (de *DBEntry) writeWorker(ctx context.Context, w *dbEntryWorker) {
+	defer de.wg.Done()
+
 	for {
 		select {
 		case qd, ok := <-w.queue:
@@ -375,6 +392,8 @@ func (de *DBEntry) processReadRequest(ctx context.Context, qd *Query) *QueryResp
 
 // readWorker processes read queries from its queue and executes them against the database.
 func (de *DBEntry) readWorker(ctx context.Context, w *dbEntryWorker) {
+	defer de.wg.Done()
+
 	for {
 		select {
 		case qd, ok := <-w.queue:
@@ -414,6 +433,9 @@ func (de *DBEntry) sendResponseWithTimeout(
 
 // RoundRobinQueueWrite enqueues a write query to the appropriate worker queue based on round-robin distribution.
 func (de *DBEntry) roundRobinQueueWrite(ctx context.Context, qd *Query) error {
+	if err := de.lifecycle.runningError(); err != nil {
+		return err
+	}
 	if de.writeWorkerIdx == nil {
 		return fmt.Errorf("roundRobinQueueWrite: no write workers available")
 	}
@@ -423,6 +445,8 @@ func (de *DBEntry) roundRobinQueueWrite(ctx context.Context, qd *Query) error {
 	select {
 	case w.queue <- qd:
 		return nil
+	case <-de.ctx.Done():
+		return fmt.Errorf("roundRobinQueueWrite: %w", ErrManagerClosed)
 	case <-ctx.Done():
 		return fmt.Errorf("roundRobinQueueWrite: context done: %w", ctx.Err())
 	}
@@ -430,6 +454,9 @@ func (de *DBEntry) roundRobinQueueWrite(ctx context.Context, qd *Query) error {
 
 // RoundRobinQueueRead enqueues a read query to the appropriate worker queue based on round-robin distribution.
 func (de *DBEntry) roundRobinQueueRead(ctx context.Context, qd *Query) error {
+	if err := de.lifecycle.runningError(); err != nil {
+		return err
+	}
 	if de.readWorkerIdx == nil {
 		return fmt.Errorf("roundRobinQueueRead: no read workers available")
 	}
@@ -439,6 +466,8 @@ func (de *DBEntry) roundRobinQueueRead(ctx context.Context, qd *Query) error {
 	select {
 	case w.queue <- qd:
 		return nil
+	case <-de.ctx.Done():
+		return fmt.Errorf("roundRobinQueueRead: %w", ErrManagerClosed)
 	case <-ctx.Done():
 		return fmt.Errorf("roundRobinQueueRead: context done: %w", ctx.Err())
 	}

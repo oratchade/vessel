@@ -64,6 +64,21 @@ make integration-test-all
 docker-compose -f docker-compose.test.yml down
 ```
 
+Strict integration runs fail when the requested database is unavailable. This
+is the recommended mode for CI and for debugging one dialect:
+
+```bash
+DB_TYPE=sqlite rtk go test -tags=integration ./tests ./db/v1 -count=1
+DB_TYPE=mysql FABRIC_INTEGRATION_STRICT=1 rtk go test -tags=integration ./tests ./db/v1 -count=1
+DB_TYPE=postgres FABRIC_INTEGRATION_STRICT=1 rtk go test -tags=integration ./tests ./db/v1 -count=1
+DB_TYPE=mssql FABRIC_INTEGRATION_STRICT=1 rtk go test -tags=integration ./tests ./db/v1 -count=1
+```
+
+When `DB_TYPE` is set, connection/setup failures are test failures. When
+running the full matrix without `FABRIC_INTEGRATION_STRICT=1`, unavailable
+external services may be skipped with a diagnostic message so local SQLite-only
+workflows stay lightweight.
+
 ---
 
 ## Environment Variables Reference
@@ -135,6 +150,18 @@ DB_MSSQL_DATABASE=test_db
 DB_MSSQL_ENCRYPT=disable
 DB_MSSQL_TRUST_SERVER_CERT=true
 ```
+
+MSSQL integration tests connect to `master` first and create
+`DB_MSSQL_DATABASE` when it does not exist, then reconnect to the configured
+test database. If MSSQL keeps skipping or failing:
+
+- Confirm the SQL Server container accepted the EULA and has finished startup.
+- Use a password that satisfies SQL Server complexity rules, such as
+  `TestPassword123!`.
+- Keep `DB_MSSQL_ENCRYPT=disable` or `DB_MSSQL_TRUST_SERVER_CERT=true` for
+  local containers unless you have configured a trusted certificate.
+- Run with `DB_TYPE=mssql FABRIC_INTEGRATION_STRICT=1` to turn availability
+  problems into a single actionable failure.
 
 ### SQLite Configuration
 

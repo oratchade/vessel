@@ -4,6 +4,8 @@ package v1_test
 
 import (
 	"context"
+	"os"
+	"strings"
 	"testing"
 	"time"
 
@@ -23,6 +25,13 @@ type IntegrationTest struct {
 // Requires docker-compose.test.yml to be running:
 // cd fabric && docker-compose -f docker-compose.test.yml up
 func setupIntegration(t *testing.T) *IntegrationTest {
+	t.Helper()
+
+	dbType := strings.ToLower(os.Getenv("DB_TYPE"))
+	if dbType != "" && dbType != "postgres" && dbType != "postgresql" {
+		t.Skipf("PostgreSQL-only FluentDB scenario skipped because DB_TYPE=%s", dbType)
+	}
+
 	ctx := context.Background()
 
 	cfg := &v1.PostgresConfig{
@@ -38,7 +47,19 @@ func setupIntegration(t *testing.T) *IntegrationTest {
 	}
 
 	db, err := v1.NewDB(cfg, nil)
-	require.NoError(t, err, "failed to connect to test database")
+	if err != nil {
+		if os.Getenv("FABRIC_INTEGRATION_STRICT") == "1" || dbType != "" {
+			require.NoError(t, err, "failed to connect to test database")
+		}
+		t.Skipf("PostgreSQL integration database unavailable: %v", err)
+	}
+	if err := db.Ping(ctx); err != nil {
+		_ = db.Close()
+		if os.Getenv("FABRIC_INTEGRATION_STRICT") == "1" || dbType != "" {
+			require.NoError(t, err, "failed to ping test database")
+		}
+		t.Skipf("PostgreSQL integration database unavailable: %v", err)
+	}
 	require.NotNil(t, db)
 
 	return &IntegrationTest{db: db, ctx: ctx}

@@ -4,6 +4,8 @@ package v1_test
 
 import (
 	"context"
+	"errors"
+	"sync"
 	"testing"
 	"time"
 
@@ -272,10 +274,57 @@ func TestQueryDataWithMultipleIDs(t *testing.T) {
 func TestDBManagerStartStop(t *testing.T) {
 	dm := &v1.DBManager{}
 
-	// Start should not panic with empty entries
+	dm.Start()
 	dm.Start()
 
-	// Stop should not panic
+	dm.Stop()
+	dm.Stop()
+}
+
+func TestDBManagerAsyncBeforeStartReturnsNotStarted(t *testing.T) {
+	dm := &v1.DBManager{}
+
+	ch, err := dm.QueryAsync(context.Background(), "SELECT 1")
+
+	assert.Nil(t, ch)
+	assert.ErrorIs(t, err, v1.ErrManagerNotStarted)
+}
+
+func TestDBManagerAsyncAfterStopReturnsClosed(t *testing.T) {
+	dm := &v1.DBManager{}
+	dm.Start()
+	dm.Stop()
+
+	ch, err := dm.QueryAsync(context.Background(), "SELECT 1")
+
+	assert.Nil(t, ch)
+	assert.ErrorIs(t, err, v1.ErrManagerClosed)
+}
+
+func TestDBManagerConcurrentStopAndAsyncCalls(t *testing.T) {
+	dm := &v1.DBManager{}
+	dm.Start()
+
+	var wg sync.WaitGroup
+	for range 64 {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			ch, err := dm.QueryAsync(context.Background(), "SELECT 1")
+			assert.Nil(t, ch)
+			assert.Error(t, err)
+			if err != nil {
+				assert.True(t,
+					errors.Is(err, v1.ErrManagerClosed) ||
+						errors.Is(err, v1.ErrManagerNotStarted) ||
+						err.Error() == "no read-only database entries available",
+				)
+			}
+		}()
+	}
+
+	dm.Stop()
+	wg.Wait()
 	dm.Stop()
 }
 

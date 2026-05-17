@@ -635,18 +635,16 @@ func main() {
     ctx := context.Background()
 
     // Load configuration from YAML file
-    dm, err := v1.NewDBManager("config.yaml")
+    dm, err := v1.NewDBManager(ctx, "config.yaml", nil)
     if err != nil {
         log.Fatal(err)
     }
 
     // Start workers and health checks
-    if err := dm.Start(ctx); err != nil {
-        log.Fatal(err)
-    }
+    dm.Start()
 
     // Always cleanup
-    defer dm.Stop(ctx)
+    defer dm.Stop()
 
     // Now ready to query
     exampleUsage(ctx, dm)
@@ -654,7 +652,11 @@ func main() {
 
 func exampleUsage(ctx context.Context, dm *v1.DBManager) {
     // Fire async query - returns immediately
-    respCh := dm.Get(ctx, "", "users", []string{"id", "name"}, nil, nil, nil)
+    respCh, err := dm.GetAsync(ctx, "users", []string{"id", "name"}, nil, nil, nil)
+    if err != nil {
+        log.Printf("Queue error: %v\n", err)
+        return
+    }
 
     // Handle response asynchronously
     go func() {
@@ -890,14 +892,19 @@ See [Resource Pooling Guide](./RESOURCE_POOLING.md) for comprehensive examples.
 
 ```go
 // Create manager from config file
-dm, err := v1.NewDBManager(configPath)
+dm, err := v1.NewDBManager(ctx, configPath, logger)
 
 // Start workers and health checks
-err := dm.Start(ctx)
+dm.Start()
 
 // Stop workers and close connections
-err := dm.Stop(ctx)
+dm.Stop()
 ```
+
+`Start` and `Stop` are idempotent. Async calls before `Start` return
+`ErrManagerNotStarted`; calls after shutdown begins return `ErrManagerClosed`.
+`Stop` cancels manager-owned worker contexts, waits for workers and health
+checks to exit, then closes database connections.
 
 ## Configuration Examples
 
@@ -1318,19 +1325,16 @@ log.Printf("Selected entry: %s (healthy: %v)\n", readOnlyEntry.Name(), readOnlyE
 **Solution:**
 
 ```go
-dm, err := v1.NewDBManager("config.yaml")
+dm, err := v1.NewDBManager(ctx, "config.yaml", logger)
 if err != nil {
     log.Fatalf("Failed to create DBManager: %v", err)
 }
 
-if err := dm.Start(ctx); err != nil {
-    log.Fatalf("Failed to start DBManager: %v", err)
-}
+dm.Start()
 
 // Verify at least one entry is available
-readOnlyEntry := dm.readOnlyEntry()
-if readOnlyEntry == nil {
-    log.Fatal("No read-only entries available")
+if _, err := dm.Ping(ctx); err != nil {
+    log.Fatalf("No healthy entries available: %v", err)
 }
 ```
 

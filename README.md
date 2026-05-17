@@ -990,13 +990,12 @@ Dialect notes:
 
 - `QueryOptions.Returning` is supported for query preview only. PostgreSQL
   renders `RETURNING`, MSSQL renders `OUTPUT`, and MySQL/SQLite ignore it.
-  Mutation `Exec` methods return `ExecResult` and reject `Returning` so rows
-  are not silently discarded.
+  Mutation `Exec` methods return `ExecResult` and reject `Returning` because
+  mutation execution does not return rows.
 - Fluent mutation builders expose `Returning(...)` plus query-preview helpers
   such as `InsertQuery`, `InsertsQuery`, `UpdateQuery`, and `DeleteQuery`.
 - MySQL supports mutation `OrderBy`/`Limit` only for non-joined UPDATE and
-  DELETE. Other dialects return explicit unsupported-option errors instead of
-  silently generating invalid SQL.
+  DELETE. Other dialects return explicit unsupported-option errors.
 - MSSQL pagination uses `ORDER BY ... OFFSET ... FETCH NEXT`; `Limit` requires
   `OrderBy`, and Fabric emits `OFFSET 0 ROWS` when only `Limit` is set.
 - Prefer `Having(condition)` for parameterized aggregate filters. `HavingRaw`

@@ -135,7 +135,8 @@ type DBManager struct {
 	readOnlyEntries  map[string]*DBEntry
 	readWriteEntries map[string]*DBEntry
 
-	logger db.Logger
+	logger    db.Logger
+	lifecycle lifecycle
 
 	writeWorkerIdx *AtomicWrapCounter
 	readWorkerIdx  *AtomicWrapCounter
@@ -345,6 +346,10 @@ func loadConfig(path string, envOpts []EnvOption) (*config.ManagerConfig, error)
 
 // Start initializes the database entries and starts their worker routines.
 func (dm *DBManager) Start() {
+	if !dm.lifecycle.compareAndSwap(lifecycleCreated, lifecycleStarted) {
+		return
+	}
+
 	if dm.logger != nil {
 		dm.logger.Info("Starting database manager",
 			"read_only_entries", len(dm.readOnlyEntries),
@@ -380,6 +385,10 @@ func (dm *DBManager) Start() {
 
 // Stop gracefully shuts down all database entries and their worker routines.
 func (dm *DBManager) Stop() {
+	if !dm.beginStop() {
+		return
+	}
+
 	if dm.logger != nil {
 		dm.logger.Info("Stopping database manager",
 			"read_only_entries", len(dm.readOnlyEntries),
@@ -406,6 +415,26 @@ func (dm *DBManager) Stop() {
 
 	if dm.logger != nil {
 		dm.logger.Info("Database manager stopped successfully")
+	}
+
+	dm.lifecycle.store(lifecycleStopped)
+}
+
+func (dm *DBManager) ensureRunning() error {
+	return dm.lifecycle.runningError()
+}
+
+func (dm *DBManager) beginStop() bool {
+	switch dm.lifecycle.load() {
+	case lifecycleStopped, lifecycleStopping:
+		return false
+	case lifecycleCreated:
+		dm.lifecycle.store(lifecycleStopping)
+		return true
+	case lifecycleStarted:
+		return dm.lifecycle.compareAndSwap(lifecycleStarted, lifecycleStopping)
+	default:
+		return false
 	}
 }
 
@@ -696,6 +725,10 @@ func (dm *DBManager) GetAsync(
 	cond condition.Condition,
 	opts *options.QueryOptions,
 ) (<-chan *QueryResponse, error) {
+	if err := dm.ensureRunning(); err != nil {
+		return nil, fmt.Errorf("GetAsync: %w", err)
+	}
+
 	dbEntry := dm.readEntry()
 	if dbEntry == nil {
 		return nil, fmt.Errorf("no read-only database entries available")
@@ -732,6 +765,10 @@ func (dm *DBManager) GetRawAsync(
 	cond condition.Condition,
 	opts *options.QueryOptions,
 ) (<-chan *QueryResponse, error) {
+	if err := dm.ensureRunning(); err != nil {
+		return nil, fmt.Errorf("GetRawAsync: %w", err)
+	}
+
 	dbEntry := dm.readEntry()
 	if dbEntry == nil {
 		return nil, fmt.Errorf("no read-only database entries available")
@@ -767,6 +804,10 @@ func (dm *DBManager) GetByIDAsync(
 	joins []condition.Join,
 	opts *options.QueryOptions,
 ) (<-chan *QueryResponse, error) {
+	if err := dm.ensureRunning(); err != nil {
+		return nil, fmt.Errorf("GetByIDAsync: %w", err)
+	}
+
 	dbEntry := dm.readEntry()
 	if dbEntry == nil {
 		return nil, fmt.Errorf("no read-only database entries available")
@@ -801,6 +842,10 @@ func (dm *DBManager) GetByIDRawAsync(
 	joins []condition.Join,
 	opts *options.QueryOptions,
 ) (<-chan *QueryResponse, error) {
+	if err := dm.ensureRunning(); err != nil {
+		return nil, fmt.Errorf("GetByIDRawAsync: %w", err)
+	}
+
 	dbEntry := dm.readEntry()
 	if dbEntry == nil {
 		return nil, fmt.Errorf("no read-only database entries available")
@@ -834,6 +879,10 @@ func (dm *DBManager) InsertAsync(
 	data map[string]any,
 	opts *options.QueryOptions,
 ) (<-chan *QueryResponse, error) {
+	if err := dm.ensureRunning(); err != nil {
+		return nil, fmt.Errorf("InsertAsync: %w", err)
+	}
+
 	dbEntry := dm.readWriteEntry()
 	if dbEntry == nil {
 		return nil, fmt.Errorf("no read-write database entries available")
@@ -866,6 +915,10 @@ func (dm *DBManager) InsertsAsync(
 	data []map[string]any,
 	opts *options.QueryOptions,
 ) (<-chan *QueryResponse, error) {
+	if err := dm.ensureRunning(); err != nil {
+		return nil, fmt.Errorf("InsertsAsync: %w", err)
+	}
+
 	dbEntry := dm.readWriteEntry()
 	if dbEntry == nil {
 		return nil, fmt.Errorf("no read-write database entries available")
@@ -901,6 +954,10 @@ func (dm *DBManager) UpdateAsync(
 	cond condition.Condition,
 	opts *options.QueryOptions,
 ) (<-chan *QueryResponse, error) {
+	if err := dm.ensureRunning(); err != nil {
+		return nil, fmt.Errorf("UpdateAsync: %w", err)
+	}
+
 	dbEntry := dm.readWriteEntry()
 	if dbEntry == nil {
 		return nil, fmt.Errorf("no read-write database entries available")
@@ -936,6 +993,10 @@ func (dm *DBManager) DeleteAsync(
 	cond condition.Condition,
 	opts *options.QueryOptions,
 ) (<-chan *QueryResponse, error) {
+	if err := dm.ensureRunning(); err != nil {
+		return nil, fmt.Errorf("DeleteAsync: %w", err)
+	}
+
 	dbEntry := dm.readWriteEntry()
 	if dbEntry == nil {
 		return nil, fmt.Errorf("no read-write database entries available")
@@ -964,6 +1025,10 @@ func (dm *DBManager) DeleteAsync(
 // Returns an error immediately if no entries are available or if context is already canceled.
 // For synchronous access, use Query() instead.
 func (dm *DBManager) QueryAsync(ctx context.Context, query string, args ...any) (<-chan *QueryResponse, error) {
+	if err := dm.ensureRunning(); err != nil {
+		return nil, fmt.Errorf("QueryAsync: %w", err)
+	}
+
 	dbEntry := dm.readEntry()
 	if dbEntry == nil {
 		return nil, fmt.Errorf("no read-only database entries available")
@@ -990,6 +1055,10 @@ func (dm *DBManager) QueryAsync(ctx context.Context, query string, args ...any) 
 // Returns an error immediately if no entries are available or if context is already canceled.
 // For synchronous access, use QueryRaw() instead.
 func (dm *DBManager) QueryRawAsync(ctx context.Context, query string, args ...any) (<-chan *QueryResponse, error) {
+	if err := dm.ensureRunning(); err != nil {
+		return nil, fmt.Errorf("QueryRawAsync: %w", err)
+	}
+
 	dbEntry := dm.readEntry()
 	if dbEntry == nil {
 		return nil, fmt.Errorf("no read-only database entries available")
@@ -1024,6 +1093,10 @@ func (dm *DBManager) readEntry() *DBEntry {
 // Returns an error immediately if no entries are available or if context is already canceled.
 // For synchronous access, use Exec() instead.
 func (dm *DBManager) ExecAsync(ctx context.Context, query string, args ...any) (<-chan *QueryResponse, error) {
+	if err := dm.ensureRunning(); err != nil {
+		return nil, fmt.Errorf("ExecAsync: %w", err)
+	}
+
 	dbEntry := dm.readWriteEntry()
 	if dbEntry == nil {
 		return nil, fmt.Errorf("no read-write database entries available")
