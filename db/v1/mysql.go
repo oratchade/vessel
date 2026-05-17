@@ -813,39 +813,15 @@ func (m *MySQL) WithTransaction(ctx context.Context, fn func(tx Tx) error) error
 		return err
 	}
 
-	defer func() {
-		var e error
-		if p := recover(); p != nil {
-			e = tx.Rollback(c)
-			span.RecordError(fmt.Errorf("panic in transaction: %v", p))
-			span.SetStatus(codes.Error, "panic occurred in transaction")
-			//nolint:errorlint
-			m.safeLogger.Error(fmt.Errorf("mysql.WithTransaction: panic occurred: %v, rollback error: %v", p, e))
-		} else if err != nil {
-			e = tx.Rollback(c)
-			if e != nil {
-				err = fmt.Errorf(
-					"mysql.WithTransaction: execution failed with error: %w, transaction rollback: %w",
-					err,
-					e,
-				)
-			}
-			span.RecordError(err)
-			span.SetStatus(codes.Error, err.Error())
-		} else {
-			err = tx.Commit(c)
-			if err != nil {
-				err = fmt.Errorf("mysql.WithTransaction: failed to commit transaction: %w", err)
-				span.RecordError(err)
-				span.SetStatus(codes.Error, err.Error())
-			} else {
-				span.SetStatus(codes.Ok, "transaction committed")
-			}
-		}
-	}()
-
-	err = fn(tx)
-	return err
+	err = runTransaction(c, "mysql.WithTransaction", tx, fn)
+	if err != nil {
+		span.RecordError(err)
+		span.SetStatus(codes.Error, err.Error())
+		m.safeLogger.Error(err)
+		return err
+	}
+	span.SetStatus(codes.Ok, "transaction committed")
+	return nil
 }
 
 // Close closes the MySQL database connection.

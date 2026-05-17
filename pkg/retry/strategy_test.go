@@ -5,6 +5,7 @@ package retry_test
 import (
 	"context"
 	"fmt"
+	"sync"
 	"testing"
 	"time"
 
@@ -41,6 +42,40 @@ func TestExponentialBackoff_MaxAttempts(t *testing.T) {
 
 	// Should be exhausted at attempt 3
 	assert.Equal(t, time.Duration(-1), eb.NextDelay(3))
+}
+
+func TestBackoffConstructorsNormalizeInvalidInputs(t *testing.T) {
+	exp := retry.NewExponentialBackoff(-1*time.Second, -500*time.Millisecond, -2, -5, 2)
+	assert.NoError(t, exp.Validate())
+	assert.Equal(t, time.Duration(0), exp.NextDelay(0))
+
+	linear := retry.NewLinearBackoff(-1*time.Second, -50*time.Millisecond, -500*time.Millisecond, -5, -1)
+	assert.NoError(t, linear.Validate())
+	assert.Equal(t, time.Duration(0), linear.NextDelay(0))
+
+	fixed := retry.NewFixedBackoff(-1*time.Second, -5, 2)
+	assert.NoError(t, fixed.Validate())
+	assert.Equal(t, time.Duration(0), fixed.NextDelay(0))
+}
+
+func TestBackoffStrategiesAreSafeForConcurrentNextDelay(t *testing.T) {
+	strategies := []retry.Strategy{
+		retry.NewExponentialBackoff(time.Millisecond, time.Second, 2, -1, 0.5),
+		retry.NewLinearBackoff(time.Millisecond, time.Millisecond, time.Second, -1, 0.5),
+		retry.NewFixedBackoff(time.Millisecond, -1, 0.5),
+	}
+
+	for _, strategy := range strategies {
+		var wg sync.WaitGroup
+		for i := 0; i < 100; i++ {
+			wg.Add(1)
+			go func(attempt int) {
+				defer wg.Done()
+				_ = strategy.NextDelay(attempt)
+			}(i)
+		}
+		wg.Wait()
+	}
 }
 
 // LinearBackoff tests

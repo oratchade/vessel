@@ -4,6 +4,7 @@
 package v1
 
 import (
+	"context"
 	"database/sql"
 	"fmt"
 	"reflect"
@@ -18,6 +19,11 @@ func ExportValidateQueryOptions(opts *options.QueryOptions) error {
 // ExportRejectExecutingReturning allows tests to verify mutation execution RETURNING guards.
 func ExportRejectExecutingReturning(operation string, opts *options.QueryOptions) error {
 	return rejectExecutingReturning(operation, opts)
+}
+
+// ExportRunTransaction allows tests to verify shared transaction semantics.
+func ExportRunTransaction(ctx context.Context, operation string, tx Tx, fn func(Tx) error) error {
+	return runTransaction(ctx, operation, tx, fn)
 }
 
 // ExportFromSQLResult allows tests to call the unexported fromSQLResult function.

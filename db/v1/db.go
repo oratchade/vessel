@@ -434,7 +434,8 @@ type transactional interface {
 	//
 	// Implementation note:
 	//   This helper should call Begin(ctx) to start a Tx, pass the Tx to fn, and commit the transaction
-	//   if fn returns nil. If fn returns an error, the transaction should be rolled back.
+	//   if fn returns nil. If fn returns an error, the transaction should be rolled back. If fn panics,
+	//   the transaction should be rolled back and the panic should be returned as an error.
 	//
 	// Parameters:
 	//   ctx: Context for cancellation and deadlines.

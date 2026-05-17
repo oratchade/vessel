@@ -72,6 +72,7 @@ func (rap *RowsAdapterPool) Acquire(rows any) (*RowsAdapter, error) {
 
 	// Initialize the adapter with the provided rows
 	if err := ra.initRowsAdapterSource(rows); err != nil {
+		ra.reset()
 		// Return to pool before returning error
 		rap.pool.Put(ra)
 		return nil, fmt.Errorf("RowsAdapterPool.Acquire: %w", err)
