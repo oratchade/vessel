@@ -11,11 +11,11 @@ import (
 
 // SQLiteQueryBuilder builds SQL queries compatible with SQLite dialects.
 type SQLiteQueryBuilder struct {
-	dialect cdt.SQLDialect
+	dialect optionDialect
 }
 
 // NewSQLiteQueryBuilder constructs a new SQLiteQueryBuilder using the provided dialect.
-func NewSQLiteQueryBuilder(dialect cdt.SQLDialect) *SQLiteQueryBuilder {
+func NewSQLiteQueryBuilder(dialect optionDialect) *SQLiteQueryBuilder {
 	return &SQLiteQueryBuilder{
 		dialect: dialect,
 	}

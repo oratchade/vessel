@@ -7,12 +7,18 @@ import (
 	"sort"
 	"strings"
 
+	"tounilab.com/fabric/internal/pkg/sqldialect"
 	cdt "tounilab.com/fabric/pkg/query/condition"
 	"tounilab.com/fabric/pkg/query/definition"
 	"tounilab.com/fabric/pkg/query/options"
 )
 
 var sqlFunctionPattern = regexp.MustCompile(`(?i)^([a-z_][a-z0-9_]*)\s*\(.*\)$`)
+
+type optionDialect interface {
+	cdt.SQLDialect
+	SupportedOptions(definition.QueryType, *options.QueryOptions, int) (string, []any, error)
+}
 
 //go:generate mockgen -source=builder.go -destination=builder_mocks.go -package=builder QueryBuilder
 
@@ -104,7 +110,7 @@ type QueryBuilder interface {
 
 // selectQ builds a SELECT query with support for columns, joins, conditions, and options.
 func selectQ(
-	dialect cdt.SQLDialect,
+	dialect optionDialect,
 	table string,
 	columns []string,
 	joins []cdt.Join,
@@ -196,7 +202,12 @@ func sanitizeColumn(dialect cdt.SQLDialect, column string) string {
 		parts := []string{}
 		columns := strings.Split(c, ".")
 		for _, p := range columns {
-			parts = append(parts, dialect.QuoteIdentifier(strings.TrimSpace(p)))
+			part := strings.TrimSpace(p)
+			if part == "*" {
+				parts = append(parts, "*")
+				continue
+			}
+			parts = append(parts, dialect.QuoteIdentifier(part))
 		}
 
 		return fmt.Sprintf("%s%s", strings.Join(parts, "."), alias)
@@ -206,7 +217,7 @@ func sanitizeColumn(dialect cdt.SQLDialect, column string) string {
 
 // insert builds an INSERT query for the given table and data.
 func insert(
-	dialect cdt.SQLDialect,
+	dialect optionDialect,
 	table string,
 	data map[string]any,
 	opts *options.QueryOptions,
@@ -261,7 +272,7 @@ func insert(
 
 // insert builds an INSERT query for the given table and multiple rows of data.
 func inserts(
-	dialect cdt.SQLDialect,
+	dialect optionDialect,
 	table string,
 	data []map[string]any,
 	opts *options.QueryOptions,
@@ -336,9 +347,9 @@ func rowValues(dialect cdt.SQLDialect, row map[string]any, columns []string, ind
 // update builds an UPDATE query for the given table, data, joins, and conditions.
 // The joins parameter is optional and may be nil or empty.
 //
-//nolint:prealloc,cyclop
+//nolint:prealloc,cyclop,gocognit
 func update(
-	dialect cdt.SQLDialect,
+	dialect optionDialect,
 	table string,
 	data map[string]any,
 	joins []cdt.Join,
@@ -372,7 +383,11 @@ func update(
 		}
 	}
 
-	outputFragment, _, err := dialect.SupportedOptions(definition.QueryTypeUpdate, opts, index)
+	if err := validateMutationOptions(dialect, definition.QueryTypeUpdate, joins, opts); err != nil {
+		return "", nil, fmt.Errorf("builder.update: %w", err)
+	}
+
+	outputFragment, _, err := dialect.SupportedOptions(definition.QueryTypeUpdate, returningOptions(opts), index)
 	if err != nil {
 		return "", nil, fmt.Errorf("builder.update: %w", err)
 	}
@@ -386,6 +401,16 @@ func update(
 		}
 		whereClause = where
 		values = append(values, condValues...)
+		index += len(condValues)
+	}
+
+	tailFragment, tailArgs, err := dialect.SupportedOptions(
+		definition.QueryTypeUpdate,
+		mutationTailOptions(opts),
+		index,
+	)
+	if err != nil {
+		return "", nil, fmt.Errorf("builder.update: %w", err)
 	}
 
 	// Assemble the final query
@@ -439,6 +464,11 @@ func update(
 		b.WriteString(" ")
 		b.WriteString(outputFragment)
 	}
+	if tailFragment != "" {
+		b.WriteString(" ")
+		b.WriteString(tailFragment)
+		values = append(values, tailArgs...)
+	}
 
 	b.WriteString(";")
 
@@ -451,7 +481,7 @@ func update(
 //
 //nolint:cyclop,gocognit
 func delete(
-	dialect cdt.SQLDialect,
+	dialect optionDialect,
 	table string,
 	joins []cdt.Join,
 	cond cdt.Condition,
@@ -473,7 +503,11 @@ func delete(
 		}
 	}
 
-	outputFragment, _, err := dialect.SupportedOptions(definition.QueryTypeDelete, opts, 1)
+	if err := validateMutationOptions(dialect, definition.QueryTypeDelete, joins, opts); err != nil {
+		return "", nil, fmt.Errorf("builder.delete: %w", err)
+	}
+
+	outputFragment, _, err := dialect.SupportedOptions(definition.QueryTypeDelete, returningOptions(opts), 1)
 	if err != nil {
 		return "", nil, fmt.Errorf("builder.delete: %w", err)
 	}
@@ -489,6 +523,15 @@ func delete(
 		}
 		whereClause = where
 		values = condValues
+	}
+	nextParam := 1 + len(values)
+	tailFragment, tailArgs, err := dialect.SupportedOptions(
+		definition.QueryTypeDelete,
+		mutationTailOptions(opts),
+		nextParam,
+	)
+	if err != nil {
+		return "", nil, fmt.Errorf("builder.delete: %w", err)
 	}
 
 	// Assemble the final query
@@ -551,10 +594,57 @@ func delete(
 		b.WriteString(" ")
 		b.WriteString(outputFragment)
 	}
+	if tailFragment != "" {
+		b.WriteString(" ")
+		b.WriteString(tailFragment)
+		values = append(values, tailArgs...)
+	}
 
 	b.WriteString(";")
 
 	return b.String(), values, nil
+}
+
+func validateMutationOptions(
+	dialect cdt.SQLDialect,
+	queryType definition.QueryType,
+	joins []cdt.Join,
+	opts *options.QueryOptions,
+) error {
+	if opts == nil {
+		return nil
+	}
+	if opts.Offset != nil {
+		return fmt.Errorf("%s does not support Offset", queryType)
+	}
+	if len(opts.OrderBy) == 0 && opts.Limit == nil {
+		return nil
+	}
+	caps := sqldialect.CapabilitiesFor(dialect)
+	if !caps.MutationOrderLimit {
+		return fmt.Errorf("%s does not support OrderBy or Limit for %s", dialectTypeName(dialect), queryType)
+	}
+	if len(joins) > 0 {
+		return fmt.Errorf("%s does not support OrderBy or Limit with joined %s", dialectTypeName(dialect), queryType)
+	}
+	return nil
+}
+
+func returningOptions(opts *options.QueryOptions) *options.QueryOptions {
+	if opts == nil || len(opts.Returning) == 0 {
+		return nil
+	}
+	return &options.QueryOptions{Returning: opts.Returning}
+}
+
+func mutationTailOptions(opts *options.QueryOptions) *options.QueryOptions {
+	if opts == nil || (len(opts.OrderBy) == 0 && opts.Limit == nil) {
+		return nil
+	}
+	return &options.QueryOptions{
+		OrderBy: opts.OrderBy,
+		Limit:   opts.Limit,
+	}
 }
 
 func dialectTypeName(dialect cdt.SQLDialect) string {

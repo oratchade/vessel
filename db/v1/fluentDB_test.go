@@ -27,6 +27,170 @@ func TestNewFluentDB(t *testing.T) {
 	assert.NotNil(t, fluentDB)
 }
 
+func TestSelectBuilderQueryPreviewWithHavingRaw(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	db := v1.NewMockDBActions(ctrl)
+	fluentDB := v1.NewFluentDB(db)
+
+	db.EXPECT().
+		GetQuery("users", []string{"department", "COUNT(*) AS total"}, nil, nil, gomock.Any()).
+		DoAndReturn(func(
+			table string,
+			columns []string,
+			joins []cdt.Join,
+			conditions cdt.Condition,
+			opts *options.QueryOptions,
+		) (string, []any, error) {
+			require.NotNil(t, opts)
+			assert.Equal(t, []string{"department"}, opts.GroupBy)
+			require.NotNil(t, opts.Having)
+			assert.Equal(t, "COUNT(*) > 1", *opts.Having)
+			return `SELECT "department", COUNT(*) AS "total" FROM "users" GROUP BY "department" HAVING COUNT(*) > 1;`, nil, nil
+		})
+
+	query, args, err := fluentDB.
+		Select("users", "department", "COUNT(*) AS total").
+		GroupBy("department").
+		HavingRaw("COUNT(*) > 1").
+		SelectQuery()
+
+	require.NoError(t, err)
+	assert.Equal(t, `SELECT "department", COUNT(*) AS "total" FROM "users" GROUP BY "department" HAVING COUNT(*) > 1;`, query)
+	assert.Empty(t, args)
+}
+
+func TestSelectBuilderQueryAliasHavingConditionAndOrderHelpers(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	db := v1.NewMockDBActions(ctrl)
+	fluentDB := v1.NewFluentDB(db)
+
+	db.EXPECT().
+		GetQuery("users", []string{"department", "COUNT(*) AS total"}, nil, gomock.Any(), gomock.Any()).
+		DoAndReturn(func(
+			table string,
+			columns []string,
+			joins []cdt.Join,
+			conditions cdt.Condition,
+			opts *options.QueryOptions,
+		) (string, []any, error) {
+			require.NotNil(t, conditions)
+			require.NotNil(t, opts)
+			require.NotNil(t, opts.HavingCondition)
+			assert.Equal(t, []options.OrderBy{
+				{Column: "department", Direction: v1.AscDirection},
+				{Column: "created_at", Direction: v1.DescDirection},
+			}, opts.OrderBy)
+			return `SELECT "department", COUNT(*) AS "total" FROM "users" WHERE "active" = $1 GROUP BY "department" HAVING COUNT(*) > $2 ORDER BY "department" ASC, "created_at" DESC;`, []any{true, 3}, nil
+		})
+
+	query, args, err := fluentDB.
+		Select("users", "department", "COUNT(*) AS total").
+		Where(cdt.NewExpr().Column("active").Op("=").Value(true)).
+		GroupBy("department").
+		Having(cdt.NewExpr().Column("COUNT(*)").Op(">").Value(3)).
+		OrderByAsc("department").
+		OrderByDesc("created_at").
+		Query()
+
+	require.NoError(t, err)
+	assert.Equal(t, `SELECT "department", COUNT(*) AS "total" FROM "users" WHERE "active" = $1 GROUP BY "department" HAVING COUNT(*) > $2 ORDER BY "department" ASC, "created_at" DESC;`, query)
+	assert.Equal(t, []any{true, 3}, args)
+}
+
+func TestMutationBuildersQueryPreviewWithReturning(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	db := v1.NewMockDBActions(ctrl)
+	fluentDB := v1.NewFluentDB(db)
+
+	db.EXPECT().
+		InsertQuery("users", gomock.Any(), gomock.Any()).
+		DoAndReturn(func(table string, data map[string]any, opts *options.QueryOptions) (string, []any, error) {
+			assert.Equal(t, map[string]any{"name": "Ada"}, data)
+			require.NotNil(t, opts)
+			assert.Equal(t, []string{"id"}, opts.Returning)
+			return `INSERT INTO "users" ("name") VALUES ($1) RETURNING "id";`, []any{"Ada"}, nil
+		})
+
+	insertSQL, insertArgs, err := fluentDB.Insert().
+		Into("users").
+		Set("name", "Ada").
+		Returning("id").
+		InsertQuery()
+	require.NoError(t, err)
+	assert.Equal(t, `INSERT INTO "users" ("name") VALUES ($1) RETURNING "id";`, insertSQL)
+	assert.Equal(t, []any{"Ada"}, insertArgs)
+
+	db.EXPECT().
+		InsertsQuery("users", gomock.Any(), gomock.Any()).
+		DoAndReturn(func(table string, data []map[string]any, opts *options.QueryOptions) (string, []any, error) {
+			assert.Equal(t, []map[string]any{{"name": "Ada"}, {"name": "Grace"}}, data)
+			require.NotNil(t, opts)
+			assert.Equal(t, []string{"id"}, opts.Returning)
+			return `INSERT INTO "users" ("name") VALUES ($1), ($2) RETURNING "id";`, []any{"Ada", "Grace"}, nil
+		})
+
+	insertsSQL, insertsArgs, err := fluentDB.Insert().
+		Into("users").
+		ValuesBulk([]map[string]any{{"name": "Ada"}, {"name": "Grace"}}).
+		Returning("id").
+		InsertsQuery()
+	require.NoError(t, err)
+	assert.Equal(t, `INSERT INTO "users" ("name") VALUES ($1), ($2) RETURNING "id";`, insertsSQL)
+	assert.Equal(t, []any{"Ada", "Grace"}, insertsArgs)
+
+	db.EXPECT().
+		UpdateQuery("users", gomock.Any(), nil, gomock.Any(), gomock.Any()).
+		DoAndReturn(func(
+			table string,
+			data map[string]any,
+			joins []cdt.Join,
+			conditions cdt.Condition,
+			opts *options.QueryOptions,
+		) (string, []any, error) {
+			assert.Equal(t, map[string]any{"name": "Ada"}, data)
+			require.NotNil(t, opts)
+			assert.Equal(t, []string{"id"}, opts.Returning)
+			return `UPDATE "users" SET "name" = $1 WHERE "id" = $2 RETURNING "id";`, []any{"Ada", 1}, nil
+		})
+
+	updateSQL, updateArgs, err := fluentDB.Update("users").
+		Set("name", "Ada").
+		Where(cdt.NewExpr().Column("id").Op("=").Value(1)).
+		Returning("id").
+		UpdateQuery()
+	require.NoError(t, err)
+	assert.Equal(t, `UPDATE "users" SET "name" = $1 WHERE "id" = $2 RETURNING "id";`, updateSQL)
+	assert.Equal(t, []any{"Ada", 1}, updateArgs)
+
+	db.EXPECT().
+		DeleteQuery("users", nil, gomock.Any(), gomock.Any()).
+		DoAndReturn(func(
+			table string,
+			joins []cdt.Join,
+			conditions cdt.Condition,
+			opts *options.QueryOptions,
+		) (string, []any, error) {
+			require.NotNil(t, opts)
+			assert.Equal(t, []string{"id"}, opts.Returning)
+			return `DELETE FROM "users" WHERE "id" = $1 RETURNING "id";`, []any{1}, nil
+		})
+
+	deleteSQL, deleteArgs, err := fluentDB.Delete().
+		From("users").
+		Where(cdt.NewExpr().Column("id").Op("=").Value(1)).
+		Returning("id").
+		DeleteQuery()
+	require.NoError(t, err)
+	assert.Equal(t, `DELETE FROM "users" WHERE "id" = $1 RETURNING "id";`, deleteSQL)
+	assert.Equal(t, []any{1}, deleteArgs)
+}
+
 // TestSelectBuilderInitialization tests that Select properly initializes SelectBuilder
 func TestSelectBuilderInitialization(t *testing.T) {
 	ctrl := gomock.NewController(t)

@@ -1,6 +1,8 @@
 // Package options defines query option structures for controlling query behavior.
 package options
 
+import "tounilab.com/fabric/pkg/query/condition"
+
 // OrderBy specifies a column and its sort direction for result ordering.
 // Column is the column name, and Direction is either "ASC" or "DESC".
 // If Direction is empty, it defaults to "ASC".
@@ -49,6 +51,10 @@ type QueryOptions struct {
 	// Applies to: SELECT (with GROUP BY).
 	// IMPORTANT: Should only be used in conjunction with GroupBy; using Having alone is invalid.
 	Having *string
+
+	// HavingCondition specifies a parameterized HAVING condition for grouped queries.
+	// Applies to: SELECT (with GROUP BY). Prefer this for dynamic values.
+	HavingCondition condition.Condition
 
 	// GroupBy specifies the columns to group the results by.
 	// Applies to: SELECT.

@@ -12,11 +12,11 @@ import (
 
 // MySQLQueryBuilder builds SQL queries that are compatible with MySQL dialects.
 type MySQLQueryBuilder struct {
-	dialect cdt.SQLDialect
+	dialect optionDialect
 }
 
 // NewMySQLQueryBuilder constructs a new MySQLQueryBuilder using the provided dialect.
-func NewMySQLQueryBuilder(dialect cdt.SQLDialect) *MySQLQueryBuilder {
+func NewMySQLQueryBuilder(dialect optionDialect) *MySQLQueryBuilder {
 	return &MySQLQueryBuilder{
 		dialect: dialect,
 	}

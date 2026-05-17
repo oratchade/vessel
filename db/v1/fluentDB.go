@@ -51,6 +51,12 @@ func validateQueryOptions(opts *options.QueryOptions) error {
 	return nil
 }
 
+func ensureQueryOptions(opts **options.QueryOptions) {
+	if *opts == nil {
+		*opts = &options.QueryOptions{}
+	}
+}
+
 // dbActions defines the interface required by FluentDB to execute all types of database operations.
 // It combines read, write, and query building capabilities.
 type dbActions interface {
@@ -286,9 +292,7 @@ func (s *SelectBuilder) Joins(joins []cdt.Join) *SelectBuilder {
 //
 // Note: Direction validation is deferred to execution time (Get, GetRaw, etc.).
 func (s *SelectBuilder) OrderBy(column, direction string) *SelectBuilder {
-	if s.opts == nil {
-		s.opts = &options.QueryOptions{}
-	}
+	ensureQueryOptions(&s.opts)
 	if s.opts.OrderBy == nil {
 		s.opts.OrderBy = make([]options.OrderBy, 0)
 	}
@@ -305,6 +309,16 @@ func (s *SelectBuilder) OrderBy(column, direction string) *SelectBuilder {
 	return s
 }
 
+// OrderByAsc adds an ascending ORDER BY clause to the SELECT query.
+func (s *SelectBuilder) OrderByAsc(column string) *SelectBuilder {
+	return s.OrderBy(column, AscDirection)
+}
+
+// OrderByDesc adds a descending ORDER BY clause to the SELECT query.
+func (s *SelectBuilder) OrderByDesc(column string) *SelectBuilder {
+	return s.OrderBy(column, DescDirection)
+}
+
 // Limit sets the maximum number of rows to return.
 //
 // Parameters:
@@ -317,9 +331,7 @@ func (s *SelectBuilder) OrderBy(column, direction string) *SelectBuilder {
 //
 // Note: Limit validation is deferred to execution time (Get, GetRaw, etc.).
 func (s *SelectBuilder) Limit(limit int) *SelectBuilder {
-	if s.opts == nil {
-		s.opts = &options.QueryOptions{}
-	}
+	ensureQueryOptions(&s.opts)
 	s.opts.Limit = &limit
 	return s
 }
@@ -336,10 +348,43 @@ func (s *SelectBuilder) Limit(limit int) *SelectBuilder {
 //
 // Note: Offset validation is deferred to execution time (Get, GetRaw, etc.).
 func (s *SelectBuilder) Offset(offset int) *SelectBuilder {
-	if s.opts == nil {
-		s.opts = &options.QueryOptions{}
-	}
+	ensureQueryOptions(&s.opts)
 	s.opts.Offset = &offset
+	return s
+}
+
+// GroupBy adds one or more GROUP BY columns to the SELECT query.
+func (s *SelectBuilder) GroupBy(columns ...string) *SelectBuilder {
+	if len(columns) == 0 {
+		return s
+	}
+	ensureQueryOptions(&s.opts)
+	s.opts.GroupBy = append(s.opts.GroupBy, columns...)
+	return s
+}
+
+// HavingRaw sets a raw HAVING clause for the SELECT query.
+//
+// The SQL fragment is caller-owned and is not quoted or parameterized. Only pass
+// trusted, allowlisted SQL syntax here; values should still be supplied through
+// parameterized conditions where possible.
+func (s *SelectBuilder) HavingRaw(sql string) *SelectBuilder {
+	ensureQueryOptions(&s.opts)
+	s.opts.Having = &sql
+	return s
+}
+
+// Having adds a parameterized HAVING condition for the SELECT query.
+func (s *SelectBuilder) Having(cond cdt.Condition) *SelectBuilder {
+	if cond == nil {
+		return s
+	}
+	ensureQueryOptions(&s.opts)
+	if s.opts.HavingCondition == nil {
+		s.opts.HavingCondition = cond
+	} else {
+		s.opts.HavingCondition = cdt.NewAnd().Conditions(s.opts.HavingCondition, cond)
+	}
 	return s
 }
 
@@ -389,6 +434,26 @@ func (s *SelectBuilder) GetRaw(ctx context.Context) (*RowsAdapter, error) {
 		return nil, fmt.Errorf("SelectBuilder.GetRaw: failed to get raw rows: %w", err)
 	}
 	return rows, nil
+}
+
+// SelectQuery returns the generated SELECT SQL and arguments without executing it.
+func (s *SelectBuilder) SelectQuery() (string, []any, error) {
+	if s.table == "" {
+		return "", nil, fmt.Errorf("SelectBuilder.SelectQuery: table not specified")
+	}
+	if err := validateQueryOptions(s.opts); err != nil {
+		return "", nil, fmt.Errorf("SelectBuilder.SelectQuery: invalid query options: %w", err)
+	}
+	query, args, err := s.db.GetQuery(s.table, s.columns, s.joins, s.conditions, s.opts)
+	if err != nil {
+		return "", nil, fmt.Errorf("SelectBuilder.SelectQuery: failed to build query: %w", err)
+	}
+	return query, args, nil
+}
+
+// Query returns the generated SELECT SQL and arguments without executing it.
+func (s *SelectBuilder) Query() (string, []any, error) {
+	return s.SelectQuery()
 }
 
 // One executes the SELECT query with Limit(1) and returns the first matching row.
@@ -597,6 +662,65 @@ func (i *InsertBuilder) SetMap(data map[string]any) *InsertBuilder {
 	return i
 }
 
+// Returning requests mutation RETURNING/OUTPUT columns in query preview.
+//
+// Returning is supported for query preview on PostgreSQL and MSSQL. Mutation
+// execution methods reject Returning because they return ExecResult, not rows.
+// MySQL and SQLite ignore Returning in generated preview SQL.
+func (i *InsertBuilder) Returning(columns ...string) *InsertBuilder {
+	if len(columns) == 0 {
+		return i
+	}
+	ensureQueryOptions(&i.opts)
+	i.opts.Returning = append(i.opts.Returning, columns...)
+	return i
+}
+
+// InsertQuery returns the generated single-row INSERT SQL and arguments without executing it.
+func (i *InsertBuilder) InsertQuery() (string, []any, error) {
+	if i.table == "" {
+		return "", nil, fmt.Errorf("InsertBuilder.InsertQuery: table not specified")
+	}
+	if len(i.data) == 0 {
+		return "", nil, fmt.Errorf("InsertBuilder.InsertQuery: no data provided")
+	}
+	if err := validateQueryOptions(i.opts); err != nil {
+		return "", nil, fmt.Errorf("InsertBuilder.InsertQuery: invalid query options: %w", err)
+	}
+	query, args, err := i.db.InsertQuery(i.table, i.data, i.opts)
+	if err != nil {
+		return "", nil, fmt.Errorf("InsertBuilder.InsertQuery: failed to build query: %w", err)
+	}
+	return query, args, nil
+}
+
+// InsertsQuery returns the generated bulk INSERT SQL and arguments without executing it.
+func (i *InsertBuilder) InsertsQuery() (string, []any, error) {
+	if i.table == "" {
+		return "", nil, fmt.Errorf("InsertBuilder.InsertsQuery: table not specified")
+	}
+	if len(i.bulk) == 0 {
+		return "", nil, fmt.Errorf("InsertBuilder.InsertsQuery: no bulk data provided")
+	}
+	if err := validateQueryOptions(i.opts); err != nil {
+		return "", nil, fmt.Errorf("InsertBuilder.InsertsQuery: invalid query options: %w", err)
+	}
+	query, args, err := i.db.InsertsQuery(i.table, i.bulk, i.opts)
+	if err != nil {
+		return "", nil, fmt.Errorf("InsertBuilder.InsertsQuery: failed to build query: %w", err)
+	}
+	return query, args, nil
+}
+
+// Query returns the generated INSERT SQL and arguments without executing it.
+// It uses bulk insert SQL when ValuesBulk was called, otherwise single insert SQL.
+func (i *InsertBuilder) Query() (string, []any, error) {
+	if len(i.bulk) > 0 {
+		return i.InsertsQuery()
+	}
+	return i.InsertQuery()
+}
+
 // Exec executes the INSERT query and returns the result.
 // Uses bulk insert if ValuesBulk was called, otherwise uses single insert.
 //
@@ -781,9 +905,7 @@ func (u *UpdateBuilder) Joins(joins []cdt.Join) *UpdateBuilder {
 //
 // Note: Direction validation is deferred to execution time (Exec, UpdateAll).
 func (u *UpdateBuilder) OrderBy(column, direction string) *UpdateBuilder {
-	if u.opts == nil {
-		u.opts = &options.QueryOptions{}
-	}
+	ensureQueryOptions(&u.opts)
 	if u.opts.OrderBy == nil {
 		u.opts.OrderBy = make([]options.OrderBy, 0)
 	}
@@ -800,6 +922,16 @@ func (u *UpdateBuilder) OrderBy(column, direction string) *UpdateBuilder {
 	return u
 }
 
+// OrderByAsc adds an ascending ORDER BY clause to the UPDATE query.
+func (u *UpdateBuilder) OrderByAsc(column string) *UpdateBuilder {
+	return u.OrderBy(column, AscDirection)
+}
+
+// OrderByDesc adds a descending ORDER BY clause to the UPDATE query.
+func (u *UpdateBuilder) OrderByDesc(column string) *UpdateBuilder {
+	return u.OrderBy(column, DescDirection)
+}
+
 // Limit sets the maximum number of rows to update.
 //
 // Parameters:
@@ -812,11 +944,46 @@ func (u *UpdateBuilder) OrderBy(column, direction string) *UpdateBuilder {
 //
 // Note: Limit validation is deferred to execution time (Exec, UpdateAll).
 func (u *UpdateBuilder) Limit(limit int) *UpdateBuilder {
-	if u.opts == nil {
-		u.opts = &options.QueryOptions{}
-	}
+	ensureQueryOptions(&u.opts)
 	u.opts.Limit = &limit
 	return u
+}
+
+// Returning requests mutation RETURNING/OUTPUT columns in query preview.
+//
+// Returning is supported for query preview on PostgreSQL and MSSQL. Mutation
+// execution methods reject Returning because they return ExecResult, not rows.
+// MySQL and SQLite ignore Returning in generated preview SQL.
+func (u *UpdateBuilder) Returning(columns ...string) *UpdateBuilder {
+	if len(columns) == 0 {
+		return u
+	}
+	ensureQueryOptions(&u.opts)
+	u.opts.Returning = append(u.opts.Returning, columns...)
+	return u
+}
+
+// UpdateQuery returns the generated UPDATE SQL and arguments without executing it.
+func (u *UpdateBuilder) UpdateQuery() (string, []any, error) {
+	if u.table == "" {
+		return "", nil, fmt.Errorf("UpdateBuilder.UpdateQuery: table not specified")
+	}
+	if len(u.data) == 0 {
+		return "", nil, fmt.Errorf("UpdateBuilder.UpdateQuery: no data to update")
+	}
+	if err := validateQueryOptions(u.opts); err != nil {
+		return "", nil, fmt.Errorf("UpdateBuilder.UpdateQuery: invalid query options: %w", err)
+	}
+	query, args, err := u.db.UpdateQuery(u.table, u.data, u.joins, u.conditions, u.opts)
+	if err != nil {
+		return "", nil, fmt.Errorf("UpdateBuilder.UpdateQuery: failed to build query: %w", err)
+	}
+	return query, args, nil
+}
+
+// Query returns the generated UPDATE SQL and arguments without executing it.
+func (u *UpdateBuilder) Query() (string, []any, error) {
+	return u.UpdateQuery()
 }
 
 // Exec executes the UPDATE query and returns the result.
@@ -1005,9 +1172,7 @@ func (d *DeleteBuilder) Joins(joins []cdt.Join) *DeleteBuilder {
 //
 // Note: Direction validation is deferred to execution time (Exec, DeleteAll).
 func (d *DeleteBuilder) OrderBy(column, direction string) *DeleteBuilder {
-	if d.opts == nil {
-		d.opts = &options.QueryOptions{}
-	}
+	ensureQueryOptions(&d.opts)
 	if d.opts.OrderBy == nil {
 		d.opts.OrderBy = make([]options.OrderBy, 0)
 	}
@@ -1024,6 +1189,16 @@ func (d *DeleteBuilder) OrderBy(column, direction string) *DeleteBuilder {
 	return d
 }
 
+// OrderByAsc adds an ascending ORDER BY clause to the DELETE query.
+func (d *DeleteBuilder) OrderByAsc(column string) *DeleteBuilder {
+	return d.OrderBy(column, AscDirection)
+}
+
+// OrderByDesc adds a descending ORDER BY clause to the DELETE query.
+func (d *DeleteBuilder) OrderByDesc(column string) *DeleteBuilder {
+	return d.OrderBy(column, DescDirection)
+}
+
 // Limit sets the maximum number of rows to delete.
 //
 // Parameters:
@@ -1036,11 +1211,43 @@ func (d *DeleteBuilder) OrderBy(column, direction string) *DeleteBuilder {
 //
 // Note: Limit validation is deferred to execution time (Exec, DeleteAll).
 func (d *DeleteBuilder) Limit(limit int) *DeleteBuilder {
-	if d.opts == nil {
-		d.opts = &options.QueryOptions{}
-	}
+	ensureQueryOptions(&d.opts)
 	d.opts.Limit = &limit
 	return d
+}
+
+// Returning requests mutation RETURNING/OUTPUT columns in query preview.
+//
+// Returning is supported for query preview on PostgreSQL and MSSQL. Mutation
+// execution methods reject Returning because they return ExecResult, not rows.
+// MySQL and SQLite ignore Returning in generated preview SQL.
+func (d *DeleteBuilder) Returning(columns ...string) *DeleteBuilder {
+	if len(columns) == 0 {
+		return d
+	}
+	ensureQueryOptions(&d.opts)
+	d.opts.Returning = append(d.opts.Returning, columns...)
+	return d
+}
+
+// DeleteQuery returns the generated DELETE SQL and arguments without executing it.
+func (d *DeleteBuilder) DeleteQuery() (string, []any, error) {
+	if d.table == "" {
+		return "", nil, fmt.Errorf("DeleteBuilder.DeleteQuery: table not specified")
+	}
+	if err := validateQueryOptions(d.opts); err != nil {
+		return "", nil, fmt.Errorf("DeleteBuilder.DeleteQuery: invalid query options: %w", err)
+	}
+	query, args, err := d.db.DeleteQuery(d.table, d.joins, d.conditions, d.opts)
+	if err != nil {
+		return "", nil, fmt.Errorf("DeleteBuilder.DeleteQuery: failed to build query: %w", err)
+	}
+	return query, args, nil
+}
+
+// Query returns the generated DELETE SQL and arguments without executing it.
+func (d *DeleteBuilder) Query() (string, []any, error) {
+	return d.DeleteQuery()
 }
 
 // Exec executes the DELETE query and returns the result.

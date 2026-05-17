@@ -16,7 +16,12 @@ func QuoteIdentifierSlice(dialect condition.SQLDialect, identifiers []string, pr
 		// split dotted identifiers and quote each segment individually
 		parts := strings.Split(id, ".")
 		for j, p := range parts {
-			parts[j] = dialect.QuoteIdentifier(strings.TrimSpace(p))
+			part := strings.TrimSpace(p)
+			if part == "*" {
+				parts[j] = "*"
+				continue
+			}
+			parts[j] = dialect.QuoteIdentifier(part)
 		}
 		quotedID := strings.Join(parts, ".")
 		if prefix != "" {

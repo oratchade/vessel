@@ -61,7 +61,7 @@ func (d PostgresDialect) Operator(op string) string {
 }
 
 func (d PostgresDialect) QuoteIdentifier(value string) string {
-	return fmt.Sprintf("\"%s\"", value)
+	return fmt.Sprintf("\"%s\"", strings.ReplaceAll(value, "\"", "\"\""))
 }
 
 func (d PostgresDialect) QuoteString(value string) string {

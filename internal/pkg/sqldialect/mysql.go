@@ -61,7 +61,7 @@ func (d MySQLDialect) Operator(op string) string {
 }
 
 func (d MySQLDialect) QuoteIdentifier(value string) string {
-	return "`" + value + "`"
+	return "`" + strings.ReplaceAll(value, "`", "``") + "`"
 }
 
 func (d MySQLDialect) QuoteString(value string) string {

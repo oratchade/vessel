@@ -72,7 +72,11 @@ func (j *Join) ToSQL(table string, dialect SQLDialect) string {
 		jn += fmt.Sprintf(" AS %s", dialect.QuoteIdentifier(j.Alias))
 	}
 
-	on := j.Conditions.on(table, j.Table, dialect)
+	joinTable := j.Table
+	if j.Alias != "" {
+		joinTable = j.Alias
+	}
+	on := j.Conditions.on(table, joinTable, dialect)
 
 	return fmt.Sprintf("%s %s", jn, on)
 }

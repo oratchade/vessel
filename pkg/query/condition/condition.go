@@ -2,11 +2,6 @@
 // for building parameterized queries.
 package condition
 
-import (
-	"tounilab.com/fabric/pkg/query/definition"
-	"tounilab.com/fabric/pkg/query/options"
-)
-
 //go:generate mockgen -source=condition.go -destination=condition_mocks.go -package=condition Condition
 
 // Condition represents a composable SQL condition expression that can be
@@ -24,20 +19,6 @@ type SQLDialect interface {
 	Operator(op string) string
 	QuoteIdentifier(value string) string
 	QuoteString(value string) string
-
-	// SupportedOptions generates the SQL fragment for supported options in a query,
-	// based on the query type (e.g., "SELECT", "INSERT") and the provided QueryOptions.
-	//
-	// Parameters:
-	//   queryType: The type of SQL query ("SELECT", "INSERT", etc.).
-	//   opts: The QueryOptions struct containing optional parameters.
-	//   paramBase: The base index to use for placeholders (1-based).
-	//
-	// Returns:
-	//   string: The SQL fragment representing the supported options for the query.
-	//   []any:  Arguments corresponding to placeholders in the fragment.
-	//   error:  Error if option building/validation fails.
-	SupportedOptions(queryType definition.QueryType, opts *options.QueryOptions, paramBase int) (string, []any, error)
 }
 
 /*

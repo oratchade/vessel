@@ -9,11 +9,11 @@ import (
 
 // MSSQLQueryBuilder builds SQL queries compatible with Microsoft SQL Server.
 type MSSQLQueryBuilder struct {
-	dialect cdt.SQLDialect
+	dialect optionDialect
 }
 
 // NewMSSQLQueryBuilder constructs a new MSSQLQueryBuilder using the provided dialect.
-func NewMSSQLQueryBuilder(dialect cdt.SQLDialect) *MSSQLQueryBuilder {
+func NewMSSQLQueryBuilder(dialect optionDialect) *MSSQLQueryBuilder {
 	return &MSSQLQueryBuilder{
 		dialect: dialect,
 	}

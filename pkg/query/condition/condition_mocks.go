@@ -8,8 +8,6 @@ import (
 	reflect "reflect"
 
 	gomock "github.com/golang/mock/gomock"
-	definition "tounilab.com/fabric/pkg/query/definition"
-	options "tounilab.com/fabric/pkg/query/options"
 )
 
 // MockCondition is a mock of Condition interface.
@@ -128,20 +126,4 @@ func (m *MockSQLDialect) QuoteString(value string) string {
 func (mr *MockSQLDialectMockRecorder) QuoteString(value interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "QuoteString", reflect.TypeOf((*MockSQLDialect)(nil).QuoteString), value)
-}
-
-// SupportedOptions mocks base method.
-func (m *MockSQLDialect) SupportedOptions(queryType definition.QueryType, opts *options.QueryOptions, paramBase int) (string, []any, error) {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "SupportedOptions", queryType, opts, paramBase)
-	ret0, _ := ret[0].(string)
-	ret1, _ := ret[1].([]any)
-	ret2, _ := ret[2].(error)
-	return ret0, ret1, ret2
-}
-
-// SupportedOptions indicates an expected call of SupportedOptions.
-func (mr *MockSQLDialectMockRecorder) SupportedOptions(queryType, opts, paramBase interface{}) *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SupportedOptions", reflect.TypeOf((*MockSQLDialect)(nil).SupportedOptions), queryType, opts, paramBase)
 }

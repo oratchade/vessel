@@ -12,6 +12,7 @@ import (
 	"tounilab.com/fabric/internal/pkg/builder"
 	"tounilab.com/fabric/internal/pkg/sqldialect"
 	cdt "tounilab.com/fabric/pkg/query/condition"
+	"tounilab.com/fabric/pkg/query/options"
 )
 
 func convertQuotedExpected(base, left, right string) string {
@@ -53,9 +54,19 @@ func TestSanitizeColumn(t *testing.T) {
 			expected: `"table"."col"`,
 		},
 		{
+			name:     "qualified wildcard",
+			input:    "table.*",
+			expected: `"table".*`,
+		},
+		{
 			name:     "qualified with multiple parts",
 			input:    "db.schema.table.col",
 			expected: `"db"."schema"."table"."col"`,
+		},
+		{
+			name:     "escaped column and alias delimiters",
+			input:    `weird"col AS alias"name`,
+			expected: `"weird""col" AS "alias""name"`,
 		},
 		{
 			name:     "column with AS alias",
@@ -112,6 +123,7 @@ func TestSanitizeColumn_MultipleDialects(t *testing.T) {
 	}{
 		{"simple column", "col", `"col"`},
 		{"qualified column", "table.col", `"table"."col"`},
+		{"qualified wildcard", "table.*", `"table".*`},
 		{"multiple parts", "db.schema.table.col", `"db"."schema"."table"."col"`},
 		{"with alias", "col AS alias", `"col" AS "alias"`},
 		{"function with alias", "COUNT(*) AS count", `COUNT(*) AS "count"`},
@@ -153,6 +165,159 @@ func TestSanitizeColumn_MultipleDialects(t *testing.T) {
 		got := builder.ExportSanitizeColumn(baseDialect, tc.input)
 		assert.Equal(t, tc.expected, got, "postgres sanitizeColumn(%q)", tc.input)
 	}
+}
+
+func TestBuilderEscapedIdentifiersInSelectClauses(t *testing.T) {
+	dialect := sqldialect.MySQLDialect{}
+	qb := builder.NewMySQLQueryBuilder(dialect)
+	having := "COUNT(*) > 1"
+
+	sql, args, err := qb.Select(
+		"user`table",
+		[]string{"user`table.id`col AS alias`name", "COUNT(*) AS total", "user`table.*"},
+		[]cdt.Join{{
+			Type:  "INNER",
+			Table: "org`table",
+			Alias: "o`alias",
+			Conditions: cdt.JoinCdts{{
+				Left:  "org`id",
+				Right: "id`col",
+			}},
+		}},
+		&options.QueryOptions{
+			GroupBy: []string{"user`table.id`col"},
+			Having:  &having,
+			OrderBy: []options.OrderBy{{Column: "user`table.id`col", Direction: "DESC"}},
+		},
+		cdt.NewExpr().Column("user`table.id`col").Op("=").Value(10),
+	)
+
+	require.NoError(t, err)
+	assert.Equal(t, "SELECT `user``table`.`id``col` AS `alias``name`, COUNT(*) AS `total`, `user``table`.* FROM `user``table` INNER JOIN `org``table` AS `o``alias` ON `user``table`.`org``id` = `o``alias`.`id``col` WHERE `user``table`.`id``col` = ? GROUP BY `user``table`.`id``col` HAVING COUNT(*) > 1 ORDER BY `user``table`.`id``col` DESC;", sql)
+	assert.Equal(t, []any{10}, args)
+}
+
+func TestSelectParameterizedHavingCondition(t *testing.T) {
+	dialect := sqldialect.PostgresDialect{}
+	qb := builder.NewPostgresQueryBuilder(dialect)
+
+	sql, args, err := qb.Select(
+		"users",
+		[]string{"department", "COUNT(*) AS total"},
+		nil,
+		&options.QueryOptions{
+			GroupBy: []string{"department"},
+			HavingCondition: cdt.NewExpr().
+				Column("COUNT(*)").
+				Op(">").
+				Value(3),
+			OrderBy: []options.OrderBy{{Column: "department", Direction: "ASC"}},
+		},
+		cdt.NewExpr().Column("active").Op("=").Value(true),
+	)
+
+	require.NoError(t, err)
+	assert.Equal(t, `SELECT "department", COUNT(*) AS "total" FROM "users" WHERE "active" = $1 GROUP BY "department" HAVING COUNT(*) > $2 ORDER BY "department" ASC;`, sql)
+	assert.Equal(t, []any{true, 3}, args)
+}
+
+func TestMySQLMutationOrderByLimitWithoutJoins(t *testing.T) {
+	dialect := sqldialect.MySQLDialect{}
+	qb := builder.NewMySQLQueryBuilder(dialect)
+	limit := 5
+	opts := &options.QueryOptions{
+		Limit:   &limit,
+		OrderBy: []options.OrderBy{{Column: "created_at", Direction: "DESC"}},
+	}
+
+	updateSQL, updateArgs, err := qb.Update(
+		"users",
+		map[string]any{"name": "Ada"},
+		nil,
+		cdt.NewExpr().Column("id").Op("=").Value(1),
+		opts,
+	)
+	require.NoError(t, err)
+	assert.Equal(t, "UPDATE `users` SET `name` = ? WHERE `id` = ? ORDER BY `created_at` DESC LIMIT ?;", updateSQL)
+	assert.Equal(t, []any{"Ada", 1, 5}, updateArgs)
+
+	deleteSQL, deleteArgs, err := qb.Delete(
+		"users",
+		nil,
+		cdt.NewExpr().Column("active").Op("=").Value(false),
+		opts,
+	)
+	require.NoError(t, err)
+	assert.Equal(t, "DELETE FROM `users` WHERE `active` = ? ORDER BY `created_at` DESC LIMIT ?;", deleteSQL)
+	assert.Equal(t, []any{false, 5}, deleteArgs)
+}
+
+func TestMutationOrderByLimitUnsupportedDialects(t *testing.T) {
+	limit := 5
+	opts := &options.QueryOptions{Limit: &limit}
+
+	cases := []struct {
+		name string
+		qb   builder.QueryBuilder
+	}{
+		{name: "postgres", qb: builder.NewPostgresQueryBuilder(sqldialect.PostgresDialect{})},
+		{name: "sqlite", qb: builder.NewSQLiteQueryBuilder(sqldialect.SQLiteDialect{})},
+		{name: "mssql", qb: builder.NewMSSQLQueryBuilder(sqldialect.MSSQLDialect{})},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			_, _, err := tc.qb.Update(
+				"users",
+				map[string]any{"name": "Ada"},
+				nil,
+				cdt.NewExpr().Column("id").Op("=").Value(1),
+				opts,
+			)
+			require.Error(t, err)
+			assert.Contains(t, err.Error(), "does not support OrderBy or Limit")
+		})
+	}
+}
+
+func TestMySQLMutationOrderByLimitWithJoinReturnsError(t *testing.T) {
+	dialect := sqldialect.MySQLDialect{}
+	qb := builder.NewMySQLQueryBuilder(dialect)
+	limit := 5
+
+	_, _, err := qb.Update(
+		"users",
+		map[string]any{"name": "Ada"},
+		[]cdt.Join{{
+			Type:  "INNER",
+			Table: "profiles",
+			Conditions: cdt.JoinCdts{{
+				Left:  "id",
+				Right: "user_id",
+			}},
+		}},
+		cdt.NewExpr().Column("active").Op("=").Value(true),
+		&options.QueryOptions{Limit: &limit},
+	)
+
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "does not support OrderBy or Limit with joined")
+}
+
+func TestMutationOffsetReturnsExplicitError(t *testing.T) {
+	dialect := sqldialect.MySQLDialect{}
+	qb := builder.NewMySQLQueryBuilder(dialect)
+	offset := 10
+
+	_, _, err := qb.Delete(
+		"users",
+		nil,
+		cdt.NewExpr().Column("active").Op("=").Value(false),
+		&options.QueryOptions{Offset: &offset},
+	)
+
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "does not support Offset")
 }
 
 func TestInserts_MySQL(t *testing.T) {

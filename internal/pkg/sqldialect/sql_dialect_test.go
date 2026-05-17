@@ -15,10 +15,109 @@ import (
 
 func intPtr(v int) *int { return &v }
 
+func TestQuoteIdentifierEscapesDelimiters(t *testing.T) {
+	cases := []struct {
+		name    string
+		dialect condition.SQLDialect
+		input   string
+		want    string
+	}{
+		{
+			name:    "mysql backtick",
+			dialect: sd.MySQLDialect{},
+			input:   "user`name",
+			want:    "`user``name`",
+		},
+		{
+			name:    "sqlite backtick",
+			dialect: sd.SQLiteDialect{},
+			input:   "user`name",
+			want:    "`user``name`",
+		},
+		{
+			name:    "postgres double quote",
+			dialect: sd.PostgresDialect{},
+			input:   `user"name`,
+			want:    `"user""name"`,
+		},
+		{
+			name:    "mssql closing bracket",
+			dialect: sd.MSSQLDialect{},
+			input:   "user]name",
+			want:    "[user]]name]",
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			assert.Equal(t, tc.want, tc.dialect.QuoteIdentifier(tc.input))
+		})
+	}
+}
+
+func TestCapabilitiesForDialects(t *testing.T) {
+	cases := []struct {
+		name string
+		d    condition.SQLDialect
+		want sd.Capabilities
+	}{
+		{
+			name: "mysql",
+			d:    sd.MySQLDialect{},
+			want: sd.Capabilities{
+				SelectPagination:       true,
+				MutationOrderLimit:     true,
+				JoinedUpdate:           true,
+				JoinedDelete:           true,
+				MutationOrderLimitName: "MySQL",
+			},
+		},
+		{
+			name: "postgres",
+			d:    sd.PostgresDialect{},
+			want: sd.Capabilities{
+				SelectPagination:      true,
+				MutationReturning:     true,
+				JoinedUpdate:          true,
+				JoinedDelete:          true,
+				JoinedDeleteWithUsing: true,
+			},
+		},
+		{
+			name: "sqlite",
+			d:    sd.SQLiteDialect{},
+			want: sd.Capabilities{
+				SelectPagination: true,
+				JoinedUpdate:     true,
+			},
+		},
+		{
+			name: "mssql",
+			d:    sd.MSSQLDialect{},
+			want: sd.Capabilities{
+				SelectPagination:  true,
+				MutationOutput:    true,
+				MutationReturning: true,
+				JoinedUpdate:      true,
+				JoinedDelete:      true,
+			},
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			assert.Equal(t, tc.want, sd.CapabilitiesFor(tc.d))
+		})
+	}
+}
+
 func TestSupportedOptions_SelectLimitOffsetOrderBy(t *testing.T) {
 	cases := []struct {
-		name     string
-		dialect  condition.SQLDialect
+		name    string
+		dialect interface {
+			condition.SQLDialect
+			SupportedOptions(definition.QueryType, *options.QueryOptions, int) (string, []any, error)
+		}
 		opts     *options.QueryOptions
 		wantFrag string
 		wantArgs []any
@@ -118,8 +217,11 @@ func TestReturningOutput_PrefixQuoting(t *testing.T) {
 func TestSupportedOptions_GroupByHavingAndMultipleOrderBy(t *testing.T) {
 	count := "COUNT(*) > 10"
 	cases := []struct {
-		name     string
-		dialect  condition.SQLDialect
+		name    string
+		dialect interface {
+			condition.SQLDialect
+			SupportedOptions(definition.QueryType, *options.QueryOptions, int) (string, []any, error)
+		}
 		opts     *options.QueryOptions
 		wantFrag string
 	}{
@@ -173,6 +275,40 @@ func TestSupportedOptions_GroupByHavingAndMultipleOrderBy(t *testing.T) {
 			assert.Equal(t, tc.wantFrag, frag)
 		})
 	}
+}
+
+func TestSupportedOptions_ParameterizedHavingUsesParamBase(t *testing.T) {
+	opts := &options.QueryOptions{
+		GroupBy: []string{"department"},
+		HavingCondition: condition.NewExpr().
+			Column("COUNT(*)").
+			Op(">").
+			Value(2),
+	}
+
+	frag, args, err := sd.PostgresDialect{}.SupportedOptions(definition.QueryTypeSelect, opts, 3)
+
+	assert.NoError(t, err)
+	assert.Equal(t, `GROUP BY "department" HAVING COUNT(*) > $3`, frag)
+	assert.Equal(t, []any{2}, args)
+}
+
+func TestSupportedOptions_RawAndParameterizedHaving(t *testing.T) {
+	raw := "COUNT(*) > 1"
+	opts := &options.QueryOptions{
+		GroupBy: []string{"department"},
+		Having:  &raw,
+		HavingCondition: condition.NewExpr().
+			Column("SUM(score)").
+			Op("<").
+			Value(100),
+	}
+
+	frag, args, err := sd.MySQLDialect{}.SupportedOptions(definition.QueryTypeSelect, opts, 1)
+
+	assert.NoError(t, err)
+	assert.Equal(t, "GROUP BY `department` HAVING COUNT(*) > 1 AND SUM(score) < ?", frag)
+	assert.Equal(t, []any{100}, args)
 }
 
 func TestReturningOutput_UpdateCase(t *testing.T) {

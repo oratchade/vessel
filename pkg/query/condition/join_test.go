@@ -60,7 +60,7 @@ func TestJoin_ToSQL_WithAlias(t *testing.T) {
 			},
 		},
 	}
-	expected := "RIGHT JOIN `payments` AS `p` ON `payments`.`user_id` = `payments`.`payer_id`"
+	expected := "RIGHT JOIN `payments` AS `p` ON `payments`.`user_id` = `p`.`payer_id`"
 	got := join.ToSQL("payments", dialect)
 	assert.Equal(t, expected, got)
 }
@@ -96,7 +96,7 @@ func TestJoin_ToSQL_Complex(t *testing.T) {
 			},
 		},
 	}
-	expected := "FULL OUTER JOIN `users` AS `u` ON `users`.`id` = `users`.`user_id`"
+	expected := "FULL OUTER JOIN `users` AS `u` ON `users`.`id` = `u`.`user_id`"
 	got := join.ToSQL("users", dialect)
 	assert.Equal(t, expected, got)
 }
@@ -125,8 +125,8 @@ func TestJoin_ToSQL_MultipleJoins(t *testing.T) {
 			},
 		},
 	}
-	expected := "INNER JOIN `orders` AS `o` ON `users`.`id` = `orders`.`user_id`" +
-		" LEFT JOIN `payments` AS `p` ON `orders`.`id` = `payments`.`order_id`"
+	expected := "INNER JOIN `orders` AS `o` ON `users`.`id` = `o`.`user_id`" +
+		" LEFT JOIN `payments` AS `p` ON `orders`.`id` = `p`.`order_id`"
 	got := join1.ToSQL("users", dialect) + " " + join2.ToSQL("orders", dialect)
 	assert.Equal(t, expected, got)
 }

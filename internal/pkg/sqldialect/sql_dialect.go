@@ -48,6 +48,19 @@ func supportedOptions(
 				*opts.Having,
 			))
 		}
+		if opts.HavingCondition != nil {
+			having, havingArgs, err := opts.HavingCondition.ToSQL(dialect, next)
+			if err != nil {
+				return "", nil, fmt.Errorf("HAVING condition: %w", err)
+			}
+			if opts.Having != nil {
+				parts[len(parts)-1] += " AND " + having
+			} else {
+				parts = append(parts, fmt.Sprintf("%s %s", dialect.Operator(operator.Having), having))
+			}
+			args = append(args, havingArgs...)
+			next += len(havingArgs)
+		}
 
 		if len(opts.OrderBy) > 0 {
 			orderByFragments := getOrderByFragment(dialect, opts.OrderBy)
@@ -103,6 +116,20 @@ func supportedOptions(
 				),
 			))
 		}
+		if queryType == definition.QueryTypeUpdate || queryType == definition.QueryTypeDelete {
+			if len(opts.OrderBy) > 0 {
+				orderByFragments := getOrderByFragment(dialect, opts.OrderBy)
+				parts = append(parts, fmt.Sprintf(
+					"%s %s",
+					dialect.Operator(operator.OrderBy),
+					strings.Join(orderByFragments, ", "),
+				))
+			}
+			if opts.Limit != nil {
+				parts = append(parts, formatOperator(dialect, dialect.Operator(operator.Limit), next))
+				args = append(args, *opts.Limit)
+			}
+		}
 	}
 
 	return strings.Join(parts, " "), args, nil
@@ -116,10 +143,18 @@ func getOrderByFragment(dialect condition.SQLDialect, orderBy []options.OrderBy)
 			direction = "ASC"
 		}
 		orderByFragments = append(orderByFragments,
-			fmt.Sprintf("%s %s", dialect.QuoteIdentifier(order.Column), direction),
+			fmt.Sprintf("%s %s", quoteOptionIdentifier(dialect, order.Column), direction),
 		)
 	}
 	return orderByFragments
+}
+
+func quoteOptionIdentifier(dialect condition.SQLDialect, value string) string {
+	value = strings.TrimSpace(value)
+	if value == "*" || strings.ContainsAny(value, " ()") {
+		return value
+	}
+	return helpers.QuoteIdentifierSlice(dialect, []string{value}, "")[0]
 }
 
 // getPrefix returns the prefix to use for column names in RETURNING/OUTPUT clauses

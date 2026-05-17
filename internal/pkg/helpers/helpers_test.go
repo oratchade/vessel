@@ -7,8 +7,6 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"tounilab.com/fabric/internal/pkg/helpers"
-	"tounilab.com/fabric/pkg/query/definition"
-	"tounilab.com/fabric/pkg/query/options"
 )
 
 type mockDialect struct {
@@ -30,14 +28,6 @@ func (m mockDialect) Operator(op string) string {
 
 func (m mockDialect) QuoteString(value string) string {
 	return "'" + value + "'"
-}
-
-func (m mockDialect) SupportedOptions(
-	queryType definition.QueryType,
-	opts *options.QueryOptions,
-	paramBase int,
-) (string, []any, error) {
-	return "", nil, nil
 }
 
 func TestQuoteIdentifierSliceNoPrefix(t *testing.T) {
