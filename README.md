@@ -20,7 +20,9 @@ support for MySQL, PostgreSQL, SQLite, and MSSQL.
 - ✨ **Zero-Copy Row Scanning** - Efficient field mapping to Go types
 - 📡 **OpenTelemetry Tracing** - Distributed tracing for all
   database operations
-- 🧪 **Comprehensive Testing** - 919 unit tests with 100% pass rate
+- 🚚 **Manager Insert Batching** - Optional per-worker `InsertAsync`
+  coalescing for write-heavy paths
+- 🧪 **Comprehensive Testing** - 946 unit tests with 100% pass rate
 
 ## Installation
 
@@ -37,7 +39,8 @@ Requires Go 1.26.0 or later.
 Fabric v1.0.0 is the first stable release with:
 
 - ✅ Full multi-database support (MySQL, PostgreSQL, SQLite, MSSQL)
-- ✅ 919 comprehensive tests (100% pass rate)
+- ✅ 946 comprehensive tests (100% pass rate)
+- ✅ Optional Manager insert coalescing for compatible async writes
 - ✅ Retry integration with automatic backoff strategies
 - ✅ Production-ready and battle-tested
 - ✅ Complete documentation and examples
@@ -1283,6 +1286,8 @@ or application-level sharding.
 - 🔧 **Worker Pools** - Configurable read/write workers per database
 - 📬 **Async Queries** - Channel-based responses for non-blocking
   operations
+- 🚚 **Opt-In Insert Coalescing** - Compatible `InsertAsync` calls can
+  flush as bulk `Inserts`
 - 🛡️ **Backpressure Handling** - Bounded queues prevent resource
   exhaustion
 

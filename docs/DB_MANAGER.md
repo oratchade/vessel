@@ -132,7 +132,7 @@ Database Entry
 │       └── Processes: Get, GetByID, Query, Exec (read-only)
 └── Read-Write Workers (e.g., 4 goroutines)
     └── Write Queue (bounded, e.g., 1000 items)
-        └── Processes: Insert, Update, Delete, Exec (write)
+        └── Processes: Insert, Inserts, Update, Delete, Exec (write)
 ```
 
 **Benefits:**
@@ -141,6 +141,24 @@ Database Entry
 - ✅ Backpressure: Bounded queues prevent memory exhaustion
 - ✅ Isolation: Read/write operations don't compete for resources
 - ✅ Scalability: Configurable worker counts per database
+- ✅ Optional batching: Compatible `InsertAsync` requests can flush as bulk writes
+
+### Insert Coalescing
+
+Write batching is opt-in. When enabled, each write worker can collect compatible
+`InsertAsync` requests and flush them as one `Inserts` call. Explicit
+`InsertsAsync` calls already contain caller-owned bulk data and execute
+directly.
+
+Requests are compatible when they target the same worker, table, query options,
+and column set. A pending insert batch flushes when it reaches
+`writeBatchMaxRows`, waits `writeBatchMaxDelay`, sees an incompatible write, or
+the manager stops.
+
+Batch errors are returned to every original caller. When database rows affected
+matches the batch size, each caller receives `RowsAffected: 1`; otherwise each
+caller receives the aggregate rows affected value because Fabric cannot infer
+per-row effects from a database-level bulk result.
 
 ## Health Monitoring
 
@@ -430,6 +448,9 @@ readQueueSize: 1000 # Default read queue size
 writeWorkers: 4 # Default write workers per entry
 readWorkers: 4 # Default read workers per entry
 healthInterval: 30s # Health check interval
+writeBatchingEnabled: false # Opt-in automatic InsertAsync batching
+writeBatchMaxRows: 100 # Flush once this many compatible inserts accumulate
+writeBatchMaxDelay: 5ms # Flush after the first insert waits this long
 
 # Database entries
 entries:
@@ -444,6 +465,9 @@ entries:
     writeWorkers: 2 # Override global default
     readWorkers: 8 # Override global default
     healthInterval: 60s # Override global default
+    writeBatchingEnabled: true # Override global default
+    writeBatchMaxRows: 250 # Override global default
+    writeBatchMaxDelay: 10ms # Override global default
 
     # Database-specific config
     config:
