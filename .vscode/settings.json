@@ -2,5 +2,14 @@
   "gopls": {
     "buildFlags": ["-tags=test"]
   },
-  "go.buildTags": "test"
+  "go.buildTags": "test",
+  "cSpell.words": [
+    "Cdts",
+    "introspector",
+    "nolint",
+    "SHOWPLAN",
+    "sqldialect",
+    "stretchr",
+    "tounilab"
+  ]
 }

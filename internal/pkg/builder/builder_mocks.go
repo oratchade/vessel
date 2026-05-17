@@ -9,8 +9,104 @@ import (
 
 	gomock "github.com/golang/mock/gomock"
 	condition "tounilab.com/fabric/pkg/query/condition"
+	definition "tounilab.com/fabric/pkg/query/definition"
 	options "tounilab.com/fabric/pkg/query/options"
 )
+
+// MockoptionDialect is a mock of optionDialect interface.
+type MockoptionDialect struct {
+	ctrl     *gomock.Controller
+	recorder *MockoptionDialectMockRecorder
+}
+
+// MockoptionDialectMockRecorder is the mock recorder for MockoptionDialect.
+type MockoptionDialectMockRecorder struct {
+	mock *MockoptionDialect
+}
+
+// NewMockoptionDialect creates a new mock instance.
+func NewMockoptionDialect(ctrl *gomock.Controller) *MockoptionDialect {
+	mock := &MockoptionDialect{ctrl: ctrl}
+	mock.recorder = &MockoptionDialectMockRecorder{mock}
+	return mock
+}
+
+// EXPECT returns an object that allows the caller to indicate expected use.
+func (m *MockoptionDialect) EXPECT() *MockoptionDialectMockRecorder {
+	return m.recorder
+}
+
+// Operator mocks base method.
+func (m *MockoptionDialect) Operator(op string) string {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "Operator", op)
+	ret0, _ := ret[0].(string)
+	return ret0
+}
+
+// Operator indicates an expected call of Operator.
+func (mr *MockoptionDialectMockRecorder) Operator(op interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Operator", reflect.TypeOf((*MockoptionDialect)(nil).Operator), op)
+}
+
+// Placeholder mocks base method.
+func (m *MockoptionDialect) Placeholder(index int) string {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "Placeholder", index)
+	ret0, _ := ret[0].(string)
+	return ret0
+}
+
+// Placeholder indicates an expected call of Placeholder.
+func (mr *MockoptionDialectMockRecorder) Placeholder(index interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Placeholder", reflect.TypeOf((*MockoptionDialect)(nil).Placeholder), index)
+}
+
+// QuoteIdentifier mocks base method.
+func (m *MockoptionDialect) QuoteIdentifier(value string) string {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "QuoteIdentifier", value)
+	ret0, _ := ret[0].(string)
+	return ret0
+}
+
+// QuoteIdentifier indicates an expected call of QuoteIdentifier.
+func (mr *MockoptionDialectMockRecorder) QuoteIdentifier(value interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "QuoteIdentifier", reflect.TypeOf((*MockoptionDialect)(nil).QuoteIdentifier), value)
+}
+
+// QuoteString mocks base method.
+func (m *MockoptionDialect) QuoteString(value string) string {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "QuoteString", value)
+	ret0, _ := ret[0].(string)
+	return ret0
+}
+
+// QuoteString indicates an expected call of QuoteString.
+func (mr *MockoptionDialectMockRecorder) QuoteString(value interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "QuoteString", reflect.TypeOf((*MockoptionDialect)(nil).QuoteString), value)
+}
+
+// SupportedOptions mocks base method.
+func (m *MockoptionDialect) SupportedOptions(arg0 definition.QueryType, arg1 *options.QueryOptions, arg2 int) (string, []any, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "SupportedOptions", arg0, arg1, arg2)
+	ret0, _ := ret[0].(string)
+	ret1, _ := ret[1].([]any)
+	ret2, _ := ret[2].(error)
+	return ret0, ret1, ret2
+}
+
+// SupportedOptions indicates an expected call of SupportedOptions.
+func (mr *MockoptionDialectMockRecorder) SupportedOptions(arg0, arg1, arg2 interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SupportedOptions", reflect.TypeOf((*MockoptionDialect)(nil).SupportedOptions), arg0, arg1, arg2)
+}
 
 // MockQueryBuilder is a mock of QueryBuilder interface.
 type MockQueryBuilder struct {
