@@ -14,12 +14,13 @@ support for MySQL, PostgreSQL, SQLite, and MSSQL.
   MSSQL with unified API
 - 🔒 **Type-Safe Queries** - Parameterized SQL with automatic escaping
 - 🎯 **Query Builder** - Fluent DSL for dynamic SQL construction
-- 🔄 **Transaction Support** - ACID compliance with automatic rollback on panic
+- 🔄 **Transaction Support** - ACID compliance with automatic rollback on
+  callback error or panic
 - 📊 **Connection Pooling** - Per-dialect statistics and configuration
 - ✨ **Zero-Copy Row Scanning** - Efficient field mapping to Go types
 - 📡 **OpenTelemetry Tracing** - Distributed tracing for all
   database operations
-- 🧪 **Comprehensive Testing** - 829 unit tests with 100% pass rate
+- 🧪 **Comprehensive Testing** - 919 unit tests with 100% pass rate
 
 ## Installation
 
@@ -36,7 +37,7 @@ Requires Go 1.26.0 or later.
 Fabric v1.0.0 is the first stable release with:
 
 - ✅ Full multi-database support (MySQL, PostgreSQL, SQLite, MSSQL)
-- ✅ 829 comprehensive tests (100% pass rate)
+- ✅ 919 comprehensive tests (100% pass rate)
 - ✅ Retry integration with automatic backoff strategies
 - ✅ Production-ready and battle-tested
 - ✅ Complete documentation and examples
@@ -923,17 +924,39 @@ users := []map[string]any{
 }
 fdb.Insert().Into("users").ValuesBulk(users).Exec()
 
-// Complex UPDATE
+// MySQL limited UPDATE
 fdb.Update("users").
     Set("status", "inactive").
     Where(cdt.NewExpr().Column("last_login").Op("<").Value("2023-01-01")).
     Where(cdt.NewExpr().Column("active").Op("=").Value(true)).
+    OrderByDesc("last_login").
     Limit(1000).
     Exec()
 
+// Safe grouped SELECT with parameterized HAVING
+query, args, err := fdb.Select("users", "department", "COUNT(*) AS total").
+    Where(cdt.NewExpr().Column("active").Op("=").Value(true)).
+    GroupBy("department").
+    Having(cdt.NewExpr().Column("COUNT(*)").Op(">").Value(3)).
+    OrderByAsc("department").
+    Query()
+
+// Raw HAVING escape hatch for trusted SQL syntax only
+query, args, err = fdb.Select("users", "department", "COUNT(*) AS total").
+    GroupBy("department").
+    HavingRaw("COUNT(*) FILTER (WHERE active = true) > 3").
+    Query()
+
+// Mutation query preview with PostgreSQL RETURNING / MSSQL OUTPUT
+query, args, err = fdb.Insert().
+    Into("users").
+    Set("name", "Ada").
+    Returning("id").
+    Query()
+
 // Pagination
 fdb.Select("users", "id", "name").
-    OrderBy("created_at", "DESC").
+    OrderByDesc("created_at").
     Limit(20).
     Offset((page-1)*20).
     Get()
@@ -945,16 +968,23 @@ usage.
 
 ## Database Support
 
-| Feature               | MySQL | PostgreSQL | SQLite | MSSQL |
-| --------------------- | ----- | ---------- | ------ | ----- |
-| Basic CRUD            | ✅    | ✅         | ✅     | ✅    |
-| Bulk Insert (Inserts) | ✅    | ✅         | ✅     | ✅    |
-| Transactions          | ✅    | ✅         | ✅     | ✅    |
-| Parameterized Queries | ✅    | ✅         | ✅     | ✅    |
-| Query Introspection   | ✅    | ✅         | ✅     | ✅    |
-| EXPLAIN Analysis      | ✅    | ✅         | ✅     | ✅    |
-| Connection Pool Stats | ✅    | ✅         | ✅     | ✅    |
-| Error Mapping         | ✅    | ✅         | ✅     | ✅    |
+| Feature                          | MySQL | PostgreSQL | SQLite | MSSQL |
+| -------------------------------- | ----- | ---------- | ------ | ----- |
+| Basic CRUD execution             | ✅    | ✅         | ✅     | ✅    |
+| Bulk insert execution            | ✅    | ✅         | ✅     | ✅    |
+| Joined SELECT                    | ✅    | ✅         | ✅     | ✅    |
+| Joined UPDATE SQL                | ✅    | ✅         | ✅     | ✅    |
+| Joined DELETE SQL                | ✅    | ✅         | ❌     | ✅    |
+| SELECT limit/offset              | ✅    | ✅         | ✅     | ✅    |
+| UPDATE/DELETE order+limit        | ✅    | explicit error | explicit error | explicit error |
+| Mutation RETURNING/OUTPUT preview | ignored | RETURNING | ignored | OUTPUT |
+| Mutation RETURNING/OUTPUT execution | explicit error | explicit error | explicit error | explicit error |
+| Safe parameterized HAVING        | ✅    | ✅         | ✅     | ✅    |
+| Raw HAVING escape hatch          | ✅    | ✅         | ✅     | ✅    |
+| Transactions                     | ✅    | ✅         | ✅     | ✅    |
+| Query introspection              | ✅    | ✅         | ✅     | ✅    |
+| EXPLAIN analysis                 | ✅    | ✅         | ✅     | ✅    |
+| Connection pool stats            | ✅    | ✅         | ✅     | ✅    |
 
 Dialect notes:
 
@@ -962,9 +992,19 @@ Dialect notes:
   renders `RETURNING`, MSSQL renders `OUTPUT`, and MySQL/SQLite ignore it.
   Mutation `Exec` methods return `ExecResult` and reject `Returning` so rows
   are not silently discarded.
+- Fluent mutation builders expose `Returning(...)` plus query-preview helpers
+  such as `InsertQuery`, `InsertsQuery`, `UpdateQuery`, and `DeleteQuery`.
+- MySQL supports mutation `OrderBy`/`Limit` only for non-joined UPDATE and
+  DELETE. Other dialects return explicit unsupported-option errors instead of
+  silently generating invalid SQL.
 - MSSQL pagination uses `ORDER BY ... OFFSET ... FETCH NEXT`; `Limit` requires
   `OrderBy`, and Fabric emits `OFFSET 0 ROWS` when only `Limit` is set.
-- `Having` is rendered as a raw SQL clause string. Use trusted SQL fragments.
+- Prefer `Having(condition)` for parameterized aggregate filters. `HavingRaw`
+  renders a raw SQL clause string. Table names, column names, raw expressions,
+  and raw HAVING clauses must be trusted or allowlisted; values should use
+  placeholders through conditions whenever possible.
+- `WithTransaction` rolls back callback errors and callback panics. Panics are
+  returned as non-nil errors with stack details rather than being swallowed.
 
 All operators are documented in the [Architecture Guide](./docs/ARCHITECTURE.md).
 

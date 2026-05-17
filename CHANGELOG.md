@@ -45,7 +45,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - ManagedRowsAdapter for automatic cleanup with finalizer fallback
 - ScanRowsTo[T] generic for type-safe automatic resource management
 - 7 comprehensive resource management examples with benchmarks
-- 829+ comprehensive tests with 100% pass rate
+- 919 comprehensive tests with 100% pass rate
 
 ### Changed
 
@@ -88,6 +88,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Mutation `RETURNING`/`OUTPUT` behavior clarified and guarded: query preview is
   supported, while execution rejects returned-row options to avoid silently
   discarding rows
+- Dialect identifier quoting now escapes quote delimiters for MySQL, SQLite, and
+  PostgreSQL while preserving MSSQL bracket escaping
+- Fluent builders now include explicit raw/query-preview helpers for grouped
+  selects and mutation `RETURNING`/`OUTPUT` previews
+- Transaction helpers now roll back callback panics and return a non-nil error
+  containing the panic details instead of swallowing the panic
+- SELECT joins with aliases now render join predicates against the alias, keeping
+  generated SQL valid when an alias is declared
+- Fluent SELECT builders now support `Query()`, `OrderByAsc`, `OrderByDesc`, and
+  parameterized `Having(condition)` alongside `HavingRaw`
+- Mutation `OrderBy`/`Limit` now either renders valid MySQL non-joined mutation
+  SQL or returns explicit unsupported-option errors for dialects/shapes that
+  cannot safely render it
+- Dialect capabilities now centralize support decisions for pagination,
+  returning/output, joined mutations, and mutation order/limit behavior
+- RowsAdapterPool now resets adapters before returning them to the pool after a
+  failed acquire
+- Retry backoff strategies now normalize invalid constructor inputs and protect
+  jitter state for concurrent `NextDelay` calls
 
 ## Documentation
 
@@ -109,7 +128,7 @@ Comprehensive documentation created:
 
 ## Testing & Quality Assurance
 
-- 829 comprehensive tests with 100% pass rate
+- 919 comprehensive tests with 100% pass rate
 - Builder tests: 30+ new test functions for UpdateAll/DeleteAll operations
 - Dialect testing: MySQL, PostgreSQL, SQLite, MSSQL with operator coverage
 - Query options testing: OrderBy, Limit/Offset, GroupBy, HAVING, RETURNING
