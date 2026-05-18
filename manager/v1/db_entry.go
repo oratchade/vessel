@@ -143,7 +143,8 @@ func newDBEntry(
 		readWorkerIdxCounter = c
 	}
 
-	c, cancel := context.WithCancel(ctx)
+	c, cancel, releaseCancel, cleanupCancel := newDBEntryContext(ctx)
+	defer cleanupCancel()
 	dbe := &DBEntry{
 		ctx:                  c,
 		cancel:               cancel,
@@ -163,7 +164,22 @@ func newDBEntry(
 		writeBatchMaxDelay:   mc.EntryWriteBatchMaxDelay(cfg),
 	}
 	dbe.healthy.Store(true) // Start as healthy
+	releaseCancel()
 	return dbe, nil
+}
+
+func newDBEntryContext(parent context.Context) (context.Context, context.CancelFunc, func(), func()) {
+	c, cancel := context.WithCancel(parent)
+	cancelOnError := true
+	release := func() {
+		cancelOnError = false
+	}
+	cleanup := func() {
+		if cancelOnError {
+			cancel()
+		}
+	}
+	return c, cancel, release, cleanup
 }
 
 // Priority returns the priority of the DBEntry, which is used for query routing and load balancing decisions.
