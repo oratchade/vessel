@@ -267,21 +267,11 @@ func ensureMSSQLTestDatabase(cfg v1.MSSQLConfig) error {
 	masterCfg := cfg
 	masterCfg.Database = "master"
 
-	masterDB, err := sql.Open(masterCfg.Driver(), masterCfg.DSN())
+	masterDB, err := openReadyMSSQLMaster(masterCfg)
 	if err != nil {
-		return fmt.Errorf("open MSSQL master connection: %w", err)
+		return err
 	}
 	defer func() { _ = masterDB.Close() }()
-
-	for attempt := 1; attempt <= 10; attempt++ {
-		if err = masterDB.Ping(); err == nil {
-			break
-		}
-		time.Sleep(time.Duration(attempt) * 250 * time.Millisecond)
-	}
-	if err != nil {
-		return fmt.Errorf("ping MSSQL master: %w", err)
-	}
 
 	dbName := strings.ReplaceAll(cfg.Database, "'", "''")
 	identifier := strings.ReplaceAll(cfg.Database, "]", "]]")
@@ -290,6 +280,39 @@ func ensureMSSQLTestDatabase(cfg v1.MSSQLConfig) error {
 		return fmt.Errorf("ensure MSSQL database %q exists: %w", cfg.Database, err)
 	}
 	return nil
+}
+
+func openReadyMSSQLMaster(cfg v1.MSSQLConfig) (*sql.DB, error) {
+	deadline := time.Now().Add(90 * time.Second)
+	var lastErr error
+
+	for attempt := 1; time.Now().Before(deadline); attempt++ {
+		masterDB, err := sql.Open(cfg.Driver(), cfg.DSN())
+		if err != nil {
+			lastErr = err
+		} else {
+			pingCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+			err = masterDB.PingContext(pingCtx)
+			cancel()
+			if err == nil {
+				return masterDB, nil
+			}
+			lastErr = err
+			_ = masterDB.Close()
+		}
+
+		time.Sleep(mssqlRetryDelay(attempt))
+	}
+
+	return nil, fmt.Errorf("ping MSSQL master within readiness window: %w", lastErr)
+}
+
+func mssqlRetryDelay(attempt int) time.Duration {
+	delay := time.Duration(attempt) * 500 * time.Millisecond
+	if delay > 5*time.Second {
+		return 5 * time.Second
+	}
+	return delay
 }
 
 // TestSimpleSQLite tests basic SQLite functionality in isolation

@@ -29,6 +29,8 @@ type fluentMatrixDB struct {
 	cfg    v1.DBConfig
 }
 
+const fluentMatrixUsersTable = "fluent_matrix_users"
+
 func TestFluentDBDialectMatrix(t *testing.T) {
 	for _, testDB := range fluentMatrixDatabases() {
 		t.Run(testDB.name, func(t *testing.T) {
@@ -40,7 +42,7 @@ func TestFluentDBDialectMatrix(t *testing.T) {
 			fluent := v1.NewFluentDB(db)
 
 			_, err := fluent.Insert().
-				Into("users").
+				Into(fluentMatrixUsersTable).
 				Set("name", "Alice").
 				Set("email", "alice.matrix@example.com").
 				Set("age", 31).
@@ -48,7 +50,7 @@ func TestFluentDBDialectMatrix(t *testing.T) {
 				Exec(ctx)
 			require.NoError(t, err)
 			_, err = fluent.Insert().
-				Into("users").
+				Into(fluentMatrixUsersTable).
 				Set("name", "Bob").
 				Set("email", "bob.matrix@example.com").
 				Set("age", 42).
@@ -56,7 +58,7 @@ func TestFluentDBDialectMatrix(t *testing.T) {
 				Exec(ctx)
 			require.NoError(t, err)
 
-			query, _, err := fluent.Select("users", "status", "COUNT(*) AS total").
+			query, _, err := fluent.Select(fluentMatrixUsersTable, "status", "COUNT(*) AS total").
 				Where(cdt.NewExpr().Column("age").Op(">").Value(20)).
 				GroupBy("status").
 				Having(cdt.NewExpr().Column("COUNT(*)").Op(">").Value(0)).
@@ -65,7 +67,7 @@ func TestFluentDBDialectMatrix(t *testing.T) {
 			require.NoError(t, err)
 			assert.NotEmpty(t, query)
 
-			grouped, err := fluent.Select("users", "status", "COUNT(*) AS total").
+			grouped, err := fluent.Select(fluentMatrixUsersTable, "status", "COUNT(*) AS total").
 				Where(cdt.NewExpr().Column("age").Op(">").Value(20)).
 				GroupBy("status").
 				HavingRaw("COUNT(*) > 0").
@@ -75,7 +77,7 @@ func TestFluentDBDialectMatrix(t *testing.T) {
 			assert.Len(t, grouped, 2)
 
 			insertPreview, _, err := fluent.Insert().
-				Into("users").
+				Into(fluentMatrixUsersTable).
 				Set("name", "Preview").
 				Set("email", "preview.matrix@example.com").
 				Returning("id").
@@ -83,7 +85,7 @@ func TestFluentDBDialectMatrix(t *testing.T) {
 			require.NoError(t, err)
 			assertMutationPreview(t, testDB.driver, insertPreview)
 
-			updateBuilder := fluent.Update("users").
+			updateBuilder := fluent.Update(fluentMatrixUsersTable).
 				Set("status", "active").
 				Where(cdt.NewExpr().Column("status").Op("=").Value("inactive")).
 				OrderByAsc("id").
@@ -193,6 +195,8 @@ func connectFluentMatrixDB(t *testing.T, testDB fluentMatrixDB) v1.DB {
 		if err == nil {
 			if pingErr := database.Ping(context.Background()); pingErr == nil {
 				return database
+			} else {
+				err = pingErr
 			}
 			_ = database.Close()
 		}
@@ -212,8 +216,8 @@ func setupFluentMatrixSchema(t *testing.T, db v1.DB, driver string) {
 
 	schema := map[string][]string{
 		"sqlite3": {
-			"DROP TABLE IF EXISTS users",
-			`CREATE TABLE users (
+			"DROP TABLE IF EXISTS " + fluentMatrixUsersTable,
+			`CREATE TABLE ` + fluentMatrixUsersTable + ` (
 				id INTEGER PRIMARY KEY AUTOINCREMENT,
 				name TEXT NOT NULL,
 				email TEXT UNIQUE NOT NULL,
@@ -222,8 +226,8 @@ func setupFluentMatrixSchema(t *testing.T, db v1.DB, driver string) {
 			)`,
 		},
 		"mysql": {
-			"DROP TABLE IF EXISTS users",
-			`CREATE TABLE users (
+			"DROP TABLE IF EXISTS " + fluentMatrixUsersTable,
+			`CREATE TABLE ` + fluentMatrixUsersTable + ` (
 				id INT PRIMARY KEY AUTO_INCREMENT,
 				name VARCHAR(255) NOT NULL,
 				email VARCHAR(255) UNIQUE NOT NULL,
@@ -232,8 +236,8 @@ func setupFluentMatrixSchema(t *testing.T, db v1.DB, driver string) {
 			)`,
 		},
 		"postgres": {
-			"DROP TABLE IF EXISTS users CASCADE",
-			`CREATE TABLE users (
+			"DROP TABLE IF EXISTS " + fluentMatrixUsersTable + " CASCADE",
+			`CREATE TABLE ` + fluentMatrixUsersTable + ` (
 				id SERIAL PRIMARY KEY,
 				name VARCHAR(255) NOT NULL,
 				email VARCHAR(255) UNIQUE NOT NULL,
@@ -242,8 +246,8 @@ func setupFluentMatrixSchema(t *testing.T, db v1.DB, driver string) {
 			)`,
 		},
 		"sqlserver": {
-			"DROP TABLE IF EXISTS users",
-			`CREATE TABLE users (
+			"DROP TABLE IF EXISTS " + fluentMatrixUsersTable,
+			`CREATE TABLE ` + fluentMatrixUsersTable + ` (
 				id INT PRIMARY KEY IDENTITY(1,1),
 				name VARCHAR(255) NOT NULL,
 				email VARCHAR(255) UNIQUE NOT NULL,
@@ -278,28 +282,52 @@ func requireMSSQLDatabase(t *testing.T, cfg v1.MSSQLConfig) {
 
 	masterCfg := cfg
 	masterCfg.Database = "master"
-	masterDB, err := sql.Open(masterCfg.Driver(), masterCfg.DSN())
-	require.NoError(t, err)
-	defer func() { _ = masterDB.Close() }()
-
-	for attempt := 1; attempt <= 10; attempt++ {
-		err = masterDB.Ping()
-		if err == nil {
-			break
-		}
-		time.Sleep(time.Duration(attempt) * 250 * time.Millisecond)
-	}
+	masterDB, err := openReadyFluentMSSQLMaster(masterCfg)
 	if err != nil {
 		if fluentStrict() || os.Getenv("DB_TYPE") != "" {
 			require.NoError(t, err)
 		}
 		t.Skipf("MSSQL integration database unavailable: %v", err)
 	}
+	defer func() { _ = masterDB.Close() }()
 
 	dbName := strings.ReplaceAll(cfg.Database, "'", "''")
 	identifier := strings.ReplaceAll(cfg.Database, "]", "]]")
 	_, err = masterDB.Exec(fmt.Sprintf("IF DB_ID(N'%s') IS NULL CREATE DATABASE [%s]", dbName, identifier))
 	require.NoError(t, err)
+}
+
+func openReadyFluentMSSQLMaster(cfg v1.MSSQLConfig) (*sql.DB, error) {
+	deadline := time.Now().Add(90 * time.Second)
+	var lastErr error
+
+	for attempt := 1; time.Now().Before(deadline); attempt++ {
+		masterDB, err := sql.Open(cfg.Driver(), cfg.DSN())
+		if err != nil {
+			lastErr = err
+		} else {
+			pingCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+			err = masterDB.PingContext(pingCtx)
+			cancel()
+			if err == nil {
+				return masterDB, nil
+			}
+			lastErr = err
+			_ = masterDB.Close()
+		}
+
+		time.Sleep(fluentMSSQLRetryDelay(attempt))
+	}
+
+	return nil, fmt.Errorf("ping MSSQL master within readiness window: %w", lastErr)
+}
+
+func fluentMSSQLRetryDelay(attempt int) time.Duration {
+	delay := time.Duration(attempt) * 500 * time.Millisecond
+	if delay > 5*time.Second {
+		return 5 * time.Second
+	}
+	return delay
 }
 
 func fluentEnv(key string, defaultVal string) string {
