@@ -5,12 +5,14 @@ package v1_test
 import (
 	"context"
 	"errors"
+	"strings"
 	"testing"
 
 	"github.com/golang/mock/gomock"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	v1 "tounilab.com/fabric/db/v1"
+	"tounilab.com/fabric/internal/pkg/helpers"
 	cdt "tounilab.com/fabric/pkg/query/condition"
 	"tounilab.com/fabric/pkg/query/options"
 )
@@ -822,6 +824,74 @@ func TestSelectBuilderCount(t *testing.T) {
 	}
 }
 
+func TestSelectBuilderCountRawAndCountQuery(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	db := v1.NewMockDBActions(ctrl)
+	fluentDB := v1.NewFluentDB(db)
+	cond := cdt.IsNull("deleted_at")
+	join := cdt.Join{Type: "LEFT", Table: "teams", Alias: "t", On: cdt.IsNull("t.deleted_at")}
+
+	db.EXPECT().
+		GetRaw(context.Background(), "users", gomock.Any(), []cdt.Join{join}, cond, nil).
+		DoAndReturn(func(_ context.Context, _ string, columns []string, _ []cdt.Join, _ cdt.Condition, _ *options.QueryOptions) (*v1.RowsAdapter, error) {
+			raw, ok := helpers.IsRawProjection(columns[0])
+			require.True(t, ok)
+			assert.Equal(t, "COUNT(*) AS cnt", raw)
+			return nil, nil
+		})
+
+	rows, err := fluentDB.Select("users").
+		Join(join).
+		Where(cond).
+		CountRaw(context.Background())
+	require.NoError(t, err)
+	assert.Nil(t, rows)
+
+	db.EXPECT().
+		GetQuery("users", gomock.Any(), nil, cond, nil).
+		DoAndReturn(func(_ string, columns []string, _ []cdt.Join, _ cdt.Condition, _ *options.QueryOptions) (string, []any, error) {
+			raw, ok := helpers.IsRawProjection(columns[0])
+			require.True(t, ok)
+			assert.Equal(t, "COUNT(*) AS total", raw)
+			return `SELECT COUNT(*) AS "total" FROM "users" WHERE "deleted_at" IS NULL;`, nil, nil
+		})
+
+	query, args, err := fluentDB.Select("users").
+		Where(cond).
+		CountQuery("total")
+	require.NoError(t, err)
+	assert.Equal(t, `SELECT COUNT(*) AS "total" FROM "users" WHERE "deleted_at" IS NULL;`, query)
+	assert.Nil(t, args)
+}
+
+func TestSelectBuilderColumnHelpers(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	db := v1.NewMockDBActions(ctrl)
+	fluentDB := v1.NewFluentDB(db)
+
+	db.EXPECT().
+		Get(context.Background(), "audit_logs", gomock.Any(), nil, nil, nil).
+		DoAndReturn(func(_ context.Context, _ string, columns []string, _ []cdt.Join, _ cdt.Condition, _ *options.QueryOptions) ([]map[string]any, error) {
+			assert.Equal(t, "id", columns[0])
+			assert.Equal(t, "created_at AS created", columns[1])
+			raw, ok := helpers.IsRawProjection(columns[2])
+			require.True(t, ok)
+			assert.Equal(t, "ip_address::text AS ip_address", raw)
+			return []map[string]any{}, nil
+		})
+
+	_, err := fluentDB.Select("audit_logs").
+		Column("id").
+		ColumnAs("created_at", "created").
+		ColumnRawAs("ip_address::text", "ip_address").
+		Get(context.Background())
+	require.NoError(t, err)
+}
+
 // TestSelectBuilderWithTx tests transaction support
 func TestSelectBuilderWithTx(t *testing.T) {
 	ctrl := gomock.NewController(t)
@@ -1093,6 +1163,108 @@ func TestInsertBuilderWithTx(t *testing.T) {
 
 	_, _ = result.Into("users").Set("name", "John").Exec(context.Background())
 }
+
+func TestInsertBuilderInsertAndFetch(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	db := v1.NewMockDBActions(ctrl)
+	fluentDB := v1.NewFluentDB(db)
+
+	data := map[string]any{"id": "asset-session-1", "status": "open"}
+	inserted := map[string]any{"id": "asset-session-1", "status": "open"}
+
+	db.EXPECT().Insert(context.Background(), "asset_sessions", data, nil).
+		Return(&v1.ExecResult{RowsAffected: 1}, nil)
+	db.EXPECT().
+		Get(context.Background(), "asset_sessions", []string{"id", "status"}, nil, gomock.Any(), nil).
+		DoAndReturn(func(_ context.Context, _ string, _ []string, _ []cdt.Join, cond cdt.Condition, _ *options.QueryOptions) ([]map[string]any, error) {
+			sql, args, err := cond.ToSQL(testDialect{}, 1)
+			require.NoError(t, err)
+			assert.Equal(t, "`id` = ?", sql)
+			assert.Equal(t, []any{"asset-session-1"}, args)
+			return []map[string]any{inserted}, nil
+		})
+
+	row, err := fluentDB.Insert().
+		Into("asset_sessions").
+		Values(data).
+		InsertAndFetch(context.Background(), "id", "id", "status")
+	require.NoError(t, err)
+	assert.Equal(t, inserted, row)
+}
+
+func TestInsertBuilderInsertAndFetchWithTx(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	db := v1.NewMockDBActions(ctrl)
+	tx := v1.NewMockTx(ctrl)
+	fluentDB := v1.NewFluentDB(db)
+
+	data := map[string]any{"id": "asset-session-1"}
+	tx.EXPECT().Insert(context.Background(), "asset_sessions", data, nil).
+		Return(&v1.ExecResult{RowsAffected: 1}, nil)
+	tx.EXPECT().Get(context.Background(), "asset_sessions", []string{"*"}, nil, gomock.Any(), nil).
+		Return([]map[string]any{{"id": "asset-session-1"}}, nil)
+
+	row, err := fluentDB.Insert().
+		Into("asset_sessions").
+		WithTx(tx).
+		Values(data).
+		InsertAndFetch(context.Background(), "id")
+	require.NoError(t, err)
+	assert.Equal(t, "asset-session-1", row["id"])
+}
+
+func TestInsertBuilderInsertAndFetchValidation(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	db := v1.NewMockDBActions(ctrl)
+	fluentDB := v1.NewFluentDB(db)
+
+	tests := []struct {
+		name  string
+		build func() *v1.InsertBuilder
+		key   string
+	}{
+		{
+			name:  "missing key column",
+			build: func() *v1.InsertBuilder { return fluentDB.Insert().Into("users").Set("name", "Ada") },
+			key:   "id",
+		},
+		{
+			name: "bulk insert",
+			build: func() *v1.InsertBuilder {
+				return fluentDB.Insert().Into("users").ValuesBulk([]map[string]any{{"id": 1}})
+			},
+			key: "id",
+		},
+		{
+			name:  "returning",
+			build: func() *v1.InsertBuilder { return fluentDB.Insert().Into("users").Set("id", 1).Returning("id") },
+			key:   "id",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			row, err := tt.build().InsertAndFetch(context.Background(), tt.key)
+			require.Error(t, err)
+			assert.Nil(t, row)
+		})
+	}
+}
+
+type testDialect struct{}
+
+func (testDialect) Placeholder(_ int) string { return "?" }
+func (testDialect) Operator(op string) string {
+	return strings.ToUpper(op)
+}
+func (testDialect) QuoteIdentifier(value string) string { return "`" + value + "`" }
+func (testDialect) QuoteString(value string) string     { return "'" + value + "'" }
 
 // TestUpdateBuilderInitialization tests that Update properly initializes UpdateBuilder
 func TestUpdateBuilderInitialization(t *testing.T) {
