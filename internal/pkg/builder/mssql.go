@@ -90,6 +90,10 @@ func (m *MSSQLQueryBuilder) Delete(
 }
 
 // join converts a Join to a SQL JOIN clause.
-func (m *MSSQLQueryBuilder) join(table string, join *cdt.Join) string {
-	return join.ToSQL(table, m.dialect)
+func (m *MSSQLQueryBuilder) join(table string, join *cdt.Join, paramBase int) (string, []any, error) {
+	sql, args, err := join.ToSQLWithArgs(table, m.dialect, paramBase)
+	if err != nil {
+		return "", nil, fmt.Errorf("mssql join: %w", err)
+	}
+	return sql, args, nil
 }

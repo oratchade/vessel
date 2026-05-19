@@ -93,11 +93,15 @@ func (m *MySQLQueryBuilder) Delete(
 }
 
 // join converts a Join to a SQL JOIN clause.
-func (m *MySQLQueryBuilder) join(table string, join *cdt.Join) string {
+func (m *MySQLQueryBuilder) join(table string, join *cdt.Join, paramBase int) (string, []any, error) {
 	switch strings.ToLower(join.Type) {
 	case operator.Inner, operator.Right, operator.Left:
-		return join.ToSQL(table, m.dialect)
+		sql, args, err := join.ToSQLWithArgs(table, m.dialect, paramBase)
+		if err != nil {
+			return "", nil, fmt.Errorf("mysql join: %w", err)
+		}
+		return sql, args, nil
 	default:
-		return ""
+		return "", nil, nil
 	}
 }

@@ -7,6 +7,7 @@ import (
 	"sort"
 	"strings"
 
+	"tounilab.com/fabric/internal/pkg/helpers"
 	"tounilab.com/fabric/internal/pkg/sqldialect"
 	cdt "tounilab.com/fabric/pkg/query/condition"
 	"tounilab.com/fabric/pkg/query/definition"
@@ -109,6 +110,8 @@ type QueryBuilder interface {
 }
 
 // selectQ builds a SELECT query with support for columns, joins, conditions, and options.
+//
+//nolint:cyclop
 func selectQ(
 	dialect optionDialect,
 	table string,
@@ -116,7 +119,7 @@ func selectQ(
 	joins []cdt.Join,
 	cond cdt.Condition,
 	opts *options.QueryOptions,
-	joinFn func(table string, join *cdt.Join) string,
+	joinFn func(table string, join *cdt.Join, paramBase int) (string, []any, error),
 ) (string, []any, error) {
 	cols := make([]string, len(columns))
 	for i, col := range columns {
@@ -126,15 +129,25 @@ func selectQ(
 	sql := "SELECT " + strings.Join(cols, ", ") + " FROM " + dialect.QuoteIdentifier(table)
 
 	join := make([]string, 0, len(joins))
+	var joinValues []any
+	nextParam := 1
 	for _, j := range joins {
-		join = append(join, joinFn(table, &j))
+		joinSQL, joinArgs, err := joinFn(table, &j, nextParam)
+		if err != nil {
+			return "", nil, fmt.Errorf("builder.selectQ: %w", err)
+		}
+		if joinSQL != "" {
+			join = append(join, joinSQL)
+		}
+		joinValues = append(joinValues, joinArgs...)
+		nextParam += len(joinArgs)
 	}
 
 	// Build condition fragment (if any)
 	var where string
 	var values []any
 	if cond != nil {
-		w, v, err := cond.ToSQL(dialect, 1)
+		w, v, err := cond.ToSQL(dialect, nextParam)
 		if err != nil {
 			return "", nil, fmt.Errorf("builder.selectQ: %w", err)
 		}
@@ -143,7 +156,7 @@ func selectQ(
 	}
 
 	// compute param base for options: placeholders used so far + starting index (1-based)
-	nextParam := 1 + len(values)
+	nextParam += len(values)
 
 	// Ask dialect to render supported options with placeholders starting at nextParam
 	optFragment, optArgs, err := dialect.SupportedOptions(definition.QueryTypeSelect, opts, nextParam)
@@ -173,7 +186,8 @@ func selectQ(
 	b.WriteString(";")
 
 	// merge args: condition args first, then options args
-	allArgs := make([]any, 0, len(values)+len(optArgs))
+	allArgs := make([]any, 0, len(joinValues)+len(values)+len(optArgs))
+	allArgs = append(allArgs, joinValues...)
 	allArgs = append(allArgs, values...)
 	allArgs = append(allArgs, optArgs...)
 
@@ -181,8 +195,20 @@ func selectQ(
 }
 
 // sanitizeColumn quotes and processes a column identifier, handling aliases and qualified names.
+//
+//nolint:cyclop
 func sanitizeColumn(dialect cdt.SQLDialect, column string) string {
 	c, alias := column, ""
+	if raw, ok := helpers.IsRawProjection(column); ok {
+		c = raw
+		if loc := rawAliasIndex(dialect, c); loc != nil {
+			c, alias = c[:loc[0]], c[loc[1]:]
+		}
+		if alias != "" {
+			alias = " " + dialect.Operator("AS") + " " + dialect.QuoteIdentifier(strings.TrimSpace(alias))
+		}
+		return strings.TrimSpace(c) + alias
+	}
 	if column == "*" {
 		return "*"
 	}
@@ -213,6 +239,11 @@ func sanitizeColumn(dialect cdt.SQLDialect, column string) string {
 		return fmt.Sprintf("%s%s", strings.Join(parts, "."), alias)
 	}
 	return fmt.Sprintf("%s%s", dialect.QuoteIdentifier(strings.TrimSpace(c)), alias)
+}
+
+func rawAliasIndex(dialect cdt.SQLDialect, column string) []int {
+	asPattern := regexp.MustCompile(`(?i)\s+` + regexp.QuoteMeta(dialect.Operator("AS")) + `\s+`)
+	return asPattern.FindStringIndex(column)
 }
 
 // insert builds an INSERT query for the given table and data.
@@ -355,7 +386,7 @@ func update(
 	joins []cdt.Join,
 	cond cdt.Condition,
 	opts *options.QueryOptions,
-	joinFn func(table string, join *cdt.Join) string,
+	joinFn func(table string, join *cdt.Join, paramBase int) (string, []any, error),
 ) (string, []any, error) {
 	// Extract and sort column names for deterministic ordering
 	columns := make([]string, 0, len(data))
@@ -379,7 +410,14 @@ func update(
 	var joinParts []string
 	if len(joins) > 0 {
 		for _, j := range joins {
-			joinParts = append(joinParts, joinFn(table, &j))
+			joinSQL, joinArgs, err := joinFn(table, &j, index)
+			if err != nil {
+				return "", nil, fmt.Errorf("builder.update: %w", err)
+			}
+			if len(joinArgs) > 0 {
+				return "", nil, fmt.Errorf("builder.update: joined mutation predicates with values are not supported")
+			}
+			joinParts = append(joinParts, joinSQL)
 		}
 	}
 
@@ -486,7 +524,7 @@ func delete(
 	joins []cdt.Join,
 	cond cdt.Condition,
 	opts *options.QueryOptions,
-	joinFn func(table string, join *cdt.Join) string,
+	joinFn func(table string, join *cdt.Join, paramBase int) (string, []any, error),
 ) (string, []any, error) {
 	// Check if SQLite is trying to use DELETE with JOINs
 	if len(joins) > 0 {
@@ -499,7 +537,14 @@ func delete(
 	var joinParts []string
 	if len(joins) > 0 {
 		for _, j := range joins {
-			joinParts = append(joinParts, joinFn(table, &j))
+			joinSQL, joinArgs, err := joinFn(table, &j, 1)
+			if err != nil {
+				return "", nil, fmt.Errorf("builder.delete: %w", err)
+			}
+			if len(joinArgs) > 0 {
+				return "", nil, fmt.Errorf("builder.delete: joined mutation predicates with values are not supported")
+			}
+			joinParts = append(joinParts, joinSQL)
 		}
 	}
 

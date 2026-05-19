@@ -10,6 +10,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"tounilab.com/fabric/internal/pkg/builder"
+	"tounilab.com/fabric/internal/pkg/helpers"
 	"tounilab.com/fabric/internal/pkg/sqldialect"
 	cdt "tounilab.com/fabric/pkg/query/condition"
 	"tounilab.com/fabric/pkg/query/options"
@@ -33,6 +34,56 @@ func convertQuotedExpected(base, left, right string) string {
 		}
 	}
 	return b.String()
+}
+
+func TestRawProjectionSanitizeColumn(t *testing.T) {
+	dialect := sqldialect.PostgresDialect{}
+	got := builder.ExportSanitizeColumn(dialect, helpers.RawProjection("ip_address::text AS ip_address"))
+	assert.Equal(t, `ip_address::text AS "ip_address"`, got)
+}
+
+func TestSelectRawProjectionJoinOnAndPagination(t *testing.T) {
+	b := builder.NewPostgresQueryBuilder(sqldialect.PostgresDialect{})
+	limit := 10
+	offset := 20
+	query, args, err := b.Select(
+		"employees",
+		[]string{
+			"id",
+			"name AS employee_name",
+			helpers.RawProjection("ip_address::text AS ip_address"),
+		},
+		[]cdt.Join{{
+			Type:       "LEFT",
+			Table:      "team_users",
+			Alias:      "tu",
+			Conditions: cdt.JoinCdts{{Left: "id", Right: "employee_id"}},
+			On:         cdt.IsNull("tu.deleted_at"),
+		}},
+		&options.QueryOptions{
+			OrderBy: []options.OrderBy{{Column: "employees.id", Direction: "ASC"}},
+			Limit:   &limit,
+			Offset:  &offset,
+		},
+		cdt.NewExpr().Column("employees.active").Op("=").Value(true),
+	)
+
+	require.NoError(t, err)
+	assert.Equal(t, `SELECT "id", "name" AS "employee_name", ip_address::text AS "ip_address" FROM "employees" LEFT JOIN "team_users" AS "tu" ON "employees"."id" = "tu"."employee_id" AND "tu"."deleted_at" IS NULL WHERE "employees"."active" = $1 ORDER BY "employees"."id" ASC LIMIT $2 OFFSET $3;`, query)
+	assert.Equal(t, []any{true, 10, 20}, args)
+}
+
+func TestJoinOnRejectsValuePredicates(t *testing.T) {
+	b := builder.NewMySQLQueryBuilder(sqldialect.MySQLDialect{})
+	_, _, err := b.Select(
+		"employees",
+		[]string{"id"},
+		[]cdt.Join{{Type: "LEFT", Table: "team_users", Alias: "tu", On: cdt.NewExpr().Column("tu.kind").Op("=").Value("owner")}},
+		nil,
+		nil,
+	)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "join ON condition values are not supported")
 }
 
 func TestSanitizeColumn(t *testing.T) {

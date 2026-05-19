@@ -62,10 +62,22 @@ type Join struct {
 	Table      string // Table to join
 	Alias      string // Optional alias
 	Conditions JoinCdts
+	On         Condition // Optional extra ON condition
 }
 
 // ToSQL converts this Join to a SQL JOIN clause for the specified table.
 func (j *Join) ToSQL(table string, dialect SQLDialect) string {
+	sql, _, err := j.ToSQLWithArgs(table, dialect, 1)
+	if err != nil {
+		return fmt.Sprintf("%s JOIN %s", dialect.Operator(j.Type), dialect.QuoteIdentifier(j.Table))
+	}
+	return sql
+}
+
+// ToSQLWithArgs converts this Join to a SQL JOIN clause and returns ON-clause
+// arguments. Join predicates with values are not supported by the current
+// builder contract and return a clear error.
+func (j *Join) ToSQLWithArgs(table string, dialect SQLDialect, paramBase int) (string, []any, error) {
 	jn := fmt.Sprintf("%s JOIN %s", dialect.Operator(j.Type), dialect.QuoteIdentifier(j.Table))
 
 	if j.Alias != "" {
@@ -76,7 +88,38 @@ func (j *Join) ToSQL(table string, dialect SQLDialect) string {
 	if j.Alias != "" {
 		joinTable = j.Alias
 	}
-	on := j.Conditions.on(table, joinTable, dialect)
 
-	return fmt.Sprintf("%s %s", jn, on)
+	if len(j.Conditions) > 0 {
+		on := j.Conditions.on(table, joinTable, dialect)
+		if j.On == nil {
+			return fmt.Sprintf("%s %s", jn, on), nil, nil
+		}
+	}
+
+	var parts []string
+	for _, cdt := range j.Conditions {
+		parts = append(parts, fmt.Sprintf(
+			"%s.%s = %s.%s",
+			dialect.QuoteIdentifier(table), dialect.QuoteIdentifier(cdt.Left),
+			dialect.QuoteIdentifier(joinTable), dialect.QuoteIdentifier(cdt.Right),
+		))
+	}
+	var args []any
+	if j.On != nil {
+		onSQL, onArgs, err := j.On.ToSQL(dialect, paramBase)
+		if err != nil {
+			return "", nil, fmt.Errorf("join ON condition: %w", err)
+		}
+		if len(onArgs) > 0 {
+			return "", nil, fmt.Errorf("join ON condition values are not supported")
+		}
+		parts = append(parts, onSQL)
+		args = onArgs
+	}
+
+	if len(parts) == 0 {
+		return "", nil, fmt.Errorf("join requires conditions or ON condition")
+	}
+
+	return fmt.Sprintf("%s ON %s", jn, strings.Join(parts, " AND ")), args, nil
 }
