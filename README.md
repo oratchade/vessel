@@ -950,6 +950,29 @@ query, args, err = fdb.Select("users", "department", "COUNT(*) AS total").
     HavingRaw("COUNT(*) FILTER (WHERE active = true) > 3").
     Query()
 
+// Count adapter for list endpoints
+countRows, err := fdb.Select("users").
+    Where(cdt.IsNull("deleted_at")).
+    CountRaw(ctx)
+
+// Trusted raw projection with a safely quoted alias
+rows, err := fdb.Select("audit_logs").
+    Column("id").
+    ColumnRawAs("ip_address::text", "ip_address").
+    Get(ctx)
+
+// Join alias plus an additional ON predicate
+rows, err = fdb.Select("employees").
+    ColumnAs("employees.name", "employee_name").
+    Join(cdt.Join{
+        Type:       "LEFT",
+        Table:      "team_users",
+        Alias:      "tu",
+        Conditions: cdt.JoinCdts{{Left: "id", Right: "employee_id"}},
+        On:         cdt.IsNull("tu.deleted_at"),
+    }).
+    Get(ctx)
+
 // Mutation query preview with PostgreSQL RETURNING / MSSQL OUTPUT
 query, args, err = fdb.Insert().
     Into("users").
@@ -963,6 +986,13 @@ fdb.Select("users", "id", "name").
     Limit(20).
     Offset((page-1)*20).
     Get()
+
+// Portable insert then fetch by application-generated key
+session, err := fdb.Insert().
+    Into("asset_sessions").
+    Set("id", sessionID).
+    Set("asset_id", assetID).
+    InsertAndFetch(ctx, "id", "id", "asset_id", "created_at")
 ```
 
 See [FluentDB Examples](./examples/fluentdb-example/README.md) for
@@ -984,6 +1014,9 @@ usage.
 | Mutation RETURNING/OUTPUT execution | explicit error | explicit error | explicit error | explicit error |
 | Safe parameterized HAVING        | ✅    | ✅         | ✅     | ✅    |
 | Raw HAVING escape hatch          | ✅    | ✅         | ✅     | ✅    |
+| Count row adapter                | ✅    | ✅         | ✅     | ✅    |
+| Portable case-insensitive LIKE   | ✅    | ✅         | ✅     | ✅    |
+| Raw projection helpers           | ✅    | ✅         | ✅     | ✅    |
 | Transactions                     | ✅    | ✅         | ✅     | ✅    |
 | Query introspection              | ✅    | ✅         | ✅     | ✅    |
 | EXPLAIN analysis                 | ✅    | ✅         | ✅     | ✅    |
@@ -1005,6 +1038,17 @@ Dialect notes:
   renders a raw SQL clause string. Table names, column names, raw expressions,
   and raw HAVING clauses must be trusted or allowlisted; values should use
   placeholders through conditions whenever possible.
+- Use `condition.In(column, values...)` for portable membership checks, including
+  expanded UUID slices. PostgreSQL `ANY` and array operators remain raw SQL.
+- Use `condition.ILike(column, pattern)` for portable case-insensitive search;
+  Fabric renders it as `LOWER(column) LIKE LOWER(?)` across built-in dialects.
+- `ColumnRaw` and `ColumnRawAs` are trusted projection escape hatches for casts,
+  functions, and dialect-specific expressions. Keep user values in conditions.
+- For portable "insert and return row" flows, prefer application-generated IDs
+  and `InsertAndFetch`; database-generated IDs remain dialect-specific.
+- Compute time cutoffs in application code, then pass the timestamp through a
+  predicate. PostgreSQL `DISTINCT ON`, `ANY`, and array-specific SQL should use
+  `QueryRaw`, a database view, or trusted raw helpers.
 - `WithTransaction` rolls back callback errors and callback panics. Panics are
   returned as non-nil errors with stack details rather than being swallowed.
 

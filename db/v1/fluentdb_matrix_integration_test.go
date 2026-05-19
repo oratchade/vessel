@@ -58,6 +58,43 @@ func TestFluentDBDialectMatrix(t *testing.T) {
 				Exec(ctx)
 			require.NoError(t, err)
 
+			countRows, err := fluent.Select(fluentMatrixUsersTable).
+				Where(cdt.In("status", "active", "inactive")).
+				CountRaw(ctx)
+			require.NoError(t, err)
+			require.True(t, countRows.Next())
+			var count int64
+			require.NoError(t, countRows.Scan(&count))
+			require.NoError(t, countRows.Close())
+			assert.Equal(t, int64(2), count)
+
+			fetched, err := fluent.Insert().
+				Into(fluentMatrixUsersTable).
+				Set("name", "Carol").
+				Set("email", "carol.matrix@example.com").
+				Set("age", 28).
+				Set("status", "active").
+				InsertAndFetch(ctx, "email", "email", "status")
+			require.NoError(t, err)
+			assert.Equal(t, "active", fetched["status"])
+
+			joinRows, err := fluent.Select(fluentMatrixUsersTable).
+				ColumnAs(fluentMatrixUsersTable+".name", "user_name").
+				ColumnRawAs("LOWER(fm2.email)", "joined_email").
+				Join(cdt.Join{
+					Type:       "LEFT",
+					Table:      fluentMatrixUsersTable,
+					Alias:      "fm2",
+					Conditions: cdt.JoinCdts{{Left: "status", Right: "status"}},
+					On:         cdt.IsNull("fm2.deleted_at"),
+				}).
+				Where(cdt.ILike(fluentMatrixUsersTable+".email", "%MATRIX@EXAMPLE.COM")).
+				OrderByAsc(fluentMatrixUsersTable + ".id").
+				Limit(1).
+				Get(ctx)
+			require.NoError(t, err)
+			assert.Len(t, joinRows, 1)
+
 			query, _, err := fluent.Select(fluentMatrixUsersTable, "status", "COUNT(*) AS total").
 				Where(cdt.NewExpr().Column("age").Op(">").Value(20)).
 				GroupBy("status").
@@ -222,7 +259,8 @@ func setupFluentMatrixSchema(t *testing.T, db v1.DB, driver string) {
 				name TEXT NOT NULL,
 				email TEXT UNIQUE NOT NULL,
 				age INTEGER,
-				status TEXT DEFAULT 'active'
+				status TEXT DEFAULT 'active',
+				deleted_at DATETIME NULL
 			)`,
 		},
 		"mysql": {
@@ -232,7 +270,8 @@ func setupFluentMatrixSchema(t *testing.T, db v1.DB, driver string) {
 				name VARCHAR(255) NOT NULL,
 				email VARCHAR(255) UNIQUE NOT NULL,
 				age INT,
-				status VARCHAR(50) DEFAULT 'active'
+				status VARCHAR(50) DEFAULT 'active',
+				deleted_at DATETIME NULL
 			)`,
 		},
 		"postgres": {
@@ -242,7 +281,8 @@ func setupFluentMatrixSchema(t *testing.T, db v1.DB, driver string) {
 				name VARCHAR(255) NOT NULL,
 				email VARCHAR(255) UNIQUE NOT NULL,
 				age INT,
-				status VARCHAR(50) DEFAULT 'active'
+				status VARCHAR(50) DEFAULT 'active',
+				deleted_at TIMESTAMP NULL
 			)`,
 		},
 		"sqlserver": {
@@ -252,7 +292,8 @@ func setupFluentMatrixSchema(t *testing.T, db v1.DB, driver string) {
 				name VARCHAR(255) NOT NULL,
 				email VARCHAR(255) UNIQUE NOT NULL,
 				age INT,
-				status VARCHAR(50) DEFAULT 'active'
+				status VARCHAR(50) DEFAULT 'active',
+				deleted_at DATETIME2 NULL
 			)`,
 		},
 	}
