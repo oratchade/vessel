@@ -15,7 +15,6 @@ MD007:
   start_indented: false
 
 MD009:
-  nbspaces: 0
   list_item_empty_lines: false
 
 MD010: true
