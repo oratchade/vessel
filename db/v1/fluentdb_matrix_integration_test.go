@@ -15,9 +15,9 @@ import (
 	_ "github.com/denisenkom/go-mssqldb"
 	_ "github.com/go-sql-driver/mysql"
 	_ "github.com/lib/pq"
-	_ "github.com/mattn/go-sqlite3"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	_ "modernc.org/sqlite"
 
 	v1 "tounilab.com/fabric/db/v1"
 	cdt "tounilab.com/fabric/pkg/query/condition"
@@ -141,7 +141,7 @@ func fluentMatrixDatabases() []fluentMatrixDB {
 	dbs := []fluentMatrixDB{
 		{
 			name:   "SQLite",
-			driver: "sqlite3",
+			driver: "sqlite",
 			cfg: v1.SQLiteConfig{
 				FilePath:     ":memory:",
 				CacheMode:    "shared",
@@ -209,7 +209,6 @@ func fluentMatrixDatabases() []fluentMatrixDB {
 	filtered := make([]fluentMatrixDB, 0, 1)
 	for _, db := range dbs {
 		if filter == db.driver ||
-			(filter == "sqlite" && db.driver == "sqlite3") ||
 			(filter == "postgresql" && db.driver == "postgres") ||
 			(filter == "mssql" && db.driver == "sqlserver") {
 			filtered = append(filtered, db)
@@ -252,7 +251,7 @@ func setupFluentMatrixSchema(t *testing.T, db v1.DB, driver string) {
 	t.Helper()
 
 	schema := map[string][]string{
-		"sqlite3": {
+		"sqlite": {
 			"DROP TABLE IF EXISTS " + fluentMatrixUsersTable,
 			`CREATE TABLE ` + fluentMatrixUsersTable + ` (
 				id INTEGER PRIMARY KEY AUTOINCREMENT,

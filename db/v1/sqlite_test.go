@@ -64,7 +64,7 @@ func TestSQLiteDSNGeneration(t *testing.T) {
 				ForeignKeys: true,
 			},
 			validate: func(t *testing.T, dsn string) {
-				assert.Contains(t, dsn, "_foreign_keys=true")
+				assert.Contains(t, dsn, "_pragma=foreign_keys%281%29")
 			},
 		},
 	}
@@ -148,8 +148,8 @@ func TestSQLiteForeignKeys(t *testing.T) {
 		enabled  bool
 		expected string
 	}{
-		{"enabled", true, "_foreign_keys=true"},
-		{"disabled", false, "_foreign_keys=false"},
+		{"enabled", true, "_pragma=foreign_keys%281%29"},
+		{"disabled", false, "_pragma=foreign_keys%281%29"},
 	}
 
 	for _, tc := range testCases {
@@ -159,7 +159,11 @@ func TestSQLiteForeignKeys(t *testing.T) {
 				ForeignKeys: tc.enabled,
 			}
 			dsn := cfg.DSN()
-			assert.Contains(t, dsn, tc.expected)
+			if tc.enabled {
+				assert.Contains(t, dsn, tc.expected)
+			} else {
+				assert.NotContains(t, dsn, tc.expected)
+			}
 		})
 	}
 }

@@ -106,7 +106,7 @@ func TestSQLiteConfigDSN(t *testing.T) {
 	assert.Contains(t, dsn, "file:/tmp/test.db")
 	assert.Contains(t, dsn, "cache=private")
 	assert.Contains(t, dsn, "mode=rwc")
-	assert.Contains(t, dsn, "_foreign_keys=true")
+	assert.Contains(t, dsn, "_pragma=foreign_keys%281%29")
 }
 
 // TestSQLiteConfigDSNMemory tests SQLite DSN generation for in-memory database

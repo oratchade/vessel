@@ -208,8 +208,7 @@ func TestGetMapper(t *testing.T) {
 		{"mysql", "mysql"},
 		{"postgres", "postgres"},
 		{"postgresql", "postgres"}, // alias for postgres
-		{"sqlite3", "sqlite"},
-		{"sqlite", "sqlite"}, // alias for sqlite3
+		{"sqlite", "sqlite"},
 		{"sqlserver", "mssql"},
 		{"mssql", "mssql"},   // alias for sqlserver
 		{"unknown", "mysql"}, // defaults to MySQL

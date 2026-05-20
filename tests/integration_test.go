@@ -17,7 +17,7 @@ import (
 	_ "github.com/denisenkom/go-mssqldb"
 	_ "github.com/go-sql-driver/mysql"
 	_ "github.com/lib/pq"
-	_ "github.com/mattn/go-sqlite3"
+	_ "modernc.org/sqlite"
 
 	v1 "tounilab.com/fabric/db/v1"
 	"tounilab.com/fabric/pkg/query/condition"
@@ -72,7 +72,7 @@ type User struct {
 var testDatabases = []TestDB{
 	{
 		name:   "SQLite",
-		driver: "sqlite3",
+		driver: "sqlite",
 		config: v1.SQLiteConfig{
 			FilePath:        ":memory:",
 			CacheMode:       "shared",
@@ -159,8 +159,8 @@ func getFilteredDatabases() []TestDB {
 	filtered := []TestDB{}
 	for _, db := range testDatabases {
 		switch dbType {
-		case "sqlite", "sqlite3":
-			if db.driver == "sqlite3" {
+		case "sqlite":
+			if db.driver == "sqlite" {
 				filtered = append(filtered, db)
 			}
 		case "mysql":

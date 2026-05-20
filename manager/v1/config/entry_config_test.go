@@ -134,7 +134,7 @@ func TestConfigEntryConfigReturnsCorrectType(t *testing.T) {
 				SQLite: &db.SQLiteConfig{FilePath: "/tmp/test.db"},
 			},
 			expectNil:  false,
-			expectType: "sqlite3",
+			expectType: "sqlite",
 		},
 		{
 			name: "returns MSSQL config",
