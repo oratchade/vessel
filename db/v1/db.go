@@ -83,7 +83,7 @@ func NewDB(cfg DBConfig, logger Logger) (DB, error) {
 		return mysqlCfgToDB(cfg, logger)
 	case definition.DriverPostgres, definition.DriverPostgresAlias:
 		return postgresCfgToDB(cfg, logger)
-	case definition.DriverSQLLite, definition.DriverSQLiteAlias:
+	case definition.DriverSQLLite:
 		return sqliteCfgToDB(cfg, logger)
 	case definition.DriverMSSQL, definition.DriverMSSQLAlias:
 		return mssqlCfgToDB(cfg, logger)

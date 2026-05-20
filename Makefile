@@ -69,7 +69,7 @@ else
 VALE_INSTALL = github.com/errata-ai/vale/v3/cmd/vale@$(VALE_VERSION)
 endif
 GOFLAGS ?= -tags=test
-CGO_ENABLED ?= 1
+CGO_ENABLED ?= 0
 TEST_FLAGS ?= -covermode=atomic -coverpkg=./... -coverprofile=$(COVER_FILE)
 
 tools:

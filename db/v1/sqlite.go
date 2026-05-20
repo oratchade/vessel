@@ -8,13 +8,13 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
+	"net/url"
 	"time"
 
-	// Import the SQLITE driver
-	_ "github.com/mattn/go-sqlite3"
 	"go.opentelemetry.io/otel/codes"
 	semconv "go.opentelemetry.io/otel/semconv/v1.37.0"
 	"go.opentelemetry.io/otel/trace"
+	_ "modernc.org/sqlite" // Register the pure-Go SQLite database/sql driver.
 
 	"tounilab.com/fabric/db/v1/dberror"
 	builder "tounilab.com/fabric/internal/pkg/builder"
@@ -53,13 +53,29 @@ func (cfg SQLiteConfig) Driver() string {
 // * file: the path to the SQLITE database file
 // * cache: the cache mode (e.g., shared, private)
 // * mode: the access mode (e.g., ro, rw, rwc, memory)
-// * _foreign_keys: whether to enable foreign key constraints
-// * _busy_timeout: the busy timeout duration in milliseconds
+// * _pragma=foreign_keys(1): enables foreign key constraints
+// * _pragma=busy_timeout(ms): sets the busy timeout duration in milliseconds
 func (cfg SQLiteConfig) DSN() string {
-	return fmt.Sprintf(
-		"file:%s?cache=%s&mode=%s&_foreign_keys=%t&_busy_timeout=%d",
-		cfg.FilePath, cfg.CacheMode, cfg.Mode, cfg.ForeignKeys, int(cfg.BusyTimeout.Milliseconds()),
-	)
+	values := url.Values{}
+	if cfg.CacheMode != "" {
+		values.Set("cache", cfg.CacheMode)
+	}
+	if cfg.Mode != "" {
+		values.Set("mode", cfg.Mode)
+	}
+	if cfg.ForeignKeys {
+		values.Add("_pragma", "foreign_keys(1)")
+	}
+	if cfg.BusyTimeout > 0 {
+		values.Add("_pragma", fmt.Sprintf("busy_timeout(%d)", int(cfg.BusyTimeout.Milliseconds())))
+	}
+
+	dsn := "file:" + cfg.FilePath
+	if encoded := values.Encode(); encoded != "" {
+		dsn += "?" + encoded
+	}
+
+	return dsn
 }
 
 // SQLITE is a DB implementation for SQLite using database/sql.
@@ -75,7 +91,7 @@ type SQLITE struct {
 func newSQLLite(cfg SQLiteConfig, logger Logger) (*SQLITE, error) {
 	dsn := cfg.DSN()
 
-	db, err := sql.Open("sqlite3", dsn)
+	db, err := sql.Open("sqlite", dsn)
 	if err != nil {
 		return nil, fmt.Errorf("failed to open SQLITE connection: %w", err)
 	}
