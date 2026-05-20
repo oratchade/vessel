@@ -270,7 +270,7 @@ not runtime. Performance is predictable and consistent.
 │  ──────────────────────────────────────────────────────────  │
 │  • MySQL:      github.com/go-sql-driver/mysql                │
 │  • PostgreSQL: github.com/jackc/pgx (with pgxpool)           │
-│  • SQLite:     github.com/mattn/go-sqlite3 (CGO)             │
+│  • SQLite:     modernc.org/sqlite (pure Go)                  │
 │  • MSSQL:      github.com/denisenkom/go-mssqldb              │
 │                                                              │
 │  Connection Pool (per driver):                               │
@@ -351,7 +351,7 @@ not runtime. Performance is predictable and consistent.
 │                                                                  │
 │ db.Query(sqlString, args...)                                     │
 │  └ database/sql.DB.Query(ctx, sqlString, 18, 10)                 │
-│      └ Vendor Driver (pgx, mysql, sqlite3, mssqldb)              │
+│      └ Vendor Driver (pgx, mysql, sqlite, mssqldb)               │
 │          └ Network/IPC to database server                        │
 │                                                                  │
 └──────────────────────────────────────┬───────────────────────────┘
@@ -1124,7 +1124,7 @@ db.SetConnMaxIdleTime(5 * time.Minute)      // Close idle after 5 min
 ```go
 // SQLite uses single connection (file-based concurrency)
 
-db, _ := sql.Open("sqlite3", "file:test.db?cache=shared&mode=rwc")
+db, _ := sql.Open("sqlite", "file:test.db?cache=shared&mode=rwc")
 
 // Set max open connections to 1 for single-writer concurrency
 db.SetMaxOpenConns(1)
@@ -2519,7 +2519,7 @@ existing renderer logic.
 | ------------------------- | ------- | ----------------- | --------------- |
 | **go-sql-driver/mysql**   | Latest  | MySQL driver      | MySQL support   |
 | **jackc/pgx**             | Latest  | PostgreSQL driver | PostgreSQL pool |
-| **mattn/go-sqlite3**      | Latest  | SQLite driver     | SQLite file-db  |
+| **modernc.org/sqlite**    | Latest  | SQLite driver     | SQLite file-db  |
 | **denisenkom/go-mssqldb** | Latest  | MSSQL driver      | MSSQL support   |
 
 ### Optional Dependencies

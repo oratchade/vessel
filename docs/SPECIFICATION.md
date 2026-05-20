@@ -528,7 +528,7 @@ distributed tracing.
 │  DRIVER LAYER (database/sql + vendors)         │
 │  • go-sql-driver/mysql                         │
 │  • jackc/pgx (with pgxpool)                    │
-│  • mattn/go-sqlite3                            │
+│  • modernc.org/sqlite                          │
 │  • denisenkom/go-mssqldb                       │
 └────────────────────────────────────────────────┘
 ```
@@ -908,7 +908,7 @@ db, _ := v1.NewDB(cfg, logger)
 ```
 
 **Test Database**: SQLite in-memory (no Docker)
-**Driver**: mattn/go-sqlite3
+**Driver**: modernc.org/sqlite
 
 ### MSSQL (SQL Server 2016+)
 

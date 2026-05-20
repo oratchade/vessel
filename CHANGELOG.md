@@ -151,7 +151,7 @@ Comprehensive documentation created:
 
 - `github.com/go-sql-driver/mysql` - MySQL driver
 - `github.com/jackc/pgx` - PostgreSQL driver
-- `github.com/mattn/go-sqlite3` - SQLite driver
+- `modernc.org/sqlite` - Pure-Go SQLite driver
 - `github.com/denisenkom/go-mssqldb` - MSSQL driver
 
 ### Logger Adapters (Optional)

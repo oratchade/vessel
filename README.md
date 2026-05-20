@@ -1087,6 +1087,9 @@ database, err := db.NewDB(db.PostgresConfig{
 
 ### SQLite
 
+SQLite uses the pure-Go `modernc.org/sqlite` driver. The SQLite driver name is
+`sqlite`.
+
 ```go
 database, err := db.NewDB(db.SQLiteConfig{
     FilePath: "/path/to/database.db",
