@@ -1,4 +1,4 @@
-// Package db provides a high-performance abstraction layer for MySQL 5.7+,
+// Package v1 provides a high-performance abstraction layer for MySQL 5.7+,
 // with support for parameterized queries, connection pooling via standard library,
 // and automatic identifier quoting using backticks (`). Optimized for InnoDB
 // with support for JSON columns, generated columns, COLLATE clauses, and XA transactions.
@@ -202,7 +202,8 @@ func (m *MySQL) Ping(ctx context.Context) error {
 }
 
 // Begin implements the DB interface method to start a new transaction.
-func (m *MySQL) Begin(ctx context.Context) (Tx, error) {
+func (m *MySQL) Begin(ctx context.Context, opts ...TransactionOptions) (Tx, error) {
+	txOpts := firstTransactionOptions(opts)
 	c, span := oh.UseTracer(ctx, "mysql.Begin",
 		trace.WithSpanKind(trace.SpanKindClient),
 		trace.WithAttributes(
@@ -218,7 +219,7 @@ func (m *MySQL) Begin(ctx context.Context) (Tx, error) {
 		m.safeLogger.QueryError(ctx, "mysql", "begin", "", 0, err)
 		return nil, err
 	}
-	t, err := sqlDB.BeginTx(c, nil)
+	t, err := sqlDB.BeginTx(c, &sql.TxOptions{Isolation: txOpts.Isolation, ReadOnly: txOpts.ReadOnly})
 	if err != nil {
 		err := fmt.Errorf("mysql.Begin: failed to begin transaction: %w", err)
 		span.RecordError(err)
@@ -247,8 +248,9 @@ func (m *MySQL) GetQuery(
 	opts *options.QueryOptions,
 ) (string, []any, error) {
 	o := dbOpts{
-		builder: m.queryBuilder,
-		querier: m.querier,
+		builder:     m.queryBuilder,
+		querier:     m.querier,
+		errorMapper: m.errorMapper,
 	}
 	return getQuery(table, columns, joins, conditions, opts, o)
 }
@@ -272,8 +274,9 @@ func (m *MySQL) Get(
 		))
 	defer span.End()
 	o := dbOpts{
-		builder: m.queryBuilder,
-		querier: m.querier,
+		builder:     m.queryBuilder,
+		querier:     m.querier,
+		errorMapper: m.errorMapper,
 	}
 	results, err := get(c, table, columns, joins, conditions, opts, o)
 	duration := time.Since(startTime)
@@ -309,8 +312,9 @@ func (m *MySQL) GetRaw(
 		))
 	defer span.End()
 	o := dbOpts{
-		builder: m.queryBuilder,
-		querier: m.querier,
+		builder:     m.queryBuilder,
+		querier:     m.querier,
+		errorMapper: m.errorMapper,
 	}
 	results, err := getRaw(c, table, columns, joins, conditions, opts, o)
 	duration := time.Since(startTime)
@@ -335,8 +339,9 @@ func (m *MySQL) GetByIDQuery(
 	opts *options.QueryOptions,
 ) (string, []any, error) {
 	o := dbOpts{
-		builder: m.queryBuilder,
-		querier: m.querier,
+		builder:     m.queryBuilder,
+		querier:     m.querier,
+		errorMapper: m.errorMapper,
 	}
 	return getByIDQuery(table, id, joins, opts, o)
 }
@@ -361,8 +366,9 @@ func (m *MySQL) GetByID(
 		))
 	defer span.End()
 	o := dbOpts{
-		builder: m.queryBuilder,
-		querier: m.querier,
+		builder:     m.queryBuilder,
+		querier:     m.querier,
+		errorMapper: m.errorMapper,
 	}
 	results, err := getByID(c, table, id, joins, opts, o)
 	duration := time.Since(startTime)
@@ -397,8 +403,9 @@ func (m *MySQL) GetByIDRaw(
 		))
 	defer span.End()
 	o := dbOpts{
-		builder: m.queryBuilder,
-		querier: m.querier,
+		builder:     m.queryBuilder,
+		querier:     m.querier,
+		errorMapper: m.errorMapper,
 	}
 	results, err := getByIDRaw(c, table, id, joins, opts, o)
 	duration := time.Since(startTime)
@@ -421,8 +428,9 @@ func (m *MySQL) InsertQuery(
 	opts *options.QueryOptions,
 ) (string, []any, error) {
 	o := dbOpts{
-		builder: m.queryBuilder,
-		querier: m.querier,
+		builder:     m.queryBuilder,
+		querier:     m.querier,
+		errorMapper: m.errorMapper,
 	}
 	return insertQuery(table, data, opts, o)
 }
@@ -446,8 +454,9 @@ func (m *MySQL) Insert(
 		))
 	defer span.End()
 	o := dbOpts{
-		builder: m.queryBuilder,
-		querier: m.querier,
+		builder:     m.queryBuilder,
+		querier:     m.querier,
+		errorMapper: m.errorMapper,
 	}
 	result, err := insert(c, table, data, opts, o)
 	duration := time.Since(startTime)
@@ -476,8 +485,9 @@ func (m *MySQL) InsertsQuery(
 	opts *options.QueryOptions,
 ) (string, []any, error) {
 	o := dbOpts{
-		builder: m.queryBuilder,
-		querier: m.querier,
+		builder:     m.queryBuilder,
+		querier:     m.querier,
+		errorMapper: m.errorMapper,
 	}
 	return insertsQuery(table, data, opts, o)
 }
@@ -501,8 +511,9 @@ func (m *MySQL) Inserts(
 		))
 	defer span.End()
 	o := dbOpts{
-		builder: m.queryBuilder,
-		querier: m.querier,
+		builder:     m.queryBuilder,
+		querier:     m.querier,
+		errorMapper: m.errorMapper,
 	}
 	result, err := inserts(c, table, data, opts, o)
 	duration := time.Since(startTime)
@@ -524,6 +535,62 @@ func (m *MySQL) Inserts(
 	return result, nil
 }
 
+// UpsertQuery builds the UPSERT query without executing it.
+func (m *MySQL) UpsertQuery(
+	table string,
+	data map[string]any,
+	upsertOpts *options.UpsertOptions,
+	opts *options.QueryOptions,
+) (string, []any, error) {
+	o := dbOpts{
+		builder:     m.queryBuilder,
+		querier:     m.querier,
+		errorMapper: m.errorMapper,
+	}
+	return upsertQuery(table, data, upsertOpts, opts, o)
+}
+
+// Upsert inserts one row or updates an existing row when a uniqueness conflict occurs.
+//
+//nolint:dupl
+func (m *MySQL) Upsert(
+	ctx context.Context,
+	table string,
+	data map[string]any,
+	upsertOpts *options.UpsertOptions,
+	opts *options.QueryOptions,
+) (*ExecResult, error) {
+	startTime := time.Now()
+	c, span := oh.UseTracer(ctx, "mysql.Upsert",
+		trace.WithSpanKind(trace.SpanKindClient),
+		trace.WithAttributes(
+			semconv.DBSystemNameMySQL,
+			semconv.DBOperationName("upsert"),
+			semconv.DBCollectionName(table),
+		))
+	defer span.End()
+	o := dbOpts{
+		builder:     m.queryBuilder,
+		querier:     m.querier,
+		errorMapper: m.errorMapper,
+	}
+	result, err := upsert(c, table, data, upsertOpts, opts, o)
+	duration := time.Since(startTime)
+	if err != nil {
+		span.RecordError(err)
+		span.SetStatus(codes.Error, err.Error())
+		m.safeLogger.QueryError(c, "mysql", "upsert", table, duration, err)
+		return result, err
+	}
+	span.SetStatus(codes.Ok, "upsert successful")
+	rowsReturned := 0
+	if result != nil {
+		rowsReturned = int(result.RowsAffected)
+	}
+	m.safeLogger.QuerySuccess(c, "mysql", "upsert", table, duration, rowsReturned)
+	return result, nil
+}
+
 // UpdateQuery builds the UPDATE query without executing it.
 func (m *MySQL) UpdateQuery(
 	table string,
@@ -533,8 +600,9 @@ func (m *MySQL) UpdateQuery(
 	opts *options.QueryOptions,
 ) (string, []any, error) {
 	o := dbOpts{
-		builder: m.queryBuilder,
-		querier: m.querier,
+		builder:     m.queryBuilder,
+		querier:     m.querier,
+		errorMapper: m.errorMapper,
 	}
 	return updateQuery(table, data, joins, conditions, opts, o)
 }
@@ -558,8 +626,9 @@ func (m *MySQL) Update(
 		))
 	defer span.End()
 	o := dbOpts{
-		builder: m.queryBuilder,
-		querier: m.querier,
+		builder:     m.queryBuilder,
+		querier:     m.querier,
+		errorMapper: m.errorMapper,
 	}
 	result, err := update(c, table, data, joins, conditions, opts, o)
 	duration := time.Since(startTime)
@@ -589,13 +658,16 @@ func (m *MySQL) DeleteQuery(
 	opts *options.QueryOptions,
 ) (string, []any, error) {
 	o := dbOpts{
-		builder: m.queryBuilder,
-		querier: m.querier,
+		builder:     m.queryBuilder,
+		querier:     m.querier,
+		errorMapper: m.errorMapper,
 	}
 	return deleteQuery(table, joins, conditions, opts, o)
 }
 
 // Delete implements the DBActions interface method to delete rows.
+//
+//nolint:dupl
 func (m *MySQL) Delete(
 	ctx context.Context,
 	table string,
@@ -613,8 +685,9 @@ func (m *MySQL) Delete(
 		))
 	defer span.End()
 	o := dbOpts{
-		builder: m.queryBuilder,
-		querier: m.querier,
+		builder:     m.queryBuilder,
+		querier:     m.querier,
+		errorMapper: m.errorMapper,
 	}
 	result, err := delete(c, table, joins, conditions, opts, o)
 	duration := time.Since(startTime)
@@ -797,7 +870,7 @@ func (m *MySQL) Explain(
 // WithTransaction implements the DB interface method to execute a function within a database transaction.
 //
 //nolint:dupl
-func (m *MySQL) WithTransaction(ctx context.Context, fn func(tx Tx) error) error {
+func (m *MySQL) WithTransaction(ctx context.Context, fn func(tx Tx) error, opts ...TransactionOptions) error {
 	c, span := oh.UseTracer(ctx, "mysql.WithTransaction",
 		trace.WithSpanKind(trace.SpanKindClient),
 		trace.WithAttributes(
@@ -805,7 +878,7 @@ func (m *MySQL) WithTransaction(ctx context.Context, fn func(tx Tx) error) error
 			semconv.DBOperationName("transaction"),
 		))
 	defer span.End()
-	tx, err := m.Begin(c)
+	tx, err := m.Begin(c, opts...)
 	if err != nil {
 		err := fmt.Errorf("mysql.WithTransaction: failed to begin transaction: %w", err)
 		span.RecordError(err)
@@ -907,4 +980,19 @@ func (m *MySQL) Rollback(ctx context.Context) error {
 	span.SetStatus(codes.Ok, "transaction rolled back")
 	m.safeLogger.TransactionSuccess(ctx, "mysql", "rollback")
 	return nil
+}
+
+// Savepoint creates a transaction savepoint.
+func (m *MySQL) Savepoint(ctx context.Context, name string) error {
+	return savepoint(ctx, m, name, false)
+}
+
+// RollbackToSavepoint rolls the transaction back to a savepoint.
+func (m *MySQL) RollbackToSavepoint(ctx context.Context, name string) error {
+	return rollbackToSavepoint(ctx, m, name, false)
+}
+
+// ReleaseSavepoint releases a transaction savepoint.
+func (m *MySQL) ReleaseSavepoint(ctx context.Context, name string) error {
+	return releaseSavepoint(ctx, m, name, false)
 }

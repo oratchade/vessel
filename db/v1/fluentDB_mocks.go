@@ -11,6 +11,7 @@ import (
 type MockDBActions struct {
 	*Mockreader
 	*Mockwriter
+	*MockUpserter
 	*Mockintrospector
 }
 
@@ -20,6 +21,7 @@ func NewMockDBActions(ctrl *gomock.Controller) *MockDBActions {
 	m := &MockDBActions{
 		Mockreader:       NewMockreader(ctrl),
 		Mockwriter:       NewMockwriter(ctrl),
+		MockUpserter:     NewMockUpserter(ctrl),
 		Mockintrospector: NewMockintrospector(ctrl),
 	}
 	return m
@@ -30,6 +32,7 @@ func NewMockDBActions(ctrl *gomock.Controller) *MockDBActions {
 type CompositeRecorder struct {
 	readerRecorder       *MockreaderMockRecorder
 	writerRecorder       *MockwriterMockRecorder
+	upserterRecorder     *MockUpserterMockRecorder
 	introspectorRecorder *MockintrospectorMockRecorder
 }
 
@@ -38,11 +41,12 @@ func (m *MockDBActions) EXPECT() *CompositeRecorder {
 	return &CompositeRecorder{
 		readerRecorder:       m.Mockreader.EXPECT(),
 		writerRecorder:       m.Mockwriter.EXPECT(),
+		upserterRecorder:     m.MockUpserter.EXPECT(),
 		introspectorRecorder: m.Mockintrospector.EXPECT(),
 	}
 }
 
-// reader methods - delegate to reader recorder
+// Get methods - delegate to reader recorder
 func (c *CompositeRecorder) Get(ctx, table, columns, joins, conditions, opts any) *gomock.Call {
 	return c.readerRecorder.Get(ctx, table, columns, joins, conditions, opts)
 }
@@ -51,13 +55,21 @@ func (c *CompositeRecorder) GetRaw(ctx, table, columns, joins, conditions, opts 
 	return c.readerRecorder.GetRaw(ctx, table, columns, joins, conditions, opts)
 }
 
-// writer methods - delegate to writer recorder
+// Insert methods - delegate to writer recorder
 func (c *CompositeRecorder) Insert(ctx, table, data, opts any) *gomock.Call {
 	return c.writerRecorder.Insert(ctx, table, data, opts)
 }
 
 func (c *CompositeRecorder) Inserts(ctx, table, data, opts any) *gomock.Call {
 	return c.writerRecorder.Inserts(ctx, table, data, opts)
+}
+
+func (c *CompositeRecorder) Upsert(ctx, table, data, upsertOpts, opts any) *gomock.Call {
+	return c.upserterRecorder.Upsert(ctx, table, data, upsertOpts, opts)
+}
+
+func (c *CompositeRecorder) UpsertQuery(table, data, upsertOpts, opts any) *gomock.Call {
+	return c.upserterRecorder.UpsertQuery(table, data, upsertOpts, opts)
 }
 
 func (c *CompositeRecorder) Update(ctx, table, data, joins, conditions, opts any) *gomock.Call {
@@ -72,7 +84,7 @@ func (c *CompositeRecorder) Exec(ctx, query any, args ...any) *gomock.Call {
 	return c.writerRecorder.Exec(ctx, query, args...)
 }
 
-// introspector methods - delegate to introspector recorder
+// GetQuery methods - delegate to introspector recorder
 func (c *CompositeRecorder) GetQuery(table, columns, joins, conditions, opts any) *gomock.Call {
 	return c.introspectorRecorder.GetQuery(table, columns, joins, conditions, opts)
 }

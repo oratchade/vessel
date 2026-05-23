@@ -1,4 +1,4 @@
-// Package db provides a lightweight abstraction layer for SQLite 3.x,
+// Package v1 provides a lightweight abstraction layer for SQLite 3.x,
 // optimized for embedded and serverless use cases. Supports in-memory databases,
 // file-backed persistence, automatic identifier quoting with no special characters,
 // and seamless foreign key enforcement. Ideal for local development and edge deployment.
@@ -14,7 +14,9 @@ import (
 	"go.opentelemetry.io/otel/codes"
 	semconv "go.opentelemetry.io/otel/semconv/v1.37.0"
 	"go.opentelemetry.io/otel/trace"
-	_ "modernc.org/sqlite" // Register the pure-Go SQLite database/sql driver.
+
+	// Register the pure-Go SQLite driver under the "sqlite" driver name.
+	_ "modernc.org/sqlite"
 
 	"tounilab.com/fabric/db/v1/dberror"
 	builder "tounilab.com/fabric/internal/pkg/builder"
@@ -44,7 +46,7 @@ type SQLiteConfig struct {
 // Driver returns the driver name for SQLITE databases.
 
 func (cfg SQLiteConfig) Driver() string {
-	return definition.DriverSQLLite
+	return definition.DriverSQLite
 }
 
 // DSN returns the Data Source Name (DSN) for connecting to the SQLITE database.
@@ -87,8 +89,8 @@ type SQLITE struct {
 	errorMapper  dberror.ErrorMapper  // Error mapper for standardizing database errors
 }
 
-// newSQLLite initializes a new SQLITE connection using the provided config.
-func newSQLLite(cfg SQLiteConfig, logger Logger) (*SQLITE, error) {
+// newSQLite initializes a new SQLITE connection using the provided config.
+func newSQLite(cfg SQLiteConfig, logger Logger) (*SQLITE, error) {
 	dsn := cfg.DSN()
 
 	db, err := sql.Open("sqlite", dsn)
@@ -107,7 +109,7 @@ func newSQLLite(cfg SQLiteConfig, logger Logger) (*SQLITE, error) {
 	return &SQLITE{
 		querier:      db,
 		queryBuilder: builder.NewSQLiteQueryBuilder(sqldialect.SQLiteDialect{}),
-		errorMapper:  dberror.GetMapper(definition.DriverSQLLite),
+		errorMapper:  dberror.GetMapper(definition.DriverSQLite),
 		safeLogger:   NewSafeLogger(logger),
 	}, nil
 }
@@ -115,9 +117,9 @@ func newSQLLite(cfg SQLiteConfig, logger Logger) (*SQLITE, error) {
 func sqliteCfgToDB(cfg DBConfig, logger Logger) (*SQLITE, error) {
 	switch c := cfg.(type) {
 	case SQLiteConfig:
-		return newSQLLite(c, logger)
+		return newSQLite(c, logger)
 	case *SQLiteConfig:
-		return newSQLLite(*c, logger)
+		return newSQLite(*c, logger)
 	default:
 		return nil, fmt.Errorf("unsupported sqlite config type: %T", cfg)
 	}
@@ -179,7 +181,8 @@ func (m *SQLITE) Ping(ctx context.Context) error {
 }
 
 // Begin implements the DB interface method to start a new transaction.
-func (m *SQLITE) Begin(ctx context.Context) (Tx, error) {
+func (m *SQLITE) Begin(ctx context.Context, opts ...TransactionOptions) (Tx, error) {
+	txOpts := firstTransactionOptions(opts)
 	c, span := oh.UseTracer(ctx, "sqlite.Begin",
 		trace.WithSpanKind(trace.SpanKindClient),
 		trace.WithAttributes(
@@ -195,7 +198,7 @@ func (m *SQLITE) Begin(ctx context.Context) (Tx, error) {
 		m.safeLogger.QueryError(c, "sqlite", "begin", "", 0, err)
 		return nil, err
 	}
-	t, err := sqlDB.BeginTx(c, nil)
+	t, err := sqlDB.BeginTx(c, &sql.TxOptions{Isolation: txOpts.Isolation, ReadOnly: txOpts.ReadOnly})
 	if err != nil {
 		err := fmt.Errorf("sqlite.Begin: failed to begin transaction: %w", err)
 		span.RecordError(err)
@@ -224,8 +227,9 @@ func (m *SQLITE) GetQuery(
 	opts *options.QueryOptions,
 ) (string, []any, error) {
 	o := dbOpts{
-		builder: m.queryBuilder,
-		querier: m.querier,
+		builder:     m.queryBuilder,
+		querier:     m.querier,
+		errorMapper: m.errorMapper,
 	}
 	return getQuery(table, columns, joins, conditions, opts, o)
 }
@@ -248,8 +252,9 @@ func (m *SQLITE) Get(
 		))
 	defer span.End()
 	o := dbOpts{
-		builder: m.queryBuilder,
-		querier: m.querier,
+		builder:     m.queryBuilder,
+		querier:     m.querier,
+		errorMapper: m.errorMapper,
 	}
 	results, err := get(c, table, columns, joins, conditions, opts, o)
 	duration := time.Since(startTime)
@@ -284,8 +289,9 @@ func (m *SQLITE) GetRaw(
 		))
 	defer span.End()
 	o := dbOpts{
-		builder: m.queryBuilder,
-		querier: m.querier,
+		builder:     m.queryBuilder,
+		querier:     m.querier,
+		errorMapper: m.errorMapper,
 	}
 	results, err := getRaw(c, table, columns, joins, conditions, opts, o)
 	duration := time.Since(startTime)
@@ -310,8 +316,9 @@ func (m *SQLITE) GetByIDQuery(
 	opts *options.QueryOptions,
 ) (string, []any, error) {
 	o := dbOpts{
-		builder: m.queryBuilder,
-		querier: m.querier,
+		builder:     m.queryBuilder,
+		querier:     m.querier,
+		errorMapper: m.errorMapper,
 	}
 	return getByIDQuery(table, id, joins, opts, o)
 }
@@ -334,8 +341,9 @@ func (m *SQLITE) GetByID(
 		))
 	defer span.End()
 	o := dbOpts{
-		builder: m.queryBuilder,
-		querier: m.querier,
+		builder:     m.queryBuilder,
+		querier:     m.querier,
+		errorMapper: m.errorMapper,
 	}
 	results, err := getByID(c, table, id, joins, opts, o)
 	duration := time.Since(startTime)
@@ -369,8 +377,9 @@ func (m *SQLITE) GetByIDRaw(
 		))
 	defer span.End()
 	o := dbOpts{
-		builder: m.queryBuilder,
-		querier: m.querier,
+		builder:     m.queryBuilder,
+		querier:     m.querier,
+		errorMapper: m.errorMapper,
 	}
 	results, err := getByIDRaw(c, table, id, joins, opts, o)
 	duration := time.Since(startTime)
@@ -394,8 +403,9 @@ func (m *SQLITE) InsertQuery(
 	opts *options.QueryOptions,
 ) (string, []any, error) {
 	o := dbOpts{
-		builder: m.queryBuilder,
-		querier: m.querier,
+		builder:     m.queryBuilder,
+		querier:     m.querier,
+		errorMapper: m.errorMapper,
 	}
 	return insertQuery(table, data, opts, o)
 }
@@ -417,8 +427,9 @@ func (m *SQLITE) Insert(
 		))
 	defer span.End()
 	o := dbOpts{
-		builder: m.queryBuilder,
-		querier: m.querier,
+		builder:     m.queryBuilder,
+		querier:     m.querier,
+		errorMapper: m.errorMapper,
 	}
 	result, err := insert(c, table, data, opts, o)
 	duration := time.Since(startTime)
@@ -447,8 +458,9 @@ func (m *SQLITE) InsertsQuery(
 	opts *options.QueryOptions,
 ) (string, []any, error) {
 	o := dbOpts{
-		builder: m.queryBuilder,
-		querier: m.querier,
+		builder:     m.queryBuilder,
+		querier:     m.querier,
+		errorMapper: m.errorMapper,
 	}
 	return insertsQuery(table, data, opts, o)
 }
@@ -470,8 +482,9 @@ func (m *SQLITE) Inserts(
 		))
 	defer span.End()
 	o := dbOpts{
-		builder: m.queryBuilder,
-		querier: m.querier,
+		builder:     m.queryBuilder,
+		querier:     m.querier,
+		errorMapper: m.errorMapper,
 	}
 	result, err := inserts(c, table, data, opts, o)
 	duration := time.Since(startTime)
@@ -493,6 +506,62 @@ func (m *SQLITE) Inserts(
 	return result, nil
 }
 
+// UpsertQuery builds the UPSERT query without executing it.
+func (m *SQLITE) UpsertQuery(
+	table string,
+	data map[string]any,
+	upsertOpts *options.UpsertOptions,
+	opts *options.QueryOptions,
+) (string, []any, error) {
+	o := dbOpts{
+		builder:     m.queryBuilder,
+		querier:     m.querier,
+		errorMapper: m.errorMapper,
+	}
+	return upsertQuery(table, data, upsertOpts, opts, o)
+}
+
+// Upsert inserts one row or updates an existing row when a uniqueness conflict occurs.
+//
+//nolint:dupl
+func (m *SQLITE) Upsert(
+	ctx context.Context,
+	table string,
+	data map[string]any,
+	upsertOpts *options.UpsertOptions,
+	opts *options.QueryOptions,
+) (*ExecResult, error) {
+	startTime := time.Now()
+	c, span := oh.UseTracer(ctx, "sqlite.Upsert",
+		trace.WithSpanKind(trace.SpanKindClient),
+		trace.WithAttributes(
+			semconv.DBSystemNameSQLite,
+			semconv.DBOperationName("upsert"),
+			semconv.DBCollectionName(table),
+		))
+	defer span.End()
+	o := dbOpts{
+		builder:     m.queryBuilder,
+		querier:     m.querier,
+		errorMapper: m.errorMapper,
+	}
+	result, err := upsert(c, table, data, upsertOpts, opts, o)
+	duration := time.Since(startTime)
+	if err != nil {
+		span.RecordError(err)
+		span.SetStatus(codes.Error, err.Error())
+		m.safeLogger.QueryError(c, "sqlite", "upsert", table, duration, err)
+		return result, err
+	}
+	span.SetStatus(codes.Ok, "upsert successful")
+	rowsReturned := 0
+	if result != nil {
+		rowsReturned = int(result.RowsAffected)
+	}
+	m.safeLogger.QuerySuccess(c, "sqlite", "upsert", table, duration, rowsReturned)
+	return result, nil
+}
+
 // UpdateQuery builds the UPDATE query without executing it.
 func (m *SQLITE) UpdateQuery(
 	table string,
@@ -502,8 +571,9 @@ func (m *SQLITE) UpdateQuery(
 	opts *options.QueryOptions,
 ) (string, []any, error) {
 	o := dbOpts{
-		builder: m.queryBuilder,
-		querier: m.querier,
+		builder:     m.queryBuilder,
+		querier:     m.querier,
+		errorMapper: m.errorMapper,
 	}
 	return updateQuery(table, data, joins, conditions, opts, o)
 }
@@ -526,8 +596,9 @@ func (m *SQLITE) Update(
 		))
 	defer span.End()
 	o := dbOpts{
-		builder: m.queryBuilder,
-		querier: m.querier,
+		builder:     m.queryBuilder,
+		querier:     m.querier,
+		errorMapper: m.errorMapper,
 	}
 	result, err := update(c, table, data, joins, conditions, opts, o)
 	duration := time.Since(startTime)
@@ -557,12 +628,14 @@ func (m *SQLITE) DeleteQuery(
 	opts *options.QueryOptions,
 ) (string, []any, error) {
 	o := dbOpts{
-		builder: m.queryBuilder,
-		querier: m.querier,
+		builder:     m.queryBuilder,
+		querier:     m.querier,
+		errorMapper: m.errorMapper,
 	}
 	return deleteQuery(table, joins, conditions, opts, o)
 }
 
+//nolint:dupl
 func (m *SQLITE) Delete(
 	ctx context.Context,
 	table string,
@@ -580,8 +653,9 @@ func (m *SQLITE) Delete(
 		))
 	defer span.End()
 	o := dbOpts{
-		builder: m.queryBuilder,
-		querier: m.querier,
+		builder:     m.queryBuilder,
+		querier:     m.querier,
+		errorMapper: m.errorMapper,
 	}
 	result, err := delete(c, table, joins, conditions, opts, o)
 	duration := time.Since(startTime)
@@ -757,7 +831,7 @@ func (m *SQLITE) Explain(
 }
 
 //nolint:dupl
-func (m *SQLITE) WithTransaction(ctx context.Context, fn func(tx Tx) error) error {
+func (m *SQLITE) WithTransaction(ctx context.Context, fn func(tx Tx) error, opts ...TransactionOptions) error {
 	c, span := oh.UseTracer(ctx, "sqlite.WithTransaction",
 		trace.WithSpanKind(trace.SpanKindClient),
 		trace.WithAttributes(
@@ -765,7 +839,7 @@ func (m *SQLITE) WithTransaction(ctx context.Context, fn func(tx Tx) error) erro
 			semconv.DBOperationName("transaction"),
 		))
 	defer span.End()
-	tx, err := m.Begin(c)
+	tx, err := m.Begin(c, opts...)
 	if err != nil {
 		err := fmt.Errorf("sqlite.WithTransaction: failed to begin transaction: %w", err)
 		span.RecordError(err)
@@ -862,4 +936,19 @@ func (m *SQLITE) Rollback(ctx context.Context) error {
 	span.SetStatus(codes.Ok, "transaction rolled back")
 	m.safeLogger.TransactionSuccess(ctx, "sqlite", "rollback")
 	return nil
+}
+
+// Savepoint creates a transaction savepoint.
+func (m *SQLITE) Savepoint(ctx context.Context, name string) error {
+	return savepoint(ctx, m, name, false)
+}
+
+// RollbackToSavepoint rolls the transaction back to a savepoint.
+func (m *SQLITE) RollbackToSavepoint(ctx context.Context, name string) error {
+	return rollbackToSavepoint(ctx, m, name, false)
+}
+
+// ReleaseSavepoint releases a transaction savepoint.
+func (m *SQLITE) ReleaseSavepoint(ctx context.Context, name string) error {
+	return releaseSavepoint(ctx, m, name, false)
 }

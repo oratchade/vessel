@@ -27,8 +27,8 @@ const (
 	DriverPostgres DBType = "postgres"
 	// DriverPostgresAlias is an alias for PostgreSQL databases.
 	DriverPostgresAlias DBType = "postgresql"
-	// DriverSQLLite is the driver name for SQLITE databases.
-	DriverSQLLite DBType = "sqlite"
+	// DriverSQLite is the driver name for SQLITE databases.
+	DriverSQLite DBType = "sqlite"
 	// DriverMSSQL is the driver name for Microsoft SQL Server databases.
 	DriverMSSQL DBType = "sqlserver"
 	// DriverMSSQLAlias is an alias for Microsoft SQL Server databases.

@@ -63,6 +63,20 @@ func (m *MySQLQueryBuilder) Inserts(
 	return q, v, nil
 }
 
+// Upsert implements the QueryBuilder interface for MySQL.
+func (m *MySQLQueryBuilder) Upsert(
+	table string,
+	data map[string]any,
+	upsertOpts *options.UpsertOptions,
+	opts *options.QueryOptions,
+) (string, []any, error) {
+	q, v, err := upsert(m.dialect, table, data, upsertOpts, opts)
+	if err != nil {
+		return "", nil, fmt.Errorf("upsert mysqlSQL Builder: error building upsert query: %w", err)
+	}
+	return q, v, nil
+}
+
 // Update implements the QueryBuilder interface for MySQL.
 func (m *MySQLQueryBuilder) Update(
 	table string,

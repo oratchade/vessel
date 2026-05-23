@@ -62,6 +62,20 @@ func (s *SQLiteQueryBuilder) Inserts(
 	return q, v, nil
 }
 
+// Upsert implements the QueryBuilder interface for SQLite.
+func (s *SQLiteQueryBuilder) Upsert(
+	table string,
+	data map[string]any,
+	upsertOpts *options.UpsertOptions,
+	opts *options.QueryOptions,
+) (string, []any, error) {
+	q, v, err := upsert(s.dialect, table, data, upsertOpts, opts)
+	if err != nil {
+		return "", nil, fmt.Errorf("upsert sqliteSQL Builder: error building upsert query: %w", err)
+	}
+	return q, v, nil
+}
+
 // Update implements the QueryBuilder interface for SQLite.
 func (s *SQLiteQueryBuilder) Update(
 	table string,

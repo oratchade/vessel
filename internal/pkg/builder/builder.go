@@ -71,6 +71,14 @@ type QueryBuilder interface {
 	//   error: Error if query building fails.
 	Inserts(table string, data []map[string]any, opts *options.QueryOptions) (string, []any, error)
 
+	// Upsert builds a single-row INSERT with conflict handling.
+	Upsert(
+		table string,
+		data map[string]any,
+		upsertOpts *options.UpsertOptions,
+		opts *options.QueryOptions,
+	) (string, []any, error)
+
 	// Update builds an UPDATE query for the given table, data, joins, and conditions.
 	//
 	// Parameters:
@@ -301,6 +309,160 @@ func insert(
 	), values, nil
 }
 
+//nolint:cyclop
+func upsert(
+	dialect optionDialect,
+	table string,
+	data map[string]any,
+	upsertOpts *options.UpsertOptions,
+	opts *options.QueryOptions,
+) (string, []any, error) {
+	if upsertOpts == nil {
+		return "", nil, fmt.Errorf("builder.upsert: upsert options are required")
+	}
+	if upsertOpts.Action == "" {
+		return "", nil, fmt.Errorf("builder.upsert: upsert action is required")
+	}
+	if isMSSQLDialect(dialect) {
+		return "", nil, fmt.Errorf(
+			"builder.upsert: MSSQL upsert is not supported; use an explicit transaction or raw SQL",
+		)
+	}
+
+	baseSQL, values, err := insert(dialect, table, data, opts)
+	if err != nil {
+		return "", nil, fmt.Errorf("builder.upsert: %w", err)
+	}
+	baseSQL = strings.TrimSuffix(baseSQL, ";")
+
+	switch upsertOpts.Action {
+	case options.UpsertDoNothing:
+		conflict, err := conflictTarget(dialect, upsertOpts)
+		if err != nil {
+			return "", nil, err
+		}
+		if isMySQLDialect(dialect) {
+			noOpColumn := dialect.QuoteIdentifier(upsertOpts.ConflictColumns[0])
+			return baseSQL + " ON DUPLICATE KEY UPDATE " + noOpColumn + " = " + noOpColumn + ";", values, nil
+		}
+		return baseSQL + " ON CONFLICT " + conflict + " DO NOTHING;", values, nil
+	case options.UpsertDoUpdate:
+		fragment, extraValues, err := upsertUpdateFragment(dialect, data, upsertOpts, len(values)+1)
+		if err != nil {
+			return "", nil, err
+		}
+		values = append(values, extraValues...)
+		if isMySQLDialect(dialect) {
+			return baseSQL + " ON DUPLICATE KEY UPDATE " + fragment + ";", values, nil
+		}
+		conflict, err := conflictTarget(dialect, upsertOpts)
+		if err != nil {
+			return "", nil, err
+		}
+		return baseSQL + " ON CONFLICT " + conflict + " DO UPDATE SET " + fragment + ";", values, nil
+	default:
+		return "", nil, fmt.Errorf("builder.upsert: unsupported upsert action %q", upsertOpts.Action)
+	}
+}
+
+func conflictTarget(dialect optionDialect, upsertOpts *options.UpsertOptions) (string, error) {
+	if len(upsertOpts.ConflictColumns) == 0 {
+		return "", fmt.Errorf("builder.upsert: conflict columns are required")
+	}
+	quoted := make([]string, 0, len(upsertOpts.ConflictColumns))
+	for _, col := range upsertOpts.ConflictColumns {
+		if col == "" {
+			return "", fmt.Errorf("builder.upsert: conflict column cannot be empty")
+		}
+		quoted = append(quoted, dialect.QuoteIdentifier(col))
+	}
+	return "(" + strings.Join(quoted, ", ") + ")", nil
+}
+
+//nolint:cyclop
+func upsertUpdateFragment(
+	dialect optionDialect,
+	data map[string]any,
+	upsertOpts *options.UpsertOptions,
+	startIndex int,
+) (string, []any, error) {
+	columns, err := upsertUpdateColumns(data, upsertOpts)
+	if err != nil {
+		return "", nil, err
+	}
+	if len(upsertOpts.UpdateValues) > 0 {
+		filtered := columns[:0]
+		for _, col := range columns {
+			if _, ok := upsertOpts.UpdateValues[col]; ok {
+				continue
+			}
+			filtered = append(filtered, col)
+		}
+		columns = filtered
+	}
+	setParts := make([]string, 0, len(columns)+len(upsertOpts.UpdateValues))
+	values := make([]any, 0, len(upsertOpts.UpdateValues))
+	index := startIndex
+
+	for _, col := range columns {
+		quoted := dialect.QuoteIdentifier(col)
+		switch {
+		case isMySQLDialect(dialect):
+			setParts = append(setParts, fmt.Sprintf("%s = VALUES(%s)", quoted, quoted))
+		default:
+			setParts = append(setParts, fmt.Sprintf("%s = excluded.%s", quoted, quoted))
+		}
+	}
+
+	if len(upsertOpts.UpdateValues) > 0 {
+		valueColumns := make([]string, 0, len(upsertOpts.UpdateValues))
+		for col := range upsertOpts.UpdateValues {
+			valueColumns = append(valueColumns, col)
+		}
+		sort.Strings(valueColumns)
+		for _, col := range valueColumns {
+			setParts = append(setParts, fmt.Sprintf(
+				"%s = %s",
+				dialect.QuoteIdentifier(col),
+				dialect.Placeholder(index),
+			))
+			values = append(values, upsertOpts.UpdateValues[col])
+			index++
+		}
+	}
+
+	if len(setParts) == 0 {
+		return "", nil, fmt.Errorf("builder.upsert: no update columns provided")
+	}
+	return strings.Join(setParts, ", "), values, nil
+}
+
+func upsertUpdateColumns(data map[string]any, upsertOpts *options.UpsertOptions) ([]string, error) {
+	columns := append([]string(nil), upsertOpts.UpdateColumns...)
+	if len(columns) == 0 {
+		conflict := make(map[string]struct{}, len(upsertOpts.ConflictColumns))
+		for _, col := range upsertOpts.ConflictColumns {
+			conflict[col] = struct{}{}
+		}
+		for col := range data {
+			if _, ok := conflict[col]; ok {
+				continue
+			}
+			columns = append(columns, col)
+		}
+	}
+	sort.Strings(columns)
+	for _, col := range columns {
+		if col == "" {
+			return nil, fmt.Errorf("builder.upsert: update column cannot be empty")
+		}
+		if _, ok := data[col]; !ok {
+			return nil, fmt.Errorf("builder.upsert: update column %q is not present in insert data", col)
+		}
+	}
+	return columns, nil
+}
+
 // insert builds an INSERT query for the given table and multiple rows of data.
 func inserts(
 	dialect optionDialect,
@@ -489,13 +651,21 @@ func update(
 	if whereClause != "" {
 		b.WriteString(" WHERE ")
 		if len(joins) > 0 && (isPostgresDialect(dialect) || isSQLiteDialect(dialect)) {
-			b.WriteString(strings.Join(joinPredicates(dialect, table, joins), " AND "))
+			predicates, err := joinPredicates(dialect, table, joins)
+			if err != nil {
+				return "", nil, fmt.Errorf("builder.update: %w", err)
+			}
+			b.WriteString(strings.Join(predicates, " AND "))
 			b.WriteString(" AND ")
 		}
 		b.WriteString(whereClause)
 	} else if len(joins) > 0 && (isPostgresDialect(dialect) || isSQLiteDialect(dialect)) {
 		b.WriteString(" WHERE ")
-		b.WriteString(strings.Join(joinPredicates(dialect, table, joins), " AND "))
+		predicates, err := joinPredicates(dialect, table, joins)
+		if err != nil {
+			return "", nil, fmt.Errorf("builder.update: %w", err)
+		}
+		b.WriteString(strings.Join(predicates, " AND "))
 	}
 
 	if outputFragment != "" && !isMSSQLDialect(dialect) {
@@ -626,13 +796,21 @@ func delete(
 	if whereClause != "" {
 		b.WriteString(" WHERE ")
 		if len(joins) > 0 && isPostgresDialect(dialect) {
-			b.WriteString(strings.Join(joinPredicates(dialect, table, joins), " AND "))
+			predicates, err := joinPredicates(dialect, table, joins)
+			if err != nil {
+				return "", nil, fmt.Errorf("builder.delete: %w", err)
+			}
+			b.WriteString(strings.Join(predicates, " AND "))
 			b.WriteString(" AND ")
 		}
 		b.WriteString(whereClause)
 	} else if len(joins) > 0 && isPostgresDialect(dialect) {
 		b.WriteString(" WHERE ")
-		b.WriteString(strings.Join(joinPredicates(dialect, table, joins), " AND "))
+		predicates, err := joinPredicates(dialect, table, joins)
+		if err != nil {
+			return "", nil, fmt.Errorf("builder.delete: %w", err)
+		}
+		b.WriteString(strings.Join(predicates, " AND "))
 	}
 
 	if outputFragment != "" && !isMSSQLDialect(dialect) {
@@ -724,7 +902,7 @@ func joinTableRefs(dialect cdt.SQLDialect, joins []cdt.Join) []string {
 	return refs
 }
 
-func joinPredicates(dialect cdt.SQLDialect, table string, joins []cdt.Join) []string {
+func joinPredicates(dialect cdt.SQLDialect, table string, joins []cdt.Join) ([]string, error) {
 	predicates := make([]string, 0)
 	for _, join := range joins {
 		rightTable := join.Table
@@ -738,6 +916,19 @@ func joinPredicates(dialect cdt.SQLDialect, table string, joins []cdt.Join) []st
 				dialect.QuoteIdentifier(rightTable), dialect.QuoteIdentifier(cdt.Right),
 			))
 		}
+		if join.On != nil {
+			onSQL, onArgs, err := join.On.ToSQL(dialect, 1)
+			if err != nil {
+				return nil, fmt.Errorf("join ON condition: %w", err)
+			}
+			if len(onArgs) > 0 {
+				return nil, fmt.Errorf("join ON condition values are not supported")
+			}
+			predicates = append(predicates, onSQL)
+		}
 	}
-	return predicates
+	if len(predicates) == 0 {
+		return nil, fmt.Errorf("joined mutation requires conditions or ON condition")
+	}
+	return predicates, nil
 }

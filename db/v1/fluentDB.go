@@ -63,6 +63,7 @@ func ensureQueryOptions(opts **options.QueryOptions) {
 type dbActions interface {
 	reader
 	writer
+	upserter
 	introspector
 }
 
@@ -77,7 +78,7 @@ type FluentDB struct {
 //
 // Parameters:
 //
-//	db: The underlying database interface to execute queries (implements reader, writer, introspector).
+//	db: The underlying database interface to execute queries.
 //
 // Returns:
 //
@@ -92,6 +93,7 @@ type FluentDB struct {
 func NewFluentDB(db interface {
 	reader
 	writer
+	upserter
 	introspector
 },
 ) *FluentDB {
@@ -660,11 +662,12 @@ func countProjection(alias ...string) string {
 // It allows specification of the table and values to insert, either as
 // single or bulk operations.
 type InsertBuilder struct {
-	db    dbActions
-	table string
-	data  map[string]any
-	bulk  []map[string]any
-	opts  *options.QueryOptions
+	db         dbActions
+	table      string
+	data       map[string]any
+	bulk       []map[string]any
+	opts       *options.QueryOptions
+	upsertOpts *options.UpsertOptions
 }
 
 // WithTx specifies a transaction to execute this query within.
@@ -784,6 +787,49 @@ func (i *InsertBuilder) Returning(columns ...string) *InsertBuilder {
 	return i
 }
 
+// OnConflict configures the uniqueness target for a portable upsert.
+//
+// PostgreSQL and SQLite render ON CONFLICT with these columns. MySQL uses the
+// table's duplicate-key constraints but still accepts the columns so Fabric can
+// choose default update columns and no-op update behavior.
+func (i *InsertBuilder) OnConflict(columns ...string) *InsertBuilder {
+	if i.upsertOpts == nil {
+		i.upsertOpts = &options.UpsertOptions{}
+	}
+	i.upsertOpts.ConflictColumns = append([]string(nil), columns...)
+	return i
+}
+
+// DoNothing makes the upsert skip conflicting rows.
+func (i *InsertBuilder) DoNothing() *InsertBuilder {
+	if i.upsertOpts == nil {
+		i.upsertOpts = &options.UpsertOptions{}
+	}
+	i.upsertOpts.Action = options.UpsertDoNothing
+	return i
+}
+
+// DoUpdate makes the upsert copy inserted column values into the conflicting row.
+// If columns are omitted, all inserted columns except conflict columns are updated.
+func (i *InsertBuilder) DoUpdate(columns ...string) *InsertBuilder {
+	if i.upsertOpts == nil {
+		i.upsertOpts = &options.UpsertOptions{}
+	}
+	i.upsertOpts.Action = options.UpsertDoUpdate
+	i.upsertOpts.UpdateColumns = append([]string(nil), columns...)
+	return i
+}
+
+// DoUpdateSet makes the upsert set explicit values on conflict.
+func (i *InsertBuilder) DoUpdateSet(data map[string]any) *InsertBuilder {
+	if i.upsertOpts == nil {
+		i.upsertOpts = &options.UpsertOptions{}
+	}
+	i.upsertOpts.Action = options.UpsertDoUpdate
+	i.upsertOpts.UpdateValues = data
+	return i
+}
+
 // InsertQuery returns the generated single-row INSERT SQL and arguments without executing it.
 func (i *InsertBuilder) InsertQuery() (string, []any, error) {
 	if i.table == "" {
@@ -820,9 +866,36 @@ func (i *InsertBuilder) InsertsQuery() (string, []any, error) {
 	return query, args, nil
 }
 
+// UpsertQuery returns the generated UPSERT SQL and arguments without executing it.
+func (i *InsertBuilder) UpsertQuery() (string, []any, error) {
+	if i.table == "" {
+		return "", nil, fmt.Errorf("InsertBuilder.UpsertQuery: table not specified")
+	}
+	if len(i.bulk) > 0 {
+		return "", nil, fmt.Errorf("InsertBuilder.UpsertQuery: bulk upserts are not supported")
+	}
+	if len(i.data) == 0 {
+		return "", nil, fmt.Errorf("InsertBuilder.UpsertQuery: no data provided")
+	}
+	if i.upsertOpts == nil {
+		return "", nil, fmt.Errorf("InsertBuilder.UpsertQuery: upsert options not specified")
+	}
+	if err := validateQueryOptions(i.opts); err != nil {
+		return "", nil, fmt.Errorf("InsertBuilder.UpsertQuery: invalid query options: %w", err)
+	}
+	query, args, err := i.db.UpsertQuery(i.table, i.data, i.upsertOpts, i.opts)
+	if err != nil {
+		return "", nil, fmt.Errorf("InsertBuilder.UpsertQuery: failed to build query: %w", err)
+	}
+	return query, args, nil
+}
+
 // Query returns the generated INSERT SQL and arguments without executing it.
 // It uses bulk insert SQL when ValuesBulk was called, otherwise single insert SQL.
 func (i *InsertBuilder) Query() (string, []any, error) {
+	if i.upsertOpts != nil {
+		return i.UpsertQuery()
+	}
 	if len(i.bulk) > 0 {
 		return i.InsertsQuery()
 	}
@@ -850,6 +923,14 @@ func (i *InsertBuilder) Exec(ctx context.Context) (*ExecResult, error) {
 		return nil, fmt.Errorf("InsertBuilder.Exec: table not specified")
 	}
 
+	if i.upsertOpts != nil {
+		result, err := i.Upsert(ctx)
+		if err != nil {
+			return nil, fmt.Errorf("InsertBuilder.Exec: failed to upsert data: %w", err)
+		}
+		return result, nil
+	}
+
 	// Use bulk insert if data was provided via ValuesBulk
 	if len(i.bulk) > 0 {
 		result, err := i.db.Inserts(ctx, i.table, i.bulk, i.opts)
@@ -870,7 +951,32 @@ func (i *InsertBuilder) Exec(ctx context.Context) (*ExecResult, error) {
 	return result, nil
 }
 
+// Upsert executes the configured single-row upsert.
+func (i *InsertBuilder) Upsert(ctx context.Context) (*ExecResult, error) {
+	if i.table == "" {
+		return nil, fmt.Errorf("InsertBuilder.Upsert: table not specified")
+	}
+	if len(i.bulk) > 0 {
+		return nil, fmt.Errorf("InsertBuilder.Upsert: bulk upserts are not supported")
+	}
+	if len(i.data) == 0 {
+		return nil, fmt.Errorf("InsertBuilder.Upsert: no data provided")
+	}
+	if i.upsertOpts == nil {
+		return nil, fmt.Errorf("InsertBuilder.Upsert: upsert options not specified")
+	}
+	result, err := i.db.Upsert(ctx, i.table, i.data, i.upsertOpts, i.opts)
+	if err != nil {
+		return nil, fmt.Errorf("InsertBuilder.Upsert: failed to execute upsert: %w", err)
+	}
+	return result, nil
+}
+
 // InsertAndFetch inserts one row and fetches it by an application-provided key.
+//
+// The insert and follow-up select are separate statements unless this builder is
+// bound to a transaction with WithTx. For atomic create-and-fetch workflows,
+// call InsertAndFetch inside WithTransaction and pass that transaction via WithTx.
 func (i *InsertBuilder) InsertAndFetch(
 	ctx context.Context,
 	keyColumn string,
@@ -908,6 +1014,9 @@ func (i *InsertBuilder) validateInsertAndFetch(keyColumn string) (any, error) {
 	}
 	if len(i.data) == 0 {
 		return nil, fmt.Errorf("InsertBuilder.InsertAndFetch: no data provided")
+	}
+	if i.upsertOpts != nil {
+		return nil, fmt.Errorf("InsertBuilder.InsertAndFetch: upsert is not supported")
 	}
 	if i.opts != nil && len(i.opts.Returning) > 0 {
 		return nil, fmt.Errorf("InsertBuilder.InsertAndFetch: Returning is not supported; fetch by key instead")
