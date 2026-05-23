@@ -993,6 +993,40 @@ session, err := fdb.Insert().
     Set("id", sessionID).
     Set("asset_id", assetID).
     InsertAndFetch(ctx, "id", "id", "asset_id", "created_at")
+
+// Portable upsert. PostgreSQL/SQLite use ON CONFLICT, MySQL uses
+// ON DUPLICATE KEY UPDATE, and MSSQL returns an explicit unsupported error.
+result, err = fdb.Insert().
+    Into("users").
+    Set("id", userID).
+    Set("email", email).
+    Set("name", name).
+    OnConflict("id").
+    DoUpdate("email", "name").
+    Upsert(ctx)
+
+// Typed scanning
+type User struct {
+    ID    string `db:"id"`
+    Email string `db:"email"`
+}
+
+rows, err := fdb.Select("users", "id", "email").GetRaw(ctx)
+if err != nil {
+    return err
+}
+users, err := db.ScanAll[User](ctx, rows)
+
+// Transaction options and savepoints
+err = database.WithTransaction(ctx, func(tx db.Tx) error {
+    if err := tx.Savepoint(ctx, "before_optional_step"); err != nil {
+        return err
+    }
+    // ...
+    return tx.ReleaseSavepoint(ctx, "before_optional_step")
+}, db.TransactionOptions{
+    ReadOnly: false,
+})
 ```
 
 See [FluentDB Examples](./examples/fluentdb-example/README.md) for
@@ -1015,7 +1049,11 @@ usage.
 | Safe parameterized HAVING        | ✅    | ✅         | ✅     | ✅    |
 | Raw HAVING escape hatch          | ✅    | ✅         | ✅     | ✅    |
 | Count row adapter                | ✅    | ✅         | ✅     | ✅    |
+| Upsert                           | ✅    | ✅         | ✅     | explicit error |
 | Portable case-insensitive LIKE   | ✅    | ✅         | ✅     | ✅    |
+| Typed scanning                   | ✅    | ✅         | ✅     | ✅    |
+| Transaction options              | ✅    | ✅         | ✅     | ✅    |
+| Transaction savepoints           | ✅    | ✅         | ✅     | partial |
 | Raw projection helpers           | ✅    | ✅         | ✅     | ✅    |
 | Transactions                     | ✅    | ✅         | ✅     | ✅    |
 | Query introspection              | ✅    | ✅         | ✅     | ✅    |
@@ -1046,6 +1084,16 @@ Dialect notes:
   functions, and dialect-specific expressions. Keep user values in conditions.
 - For portable "insert and return row" flows, prefer application-generated IDs
   and `InsertAndFetch`; database-generated IDs remain dialect-specific.
+- Use `OnConflict(...).DoUpdate(...)` or `DoNothing()` for portable upsert on
+  PostgreSQL, SQLite, and MySQL. MSSQL returns a clear unsupported error instead
+  of generating `MERGE`.
+- Use `ScanAll[T]` and `ScanOne[T]` over `RowsAdapter` for typed reads. They use
+  the same mapper as `ScanRowsTo[T]`.
+- Pass `TransactionOptions` to `Begin` or `WithTransaction` for explicit
+  transaction workflows. Use `tx.Savepoint`, `tx.RollbackToSavepoint`, and
+  `tx.ReleaseSavepoint` inside an active transaction. MSSQL supports
+  savepoint creation/rollback through `SAVE TRANSACTION`; savepoint release is
+  not supported by SQL Server.
 - Compute time cutoffs in application code, then pass the timestamp through a
   predicate. PostgreSQL `DISTINCT ON`, `ANY`, and array-specific SQL should use
   `QueryRaw`, a database view, or trusted raw helpers.
@@ -1053,6 +1101,8 @@ Dialect notes:
   returned as non-nil errors with stack details rather than being swallowed.
 
 All operators are documented in the [Architecture Guide](./docs/ARCHITECTURE.md).
+For a compact feature-by-dialect view, see
+[PORTABILITY_MATRIX.md](./docs/PORTABILITY_MATRIX.md).
 
 ## Database Configuration
 
@@ -1648,6 +1698,8 @@ MIT License - see [LICENSE.md](./LICENSE.md)
   standards and testing requirements
 - ⚠️ **[ERROR_HANDLING.md](./docs/ERROR_HANDLING.md)** - Error handling
   patterns and NULL type mapping
+- 🧭 **[PORTABILITY_MATRIX.md](./docs/PORTABILITY_MATRIX.md)** - Dialect
+  feature support, explicit unsupported paths, and raw SQL boundaries
 - 🔧 **[DB_MANAGER.md](./docs/DB_MANAGER.md)** - Multi-database
   management and load balancing
 - 📦 **[ENVIRONMENT_VARIABLES.md](./docs/ENVIRONMENT_VARIABLES.md)** -
