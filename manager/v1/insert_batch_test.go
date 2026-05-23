@@ -156,6 +156,25 @@ func (b *batchDB) InsertsQuery(string, []map[string]any, *options.QueryOptions) 
 	return "", nil, nil
 }
 
+func (b *batchDB) Upsert(
+	context.Context,
+	string,
+	map[string]any,
+	*options.UpsertOptions,
+	*options.QueryOptions,
+) (*db.ExecResult, error) {
+	return &db.ExecResult{RowsAffected: 1}, nil
+}
+
+func (b *batchDB) UpsertQuery(
+	string,
+	map[string]any,
+	*options.UpsertOptions,
+	*options.QueryOptions,
+) (string, []any, error) {
+	return "", nil, nil
+}
+
 func (b *batchDB) Update(
 	context.Context,
 	string,
@@ -195,11 +214,11 @@ func (b *batchDB) Explain(context.Context, string, ...any) (*db.RowsAdapter, err
 	return nil, nil
 }
 
-func (b *batchDB) Begin(context.Context) (db.Tx, error) {
+func (b *batchDB) Begin(context.Context, ...db.TransactionOptions) (db.Tx, error) {
 	return nil, nil
 }
 
-func (b *batchDB) WithTransaction(context.Context, func(db.Tx) error) error {
+func (b *batchDB) WithTransaction(context.Context, func(db.Tx) error, ...db.TransactionOptions) error {
 	return nil
 }
 
@@ -388,6 +407,37 @@ func TestWriteBatchingWorkerConcurrentInsertProducers(t *testing.T) {
 	}
 	_, insertsCalls, _ := fake.calls()
 	assert.GreaterOrEqual(t, insertsCalls, 1)
+}
+
+func TestWriteBatchingRoutesCompatibleInsertsToSameWorker(t *testing.T) {
+	counter, err := NewAtomicWrapCounter(8)
+	require.NoError(t, err)
+	de := &DBEntry{
+		writeBatchingEnabled: true,
+		writeWorkerIdx:       counter,
+		writeQueue:           make([]*dbEntryWorker, 8),
+	}
+	for i := range de.writeQueue {
+		de.writeQueue[i] = &dbEntryWorker{queue: make(chan *Query, 1)}
+	}
+
+	first := de.nextWriteWorkerIndex(insertQuery("users", map[string]any{"id": 1, "name": "Ada"}))
+	second := de.nextWriteWorkerIndex(insertQuery("users", map[string]any{"name": "Linus", "id": 2}))
+
+	assert.Equal(t, first, second)
+}
+
+func TestWriteBatchingDisabledUsesRoundRobinRouting(t *testing.T) {
+	counter, err := NewAtomicWrapCounter(8)
+	require.NoError(t, err)
+	de := &DBEntry{
+		writeBatchingEnabled: false,
+		writeWorkerIdx:       counter,
+		writeQueue:           make([]*dbEntryWorker, 8),
+	}
+
+	assert.Equal(t, int64(1), de.nextWriteWorkerIndex(insertQuery("users", map[string]any{"id": 1})))
+	assert.Equal(t, int64(2), de.nextWriteWorkerIndex(insertQuery("users", map[string]any{"id": 2})))
 }
 
 func newBatchTestEntry(
