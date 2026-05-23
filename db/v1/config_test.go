@@ -90,7 +90,7 @@ func TestPostgresConfigDSNMinimal(t *testing.T) {
 // TestSQLiteConfigDriver tests the Driver method for SQLite config
 func TestSQLiteConfigDriver(t *testing.T) {
 	cfg := v1.SQLiteConfig{}
-	assert.Equal(t, definition.DriverSQLLite, cfg.Driver())
+	assert.Equal(t, definition.DriverSQLite, cfg.Driver())
 }
 
 // TestSQLiteConfigDSN tests SQLite DSN generation
@@ -168,7 +168,7 @@ func TestDatabaseConfigs(t *testing.T) {
 		{
 			name: "SQLite config",
 			cfg:  v1.SQLiteConfig{},
-			want: definition.DriverSQLLite,
+			want: definition.DriverSQLite,
 		},
 		{
 			name: "MSSQL config",

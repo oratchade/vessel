@@ -101,6 +101,29 @@ func TestRunTransactionCommitFailureReturnsError(t *testing.T) {
 	assert.Contains(t, err.Error(), "failed to commit transaction")
 }
 
+func TestSavepointHelpers(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	ctx := context.Background()
+	tx := v1.NewMockTx(ctrl)
+
+	tx.EXPECT().Savepoint(ctx, "sp1").Return(nil)
+	tx.EXPECT().RollbackToSavepoint(ctx, "sp1").Return(nil)
+	tx.EXPECT().ReleaseSavepoint(ctx, "sp1").Return(nil)
+
+	require.NoError(t, tx.Savepoint(ctx, "sp1"))
+	require.NoError(t, tx.RollbackToSavepoint(ctx, "sp1"))
+	require.NoError(t, tx.ReleaseSavepoint(ctx, "sp1"))
+}
+
+func TestSavepointRejectsUnsafeName(t *testing.T) {
+	tx := &v1.SQLITE{}
+	err := tx.Savepoint(context.Background(), "sp1; DROP TABLE users")
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "savepoint name")
+}
+
 func TestSQLiteWithTransactionPanicRollsBackAndReturnsError(t *testing.T) {
 	ctx := context.Background()
 	database, err := v1.NewDB(&v1.SQLiteConfig{
@@ -127,4 +150,37 @@ func TestSQLiteWithTransactionPanicRollsBackAndReturnsError(t *testing.T) {
 	rows, err := database.Query(ctx, "SELECT name FROM users")
 	require.NoError(t, err)
 	assert.Empty(t, rows)
+}
+
+func TestSQLiteWithTransactionOptionAndSavepoint(t *testing.T) {
+	ctx := context.Background()
+	database, err := v1.NewDB(&v1.SQLiteConfig{
+		FilePath:     ":memory:",
+		CacheMode:    "shared",
+		Mode:         "memory",
+		MaxOpenConns: 1,
+		MaxIdleConns: 1,
+	}, NoOpLogger{})
+	require.NoError(t, err)
+	defer database.Close() //nolint:errcheck
+
+	_, err = database.Exec(ctx, "CREATE TABLE users (id INTEGER PRIMARY KEY, name TEXT)")
+	require.NoError(t, err)
+
+	err = database.WithTransaction(ctx, func(tx v1.Tx) error {
+		_, execErr := tx.Exec(ctx, "INSERT INTO users (name) VALUES (?)", "Ada")
+		require.NoError(t, execErr)
+		require.NoError(t, tx.Savepoint(ctx, "before_grace"))
+		_, execErr = tx.Exec(ctx, "INSERT INTO users (name) VALUES (?)", "Grace")
+		require.NoError(t, execErr)
+		require.NoError(t, tx.RollbackToSavepoint(ctx, "before_grace"))
+		require.NoError(t, tx.ReleaseSavepoint(ctx, "before_grace"))
+		return nil
+	}, v1.TransactionOptions{})
+	require.NoError(t, err)
+
+	rows, err := database.Query(ctx, "SELECT name FROM users ORDER BY name")
+	require.NoError(t, err)
+	require.Len(t, rows, 1)
+	assert.Equal(t, "Ada", rows[0]["name"])
 }

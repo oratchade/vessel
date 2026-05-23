@@ -86,6 +86,74 @@ func TestJoinOnRejectsValuePredicates(t *testing.T) {
 	assert.Contains(t, err.Error(), "join ON condition values are not supported")
 }
 
+func TestPostgresUpsertDoUpdate(t *testing.T) {
+	b := builder.NewPostgresQueryBuilder(sqldialect.PostgresDialect{})
+	query, args, err := b.Upsert(
+		"users",
+		map[string]any{"email": "a@example.com", "name": "Alice"},
+		&options.UpsertOptions{
+			ConflictColumns: []string{"email"},
+			Action:          options.UpsertDoUpdate,
+		},
+		nil,
+	)
+
+	require.NoError(t, err)
+	assert.Equal(t, `INSERT INTO "users" ("email", "name") VALUES ($1, $2) ON CONFLICT ("email") DO UPDATE SET "name" = excluded."name";`, query)
+	assert.Equal(t, []any{"a@example.com", "Alice"}, args)
+}
+
+func TestSQLiteUpsertDoNothing(t *testing.T) {
+	b := builder.NewSQLiteQueryBuilder(sqldialect.SQLiteDialect{})
+	query, args, err := b.Upsert(
+		"users",
+		map[string]any{"email": "a@example.com", "name": "Alice"},
+		&options.UpsertOptions{
+			ConflictColumns: []string{"email"},
+			Action:          options.UpsertDoNothing,
+		},
+		nil,
+	)
+
+	require.NoError(t, err)
+	assert.Equal(t, "INSERT INTO `users` (`email`, `name`) VALUES (?, ?) ON CONFLICT (`email`) DO NOTHING;", query)
+	assert.Equal(t, []any{"a@example.com", "Alice"}, args)
+}
+
+func TestMySQLUpsertDoUpdateWithExplicitValue(t *testing.T) {
+	b := builder.NewMySQLQueryBuilder(sqldialect.MySQLDialect{})
+	query, args, err := b.Upsert(
+		"users",
+		map[string]any{"email": "a@example.com", "name": "Alice"},
+		&options.UpsertOptions{
+			ConflictColumns: []string{"email"},
+			Action:          options.UpsertDoUpdate,
+			UpdateValues:    map[string]any{"name": "Updated"},
+		},
+		nil,
+	)
+
+	require.NoError(t, err)
+	assert.Equal(t, "INSERT INTO `users` (`email`, `name`) VALUES (?, ?) ON DUPLICATE KEY UPDATE `name` = ?;", query)
+	assert.Equal(t, []any{"a@example.com", "Alice", "Updated"}, args)
+}
+
+func TestMSSQLUpsertUnsupported(t *testing.T) {
+	b := builder.NewMSSQLQueryBuilder(sqldialect.MSSQLDialect{})
+	_, _, err := b.Upsert(
+		"users",
+		map[string]any{"email": "a@example.com"},
+		&options.UpsertOptions{
+			ConflictColumns: []string{"email"},
+			Action:          options.UpsertDoUpdate,
+		},
+		nil,
+	)
+
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "MSSQL upsert is not supported")
+}
+
 func TestSanitizeColumn(t *testing.T) {
 	dialect := sqldialect.PostgresDialect{}
 
@@ -585,6 +653,59 @@ func TestPostgresUpdateWithJoin(t *testing.T) {
 	assert.Len(t, args, 2)
 }
 
+func TestPostgresUpdateWithJoinOnCondition(t *testing.T) {
+	dialect := &sqldialect.PostgresDialect{}
+	qb := builder.NewPostgresQueryBuilder(dialect)
+
+	data := map[string]any{"status": "verified"}
+	joins := []cdt.Join{
+		{
+			Type:       "INNER",
+			Table:      "accounts",
+			Alias:      "a",
+			Conditions: cdt.JoinCdts{{Left: "id", Right: "user_id"}},
+			On:         cdt.IsNull("a.deleted_at"),
+		},
+	}
+	condition := cdt.NewExpr().Column("a.verified").Op("=").Value(true)
+
+	query, args, err := qb.Update("users", data, joins, condition, nil)
+
+	require.NoError(t, err)
+	assert.Equal(
+		t,
+		`UPDATE "users" SET "status" = $1 FROM "accounts" AS "a" WHERE "users"."id" = "a"."user_id" AND "a"."deleted_at" IS NULL AND "a"."verified" = $2;`,
+		query,
+	)
+	assert.Equal(t, []any{"verified", true}, args)
+}
+
+func TestPostgresUpdateWithJoinOnOnlyCondition(t *testing.T) {
+	dialect := &sqldialect.PostgresDialect{}
+	qb := builder.NewPostgresQueryBuilder(dialect)
+
+	data := map[string]any{"status": "archived"}
+	joins := []cdt.Join{
+		{
+			Type:  "INNER",
+			Table: "accounts",
+			Alias: "a",
+			On:    cdt.IsNull("a.deleted_at"),
+		},
+	}
+	condition := cdt.NewExpr().Column("users.account_id").Op("=").Value(10)
+
+	query, args, err := qb.Update("users", data, joins, condition, nil)
+
+	require.NoError(t, err)
+	assert.Equal(
+		t,
+		`UPDATE "users" SET "status" = $1 FROM "accounts" AS "a" WHERE "a"."deleted_at" IS NULL AND "users"."account_id" = $2;`,
+		query,
+	)
+	assert.Equal(t, []any{"archived", 10}, args)
+}
+
 // TestPostgresDeleteWithJoin tests PostgreSQL DELETE with JOIN using USING clause
 func TestPostgresDeleteWithJoin(t *testing.T) {
 	dialect := &sqldialect.PostgresDialect{}
@@ -610,6 +731,32 @@ func TestPostgresDeleteWithJoin(t *testing.T) {
 		query,
 	)
 	assert.Len(t, args, 1)
+}
+
+func TestPostgresDeleteWithJoinOnCondition(t *testing.T) {
+	dialect := &sqldialect.PostgresDialect{}
+	qb := builder.NewPostgresQueryBuilder(dialect)
+
+	joins := []cdt.Join{
+		{
+			Type:       "INNER",
+			Table:      "logs",
+			Alias:      "l",
+			Conditions: cdt.JoinCdts{{Left: "id", Right: "user_id"}},
+			On:         cdt.IsNull("l.deleted_at"),
+		},
+	}
+	condition := cdt.NewExpr().Column("l.action").Op("=").Value("delete_request")
+
+	query, args, err := qb.Delete("users", joins, condition, nil)
+
+	require.NoError(t, err)
+	assert.Equal(
+		t,
+		`DELETE FROM "users" USING "logs" AS "l" WHERE "users"."id" = "l"."user_id" AND "l"."deleted_at" IS NULL AND "l"."action" = $1;`,
+		query,
+	)
+	assert.Equal(t, []any{"delete_request"}, args)
 }
 
 // ==================== MSSQL JOIN Tests ====================
@@ -701,6 +848,33 @@ func TestSQLiteUpdateWithJoin(t *testing.T) {
 		query,
 	)
 	assert.Len(t, args, 2)
+}
+
+func TestSQLiteUpdateWithJoinOnCondition(t *testing.T) {
+	dialect := &sqldialect.SQLiteDialect{}
+	qb := builder.NewSQLiteQueryBuilder(dialect)
+
+	data := map[string]any{"active": 1}
+	joins := []cdt.Join{
+		{
+			Type:       "INNER",
+			Table:      "profiles",
+			Alias:      "p",
+			Conditions: cdt.JoinCdts{{Left: "id", Right: "user_id"}},
+			On:         cdt.IsNull("p.deleted_at"),
+		},
+	}
+	condition := cdt.NewExpr().Column("p.verified").Op("=").Value(1)
+
+	query, args, err := qb.Update("users", data, joins, condition, nil)
+
+	require.NoError(t, err)
+	assert.Equal(
+		t,
+		"UPDATE `users` SET `active` = ? FROM `profiles` AS `p` WHERE `users`.`id` = `p`.`user_id` AND `p`.`deleted_at` IS NULL AND `p`.`verified` = ?;",
+		query,
+	)
+	assert.Equal(t, []any{1, 1}, args)
 }
 
 // TestSQLiteDeleteWithJoinReturnsError tests SQLite DELETE with JOINs returns error

@@ -18,7 +18,7 @@ func TestSQLiteNewDB(t *testing.T) {
 	}
 
 	assert.NotNil(t, cfg)
-	assert.Equal(t, definition.DriverSQLLite, cfg.Driver())
+	assert.Equal(t, definition.DriverSQLite, cfg.Driver())
 }
 
 // TestSQLiteDSNGeneration tests SQLite DSN creation

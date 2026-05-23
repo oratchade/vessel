@@ -107,6 +107,45 @@ func TestScanRowsTo_BasicStruct(t *testing.T) {
 	assert.Equal(t, "Bob", users[1].Name)
 }
 
+func TestScanAllAndScanOne(t *testing.T) {
+	type User struct {
+		ID   int    `db:"id"`
+		Name string `db:"name"`
+	}
+
+	allRows := NewMockRows(
+		[]string{"id", "name"},
+		[][]any{{int64(1), "Alice"}, {int64(2), "Bob"}},
+	)
+	users, err := v1.ScanAll[User](context.Background(), v1.NewRowsAdapterWithMockRows(allRows))
+	require.NoError(t, err)
+	require.Len(t, users, 2)
+	assert.Equal(t, "Alice", users[0].Name)
+
+	oneRows := NewMockRows(
+		[]string{"id", "name"},
+		[][]any{{int64(3), "Cara"}},
+	)
+	user, err := v1.ScanOne[User](context.Background(), v1.NewRowsAdapterWithMockRows(oneRows))
+	require.NoError(t, err)
+	assert.Equal(t, 3, user.ID)
+	assert.Equal(t, "Cara", user.Name)
+}
+
+func TestScanOneRejectsWrongRowCount(t *testing.T) {
+	type User struct {
+		ID int `db:"id"`
+	}
+
+	_, err := v1.ScanOne[User](context.Background(), v1.NewRowsAdapterWithMockRows(NewMockRows([]string{"id"}, nil)))
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "no rows")
+
+	_, err = v1.ScanOne[User](context.Background(), v1.NewRowsAdapterWithMockRows(NewMockRows([]string{"id"}, [][]any{{int64(1)}, {int64(2)}})))
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "expected one row")
+}
+
 // TestScanRowsTo_WithNullFields tests scanning rows with nullable fields.
 func TestScanRowsTo_WithNullFields(t *testing.T) {
 	type Product struct {
