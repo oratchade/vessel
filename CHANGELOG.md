@@ -1,224 +1,146 @@
 # Changelog
 
-All notable changes to this project are documented in this file.
+All notable changes to Fabric are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
-and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
+and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
-
-## [1.0.0] - 2026-04-19
+## [1.0.0] - 2026-05-23
 
 ### Added
 
-- Multi-database support: MySQL 5.7+, PostgreSQL 9.6+, SQLite 3.x, MSSQL 2016+
-  with consistent API
-- Configuration with variable expansion and environment file loading
-- Fluent query DSL with SelectBuilder, InsertBuilder, UpdateBuilder, DeleteBuilder
-- Method chaining for ergonomic query construction
-- Type-safe SQL generation with parameterized queries
-- Identifier quoting per database dialect
-- SQL function support (SUM, COUNT, AVG, MAX, MIN, CONCAT, UPPER, LOWER)
-- Aliasing support (AS keyword)
-- Pluggable logger adapters: SlogAdapter, LogrusAdapter, ZapAdapter, ApexAdapter
-- CRUD operations (Get, Insert, Update, Delete, Query, Exec)
-- JOIN support (INNER, LEFT, RIGHT, FULL OUTER) in SELECT, UPDATE and DELETE queries
-- Subqueries and expressions
-- Aggregate functions with GROUP BY and HAVING clauses
-- ORDER BY with ASC/DESC direction control
-- DISTINCT support
-- LIMIT and OFFSET pagination
-- RETURNING clauses (PostgreSQL, SQLite)
-- Bulk inserts for all 4 databases
-- Query plan capabilities (EXPLAIN format)
-- Transaction support with atomicity guarantees, nested transaction awareness
-- Context propagation with timeouts and automatic rollback
-- OpenTelemetry tracing integration for distributed tracing
-- Plugin system with custom driver registration
-- Manager API for multi-database connection management
-- Database routing by entity type
-- Configuration loading from YAML/TOML/JSON
-- Health check support
-- Row scanning abstraction with universal Row interface
-- Type-safe field access and flexible scanning strategies
-- Resource pooling for RowsAdapter with sync.Pool (98-99% allocation reduction)
-- ManagedRowsAdapter for automatic cleanup with finalizer fallback
-- ScanRowsTo[T] generic for type-safe automatic resource management
-- 7 comprehensive resource management examples with benchmarks
-- 919 comprehensive tests with 100% pass rate
+- Core `db/v1.DB` interface for context-aware database access:
+  - `Get`, `GetRaw`, `GetByID`, `GetByIDRaw`
+  - `Insert`, `Inserts`, `Update`, `Delete`, `Exec`
+  - `Upsert`
+  - query preview methods
+  - `Begin`, `WithTransaction`, health checks, pool stats, and close support
+- Core `db/v1.Tx` interface for transaction-scoped operations:
+  - read, write, upsert, and query preview operations
+  - `Savepoint`, `RollbackToSavepoint`, and `ReleaseSavepoint`
+  - `Commit` and `Rollback`
+- Built-in database support:
+  - MySQL
+  - PostgreSQL
+  - SQLite through the pure-Go `modernc.org/sqlite` driver
+  - Microsoft SQL Server
+- Fluent query builders:
+  - `SelectBuilder`
+  - `InsertBuilder`
+  - `UpdateBuilder`
+  - `DeleteBuilder`
+- SQL preview for all fluent builders.
+- Parameterized condition DSL with:
+  - equality and comparison operators
+  - grouped `AND` / `OR` / `NOT`
+  - `IN` / `NOT IN`
+  - `IS NULL` / `IS NOT NULL`
+  - portable case-insensitive search through `ILike`
+  - `BETWEEN`
+- Projection helpers:
+  - `Column`
+  - `ColumnAs`
+  - `ColumnRaw`
+  - `ColumnRawAs`
+- Grouped select helpers:
+  - `GroupBy`
+  - parameterized `Having`
+  - trusted raw `HavingRaw`
+  - `Count`
+  - `CountRaw`
+  - `CountQuery`
+- Join support with aliases, equality predicates, and additional `JoinOn`
+  conditions.
+- Dialect-specific SQL generation for:
+  - joined `SELECT`
+  - joined `UPDATE`
+  - joined `DELETE`
+  - select pagination
+  - mutation `ORDER BY` / `LIMIT` where supported
+  - mutation returning/output query preview
+- Upsert support:
+  - MySQL `ON DUPLICATE KEY UPDATE`
+  - PostgreSQL `ON CONFLICT`
+  - SQLite `ON CONFLICT`
+  - explicit unsupported errors for MSSQL
+- Portable create-and-fetch helper through `InsertAndFetch`.
+- Typed row scanning:
+  - `ScanRowsTo`
+  - `ScanAll`
+  - `ScanOne`
+  - `db` and `json` tag mapping
+  - `sql.Null*` support
+  - custom scanner support
+- Streaming row access through `RowsAdapter`.
+- RowsAdapter pooling and managed adapter helpers.
+- Transaction options:
+  - isolation level
+  - read-only transactions
+  - variadic options on `Begin` and `WithTransaction`
+- Transaction panic handling:
+  - callback errors roll back
+  - callback panics roll back and return non-nil errors with stack details
+  - rollback and commit failures are surfaced
+- Transaction savepoints on `Tx`.
+- Driver error mapping to Fabric sentinel errors for duplicate key, foreign key,
+  syntax, timeout, connection, and cancellation scenarios.
+- Explicit mutation returning/output execution rejection to avoid silently
+  discarding returned rows.
+- OpenTelemetry tracing integration.
+- Logger adapters for standard and structured loggers.
+- Plugin registry for custom database drivers.
+- Plugin conformance helper for validating driver factories.
+- Manager package for operational database routing:
+  - lifecycle management
+  - read/write workers
+  - health checks
+  - priority selection
+  - async APIs
+  - opt-in insert batching
+  - batching-aware compatible insert routing
+- Retry package with fixed, exponential, linear, jitter, and random strategies.
+- Docker-backed integration test harness for MySQL, PostgreSQL, SQLite, and
+  MSSQL.
+- Documentation:
+  - README
+  - integration setup guide
+  - error handling guide
+  - manager guide
+  - resource pooling guide
+  - SQL null type guide
+  - portability matrix
+  - architecture and specification references
+- Benchmarks for query building and typed scanning entry points.
 
-### Changed
+### Dialect Notes
 
-- **Interface Encapsulation**: Made reader, writer, introspector,
-  transactional, healthCheck, and closer interfaces private (lowercase names)
-  as they are internal implementation details. Public API surfaces
-  (DB, Tx, FluentDB) remain unchanged, providing better encapsulation and
-  cleaner public API surface.
-- **FluentDB API Simplification**: Simplified `NewFluentDB`
-  constructor to accept a single composed interface combining reader,
-  writer, and introspector operations. This reduces parameter passing
-  complexity and improves API ergonomics.
-- Fluent API redesigned for ergonomics with clear separation of concerns
-- OrderBy implementation restructured to support ASC/DESC direction control
-- SQL function support enhanced with better AS aliases
-- Replaced `interface{}` with `any` throughout codebase
-- Changed from async-first to sync-first API design
-- Project restructured with `db/v1` package naming
-- Manager query routing improved for better performance
-- Synchronous API as default, matching Go's standard library patterns
-- Interface modernization using modern Go idioms
-- Gitignore updated with complete coverage of build artifacts
+- MySQL supports non-joined mutation `ORDER BY` / `LIMIT`.
+- PostgreSQL supports mutation `RETURNING` in query preview.
+- MSSQL supports mutation `OUTPUT` in query preview and requires `ORDER BY` for
+  offset/fetch pagination.
+- SQLite uses the driver name `sqlite` and the pure-Go `modernc.org/sqlite`
+  implementation.
+- Mutation returning/output execution is intentionally unsupported because
+  mutation execution returns `ExecResult`, not rows.
+- Raw SQL helpers are explicit caller-owned escape hatches. Values should stay
+  parameterized through conditions or raw query arguments.
 
-### Fixed
+### Security
 
-- Transaction ID uniqueness improved for high-concurrency scenarios
-- PostgreSQL support fixed: removed `lastInsertID` dependency, uses RETURNING clause
-- MSSQL integration tests fixed: improved connection pool timeout handling
-- PostgreSQL hanging connection tests resolved
-- Error handling improved with `ErrQueryTimeout` and comprehensive error wrapping
-- Linting infrastructure added with markdown linting and CI/CD integration
-- Condition identifiers are now quoted consistently in `Expr`, `In`, and `Between`
-  SQL generation
-- Dialect-specific joined `UPDATE` and `DELETE` SQL generation fixed for MySQL,
-  PostgreSQL, SQLite, and MSSQL
-- MSSQL `Limit` pagination now emits valid `ORDER BY ... OFFSET ... FETCH` SQL
-- `HAVING` clauses now render as raw SQL clauses instead of incorrectly quoting
-  the whole clause as one identifier
-- Unsupported dialect operators now return builder errors instead of malformed SQL
-- Mutation `RETURNING`/`OUTPUT` behavior clarified and guarded: query preview is
-  supported, while execution rejects returned-row options to avoid silently
-  discarding rows
-- Dialect identifier quoting now escapes quote delimiters for MySQL, SQLite, and
-  PostgreSQL while preserving MSSQL bracket escaping
-- Fluent builders now include explicit raw/query-preview helpers for grouped
-  selects and mutation `RETURNING`/`OUTPUT` previews
-- Transaction helpers now roll back callback panics and return a non-nil error
-  containing the panic details instead of swallowing the panic
-- SELECT joins with aliases now render join predicates against the alias, keeping
-  generated SQL valid when an alias is declared
-- Fluent SELECT builders now support `Query()`, `OrderByAsc`, `OrderByDesc`, and
-  parameterized `Having(condition)` alongside `HavingRaw`
-- Mutation `OrderBy`/`Limit` now either renders valid MySQL non-joined mutation
-  SQL or returns explicit unsupported-option errors for dialects/shapes that
-  cannot safely render it
-- Dialect capabilities now centralize support decisions for pagination,
-  returning/output, joined mutations, and mutation order/limit behavior
-- RowsAdapterPool now resets adapters before returning them to the pool after a
-  failed acquire
-- Retry backoff strategies now normalize invalid constructor inputs and protect
-  jitter state for concurrent `NextDelay` calls
+- Values are parameterized by default.
+- Identifiers are quoted per dialect.
+- Identifier quote delimiters are escaped.
+- Unsupported SQL operators and unsupported dialect options return explicit
+  errors.
+- Raw projections, raw HAVING clauses, raw queries, and raw exec statements must
+  use trusted or allowlisted SQL.
 
-## Documentation
+### Testing
 
-Comprehensive documentation created:
-
-- [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) - 5-layer architecture breakdown,
-  design patterns
-- [docs/CODE_REVIEW.md](docs/CODE_REVIEW.md) - Architecture review,
-  testing improvements, quality standards
-- [docs/ENVIRONMENT_VARIABLES.md](docs/ENVIRONMENT_VARIABLES.md) - Configuration
-  guide, test setup
-- [docs/ERROR_HANDLING.md](docs/ERROR_HANDLING.md) - Error types,
-  database error codes, NULL mapping
-- [docs/DB_MANAGER.md](docs/DB_MANAGER.md) - Multi-database management, load balancing
-- [docs/LINTING.md](docs/LINTING.md) - Code style standards, 40+ linters configuration
-- [README.md](README.md) - Quick start guide, feature overview, OpenTelemetry integration
-- [CONTRIBUTING.md](CONTRIBUTING.md) - Contribution guidelines, development setup
-- [Agents.md](Agents.md) - AI agent customization patterns
-
-## Testing & Quality Assurance
-
-- 919 comprehensive tests with 100% pass rate
-- Builder tests: 30+ new test functions for UpdateAll/DeleteAll operations
-- Dialect testing: MySQL, PostgreSQL, SQLite, MSSQL with operator coverage
-- Query options testing: OrderBy, Limit/Offset, GroupBy, HAVING, RETURNING
-- Complex conditions testing: nested AND/OR, wildcards, Unicode handling
-- Integration tests: 19+ tests across MySQL, PostgreSQL, SQLite with Docker containers
-- Retry integration examples with 4 comprehensive patterns and 27 test cases
-- Test coverage improved across all modules (55%+ → 80%+)
-- Full CI/CD integration with 100% pass rate maintained
-
-## Dependencies
-
-### Core Dependencies
-
-- `database/sql` - Standard library database interface
-- `github.com/mitchellh/go-wordwrap` - CLI text wrapping
-- `gopkg.in/yaml.v3` - YAML configuration parsing
-- `github.com/stretchr/testify` - Testing assertions
-
-### Database Drivers
-
-- `github.com/go-sql-driver/mysql` - MySQL driver
-- `github.com/jackc/pgx` - PostgreSQL driver
-- `github.com/mattn/go-sqlite3` - SQLite driver
-- `github.com/denisenkom/go-mssqldb` - MSSQL driver
-
-### Logger Adapters (Optional)
-
-- `log/slog` - Go stdlib logging
-- `github.com/sirupsen/logrus` - Structured logger
-- `go.uber.org/zap` - High-performance logger
-- `github.com/apex/log` - Minimal logging
-
-### Observability
-
-- `go.opentelemetry.io/otel` - OpenTelemetry tracing
-
-## Security
-
-- Parameterized queries throughout entire codebase (zero SQL injection vectors)
-- Identifier quoting per database dialect
-- No string concatenation in SQL generation
-- Type-safe value binding
-- No hardcoded secrets or credentials
-- Environment variable configuration
-- No known CVEs in dependencies
-- Regular updates from maintainers
-
-## Known Limitations
-
-1. **Default Row API Returns Maps** - `Get()` materializes all rows as `map[string]any`
-   (high GC pressure on massive datasets)
-   - Mitigation: Use `GetRaw() + ScanRowsTo[T]()` for zero-copy streaming
-     into typed structs
-
-1. **No ORM Features** - Fabric is query-focused, not entity-focused
-   - By design: Gives full SQL control; ORM can be built on top if needed
-
-1. **Manager API Maturity** - Less documented than core db/v1
-   - Roadmap: Dedicated tutorial and examples in v1.1
-
-1. **No Property-Based Testing** - Fuzzing not yet integrated
-   - Roadmap: Add fuzzing for SQL injection validation in v1.1
-
-## Roadmap
-
-### v1.1 (Planned)
-
-- Performance benchmarks
-- Manager API tutorial and examples
-- Property-based testing with fuzzing
-- Performance tuning guide
-
-### v1.2 (Future)
-
-- Query result caching layer
-- Connection pool auto-tuning
-- Metrics export (Prometheus)
-- Schema migration helpers
-
-## Credits
-
-**Fabric** is maintained by the **oratchade** team with contributions
-from the Go community.
-
-Contributors: Touni Atchadé (@oratchade), GitHub Copilot
-
-## License
-
-Fabric is licensed under the [MIT License](LICENSE.md).
-
----
-
-[1.0.0]: https://github.com/oratchade/fabric/releases/tag/v1.0.0
+- Unit tests cover builders, dialects, conditions, query options, fluent APIs,
+  transactions, row scanning, manager lifecycle, batching, retry behavior, and
+  plugin conformance.
+- Race test targets cover manager, DB, query, internal builder/dialect, and retry
+  packages.
+- Integration tests cover regular DB and FluentDB flows against SQLite and the
+  Docker-backed MySQL/PostgreSQL/MSSQL matrix.

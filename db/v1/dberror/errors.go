@@ -36,7 +36,8 @@ import (
 	mssql "github.com/denisenkom/go-mssqldb"
 	mysql "github.com/go-sql-driver/mysql"
 	"github.com/jackc/pgx/v5/pgconn"
-	sqlite3 "github.com/mattn/go-sqlite3"
+	sqlite "modernc.org/sqlite"
+	sqlitelib "modernc.org/sqlite/lib"
 )
 
 const (
@@ -196,25 +197,33 @@ func pgMapErrorOnString(err error) error {
 type SQLiteErrorMapper struct{}
 
 // MapError maps SQLite error codes to sentinel errors with [sqlite] prefix.
-// Typed detection via sqlite3.Error.ExtendedCode takes precedence over string matching.
+// Typed detection via modernc.org/sqlite.Error takes precedence over string matching.
 func (m SQLiteErrorMapper) MapError(err error) error {
 	if err == nil {
 		return nil
 	}
 
-	var sqliteErr sqlite3.Error
+	var sqliteErr *sqlite.Error
 	if errors.As(err, &sqliteErr) {
-		switch sqliteErr.ExtendedCode {
-		case sqlite3.ErrConstraintUnique, sqlite3.ErrConstraintPrimaryKey, sqlite3.ErrConstraintRowID:
+		switch sqliteErr.Code() {
+		case sqlitelib.SQLITE_CONSTRAINT_UNIQUE,
+			sqlitelib.SQLITE_CONSTRAINT_PRIMARYKEY,
+			sqlitelib.SQLITE_CONSTRAINT_ROWID:
 			return wrapError(SQLitePrefix, ErrDuplicateKey, err)
-		case sqlite3.ErrConstraintForeignKey:
+		case sqlitelib.SQLITE_CONSTRAINT_FOREIGNKEY:
 			return wrapError(SQLitePrefix, ErrForeignKeyViolation, err)
-		}
-		switch sqliteErr.Code {
-		case sqlite3.ErrCantOpen:
+		case sqlitelib.SQLITE_CANTOPEN,
+			sqlitelib.SQLITE_CANTOPEN_CONVPATH,
+			sqlitelib.SQLITE_CANTOPEN_DIRTYWAL,
+			sqlitelib.SQLITE_CANTOPEN_FULLPATH,
+			sqlitelib.SQLITE_CANTOPEN_ISDIR,
+			sqlitelib.SQLITE_CANTOPEN_NOTEMPDIR,
+			sqlitelib.SQLITE_CANTOPEN_SYMLINK:
 			return wrapError(SQLitePrefix, ErrConnectionFailed, err)
-		case sqlite3.ErrError:
+		case sqlitelib.SQLITE_ERROR:
 			return wrapError(SQLitePrefix, ErrSyntaxError, err)
+		case sqlitelib.SQLITE_BUSY, sqlitelib.SQLITE_LOCKED:
+			return wrapError(SQLitePrefix, ErrQueryTimeout, err)
 		}
 	}
 
@@ -244,7 +253,7 @@ func sqliteMapErrorOnString(err error) error {
 		return wrapError(SQLitePrefix, ErrSyntaxError, err)
 	}
 
-	// Query timeout (context-level, not a sqlite3.Error)
+	// Query timeout (context-level, not a SQLite driver error)
 	if strings.Contains(errMsg, "deadline exceeded") || strings.Contains(errMsg, "query timeout") {
 		return wrapError(SQLitePrefix, ErrQueryTimeout, err)
 	}
@@ -388,13 +397,13 @@ func checkMSSQLTimeout(errMsg string) bool {
 
 // GetMapper returns the appropriate error mapper for the given dialect name.
 // The dialect should be one of the driver constants from pkg/query/definition.
-// Supports both primary names and aliases:
-// - postgres/postgresql, sqlite3/sqlite, sqlserver/mssql.
+// Supports primary names and documented aliases:
+// - postgres/postgresql, sqlite, sqlserver/mssql.
 func GetMapper(dialect string) ErrorMapper {
 	switch strings.ToLower(dialect) {
 	case "postgres", "postgresql":
 		return PostgresErrorMapper{}
-	case "sqlite3", "sqlite":
+	case "sqlite":
 		return SQLiteErrorMapper{}
 	case "sqlserver", "mssql":
 		return MSSQLErrorMapper{}

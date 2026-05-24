@@ -280,21 +280,21 @@ import (
 )
 
 // Check if value is in set
-expr := cdt.NewExpr().Column("status").Op("IN").Value("active", "pending", "review")
+expr := cdt.In("status", "active", "pending", "review")
 // Generated SQL: WHERE status IN (?, ?, ?)
 
 // With numeric values
-expr := cdt.NewExpr().Column("user_id").Op("IN").Value(1, 2, 3, 4, 5)
+expr := cdt.In("user_id", 1, 2, 3, 4, 5)
 
 // With single value (works but typically use = instead)
-expr := cdt.NewExpr().Column("role").Op("IN").Value("admin")
+expr := cdt.In("role", "admin")
 ```
 
 ### NOT IN Operator
 
 ```go
 // Negated set membership
-expr := cdt.NewExpr().Column("status").Op("NOT IN").Value("deleted", "banned", "suspended")
+expr := cdt.NotIn("status", "deleted", "banned", "suspended")
 // Generated SQL: WHERE status NOT IN (?, ?, ?)
 ```
 
@@ -317,7 +317,7 @@ import (
 )
 
 // Check if value is NULL (no parameter needed)
-expr := cdt.NewExpr().Column("deleted_at").Op("IS NULL")
+expr := cdt.IsNull("deleted_at")
 // Generated SQL: WHERE deleted_at IS NULL
 ```
 
@@ -325,7 +325,7 @@ expr := cdt.NewExpr().Column("deleted_at").Op("IS NULL")
 
 ```go
 // Check if value is not NULL
-expr := cdt.NewExpr().Column("email").Op("IS NOT NULL")
+expr := cdt.IsNotNull("email")
 // Generated SQL: WHERE email IS NOT NULL
 ```
 

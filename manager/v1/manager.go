@@ -120,6 +120,10 @@ type QueryResponse struct {
 	Error     error
 }
 
+func newQueryResponseChannel() chan *QueryResponse {
+	return make(chan *QueryResponse, 1)
+}
+
 // HealthStatus represents the current health status of all database entries.
 type HealthStatus struct {
 	ReadOnlyHealthy  int // Number of healthy readonly entries
@@ -743,7 +747,7 @@ func (dm *DBManager) GetAsync(
 			Conditions: cond,
 			Opts:       opts,
 		},
-		ResponseCh: make(chan *QueryResponse),
+		ResponseCh: newQueryResponseChannel(),
 	}
 
 	if err := dbEntry.roundRobinQueueRead(ctx, q); err != nil {
@@ -783,7 +787,7 @@ func (dm *DBManager) GetRawAsync(
 			Conditions: cond,
 			Opts:       opts,
 		},
-		ResponseCh: make(chan *QueryResponse),
+		ResponseCh: newQueryResponseChannel(),
 	}
 
 	if err := dbEntry.roundRobinQueueRead(ctx, q); err != nil {
@@ -821,7 +825,7 @@ func (dm *DBManager) GetByIDAsync(
 			Joins: joins,
 			Opts:  opts,
 		},
-		ResponseCh: make(chan *QueryResponse),
+		ResponseCh: newQueryResponseChannel(),
 	}
 
 	if err := dbEntry.roundRobinQueueRead(ctx, q); err != nil {
@@ -859,7 +863,7 @@ func (dm *DBManager) GetByIDRawAsync(
 			Joins: joins,
 			Opts:  opts,
 		},
-		ResponseCh: make(chan *QueryResponse),
+		ResponseCh: newQueryResponseChannel(),
 	}
 
 	if err := dbEntry.roundRobinQueueRead(ctx, q); err != nil {
@@ -895,7 +899,7 @@ func (dm *DBManager) InsertAsync(
 			Data:  data,
 			Opts:  opts,
 		},
-		ResponseCh: make(chan *QueryResponse),
+		ResponseCh: newQueryResponseChannel(),
 	}
 
 	if err := dbEntry.roundRobinQueueWrite(ctx, q); err != nil {
@@ -931,7 +935,7 @@ func (dm *DBManager) InsertsAsync(
 			BulkData: data,
 			Opts:     opts,
 		},
-		ResponseCh: make(chan *QueryResponse),
+		ResponseCh: newQueryResponseChannel(),
 	}
 
 	if err := dbEntry.roundRobinQueueWrite(ctx, q); err != nil {
@@ -972,7 +976,7 @@ func (dm *DBManager) UpdateAsync(
 			Conditions: cond,
 			Opts:       opts,
 		},
-		ResponseCh: make(chan *QueryResponse),
+		ResponseCh: newQueryResponseChannel(),
 	}
 
 	if err := dbEntry.roundRobinQueueWrite(ctx, q); err != nil {
@@ -1010,7 +1014,7 @@ func (dm *DBManager) DeleteAsync(
 			Conditions: cond,
 			Opts:       opts,
 		},
-		ResponseCh: make(chan *QueryResponse),
+		ResponseCh: newQueryResponseChannel(),
 	}
 
 	if err := dbEntry.roundRobinQueueWrite(ctx, q); err != nil {
@@ -1040,7 +1044,7 @@ func (dm *DBManager) QueryAsync(ctx context.Context, query string, args ...any) 
 			Query:  query,
 			Params: args,
 		},
-		ResponseCh: make(chan *QueryResponse),
+		ResponseCh: newQueryResponseChannel(),
 	}
 
 	if err := dbEntry.roundRobinQueueRead(ctx, q); err != nil {
@@ -1070,7 +1074,7 @@ func (dm *DBManager) QueryRawAsync(ctx context.Context, query string, args ...an
 			Query:  query,
 			Params: args,
 		},
-		ResponseCh: make(chan *QueryResponse),
+		ResponseCh: newQueryResponseChannel(),
 	}
 
 	if err := dbEntry.roundRobinQueueRead(ctx, q); err != nil {
@@ -1108,7 +1112,7 @@ func (dm *DBManager) ExecAsync(ctx context.Context, query string, args ...any) (
 			Query:  query,
 			Params: args,
 		},
-		ResponseCh: make(chan *QueryResponse),
+		ResponseCh: newQueryResponseChannel(),
 	}
 
 	if err := dbEntry.roundRobinQueueWrite(ctx, q); err != nil {

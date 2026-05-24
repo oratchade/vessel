@@ -88,7 +88,7 @@ jobs:
         run: make cobertura
 
   integration-tests-all:
-    name: Integration Tests
+    name: Integration Tests All
     needs: [setup-tools]
     runs-on: ubuntu-latest
     steps:

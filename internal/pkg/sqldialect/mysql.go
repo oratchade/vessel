@@ -75,3 +75,14 @@ func (d MySQLDialect) SupportedOptions(
 ) (string, []any, error) {
 	return supportedOptions(d, queryType, opts, paramBase)
 }
+
+func (d MySQLDialect) Capabilities() Capabilities {
+	return Capabilities{
+		SelectPagination:       true,
+		MutationOrderLimit:     true,
+		Upsert:                 true,
+		JoinedUpdate:           true,
+		JoinedDelete:           true,
+		MutationOrderLimitName: "MySQL",
+	}
+}

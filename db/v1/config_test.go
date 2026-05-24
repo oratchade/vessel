@@ -90,7 +90,7 @@ func TestPostgresConfigDSNMinimal(t *testing.T) {
 // TestSQLiteConfigDriver tests the Driver method for SQLite config
 func TestSQLiteConfigDriver(t *testing.T) {
 	cfg := v1.SQLiteConfig{}
-	assert.Equal(t, definition.DriverSQLLite, cfg.Driver())
+	assert.Equal(t, definition.DriverSQLite, cfg.Driver())
 }
 
 // TestSQLiteConfigDSN tests SQLite DSN generation
@@ -106,7 +106,7 @@ func TestSQLiteConfigDSN(t *testing.T) {
 	assert.Contains(t, dsn, "file:/tmp/test.db")
 	assert.Contains(t, dsn, "cache=private")
 	assert.Contains(t, dsn, "mode=rwc")
-	assert.Contains(t, dsn, "_foreign_keys=true")
+	assert.Contains(t, dsn, "_pragma=foreign_keys%281%29")
 }
 
 // TestSQLiteConfigDSNMemory tests SQLite DSN generation for in-memory database
@@ -168,7 +168,7 @@ func TestDatabaseConfigs(t *testing.T) {
 		{
 			name: "SQLite config",
 			cfg:  v1.SQLiteConfig{},
-			want: definition.DriverSQLLite,
+			want: definition.DriverSQLite,
 		},
 		{
 			name: "MSSQL config",

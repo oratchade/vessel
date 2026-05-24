@@ -62,6 +62,20 @@ func (s *SQLiteQueryBuilder) Inserts(
 	return q, v, nil
 }
 
+// Upsert implements the QueryBuilder interface for SQLite.
+func (s *SQLiteQueryBuilder) Upsert(
+	table string,
+	data map[string]any,
+	upsertOpts *options.UpsertOptions,
+	opts *options.QueryOptions,
+) (string, []any, error) {
+	q, v, err := upsert(s.dialect, table, data, upsertOpts, opts)
+	if err != nil {
+		return "", nil, fmt.Errorf("upsert sqliteSQL Builder: error building upsert query: %w", err)
+	}
+	return q, v, nil
+}
+
 // Update implements the QueryBuilder interface for SQLite.
 func (s *SQLiteQueryBuilder) Update(
 	table string,
@@ -92,10 +106,14 @@ func (s *SQLiteQueryBuilder) Delete(
 }
 
 // join converts a Join to a SQL JOIN clause, handling SQLite-specific RIGHT JOIN conversion.
-func (m *SQLiteQueryBuilder) join(table string, join *cdt.Join) string {
+func (m *SQLiteQueryBuilder) join(table string, join *cdt.Join, paramBase int) (string, []any, error) {
 	switch strings.ToLower(join.Type) {
 	case operator.Inner, operator.Left:
-		return join.ToSQL(table, m.dialect)
+		sql, args, err := join.ToSQLWithArgs(table, m.dialect, paramBase)
+		if err != nil {
+			return "", nil, fmt.Errorf("sqlite join: %w", err)
+		}
+		return sql, args, nil
 	case operator.Right:
 		j := &cdt.Join{
 			Type:       operator.Left,
@@ -103,8 +121,12 @@ func (m *SQLiteQueryBuilder) join(table string, join *cdt.Join) string {
 			Conditions: join.Conditions.Reverse(),
 			Alias:      "",
 		}
-		return j.ToSQL(table, m.dialect)
+		sql, args, err := j.ToSQLWithArgs(table, m.dialect, paramBase)
+		if err != nil {
+			return "", nil, fmt.Errorf("sqlite right join conversion: %w", err)
+		}
+		return sql, args, nil
 	default:
-		return ""
+		return "", nil, nil
 	}
 }

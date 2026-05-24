@@ -67,6 +67,7 @@ func TestCapabilitiesForDialects(t *testing.T) {
 			want: sd.Capabilities{
 				SelectPagination:       true,
 				MutationOrderLimit:     true,
+				Upsert:                 true,
 				JoinedUpdate:           true,
 				JoinedDelete:           true,
 				MutationOrderLimitName: "MySQL",
@@ -78,6 +79,7 @@ func TestCapabilitiesForDialects(t *testing.T) {
 			want: sd.Capabilities{
 				SelectPagination:      true,
 				MutationReturning:     true,
+				Upsert:                true,
 				JoinedUpdate:          true,
 				JoinedDelete:          true,
 				JoinedDeleteWithUsing: true,
@@ -89,6 +91,7 @@ func TestCapabilitiesForDialects(t *testing.T) {
 			want: sd.Capabilities{
 				SelectPagination: true,
 				JoinedUpdate:     true,
+				Upsert:           true,
 			},
 		},
 		{
@@ -109,6 +112,27 @@ func TestCapabilitiesForDialects(t *testing.T) {
 			assert.Equal(t, tc.want, sd.CapabilitiesFor(tc.d))
 		})
 	}
+}
+
+func TestCapabilitiesForUsesProvider(t *testing.T) {
+	dialect := capabilityProviderDialect{
+		SQLDialect: sd.MySQLDialect{},
+		caps: sd.Capabilities{
+			SelectPagination:  true,
+			MutationReturning: true,
+		},
+	}
+
+	assert.Equal(t, dialect.caps, sd.CapabilitiesFor(dialect))
+}
+
+type capabilityProviderDialect struct {
+	condition.SQLDialect
+	caps sd.Capabilities
+}
+
+func (c capabilityProviderDialect) Capabilities() sd.Capabilities {
+	return c.caps
 }
 
 func TestSupportedOptions_SelectLimitOffsetOrderBy(t *testing.T) {

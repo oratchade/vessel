@@ -50,7 +50,7 @@ func fromSQLResult(res sql.Result) (*ExecResult, error) {
 // DBConfig represents configuration needed to create a DB connection. It
 // exposes the driver name and a DSN builder for connecting to the database.
 type DBConfig interface {
-	// Driver returns the database driver name (e.g., "mysql", "postgres", "SQLLite3").
+	// Driver returns the database driver name (e.g., "mysql", "postgres", "sqlite").
 	Driver() string
 	// DSN returns the Data Source Name (DSN) for connecting to the database.
 	DSN() string
@@ -83,7 +83,7 @@ func NewDB(cfg DBConfig, logger Logger) (DB, error) {
 		return mysqlCfgToDB(cfg, logger)
 	case definition.DriverPostgres, definition.DriverPostgresAlias:
 		return postgresCfgToDB(cfg, logger)
-	case definition.DriverSQLLite, definition.DriverSQLiteAlias:
+	case definition.DriverSQLite:
 		return sqliteCfgToDB(cfg, logger)
 	case definition.DriverMSSQL, definition.DriverMSSQLAlias:
 		return mssqlCfgToDB(cfg, logger)
@@ -271,6 +271,25 @@ type writer interface {
 	Exec(ctx context.Context, query string, args ...any) (*ExecResult, error)
 }
 
+type upserter interface {
+	// Upsert inserts one row or applies conflict behavior when a uniqueness conflict occurs.
+	Upsert(
+		ctx context.Context,
+		table string,
+		data map[string]any,
+		upsertOpts *options.UpsertOptions,
+		opts *options.QueryOptions,
+	) (*ExecResult, error)
+
+	// UpsertQuery builds an UPSERT statement without executing it.
+	UpsertQuery(
+		table string,
+		data map[string]any,
+		upsertOpts *options.UpsertOptions,
+		opts *options.QueryOptions,
+	) (string, []any, error)
+}
+
 //go:generate mockgen -source=db.go -destination=db_mocks.go -package=v1 introspector
 
 // introspector provides access to SQL queries without executing them.
@@ -428,7 +447,7 @@ type transactional interface {
 	// Returns:
 	//   Tx: Transaction object to execute queries within the transaction.
 	//   error: Error if starting the transaction fails.
-	Begin(ctx context.Context) (Tx, error)
+	Begin(ctx context.Context, opts ...TransactionOptions) (Tx, error)
 
 	// WithTransaction executes a function within a database transaction.
 	//
@@ -443,7 +462,13 @@ type transactional interface {
 	//
 	// Returns:
 	//   error: Error if the transaction fails or is rolled back.
-	WithTransaction(ctx context.Context, fn func(Tx) error) error
+	WithTransaction(ctx context.Context, fn func(Tx) error, opts ...TransactionOptions) error
+}
+
+type savepointer interface {
+	Savepoint(ctx context.Context, name string) error
+	RollbackToSavepoint(ctx context.Context, name string) error
+	ReleaseSavepoint(ctx context.Context, name string) error
 }
 
 //go:generate mockgen -source=db.go -destination=db_mocks.go -package=v1 healthCheck
@@ -486,6 +511,7 @@ type closer interface {
 type DB interface {
 	reader
 	writer
+	upserter
 	introspector
 	transactional
 	healthCheck
@@ -498,7 +524,9 @@ type DB interface {
 type Tx interface {
 	reader
 	writer
+	upserter
 	introspector
+	savepointer
 
 	// Commit commits the transaction.
 	//
@@ -648,4 +676,34 @@ func ScanRowsTo[T any](ctx context.Context, ra RowsProvider) ([]T, error) {
 	}
 	span.SetStatus(codes.Ok, "scanRowsTo completed successfully")
 	return out, nil
+}
+
+// ScanAll scans every row from a RowsProvider into a typed slice.
+//
+// It is the preferred public helper for typed reads. It uses db/json tags and
+// field-name fallback through the same mapper as ScanRowsTo.
+func ScanAll[T any](ctx context.Context, rows RowsProvider) ([]T, error) {
+	result, err := ScanRowsTo[T](ctx, rows)
+	if err != nil {
+		return nil, fmt.Errorf("ScanAll: %w", err)
+	}
+	return result, nil
+}
+
+// ScanOne scans exactly one row from a RowsProvider.
+//
+// It returns an error when the result set is empty or contains more than one row.
+func ScanOne[T any](ctx context.Context, rows RowsProvider) (T, error) {
+	var zero T
+	result, err := ScanRowsTo[T](ctx, rows)
+	if err != nil {
+		return zero, fmt.Errorf("ScanOne: %w", err)
+	}
+	if len(result) == 0 {
+		return zero, fmt.Errorf("ScanOne: no rows")
+	}
+	if len(result) > 1 {
+		return zero, fmt.Errorf("ScanOne: expected one row, got %d", len(result))
+	}
+	return result[0], nil
 }

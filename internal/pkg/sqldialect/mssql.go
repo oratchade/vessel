@@ -73,3 +73,13 @@ func (d MSSQLDialect) SupportedOptions(
 ) (string, []any, error) {
 	return supportedOptions(d, queryType, opts, paramBase)
 }
+
+func (d MSSQLDialect) Capabilities() Capabilities {
+	return Capabilities{
+		SelectPagination:  true,
+		MutationOutput:    true,
+		MutationReturning: true,
+		JoinedUpdate:      true,
+		JoinedDelete:      true,
+	}
+}

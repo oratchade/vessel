@@ -42,7 +42,7 @@ func TestWithTransactionConcreteDriversReturnBeginErrors(t *testing.T) {
 	cases := []struct {
 		name string
 		db   interface {
-			WithTransaction(context.Context, func(Tx) error) error
+			WithTransaction(context.Context, func(Tx) error, ...TransactionOptions) error
 		}
 		want string
 	}{

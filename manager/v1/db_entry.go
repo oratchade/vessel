@@ -549,7 +549,7 @@ func (de *DBEntry) roundRobinQueueWrite(ctx context.Context, qd *Query) error {
 	if de.writeWorkerIdx == nil {
 		return fmt.Errorf("roundRobinQueueWrite: no write workers available")
 	}
-	idx := de.writeWorkerIdx.Next()
+	idx := de.nextWriteWorkerIndex(qd)
 	w := de.writeQueue[idx]
 
 	select {
@@ -560,6 +560,21 @@ func (de *DBEntry) roundRobinQueueWrite(ctx context.Context, qd *Query) error {
 	case <-ctx.Done():
 		return fmt.Errorf("roundRobinQueueWrite: context done: %w", ctx.Err())
 	}
+}
+
+func (de *DBEntry) nextWriteWorkerIndex(qd *Query) int64 {
+	if de.writeBatchingEnabled && qd != nil && qd.Request == ReqInsert && qd.Data != nil {
+		key := qd.Data.Table + "\x00" + insertColumnsKey(qd.Data.Data) + "\x00" + fmt.Sprintf("%#v", qd.Data.Opts)
+		mod := int64(len(de.writeQueue))
+		var idx int64
+		var position int64
+		for _, b := range []byte(key) {
+			idx = (idx*31 + int64(b) + position) % mod
+			position++
+		}
+		return idx
+	}
+	return de.writeWorkerIdx.Next()
 }
 
 // RoundRobinQueueRead enqueues a read query to the appropriate worker queue based on round-robin distribution.

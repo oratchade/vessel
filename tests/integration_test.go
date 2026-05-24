@@ -6,6 +6,7 @@ package tests
 import (
 	"context"
 	"database/sql"
+	"errors"
 	"fmt"
 	"os"
 	"strconv"
@@ -17,9 +18,10 @@ import (
 	_ "github.com/denisenkom/go-mssqldb"
 	_ "github.com/go-sql-driver/mysql"
 	_ "github.com/lib/pq"
-	_ "github.com/mattn/go-sqlite3"
+	_ "modernc.org/sqlite"
 
 	v1 "tounilab.com/fabric/db/v1"
+	"tounilab.com/fabric/db/v1/dberror"
 	"tounilab.com/fabric/pkg/query/condition"
 )
 
@@ -72,7 +74,7 @@ type User struct {
 var testDatabases = []TestDB{
 	{
 		name:   "SQLite",
-		driver: "sqlite3",
+		driver: "sqlite",
 		config: v1.SQLiteConfig{
 			FilePath:        ":memory:",
 			CacheMode:       "shared",
@@ -159,8 +161,8 @@ func getFilteredDatabases() []TestDB {
 	filtered := []TestDB{}
 	for _, db := range testDatabases {
 		switch dbType {
-		case "sqlite", "sqlite3":
-			if db.driver == "sqlite3" {
+		case "sqlite":
+			if db.driver == "sqlite" {
 				filtered = append(filtered, db)
 			}
 		case "mysql":
@@ -397,6 +399,75 @@ func TestIntegration_GetAllUsers(t *testing.T) {
 
 			if len(users) == 0 {
 				t.Error("Expected to find users, but found none")
+			}
+		})
+	}
+}
+
+func TestIntegration_ErrorMappingDuplicateKey(t *testing.T) {
+	if testing.Short() {
+		t.Skip("Skipping integration tests in short mode")
+	}
+
+	for _, testDB := range getFilteredDatabases() {
+		t.Run(testDB.name, func(t *testing.T) {
+			database := connectIntegrationDB(t, testDB)
+			defer database.Close()
+			testDB.setupFn(t, database)
+
+			_, err := database.Insert(context.Background(), "users", map[string]any{
+				"name":   "Duplicate Alice",
+				"email":  "alice@example.com",
+				"age":    30,
+				"status": activeStatus,
+			}, nil)
+
+			if !errors.Is(err, dberror.ErrDuplicateKey) {
+				t.Fatalf("expected duplicate key error, got %v", err)
+			}
+		})
+	}
+}
+
+func TestIntegration_ErrorMappingForeignKey(t *testing.T) {
+	if testing.Short() {
+		t.Skip("Skipping integration tests in short mode")
+	}
+
+	for _, testDB := range getFilteredDatabases() {
+		t.Run(testDB.name, func(t *testing.T) {
+			database := connectIntegrationDB(t, testDB)
+			defer database.Close()
+			testDB.setupFn(t, database)
+
+			_, err := database.Insert(context.Background(), "posts", map[string]any{
+				"user_id":   999999,
+				"title":     "Orphaned Post",
+				"content":   "foreign key coverage",
+				"published": 1,
+			}, nil)
+
+			if !errors.Is(err, dberror.ErrForeignKeyViolation) {
+				t.Fatalf("expected foreign key error, got %v", err)
+			}
+		})
+	}
+}
+
+func TestIntegration_ErrorMappingSyntax(t *testing.T) {
+	if testing.Short() {
+		t.Skip("Skipping integration tests in short mode")
+	}
+
+	for _, testDB := range getFilteredDatabases() {
+		t.Run(testDB.name, func(t *testing.T) {
+			database := connectIntegrationDB(t, testDB)
+			defer database.Close()
+			testDB.setupFn(t, database)
+
+			_, err := database.Exec(context.Background(), "SELEC FROM users")
+			if !errors.Is(err, dberror.ErrSyntaxError) {
+				t.Fatalf("expected syntax error, got %v", err)
 			}
 		})
 	}

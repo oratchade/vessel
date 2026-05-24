@@ -15,9 +15,9 @@ import (
 	_ "github.com/denisenkom/go-mssqldb"
 	_ "github.com/go-sql-driver/mysql"
 	_ "github.com/lib/pq"
-	_ "github.com/mattn/go-sqlite3"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	_ "modernc.org/sqlite"
 
 	v1 "tounilab.com/fabric/db/v1"
 	cdt "tounilab.com/fabric/pkg/query/condition"
@@ -57,6 +57,43 @@ func TestFluentDBDialectMatrix(t *testing.T) {
 				Set("status", "inactive").
 				Exec(ctx)
 			require.NoError(t, err)
+
+			countRows, err := fluent.Select(fluentMatrixUsersTable).
+				Where(cdt.In("status", "active", "inactive")).
+				CountRaw(ctx)
+			require.NoError(t, err)
+			require.True(t, countRows.Next())
+			var count int64
+			require.NoError(t, countRows.Scan(&count))
+			require.NoError(t, countRows.Close())
+			assert.Equal(t, int64(2), count)
+
+			fetched, err := fluent.Insert().
+				Into(fluentMatrixUsersTable).
+				Set("name", "Carol").
+				Set("email", "carol.matrix@example.com").
+				Set("age", 28).
+				Set("status", "active").
+				InsertAndFetch(ctx, "email", "email", "status")
+			require.NoError(t, err)
+			assert.Equal(t, "active", fetched["status"])
+
+			joinRows, err := fluent.Select(fluentMatrixUsersTable).
+				ColumnAs(fluentMatrixUsersTable+".name", "user_name").
+				ColumnRawAs("LOWER(fm2.email)", "joined_email").
+				Join(cdt.Join{
+					Type:       "LEFT",
+					Table:      fluentMatrixUsersTable,
+					Alias:      "fm2",
+					Conditions: cdt.JoinCdts{{Left: "status", Right: "status"}},
+					On:         cdt.IsNull("fm2.deleted_at"),
+				}).
+				Where(cdt.ILike(fluentMatrixUsersTable+".email", "%MATRIX@EXAMPLE.COM")).
+				OrderByAsc(fluentMatrixUsersTable + ".id").
+				Limit(1).
+				Get(ctx)
+			require.NoError(t, err)
+			assert.Len(t, joinRows, 1)
 
 			query, _, err := fluent.Select(fluentMatrixUsersTable, "status", "COUNT(*) AS total").
 				Where(cdt.NewExpr().Column("age").Op(">").Value(20)).
@@ -104,7 +141,7 @@ func fluentMatrixDatabases() []fluentMatrixDB {
 	dbs := []fluentMatrixDB{
 		{
 			name:   "SQLite",
-			driver: "sqlite3",
+			driver: "sqlite",
 			cfg: v1.SQLiteConfig{
 				FilePath:     ":memory:",
 				CacheMode:    "shared",
@@ -172,7 +209,6 @@ func fluentMatrixDatabases() []fluentMatrixDB {
 	filtered := make([]fluentMatrixDB, 0, 1)
 	for _, db := range dbs {
 		if filter == db.driver ||
-			(filter == "sqlite" && db.driver == "sqlite3") ||
 			(filter == "postgresql" && db.driver == "postgres") ||
 			(filter == "mssql" && db.driver == "sqlserver") {
 			filtered = append(filtered, db)
@@ -215,14 +251,15 @@ func setupFluentMatrixSchema(t *testing.T, db v1.DB, driver string) {
 	t.Helper()
 
 	schema := map[string][]string{
-		"sqlite3": {
+		"sqlite": {
 			"DROP TABLE IF EXISTS " + fluentMatrixUsersTable,
 			`CREATE TABLE ` + fluentMatrixUsersTable + ` (
 				id INTEGER PRIMARY KEY AUTOINCREMENT,
 				name TEXT NOT NULL,
 				email TEXT UNIQUE NOT NULL,
 				age INTEGER,
-				status TEXT DEFAULT 'active'
+				status TEXT DEFAULT 'active',
+				deleted_at DATETIME NULL
 			)`,
 		},
 		"mysql": {
@@ -232,7 +269,8 @@ func setupFluentMatrixSchema(t *testing.T, db v1.DB, driver string) {
 				name VARCHAR(255) NOT NULL,
 				email VARCHAR(255) UNIQUE NOT NULL,
 				age INT,
-				status VARCHAR(50) DEFAULT 'active'
+				status VARCHAR(50) DEFAULT 'active',
+				deleted_at DATETIME NULL
 			)`,
 		},
 		"postgres": {
@@ -242,7 +280,8 @@ func setupFluentMatrixSchema(t *testing.T, db v1.DB, driver string) {
 				name VARCHAR(255) NOT NULL,
 				email VARCHAR(255) UNIQUE NOT NULL,
 				age INT,
-				status VARCHAR(50) DEFAULT 'active'
+				status VARCHAR(50) DEFAULT 'active',
+				deleted_at TIMESTAMP NULL
 			)`,
 		},
 		"sqlserver": {
@@ -252,7 +291,8 @@ func setupFluentMatrixSchema(t *testing.T, db v1.DB, driver string) {
 				name VARCHAR(255) NOT NULL,
 				email VARCHAR(255) UNIQUE NOT NULL,
 				age INT,
-				status VARCHAR(50) DEFAULT 'active'
+				status VARCHAR(50) DEFAULT 'active',
+				deleted_at DATETIME2 NULL
 			)`,
 		},
 	}

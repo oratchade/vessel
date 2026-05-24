@@ -1,4 +1,4 @@
-// Package db provides a high-performance abstraction layer for Microsoft SQL Server 2016+,
+// Package v1 provides a high-performance abstraction layer for Microsoft SQL Server 2016+,
 // with support for parameterized queries, connection pooling via go-mssqldb,
 // automatic identifier quoting using square brackets ([]), and T-SQL specific
 // features like @@IDENTITY, WAITFOR clauses, and table-valued parameters.
@@ -177,7 +177,8 @@ func (m *MSSQL) Ping(ctx context.Context) error {
 	return nil
 }
 
-func (m *MSSQL) Begin(ctx context.Context) (Tx, error) {
+func (m *MSSQL) Begin(ctx context.Context, opts ...TransactionOptions) (Tx, error) {
+	txOpts := firstTransactionOptions(opts)
 	c, span := oh.UseTracer(ctx, "mssql.Begin",
 		trace.WithSpanKind(trace.SpanKindClient),
 		trace.WithAttributes(
@@ -193,7 +194,7 @@ func (m *MSSQL) Begin(ctx context.Context) (Tx, error) {
 		m.safeLogger.QueryError(c, "mssql", "begin", "", 0, err)
 		return nil, err
 	}
-	t, err := sqlDB.BeginTx(c, nil)
+	t, err := sqlDB.BeginTx(c, &sql.TxOptions{Isolation: txOpts.Isolation, ReadOnly: txOpts.ReadOnly})
 	if err != nil {
 		err := fmt.Errorf("mssql.Begin: failed to begin transaction: %w", err)
 		span.RecordError(err)
@@ -221,8 +222,9 @@ func (m *MSSQL) GetQuery(
 	opts *options.QueryOptions,
 ) (string, []any, error) {
 	o := dbOpts{
-		builder: m.queryBuilder,
-		querier: m.querier,
+		builder:     m.queryBuilder,
+		querier:     m.querier,
+		errorMapper: m.errorMapper,
 	}
 	return getQuery(table, columns, joins, conditions, opts, o)
 }
@@ -245,8 +247,9 @@ func (m *MSSQL) Get(
 		))
 	defer span.End()
 	o := dbOpts{
-		builder: m.queryBuilder,
-		querier: m.querier,
+		builder:     m.queryBuilder,
+		querier:     m.querier,
+		errorMapper: m.errorMapper,
 	}
 	results, err := get(c, table, columns, joins, conditions, opts, o)
 	duration := time.Since(startTime)
@@ -281,8 +284,9 @@ func (m *MSSQL) GetRaw(
 		))
 	defer span.End()
 	o := dbOpts{
-		builder: m.queryBuilder,
-		querier: m.querier,
+		builder:     m.queryBuilder,
+		querier:     m.querier,
+		errorMapper: m.errorMapper,
 	}
 	results, err := getRaw(c, table, columns, joins, conditions, opts, o)
 	duration := time.Since(startTime)
@@ -306,8 +310,9 @@ func (m *MSSQL) GetByIDQuery(
 	opts *options.QueryOptions,
 ) (string, []any, error) {
 	o := dbOpts{
-		builder: m.queryBuilder,
-		querier: m.querier,
+		builder:     m.queryBuilder,
+		querier:     m.querier,
+		errorMapper: m.errorMapper,
 	}
 	return getByIDQuery(table, id, joins, opts, o)
 }
@@ -330,8 +335,9 @@ func (m *MSSQL) GetByID(
 		))
 	defer span.End()
 	o := dbOpts{
-		builder: m.queryBuilder,
-		querier: m.querier,
+		builder:     m.queryBuilder,
+		querier:     m.querier,
+		errorMapper: m.errorMapper,
 	}
 	results, err := getByID(c, table, id, joins, opts, o)
 	duration := time.Since(startTime)
@@ -365,8 +371,9 @@ func (m *MSSQL) GetByIDRaw(
 		))
 	defer span.End()
 	o := dbOpts{
-		builder: m.queryBuilder,
-		querier: m.querier,
+		builder:     m.queryBuilder,
+		querier:     m.querier,
+		errorMapper: m.errorMapper,
 	}
 	results, err := getByIDRaw(c, table, id, joins, opts, o)
 	duration := time.Since(startTime)
@@ -388,8 +395,9 @@ func (m *MSSQL) InsertQuery(
 	opts *options.QueryOptions,
 ) (string, []any, error) {
 	o := dbOpts{
-		builder: m.queryBuilder,
-		querier: m.querier,
+		builder:     m.queryBuilder,
+		querier:     m.querier,
+		errorMapper: m.errorMapper,
 	}
 	return insertQuery(table, data, opts, o)
 }
@@ -411,8 +419,9 @@ func (m *MSSQL) Insert(
 		))
 	defer span.End()
 	o := dbOpts{
-		builder: m.queryBuilder,
-		querier: m.querier,
+		builder:     m.queryBuilder,
+		querier:     m.querier,
+		errorMapper: m.errorMapper,
 	}
 	result, err := insert(c, table, data, opts, o)
 	duration := time.Since(startTime)
@@ -440,8 +449,9 @@ func (m *MSSQL) InsertsQuery(
 	opts *options.QueryOptions,
 ) (string, []any, error) {
 	o := dbOpts{
-		builder: m.queryBuilder,
-		querier: m.querier,
+		builder:     m.queryBuilder,
+		querier:     m.querier,
+		errorMapper: m.errorMapper,
 	}
 	return insertsQuery(table, data, opts, o)
 }
@@ -463,8 +473,9 @@ func (m *MSSQL) Inserts(
 		))
 	defer span.End()
 	o := dbOpts{
-		builder: m.queryBuilder,
-		querier: m.querier,
+		builder:     m.queryBuilder,
+		querier:     m.querier,
+		errorMapper: m.errorMapper,
 	}
 	result, err := inserts(c, table, data, opts, o)
 	duration := time.Since(startTime)
@@ -486,6 +497,62 @@ func (m *MSSQL) Inserts(
 	return result, nil
 }
 
+// UpsertQuery returns a clear unsupported error for MSSQL.
+func (m *MSSQL) UpsertQuery(
+	table string,
+	data map[string]any,
+	upsertOpts *options.UpsertOptions,
+	opts *options.QueryOptions,
+) (string, []any, error) {
+	o := dbOpts{
+		builder:     m.queryBuilder,
+		querier:     m.querier,
+		errorMapper: m.errorMapper,
+	}
+	return upsertQuery(table, data, upsertOpts, opts, o)
+}
+
+// Upsert returns a clear unsupported error for MSSQL.
+//
+//nolint:dupl
+func (m *MSSQL) Upsert(
+	ctx context.Context,
+	table string,
+	data map[string]any,
+	upsertOpts *options.UpsertOptions,
+	opts *options.QueryOptions,
+) (*ExecResult, error) {
+	startTime := time.Now()
+	c, span := oh.UseTracer(ctx, "mssql.Upsert",
+		trace.WithSpanKind(trace.SpanKindClient),
+		trace.WithAttributes(
+			semconv.DBSystemNameMicrosoftSQLServer,
+			semconv.DBOperationName("upsert"),
+			semconv.DBCollectionName(table),
+		))
+	defer span.End()
+	o := dbOpts{
+		builder:     m.queryBuilder,
+		querier:     m.querier,
+		errorMapper: m.errorMapper,
+	}
+	result, err := upsert(c, table, data, upsertOpts, opts, o)
+	duration := time.Since(startTime)
+	if err != nil {
+		span.RecordError(err)
+		span.SetStatus(codes.Error, err.Error())
+		m.safeLogger.QueryError(c, "mssql", "upsert", table, duration, err)
+		return result, err
+	}
+	span.SetStatus(codes.Ok, "upsert successful")
+	rowsAffected := int(0)
+	if result != nil {
+		rowsAffected = int(result.RowsAffected)
+	}
+	m.safeLogger.QuerySuccess(c, "mssql", "upsert", table, duration, rowsAffected)
+	return result, nil
+}
+
 func (m *MSSQL) UpdateQuery(
 	table string,
 	data map[string]any,
@@ -494,8 +561,9 @@ func (m *MSSQL) UpdateQuery(
 	opts *options.QueryOptions,
 ) (string, []any, error) {
 	o := dbOpts{
-		builder: m.queryBuilder,
-		querier: m.querier,
+		builder:     m.queryBuilder,
+		querier:     m.querier,
+		errorMapper: m.errorMapper,
 	}
 	return updateQuery(table, data, joins, conditions, opts, o)
 }
@@ -518,8 +586,9 @@ func (m *MSSQL) Update(
 		))
 	defer span.End()
 	o := dbOpts{
-		builder: m.queryBuilder,
-		querier: m.querier,
+		builder:     m.queryBuilder,
+		querier:     m.querier,
+		errorMapper: m.errorMapper,
 	}
 	result, err := update(c, table, data, joins, conditions, opts, o)
 	duration := time.Since(startTime)
@@ -548,12 +617,14 @@ func (m *MSSQL) DeleteQuery(
 	opts *options.QueryOptions,
 ) (string, []any, error) {
 	o := dbOpts{
-		builder: m.queryBuilder,
-		querier: m.querier,
+		builder:     m.queryBuilder,
+		querier:     m.querier,
+		errorMapper: m.errorMapper,
 	}
 	return deleteQuery(table, joins, conditions, opts, o)
 }
 
+//nolint:dupl
 func (m *MSSQL) Delete(
 	ctx context.Context,
 	table string,
@@ -571,8 +642,9 @@ func (m *MSSQL) Delete(
 		))
 	defer span.End()
 	o := dbOpts{
-		builder: m.queryBuilder,
-		querier: m.querier,
+		builder:     m.queryBuilder,
+		querier:     m.querier,
+		errorMapper: m.errorMapper,
 	}
 	result, err := delete(c, table, joins, conditions, opts, o)
 	duration := time.Since(startTime)
@@ -748,7 +820,7 @@ func (m *MSSQL) Explain(
 }
 
 //nolint:dupl
-func (m *MSSQL) WithTransaction(ctx context.Context, fn func(tx Tx) error) error {
+func (m *MSSQL) WithTransaction(ctx context.Context, fn func(tx Tx) error, opts ...TransactionOptions) error {
 	c, span := oh.UseTracer(ctx, "mssql.WithTransaction",
 		trace.WithSpanKind(trace.SpanKindClient),
 		trace.WithAttributes(
@@ -756,7 +828,7 @@ func (m *MSSQL) WithTransaction(ctx context.Context, fn func(tx Tx) error) error
 			semconv.DBOperationName("transaction"),
 		))
 	defer span.End()
-	tx, err := m.Begin(c)
+	tx, err := m.Begin(c, opts...)
 	if err != nil {
 		err := fmt.Errorf("mssql.WithTransaction: failed to begin transaction: %w", err)
 		span.RecordError(err)
@@ -853,4 +925,20 @@ func (m *MSSQL) Rollback(ctx context.Context) error {
 	span.SetStatus(codes.Ok, "transaction rolled back")
 	m.safeLogger.TransactionSuccess(ctx, "mssql", "rollback")
 	return nil
+}
+
+// Savepoint creates a transaction savepoint.
+func (m *MSSQL) Savepoint(ctx context.Context, name string) error {
+	return savepoint(ctx, m, name, true)
+}
+
+// RollbackToSavepoint rolls the transaction back to a savepoint.
+func (m *MSSQL) RollbackToSavepoint(ctx context.Context, name string) error {
+	return rollbackToSavepoint(ctx, m, name, true)
+}
+
+// ReleaseSavepoint returns an explicit unsupported error because SQL Server
+// does not support releasing savepoints.
+func (m *MSSQL) ReleaseSavepoint(ctx context.Context, name string) error {
+	return releaseSavepoint(ctx, m, name, true)
 }

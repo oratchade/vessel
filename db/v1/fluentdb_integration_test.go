@@ -753,7 +753,7 @@ func TestFluentDBTransactionErrorHandling(t *testing.T) {
 	assert.Error(t, err) // Expected error
 
 	// Rollback transaction
-	err = tx.Rollback(it.ctx)
+	_ = tx.Rollback(it.ctx)
 	// Rollback should succeed even after error
 
 	// Verify no users were inserted (entire transaction rolled back)

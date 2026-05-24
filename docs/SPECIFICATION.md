@@ -528,7 +528,7 @@ distributed tracing.
 │  DRIVER LAYER (database/sql + vendors)         │
 │  • go-sql-driver/mysql                         │
 │  • jackc/pgx (with pgxpool)                    │
-│  • mattn/go-sqlite3                            │
+│  • modernc.org/sqlite                          │
 │  • denisenkom/go-mssqldb                       │
 └────────────────────────────────────────────────┘
 ```
@@ -550,37 +550,72 @@ distributed tracing.
 ```go
 // DB is the main entry point
 type DB interface {
-    // Data access
-    Get(ctx context.Context, query string, args ...any) ([]Row, error)
-    Insert(ctx context.Context, table string, data map[string]any) (Row, error)
-    Update(ctx context.Context, table string, updates map[string]any) error
-    Delete(ctx context.Context, table string) error
-    Query(ctx context.Context, query string, args ...any) ([]Row, error)
-    Exec(ctx context.Context, query string, args ...any) (Result, error)
+    reader
+    writer
+    upserter
+    introspector
+    transactional
+    healthCheck
+    closer
+}
 
-    // Transactions
-    Begin(ctx context.Context) (Tx, error)
-    WithTransaction(ctx context.Context, fn func(Tx) error) error
+type TransactionOptions struct {
+    Isolation sql.IsolationLevel
+    ReadOnly  bool
+}
 
-    // Lifecycle
+type transactional interface {
+    Begin(ctx context.Context, opts ...TransactionOptions) (Tx, error)
+    WithTransaction(ctx context.Context, fn func(Tx) error, opts ...TransactionOptions) error
+}
+
+type Tx interface {
+    reader
+    writer
+    upserter
+    introspector
+    savepointer
+    Commit(ctx context.Context) error
+    Rollback(ctx context.Context) error
+}
+
+type savepointer interface {
+    Savepoint(ctx context.Context, name string) error
+    RollbackToSavepoint(ctx context.Context, name string) error
+    ReleaseSavepoint(ctx context.Context, name string) error
+}
+```
+
+Primary method groups include:
+
+```go
+type reader interface {
+    Get(ctx context.Context, table string, columns []string, joins []condition.Join, conditions condition.Condition, opts *options.QueryOptions) ([]map[string]any, error)
+    GetRaw(ctx context.Context, table string, columns []string, joins []condition.Join, conditions condition.Condition, opts *options.QueryOptions) (*RowsAdapter, error)
+    Query(ctx context.Context, query string, args ...any) ([]map[string]any, error)
+    QueryRaw(ctx context.Context, query string, args ...any) (*RowsAdapter, error)
+}
+
+type upserter interface {
+    Upsert(ctx context.Context, table string, data map[string]any, upsertOpts *options.UpsertOptions, opts *options.QueryOptions) (*ExecResult, error)
+    UpsertQuery(table string, data map[string]any, upsertOpts *options.UpsertOptions, opts *options.QueryOptions) (string, []any, error)
+}
+```
+
+Additional lifecycle methods:
+
+```go
+type healthCheck interface {
     Ping(ctx context.Context) error
-    PoolStats() PoolStats
+    PoolStats() (*PoolStatistics, error)
+}
+
+type closer interface {
     Close() error
 }
+```
 
-// Tx represents a transaction
-type Tx interface {
-    // Same methods as DB, but within transaction scope
-    Get(ctx context.Context, query string, args ...any) ([]Row, error)
-    Insert(ctx context.Context, table string, data map[string]any) (Row, error)
-    Update(ctx context.Context, table string, updates map[string]any) error
-    Delete(ctx context.Context, table string) error
-
-    // Commit/rollback
-    Commit() error
-    Rollback() error
-}
-
+```go
 // Logger is the abstraction
 type Logger interface {
     Debug(msg string, keyvals ...any)
@@ -908,7 +943,7 @@ db, _ := v1.NewDB(cfg, logger)
 ```
 
 **Test Database**: SQLite in-memory (no Docker)
-**Driver**: mattn/go-sqlite3
+**Driver**: modernc.org/sqlite
 
 ### MSSQL (SQL Server 2016+)
 

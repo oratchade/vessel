@@ -1,4 +1,4 @@
-// Package db provides database abstraction interfaces and implementations for multiple database engines.
+// Package v1 provides database abstraction interfaces and implementations for multiple database engines.
 package v1
 
 //go:generate mockgen -source=logger.go -destination=logger_mocks.go -package=v1 Logger

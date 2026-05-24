@@ -7,9 +7,11 @@
     "Cdts",
     "introspector",
     "nolint",
+    "Novalys",
     "SHOWPLAN",
     "sqldialect",
     "stretchr",
-    "tounilab"
+    "tounilab",
+    "unittests"
   ]
 }

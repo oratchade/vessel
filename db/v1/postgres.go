@@ -1,4 +1,4 @@
-// Package db provides a high-performance abstraction layer for PostgreSQL 9.6+,
+// Package v1 provides a high-performance abstraction layer for PostgreSQL 9.6+,
 // with support for parameterized queries, connection pooling via pgxpool,
 // automatic identifier quoting using double quotes ("), and advanced features
 // like RETURNING clauses, LISTEN/NOTIFY, window functions, CTEs, and custom types.
@@ -6,6 +6,7 @@ package v1
 
 import (
 	"context"
+	"database/sql"
 	"fmt"
 	"net/url"
 	"strconv"
@@ -216,7 +217,8 @@ func (pg *Postgres) Ping(ctx context.Context) error {
 	return nil
 }
 
-func (pg *Postgres) Begin(ctx context.Context) (Tx, error) {
+func (pg *Postgres) Begin(ctx context.Context, opts ...TransactionOptions) (Tx, error) {
+	txOpts := firstTransactionOptions(opts)
 	c, span := otel.UseTracer(ctx, "postgres.Begin",
 		trace.WithSpanKind(trace.SpanKindClient),
 		trace.WithAttributes(
@@ -232,7 +234,7 @@ func (pg *Postgres) Begin(ctx context.Context) (Tx, error) {
 		pg.safeLogger.QueryError(c, "postgres", "begin", "", 0, err)
 		return nil, err
 	}
-	t, err := pgPool.Begin(c)
+	t, err := pgPool.BeginTx(c, postgresTxOptions(txOpts))
 	if err != nil {
 		err := fmt.Errorf("postgres.Begin: failed to begin transaction: %w", err)
 		span.RecordError(err)
@@ -249,6 +251,33 @@ func (pg *Postgres) Begin(ctx context.Context) (Tx, error) {
 		safeLogger:   pg.safeLogger,
 		errorMapper:  pg.errorMapper,
 	}, nil
+}
+
+func postgresTxOptions(opts TransactionOptions) pgx.TxOptions {
+	return pgx.TxOptions{
+		IsoLevel:   postgresIsolation(opts.Isolation),
+		AccessMode: postgresAccessMode(opts.ReadOnly),
+	}
+}
+
+func postgresIsolation(level sql.IsolationLevel) pgx.TxIsoLevel {
+	switch level {
+	case sql.LevelReadUncommitted, sql.LevelReadCommitted:
+		return pgx.ReadCommitted
+	case sql.LevelRepeatableRead:
+		return pgx.RepeatableRead
+	case sql.LevelSerializable:
+		return pgx.Serializable
+	default:
+		return ""
+	}
+}
+
+func postgresAccessMode(readOnly bool) pgx.TxAccessMode {
+	if readOnly {
+		return pgx.ReadOnly
+	}
+	return ""
 }
 
 func (pg *Postgres) GetQuery(
@@ -540,7 +569,7 @@ func (pg *Postgres) Insert(
 		pg.safeLogger.QueryError(c, "postgres", "insert", table, 0, err)
 		return nil, err
 	}
-	query, args, err := pg.queryBuilder.Insert(table, data, nil)
+	query, args, err := pg.queryBuilder.Insert(table, data, opts)
 	if err != nil {
 		err := fmt.Errorf("postgres.Insert: failed to build insert query: %w", err)
 		span.RecordError(err)
@@ -551,7 +580,7 @@ func (pg *Postgres) Insert(
 
 	result, err := pg.querier.Exec(c, query, args...)
 	if err != nil {
-		err := fmt.Errorf("postgres.Insert: failed to execute insert query: %w", err)
+		err := fmt.Errorf("postgres.Insert: failed to execute insert query: %w", pg.errorMapper.MapError(err))
 		span.RecordError(err)
 		span.SetStatus(codes.Error, err.Error())
 		duration := time.Since(startTime)
@@ -605,7 +634,7 @@ func (pg *Postgres) Inserts(
 		pg.safeLogger.QueryError(c, "postgres", "insert", table, 0, err)
 		return nil, err
 	}
-	query, args, err := pg.queryBuilder.Inserts(table, data, nil)
+	query, args, err := pg.queryBuilder.Inserts(table, data, opts)
 	if err != nil {
 		err := fmt.Errorf("postgres.Inserts: failed to build insert query: %w", err)
 		span.RecordError(err)
@@ -618,7 +647,7 @@ func (pg *Postgres) Inserts(
 	duration := time.Since(startTime)
 
 	if err != nil {
-		err := fmt.Errorf("postgres.Inserts: failed to execute insert query: %w", err)
+		err := fmt.Errorf("postgres.Inserts: failed to execute insert query: %w", pg.errorMapper.MapError(err))
 		span.RecordError(err)
 		span.SetStatus(codes.Error, err.Error())
 		pg.safeLogger.QueryError(c, "postgres", "insert", table, duration, err)
@@ -632,6 +661,70 @@ func (pg *Postgres) Inserts(
 		rowsReturned = int(execResult.RowsAffected)
 	}
 	pg.safeLogger.QuerySuccess(c, "postgres", "insert", table, duration, rowsReturned)
+	return execResult, nil
+}
+
+// UpsertQuery builds the UPSERT query without executing it.
+func (pg *Postgres) UpsertQuery(
+	table string,
+	data map[string]any,
+	upsertOpts *options.UpsertOptions,
+	opts *options.QueryOptions,
+) (string, []any, error) {
+	query, args, err := pg.queryBuilder.Upsert(table, data, upsertOpts, opts)
+	if err != nil {
+		return "", nil, fmt.Errorf("postgres.Upsert: failed to build upsert query: %w", err)
+	}
+	return query, args, nil
+}
+
+// Upsert inserts one row or updates an existing row when a uniqueness conflict occurs.
+func (pg *Postgres) Upsert(
+	ctx context.Context,
+	table string,
+	data map[string]any,
+	upsertOpts *options.UpsertOptions,
+	opts *options.QueryOptions,
+) (*ExecResult, error) {
+	startTime := time.Now()
+	c, span := otel.UseTracer(ctx, "postgres.Upsert",
+		trace.WithSpanKind(trace.SpanKindClient),
+		trace.WithAttributes(
+			semconv.DBSystemNamePostgreSQL,
+			semconv.DBOperationName("upsert"),
+			semconv.DBCollectionName(table),
+		))
+	defer span.End()
+	if err := rejectExecutingReturning("Upsert", opts); err != nil {
+		span.RecordError(err)
+		span.SetStatus(codes.Error, err.Error())
+		pg.safeLogger.QueryError(c, "postgres", "upsert", table, 0, err)
+		return nil, err
+	}
+	query, args, err := pg.queryBuilder.Upsert(table, data, upsertOpts, opts)
+	if err != nil {
+		err := fmt.Errorf("postgres.Upsert: failed to build upsert query: %w", err)
+		span.RecordError(err)
+		span.SetStatus(codes.Error, err.Error())
+		pg.safeLogger.QueryError(c, "postgres", "upsert", table, 0, err)
+		return nil, err
+	}
+	result, err := pg.querier.Exec(c, query, args...)
+	duration := time.Since(startTime)
+	if err != nil {
+		err := fmt.Errorf("postgres.Upsert: failed to execute upsert query: %w", pg.errorMapper.MapError(err))
+		span.RecordError(err)
+		span.SetStatus(codes.Error, err.Error())
+		pg.safeLogger.QueryError(c, "postgres", "upsert", table, duration, err)
+		return nil, err
+	}
+	span.SetStatus(codes.Ok, "upsert successful")
+	execResult := fromCommandTag(result)
+	rowsReturned := 0
+	if execResult != nil {
+		rowsReturned = int(execResult.RowsAffected)
+	}
+	pg.safeLogger.QuerySuccess(c, "postgres", "upsert", table, duration, rowsReturned)
 	return execResult, nil
 }
 
@@ -673,7 +766,7 @@ func (pg *Postgres) Update(
 		pg.safeLogger.QueryError(c, "postgres", "update", table, 0, err)
 		return nil, err
 	}
-	query, args, err := pg.queryBuilder.Update(table, data, joins, conditions, nil)
+	query, args, err := pg.queryBuilder.Update(table, data, joins, conditions, opts)
 	if err != nil {
 		err := fmt.Errorf("postgres.Update: failed to build update query: %w", err)
 		span.RecordError(err)
@@ -684,7 +777,7 @@ func (pg *Postgres) Update(
 
 	result, err := pg.querier.Exec(c, query, args...)
 	if err != nil {
-		err := fmt.Errorf("postgres.Update: failed to execute update query: %w", err)
+		err := fmt.Errorf("postgres.Update: failed to execute update query: %w", pg.errorMapper.MapError(err))
 		span.RecordError(err)
 		span.SetStatus(codes.Error, err.Error())
 		duration := time.Since(startTime)
@@ -739,7 +832,7 @@ func (pg *Postgres) Delete(
 		pg.safeLogger.QueryError(c, "postgres", "delete", table, 0, err)
 		return nil, err
 	}
-	query, args, err := pg.queryBuilder.Delete(table, joins, conditions, nil)
+	query, args, err := pg.queryBuilder.Delete(table, joins, conditions, opts)
 	if err != nil {
 		err := fmt.Errorf("postgres.Delete: failed to build delete query: %w", err)
 		span.RecordError(err)
@@ -750,7 +843,7 @@ func (pg *Postgres) Delete(
 
 	result, err := pg.querier.Exec(c, query, args...)
 	if err != nil {
-		err := fmt.Errorf("postgres.Delete: failed to execute delete query: %w", err)
+		err := fmt.Errorf("postgres.Delete: failed to execute delete query: %w", pg.errorMapper.MapError(err))
 		span.RecordError(err)
 		span.SetStatus(codes.Error, err.Error())
 		duration := time.Since(startTime)
@@ -909,7 +1002,7 @@ func (pg *Postgres) Explain(
 }
 
 //nolint:dupl
-func (pg *Postgres) WithTransaction(ctx context.Context, fn func(tx Tx) error) error {
+func (pg *Postgres) WithTransaction(ctx context.Context, fn func(tx Tx) error, opts ...TransactionOptions) error {
 	c, span := otel.UseTracer(ctx, "postgres.WithTransaction",
 		trace.WithSpanKind(trace.SpanKindClient),
 		trace.WithAttributes(
@@ -917,7 +1010,7 @@ func (pg *Postgres) WithTransaction(ctx context.Context, fn func(tx Tx) error) e
 			semconv.DBOperationName("transaction"),
 		))
 	defer span.End()
-	tx, err := pg.Begin(c)
+	tx, err := pg.Begin(c, opts...)
 	if err != nil {
 		err := fmt.Errorf("postgres.WithTransaction: failed to begin transaction: %w", err)
 		span.RecordError(err)
@@ -1012,4 +1105,19 @@ func (pg *Postgres) Rollback(ctx context.Context) error {
 	span.SetStatus(codes.Ok, "transaction rolled back")
 	pg.safeLogger.TransactionSuccess(ctx, "postgres", "rollback")
 	return nil
+}
+
+// Savepoint creates a transaction savepoint.
+func (pg *Postgres) Savepoint(ctx context.Context, name string) error {
+	return savepoint(ctx, pg, name, false)
+}
+
+// RollbackToSavepoint rolls the transaction back to a savepoint.
+func (pg *Postgres) RollbackToSavepoint(ctx context.Context, name string) error {
+	return rollbackToSavepoint(ctx, pg, name, false)
+}
+
+// ReleaseSavepoint releases a transaction savepoint.
+func (pg *Postgres) ReleaseSavepoint(ctx context.Context, name string) error {
+	return releaseSavepoint(ctx, pg, name, false)
 }

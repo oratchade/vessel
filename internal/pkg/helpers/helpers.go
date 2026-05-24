@@ -7,6 +7,23 @@ import (
 	"tounilab.com/fabric/pkg/query/condition"
 )
 
+const rawProjectionPrefix = "\x00fabric:raw-projection:"
+
+// RawProjection marks a trusted projection fragment so builders render it
+// without identifier quoting. The marker is internal to Fabric.
+func RawProjection(sql string) string {
+	return rawProjectionPrefix + sql
+}
+
+// IsRawProjection returns a trusted projection fragment when value was created
+// with RawProjection.
+func IsRawProjection(value string) (string, bool) {
+	if !strings.HasPrefix(value, rawProjectionPrefix) {
+		return "", false
+	}
+	return strings.TrimPrefix(value, rawProjectionPrefix), true
+}
+
 // QuoteIdentifierSlice returns a slice of identifiers where each dotted segment
 // is quoted using the provided dialect. If a non-empty prefix is provided it
 // is prepended (unquoted) to each resulting identifier.

@@ -3,6 +3,34 @@ package options
 
 import "tounilab.com/fabric/pkg/query/condition"
 
+// UpsertAction describes what an upsert should do when a uniqueness conflict occurs.
+type UpsertAction string
+
+const (
+	// UpsertDoNothing skips conflicting rows.
+	UpsertDoNothing UpsertAction = "DO NOTHING"
+	// UpsertDoUpdate updates existing rows on conflict.
+	UpsertDoUpdate UpsertAction = "DO UPDATE"
+)
+
+// UpsertOptions describes conflict behavior for an INSERT ... ON CONFLICT style statement.
+type UpsertOptions struct {
+	// ConflictColumns identifies the uniqueness target for PostgreSQL and SQLite.
+	// MySQL ignores this field and uses the table's duplicate-key constraints.
+	ConflictColumns []string
+
+	// Action controls whether conflicts are ignored or updated.
+	Action UpsertAction
+
+	// UpdateColumns lists inserted columns to copy into the existing row for DoUpdate.
+	// If empty and Action is UpsertDoUpdate, all insert columns except conflict columns are updated.
+	UpdateColumns []string
+
+	// UpdateValues contains explicit values to set on conflict.
+	// These values are parameterized. If provided, they are appended after insert values.
+	UpdateValues map[string]any
+}
+
 // OrderBy specifies a column and its sort direction for result ordering.
 // Column is the column name, and Direction is either "ASC" or "DESC".
 // If Direction is empty, it defaults to "ASC".

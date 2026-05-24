@@ -160,14 +160,24 @@ All public types are **interfaces**, not concrete implementations:
 ```go
 // Users depend on interfaces
 type DB interface {
-    Get(ctx context.Context, query string, args ...any) ([]Row, error)
-    Insert(ctx context.Context, table string, data map[string]any) (Row, error)
-    Begin(ctx context.Context) (Tx, error)
+    reader
+    writer
+    upserter
+    introspector
+    transactional
+    healthCheck
+    closer
 }
 
-// Implementations are hidden
-type pgDB struct { /* internal */ }
-type mysqlDB struct { /* internal */ }
+type Tx interface {
+    reader
+    writer
+    upserter
+    introspector
+    savepointer
+    Commit(ctx context.Context) error
+    Rollback(ctx context.Context) error
+}
 ```
 
 **Benefit**: Tests mock interfaces; multiple implementations can coexist.
@@ -270,7 +280,7 @@ not runtime. Performance is predictable and consistent.
 │  ──────────────────────────────────────────────────────────  │
 │  • MySQL:      github.com/go-sql-driver/mysql                │
 │  • PostgreSQL: github.com/jackc/pgx (with pgxpool)           │
-│  • SQLite:     github.com/mattn/go-sqlite3 (CGO)             │
+│  • SQLite:     modernc.org/sqlite (pure Go)                  │
 │  • MSSQL:      github.com/denisenkom/go-mssqldb              │
 │                                                              │
 │  Connection Pool (per driver):                               │
@@ -351,7 +361,7 @@ not runtime. Performance is predictable and consistent.
 │                                                                  │
 │ db.Query(sqlString, args...)                                     │
 │  └ database/sql.DB.Query(ctx, sqlString, 18, 10)                 │
-│      └ Vendor Driver (pgx, mysql, sqlite3, mssqldb)              │
+│      └ Vendor Driver (pgx, mysql, sqlite, mssqldb)               │
 │          └ Network/IPC to database server                        │
 │                                                                  │
 └──────────────────────────────────────┬───────────────────────────┘
@@ -1124,7 +1134,7 @@ db.SetConnMaxIdleTime(5 * time.Minute)      // Close idle after 5 min
 ```go
 // SQLite uses single connection (file-based concurrency)
 
-db, _ := sql.Open("sqlite3", "file:test.db?cache=shared&mode=rwc")
+db, _ := sql.Open("sqlite", "file:test.db?cache=shared&mode=rwc")
 
 // Set max open connections to 1 for single-writer concurrency
 db.SetMaxOpenConns(1)
@@ -1332,16 +1342,19 @@ Args: ["active", 18, 100, 0]
 
 ```go
 type Tx interface {
-    // Same CRUD methods as DB
-    Get(ctx context.Context, query string, args ...any) ([]Row, error)
-    Insert(ctx context.Context, table string, data map[string]any) (Row, error)
-    Update(ctx context.Context, table string, data map[string]any, cond Condition)
-     (int64, error)
-    Delete(ctx context.Context, table string, cond Condition) (int64, error)
+    reader
+    writer
+    upserter
+    introspector
+    savepointer
+    Commit(ctx context.Context) error
+    Rollback(ctx context.Context) error
+}
 
-    // Transaction control
-    Commit() error
-    Rollback() error
+type savepointer interface {
+    Savepoint(ctx context.Context, name string) error
+    RollbackToSavepoint(ctx context.Context, name string) error
+    ReleaseSavepoint(ctx context.Context, name string) error
 }
 ```
 
@@ -1471,16 +1484,20 @@ defer tx.Rollback()
 _, _ = tx.Insert(ctx, "users", user1)
 _, _ = tx.Insert(ctx, "users", user2)
 
+if err := tx.Savepoint(ctx, "before_batch_2"); err != nil {
+    return err
+}
+
 // Batch operation 2 (might fail)
 if err := riskyOperation(ctx, tx); err != nil {
-    // Rollback only operation 2, keep operation 1
-    // (Requires save point support)
-    tx.Rollback()
+    // Rollback only operation 2, keep operation 1.
+    _ = tx.RollbackToSavepoint(ctx, "before_batch_2")
     return
 }
 
 // All good
-tx.Commit()
+_ = tx.ReleaseSavepoint(ctx, "before_batch_2")
+tx.Commit(ctx)
 ```
 
 ---
@@ -2519,7 +2536,7 @@ existing renderer logic.
 | ------------------------- | ------- | ----------------- | --------------- |
 | **go-sql-driver/mysql**   | Latest  | MySQL driver      | MySQL support   |
 | **jackc/pgx**             | Latest  | PostgreSQL driver | PostgreSQL pool |
-| **mattn/go-sqlite3**      | Latest  | SQLite driver     | SQLite file-db  |
+| **modernc.org/sqlite**    | Latest  | SQLite driver     | SQLite file-db  |
 | **denisenkom/go-mssqldb** | Latest  | MSSQL driver      | MSSQL support   |
 
 ### Optional Dependencies
@@ -2804,28 +2821,18 @@ logger := v1.NewApexAdapter(apexLogger)
 
 ```go
 type DB interface {
-    // CRUD operations
-    Get(ctx context.Context, query string, args ...any) ([]Row, error)
-    GetByID(ctx context.Context, table string, id any) (Row, error)
-    Insert(ctx context.Context, table string, data map[string]any) (Row, error)
-    Inserts(ctx context.Context, table string, dataSlice []map[string]any)
-     ([]Row, error)
-    Update(ctx context.Context, table string, data map[string]any, conditions ...Condition)
-     (int64, error)
-    Delete(ctx context.Context, table string, conditions ...Condition) (int64, error)
+    reader
+    writer
+    upserter
+    introspector
+    transactional
+    healthCheck
+    closer
+}
 
-    // Raw queries
-    Query(ctx context.Context, query string, args ...any) (sql.Rows, error)
-    Exec(ctx context.Context, query string, args ...any) (sql.Result, error)
-
-    // Transaction management
-    Begin(ctx context.Context) (Tx, error)
-    WithTransaction(ctx context.Context, fn func(Tx) error) error
-
-    // Connection management
-    Ping(ctx context.Context) error
-    Close() error
-    PoolStats() PoolStats
+type transactional interface {
+    Begin(ctx context.Context, opts ...TransactionOptions) (Tx, error)
+    WithTransaction(ctx context.Context, fn func(Tx) error, opts ...TransactionOptions) error
 }
 ```
 

@@ -8,3 +8,11 @@ package sqldialect
 type SQLiteDialect struct {
 	MySQLDialect
 }
+
+func (d SQLiteDialect) Capabilities() Capabilities {
+	return Capabilities{
+		SelectPagination: true,
+		JoinedUpdate:     true,
+		Upsert:           true,
+	}
+}

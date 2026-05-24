@@ -75,3 +75,14 @@ func (d PostgresDialect) SupportedOptions(
 ) (string, []any, error) {
 	return supportedOptions(d, queryType, opts, paramBase)
 }
+
+func (d PostgresDialect) Capabilities() Capabilities {
+	return Capabilities{
+		SelectPagination:      true,
+		MutationReturning:     true,
+		Upsert:                true,
+		JoinedUpdate:          true,
+		JoinedDelete:          true,
+		JoinedDeleteWithUsing: true,
+	}
+}

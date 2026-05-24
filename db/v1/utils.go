@@ -1,10 +1,11 @@
-// Package db provides database abstraction and query execution utilities.
+// Package v1 provides database abstraction and query execution utilities.
 package v1
 
 import (
 	"context"
 	"fmt"
 
+	"tounilab.com/fabric/db/v1/dberror"
 	builder "tounilab.com/fabric/internal/pkg/builder"
 	cdt "tounilab.com/fabric/pkg/query/condition"
 	"tounilab.com/fabric/pkg/query/options"
@@ -12,8 +13,16 @@ import (
 
 // dbOpts holds common database operation dependencies used by helper functions.
 type dbOpts struct {
-	builder builder.QueryBuilder
-	querier sqlQuerier
+	builder     builder.QueryBuilder
+	querier     sqlQuerier
+	errorMapper dberror.ErrorMapper
+}
+
+func (d dbOpts) mapError(err error) error {
+	if err == nil || d.errorMapper == nil {
+		return err
+	}
+	return fmt.Errorf("mapped database error: %w", d.errorMapper.MapError(err))
 }
 
 func rejectExecutingReturning(operation string, opts *options.QueryOptions) error {
@@ -44,7 +53,7 @@ func get(
 
 	rows, err := dbOpts.querier.QueryContext(ctx, query, args...)
 	if err != nil {
-		return nil, fmt.Errorf("get: execute query: %w", err)
+		return nil, fmt.Errorf("get: execute query: %w", dbOpts.mapError(err))
 	}
 	defer func() {
 		_ = rows.Close()
@@ -80,7 +89,7 @@ func getRaw(
 
 	rows, err := dbOpts.querier.QueryContext(ctx, query, args...)
 	if err != nil {
-		return nil, fmt.Errorf("getRaw: execute query: %w", err)
+		return nil, fmt.Errorf("getRaw: execute query: %w", dbOpts.mapError(err))
 	}
 
 	ra, err := newRowsAdapter(rows)
@@ -124,7 +133,7 @@ func getByID(
 
 	rows, err := dbOpts.querier.QueryContext(ctx, query, args...)
 	if err != nil {
-		return nil, fmt.Errorf("getByID: execute query: %w", err)
+		return nil, fmt.Errorf("getByID: execute query: %w", dbOpts.mapError(err))
 	}
 	defer func() {
 		_ = rows.Close()
@@ -159,7 +168,7 @@ func getByIDRaw(
 
 	rows, err := dbOpts.querier.QueryContext(ctx, query, args...)
 	if err != nil {
-		return nil, fmt.Errorf("getByIDRaw: execute query: %w", err)
+		return nil, fmt.Errorf("getByIDRaw: execute query: %w", dbOpts.mapError(err))
 	}
 
 	ra, err := newRowsAdapter(rows)
@@ -206,7 +215,7 @@ func insert(
 
 	result, err := dbOpts.querier.ExecContext(ctx, query, args...)
 	if err != nil {
-		return nil, fmt.Errorf("insert: execute query: %w", err)
+		return nil, fmt.Errorf("insert: execute query: %w", dbOpts.mapError(err))
 	}
 
 	execResult, err := fromSQLResult(result)
@@ -249,7 +258,7 @@ func inserts(
 
 	result, err := dbOpts.querier.ExecContext(ctx, query, args...)
 	if err != nil {
-		return nil, fmt.Errorf("inserts: execute query: %w", err)
+		return nil, fmt.Errorf("inserts: execute query: %w", dbOpts.mapError(err))
 	}
 
 	execResult, err := fromSQLResult(result)
@@ -274,6 +283,46 @@ func insertsQuery(
 	return query, args, nil
 }
 
+func upsert(
+	ctx context.Context,
+	table string,
+	data map[string]any,
+	upsertOpts *options.UpsertOptions,
+	opts *options.QueryOptions,
+	dbOpts dbOpts,
+) (*ExecResult, error) {
+	if err := rejectExecutingReturning("Upsert", opts); err != nil {
+		return nil, err
+	}
+	query, args, err := upsertQuery(table, data, upsertOpts, opts, dbOpts)
+	if err != nil {
+		return nil, fmt.Errorf("upsert: build query: %w", err)
+	}
+	result, err := dbOpts.querier.ExecContext(ctx, query, args...)
+	if err != nil {
+		return nil, fmt.Errorf("upsert: execute query: %w", dbOpts.mapError(err))
+	}
+	execResult, err := fromSQLResult(result)
+	if err != nil {
+		return nil, fmt.Errorf("upsert: %w", err)
+	}
+	return execResult, nil
+}
+
+func upsertQuery(
+	table string,
+	data map[string]any,
+	upsertOpts *options.UpsertOptions,
+	opts *options.QueryOptions,
+	dbOpts dbOpts,
+) (string, []any, error) {
+	query, args, err := dbOpts.builder.Upsert(table, data, upsertOpts, opts)
+	if err != nil {
+		return "", nil, fmt.Errorf("failed to build upsert query: %w", err)
+	}
+	return query, args, nil
+}
+
 // update executes an UPDATE query and returns the result with rows affected.
 func update(
 	ctx context.Context,
@@ -294,7 +343,7 @@ func update(
 
 	result, err := dbOpts.querier.ExecContext(ctx, query, args...)
 	if err != nil {
-		return nil, fmt.Errorf("update: execute query: %w", err)
+		return nil, fmt.Errorf("update: execute query: %w", dbOpts.mapError(err))
 	}
 
 	execResult, err := fromSQLResult(result)
@@ -340,7 +389,7 @@ func delete(
 
 	result, err := dbOpts.querier.ExecContext(ctx, query, args...)
 	if err != nil {
-		return nil, fmt.Errorf("delete: execute query: %w", err)
+		return nil, fmt.Errorf("delete: execute query: %w", dbOpts.mapError(err))
 	}
 
 	execResult, err := fromSQLResult(result)

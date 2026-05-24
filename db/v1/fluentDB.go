@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"strings"
 
+	"tounilab.com/fabric/internal/pkg/helpers"
 	cdt "tounilab.com/fabric/pkg/query/condition"
 	"tounilab.com/fabric/pkg/query/options"
 )
@@ -62,6 +63,7 @@ func ensureQueryOptions(opts **options.QueryOptions) {
 type dbActions interface {
 	reader
 	writer
+	upserter
 	introspector
 }
 
@@ -76,7 +78,7 @@ type FluentDB struct {
 //
 // Parameters:
 //
-//	db: The underlying database interface to execute queries (implements reader, writer, introspector).
+//	db: The underlying database interface to execute queries.
 //
 // Returns:
 //
@@ -91,6 +93,7 @@ type FluentDB struct {
 func NewFluentDB(db interface {
 	reader
 	writer
+	upserter
 	introspector
 },
 ) *FluentDB {
@@ -275,6 +278,79 @@ func (s *SelectBuilder) Joins(joins []cdt.Join) *SelectBuilder {
 	}
 	s.joins = append(s.joins, joins...)
 	return s
+}
+
+// JoinOn adds a JOIN with a condition-based ON clause.
+//
+// The ON condition is rendered by Fabric. Conditions with values are rejected
+// by the current join builder; use this for column predicates and unary checks
+// such as condition.IsNull("tu.deleted_at").
+func (s *SelectBuilder) JoinOn(joinType, table, alias string, on cdt.Condition) *SelectBuilder {
+	return s.Join(cdt.Join{Type: joinType, Table: table, Alias: alias, On: on})
+}
+
+// LeftJoinOn adds a LEFT JOIN with a condition-based ON clause.
+func (s *SelectBuilder) LeftJoinOn(table, alias string, on cdt.Condition) *SelectBuilder {
+	return s.JoinOn("LEFT", table, alias, on)
+}
+
+// InnerJoinOn adds an INNER JOIN with a condition-based ON clause.
+func (s *SelectBuilder) InnerJoinOn(table, alias string, on cdt.Condition) *SelectBuilder {
+	return s.JoinOn("INNER", table, alias, on)
+}
+
+// Column appends a safely quoted projection column.
+func (s *SelectBuilder) Column(column string) *SelectBuilder {
+	if column == "" {
+		return s
+	}
+	s.appendColumn(column)
+	return s
+}
+
+// ColumnAs appends a safely quoted projection column with an alias.
+func (s *SelectBuilder) ColumnAs(column, alias string) *SelectBuilder {
+	if column == "" {
+		return s
+	}
+	if alias == "" {
+		return s.Column(column)
+	}
+	s.appendColumn(column + " AS " + alias)
+	return s
+}
+
+// ColumnRaw appends a trusted raw projection fragment.
+//
+// The SQL fragment is caller-owned and is not quoted or parameterized. Only pass
+// trusted, allowlisted SQL syntax here; values should still be supplied through
+// parameterized conditions where possible.
+func (s *SelectBuilder) ColumnRaw(sql string) *SelectBuilder {
+	if sql == "" {
+		return s
+	}
+	s.appendColumn(helpers.RawProjection(sql))
+	return s
+}
+
+// ColumnRawAs appends a trusted raw projection fragment with a safely quoted alias.
+func (s *SelectBuilder) ColumnRawAs(sql, alias string) *SelectBuilder {
+	if sql == "" {
+		return s
+	}
+	if alias == "" {
+		return s.ColumnRaw(sql)
+	}
+	s.appendColumn(helpers.RawProjection(sql + " AS " + alias))
+	return s
+}
+
+func (s *SelectBuilder) appendColumn(column string) {
+	if len(s.columns) == 1 && s.columns[0] == "*" {
+		s.columns = []string{column}
+		return
+	}
+	s.columns = append(s.columns, column)
 }
 
 // OrderBy adds an ORDER BY clause to the SELECT query.
@@ -520,7 +596,9 @@ func (s *SelectBuilder) Count(ctx context.Context) (int64, error) {
 		return 0, fmt.Errorf("SelectBuilder.Count: table not specified")
 	}
 
-	rows, err := s.db.Get(ctx, s.table, []string{"COUNT(*) as count"}, s.joins, s.conditions, nil)
+	rows, err := s.db.Get(
+		ctx, s.table, []string{helpers.RawProjection("COUNT(*) AS count")}, s.joins, s.conditions, nil,
+	)
 	if err != nil {
 		return 0, fmt.Errorf("SelectBuilder.Count: failed to count rows: %w", err)
 	}
@@ -548,15 +626,48 @@ func (s *SelectBuilder) Count(ctx context.Context) (int64, error) {
 	}
 }
 
+// CountRaw executes a COUNT(*) query and returns a RowsAdapter.
+func (s *SelectBuilder) CountRaw(ctx context.Context, alias ...string) (*RowsAdapter, error) {
+	if s.table == "" {
+		return nil, fmt.Errorf("SelectBuilder.CountRaw: table not specified")
+	}
+	rows, err := s.db.GetRaw(ctx, s.table, []string{countProjection(alias...)}, s.joins, s.conditions, nil)
+	if err != nil {
+		return nil, fmt.Errorf("SelectBuilder.CountRaw: failed to count rows: %w", err)
+	}
+	return rows, nil
+}
+
+// CountQuery returns the generated COUNT(*) SQL and arguments without executing it.
+func (s *SelectBuilder) CountQuery(alias ...string) (string, []any, error) {
+	if s.table == "" {
+		return "", nil, fmt.Errorf("SelectBuilder.CountQuery: table not specified")
+	}
+	query, args, err := s.db.GetQuery(s.table, []string{countProjection(alias...)}, s.joins, s.conditions, nil)
+	if err != nil {
+		return "", nil, fmt.Errorf("SelectBuilder.CountQuery: failed to build query: %w", err)
+	}
+	return query, args, nil
+}
+
+func countProjection(alias ...string) string {
+	name := "cnt"
+	if len(alias) > 0 && strings.TrimSpace(alias[0]) != "" {
+		name = strings.TrimSpace(alias[0])
+	}
+	return helpers.RawProjection("COUNT(*) AS " + name)
+}
+
 // InsertBuilder is a fluent builder for INSERT queries.
 // It allows specification of the table and values to insert, either as
 // single or bulk operations.
 type InsertBuilder struct {
-	db    dbActions
-	table string
-	data  map[string]any
-	bulk  []map[string]any
-	opts  *options.QueryOptions
+	db         dbActions
+	table      string
+	data       map[string]any
+	bulk       []map[string]any
+	opts       *options.QueryOptions
+	upsertOpts *options.UpsertOptions
 }
 
 // WithTx specifies a transaction to execute this query within.
@@ -676,6 +787,49 @@ func (i *InsertBuilder) Returning(columns ...string) *InsertBuilder {
 	return i
 }
 
+// OnConflict configures the uniqueness target for a portable upsert.
+//
+// PostgreSQL and SQLite render ON CONFLICT with these columns. MySQL uses the
+// table's duplicate-key constraints but still accepts the columns so Fabric can
+// choose default update columns and no-op update behavior.
+func (i *InsertBuilder) OnConflict(columns ...string) *InsertBuilder {
+	if i.upsertOpts == nil {
+		i.upsertOpts = &options.UpsertOptions{}
+	}
+	i.upsertOpts.ConflictColumns = append([]string(nil), columns...)
+	return i
+}
+
+// DoNothing makes the upsert skip conflicting rows.
+func (i *InsertBuilder) DoNothing() *InsertBuilder {
+	if i.upsertOpts == nil {
+		i.upsertOpts = &options.UpsertOptions{}
+	}
+	i.upsertOpts.Action = options.UpsertDoNothing
+	return i
+}
+
+// DoUpdate makes the upsert copy inserted column values into the conflicting row.
+// If columns are omitted, all inserted columns except conflict columns are updated.
+func (i *InsertBuilder) DoUpdate(columns ...string) *InsertBuilder {
+	if i.upsertOpts == nil {
+		i.upsertOpts = &options.UpsertOptions{}
+	}
+	i.upsertOpts.Action = options.UpsertDoUpdate
+	i.upsertOpts.UpdateColumns = append([]string(nil), columns...)
+	return i
+}
+
+// DoUpdateSet makes the upsert set explicit values on conflict.
+func (i *InsertBuilder) DoUpdateSet(data map[string]any) *InsertBuilder {
+	if i.upsertOpts == nil {
+		i.upsertOpts = &options.UpsertOptions{}
+	}
+	i.upsertOpts.Action = options.UpsertDoUpdate
+	i.upsertOpts.UpdateValues = data
+	return i
+}
+
 // InsertQuery returns the generated single-row INSERT SQL and arguments without executing it.
 func (i *InsertBuilder) InsertQuery() (string, []any, error) {
 	if i.table == "" {
@@ -712,9 +866,36 @@ func (i *InsertBuilder) InsertsQuery() (string, []any, error) {
 	return query, args, nil
 }
 
+// UpsertQuery returns the generated UPSERT SQL and arguments without executing it.
+func (i *InsertBuilder) UpsertQuery() (string, []any, error) {
+	if i.table == "" {
+		return "", nil, fmt.Errorf("InsertBuilder.UpsertQuery: table not specified")
+	}
+	if len(i.bulk) > 0 {
+		return "", nil, fmt.Errorf("InsertBuilder.UpsertQuery: bulk upserts are not supported")
+	}
+	if len(i.data) == 0 {
+		return "", nil, fmt.Errorf("InsertBuilder.UpsertQuery: no data provided")
+	}
+	if i.upsertOpts == nil {
+		return "", nil, fmt.Errorf("InsertBuilder.UpsertQuery: upsert options not specified")
+	}
+	if err := validateQueryOptions(i.opts); err != nil {
+		return "", nil, fmt.Errorf("InsertBuilder.UpsertQuery: invalid query options: %w", err)
+	}
+	query, args, err := i.db.UpsertQuery(i.table, i.data, i.upsertOpts, i.opts)
+	if err != nil {
+		return "", nil, fmt.Errorf("InsertBuilder.UpsertQuery: failed to build query: %w", err)
+	}
+	return query, args, nil
+}
+
 // Query returns the generated INSERT SQL and arguments without executing it.
 // It uses bulk insert SQL when ValuesBulk was called, otherwise single insert SQL.
 func (i *InsertBuilder) Query() (string, []any, error) {
+	if i.upsertOpts != nil {
+		return i.UpsertQuery()
+	}
 	if len(i.bulk) > 0 {
 		return i.InsertsQuery()
 	}
@@ -742,6 +923,14 @@ func (i *InsertBuilder) Exec(ctx context.Context) (*ExecResult, error) {
 		return nil, fmt.Errorf("InsertBuilder.Exec: table not specified")
 	}
 
+	if i.upsertOpts != nil {
+		result, err := i.Upsert(ctx)
+		if err != nil {
+			return nil, fmt.Errorf("InsertBuilder.Exec: failed to upsert data: %w", err)
+		}
+		return result, nil
+	}
+
 	// Use bulk insert if data was provided via ValuesBulk
 	if len(i.bulk) > 0 {
 		result, err := i.db.Inserts(ctx, i.table, i.bulk, i.opts)
@@ -760,6 +949,83 @@ func (i *InsertBuilder) Exec(ctx context.Context) (*ExecResult, error) {
 		return nil, fmt.Errorf("InsertBuilder.Exec: failed to insert data: %w", err)
 	}
 	return result, nil
+}
+
+// Upsert executes the configured single-row upsert.
+func (i *InsertBuilder) Upsert(ctx context.Context) (*ExecResult, error) {
+	if i.table == "" {
+		return nil, fmt.Errorf("InsertBuilder.Upsert: table not specified")
+	}
+	if len(i.bulk) > 0 {
+		return nil, fmt.Errorf("InsertBuilder.Upsert: bulk upserts are not supported")
+	}
+	if len(i.data) == 0 {
+		return nil, fmt.Errorf("InsertBuilder.Upsert: no data provided")
+	}
+	if i.upsertOpts == nil {
+		return nil, fmt.Errorf("InsertBuilder.Upsert: upsert options not specified")
+	}
+	result, err := i.db.Upsert(ctx, i.table, i.data, i.upsertOpts, i.opts)
+	if err != nil {
+		return nil, fmt.Errorf("InsertBuilder.Upsert: failed to execute upsert: %w", err)
+	}
+	return result, nil
+}
+
+// InsertAndFetch inserts one row and fetches it by an application-provided key.
+//
+// The insert and follow-up select are separate statements unless this builder is
+// bound to a transaction with WithTx. For atomic create-and-fetch workflows,
+// call InsertAndFetch inside WithTransaction and pass that transaction via WithTx.
+func (i *InsertBuilder) InsertAndFetch(
+	ctx context.Context,
+	keyColumn string,
+	columns ...string,
+) (map[string]any, error) {
+	keyValue, err := i.validateInsertAndFetch(keyColumn)
+	if err != nil {
+		return nil, err
+	}
+	if _, err := i.Exec(ctx); err != nil {
+		return nil, err
+	}
+	if len(columns) == 0 {
+		columns = []string{"*"}
+	}
+	rows, err := i.db.Get(ctx, i.table, columns, nil, cdt.NewExpr().Column(keyColumn).Op("=").Value(keyValue), nil)
+	if err != nil {
+		return nil, fmt.Errorf("InsertBuilder.InsertAndFetch: failed to fetch inserted row: %w", err)
+	}
+	if len(rows) == 0 {
+		return nil, fmt.Errorf("InsertBuilder.InsertAndFetch: inserted row was not found")
+	}
+	return rows[0], nil
+}
+
+func (i *InsertBuilder) validateInsertAndFetch(keyColumn string) (any, error) {
+	if i.table == "" {
+		return nil, fmt.Errorf("InsertBuilder.InsertAndFetch: table not specified")
+	}
+	if keyColumn == "" {
+		return nil, fmt.Errorf("InsertBuilder.InsertAndFetch: key column not specified")
+	}
+	if len(i.bulk) > 0 {
+		return nil, fmt.Errorf("InsertBuilder.InsertAndFetch: bulk inserts are not supported")
+	}
+	if len(i.data) == 0 {
+		return nil, fmt.Errorf("InsertBuilder.InsertAndFetch: no data provided")
+	}
+	if i.upsertOpts != nil {
+		return nil, fmt.Errorf("InsertBuilder.InsertAndFetch: upsert is not supported")
+	}
+	if i.opts != nil && len(i.opts.Returning) > 0 {
+		return nil, fmt.Errorf("InsertBuilder.InsertAndFetch: Returning is not supported; fetch by key instead")
+	}
+	keyValue, ok := i.data[keyColumn]
+	if !ok {
+		return nil, fmt.Errorf("InsertBuilder.InsertAndFetch: key column %q missing from insert data", keyColumn)
+	}
+	return keyValue, nil
 }
 
 // UpdateBuilder is a fluent builder for UPDATE queries.

@@ -307,7 +307,7 @@ gh workflow run integration-tests.yml -f test_all_databases=true
 
 ```bash
 # Database selection
-export DB_TYPE=sqlite  # sqlite3, mysql, postgres, sqlserver
+export DB_TYPE=sqlite  # sqlite, mysql, postgres, sqlserver
 
 # MySQL
 export MYSQL_DSN="root:password@tcp(localhost:3306)/\
@@ -421,7 +421,7 @@ func runNewFeatureTest(t *testing.T, tdb TestDB) {
     t.Run(tdb.name, func(t *testing.T) {
         conn, err := sql.Open(tdb.driver, tdb.connString)
         if err != nil {
-            if tdb.driver != "sqlite3" {
+            if tdb.driver != "sqlite" {
                 t.Skipf("Skipping %s - not available", tdb.name)
             }
             t.Fatalf("Failed to open: %v", err)

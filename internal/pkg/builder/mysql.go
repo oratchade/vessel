@@ -63,6 +63,20 @@ func (m *MySQLQueryBuilder) Inserts(
 	return q, v, nil
 }
 
+// Upsert implements the QueryBuilder interface for MySQL.
+func (m *MySQLQueryBuilder) Upsert(
+	table string,
+	data map[string]any,
+	upsertOpts *options.UpsertOptions,
+	opts *options.QueryOptions,
+) (string, []any, error) {
+	q, v, err := upsert(m.dialect, table, data, upsertOpts, opts)
+	if err != nil {
+		return "", nil, fmt.Errorf("upsert mysqlSQL Builder: error building upsert query: %w", err)
+	}
+	return q, v, nil
+}
+
 // Update implements the QueryBuilder interface for MySQL.
 func (m *MySQLQueryBuilder) Update(
 	table string,
@@ -93,11 +107,15 @@ func (m *MySQLQueryBuilder) Delete(
 }
 
 // join converts a Join to a SQL JOIN clause.
-func (m *MySQLQueryBuilder) join(table string, join *cdt.Join) string {
+func (m *MySQLQueryBuilder) join(table string, join *cdt.Join, paramBase int) (string, []any, error) {
 	switch strings.ToLower(join.Type) {
 	case operator.Inner, operator.Right, operator.Left:
-		return join.ToSQL(table, m.dialect)
+		sql, args, err := join.ToSQLWithArgs(table, m.dialect, paramBase)
+		if err != nil {
+			return "", nil, fmt.Errorf("mysql join: %w", err)
+		}
+		return sql, args, nil
 	default:
-		return ""
+		return "", nil, nil
 	}
 }
