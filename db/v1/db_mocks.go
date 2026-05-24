@@ -290,31 +290,31 @@ func (mr *MockwriterMockRecorder) Update(ctx, table, data, joins, conditions, op
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Update", reflect.TypeOf((*Mockwriter)(nil).Update), ctx, table, data, joins, conditions, opts)
 }
 
-// MockUpserter is a mock of Upserter interface.
-type MockUpserter struct {
+// Mockupserter is a mock of upserter interface.
+type Mockupserter struct {
 	ctrl     *gomock.Controller
-	recorder *MockUpserterMockRecorder
+	recorder *MockupserterMockRecorder
 }
 
-// MockUpserterMockRecorder is the mock recorder for MockUpserter.
-type MockUpserterMockRecorder struct {
-	mock *MockUpserter
+// MockupserterMockRecorder is the mock recorder for Mockupserter.
+type MockupserterMockRecorder struct {
+	mock *Mockupserter
 }
 
-// NewMockUpserter creates a new mock instance.
-func NewMockUpserter(ctrl *gomock.Controller) *MockUpserter {
-	mock := &MockUpserter{ctrl: ctrl}
-	mock.recorder = &MockUpserterMockRecorder{mock}
+// NewMockupserter creates a new mock instance.
+func NewMockupserter(ctrl *gomock.Controller) *Mockupserter {
+	mock := &Mockupserter{ctrl: ctrl}
+	mock.recorder = &MockupserterMockRecorder{mock}
 	return mock
 }
 
 // EXPECT returns an object that allows the caller to indicate expected use.
-func (m *MockUpserter) EXPECT() *MockUpserterMockRecorder {
+func (m *Mockupserter) EXPECT() *MockupserterMockRecorder {
 	return m.recorder
 }
 
 // Upsert mocks base method.
-func (m *MockUpserter) Upsert(ctx context.Context, table string, data map[string]any, upsertOpts *options.UpsertOptions, opts *options.QueryOptions) (*ExecResult, error) {
+func (m *Mockupserter) Upsert(ctx context.Context, table string, data map[string]any, upsertOpts *options.UpsertOptions, opts *options.QueryOptions) (*ExecResult, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "Upsert", ctx, table, data, upsertOpts, opts)
 	ret0, _ := ret[0].(*ExecResult)
@@ -323,13 +323,13 @@ func (m *MockUpserter) Upsert(ctx context.Context, table string, data map[string
 }
 
 // Upsert indicates an expected call of Upsert.
-func (mr *MockUpserterMockRecorder) Upsert(ctx, table, data, upsertOpts, opts interface{}) *gomock.Call {
+func (mr *MockupserterMockRecorder) Upsert(ctx, table, data, upsertOpts, opts interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Upsert", reflect.TypeOf((*MockUpserter)(nil).Upsert), ctx, table, data, upsertOpts, opts)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Upsert", reflect.TypeOf((*Mockupserter)(nil).Upsert), ctx, table, data, upsertOpts, opts)
 }
 
 // UpsertQuery mocks base method.
-func (m *MockUpserter) UpsertQuery(table string, data map[string]any, upsertOpts *options.UpsertOptions, opts *options.QueryOptions) (string, []any, error) {
+func (m *Mockupserter) UpsertQuery(table string, data map[string]any, upsertOpts *options.UpsertOptions, opts *options.QueryOptions) (string, []any, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "UpsertQuery", table, data, upsertOpts, opts)
 	ret0, _ := ret[0].(string)
@@ -339,9 +339,9 @@ func (m *MockUpserter) UpsertQuery(table string, data map[string]any, upsertOpts
 }
 
 // UpsertQuery indicates an expected call of UpsertQuery.
-func (mr *MockUpserterMockRecorder) UpsertQuery(table, data, upsertOpts, opts interface{}) *gomock.Call {
+func (mr *MockupserterMockRecorder) UpsertQuery(table, data, upsertOpts, opts interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "UpsertQuery", reflect.TypeOf((*MockUpserter)(nil).UpsertQuery), table, data, upsertOpts, opts)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "UpsertQuery", reflect.TypeOf((*Mockupserter)(nil).UpsertQuery), table, data, upsertOpts, opts)
 }
 
 // Mockintrospector is a mock of introspector interface.
@@ -543,6 +543,71 @@ func (mr *MocktransactionalMockRecorder) WithTransaction(ctx, fn interface{}, op
 	mr.mock.ctrl.T.Helper()
 	varargs := append([]interface{}{ctx, fn}, opts...)
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "WithTransaction", reflect.TypeOf((*Mocktransactional)(nil).WithTransaction), varargs...)
+}
+
+// Mocksavepointer is a mock of savepointer interface.
+type Mocksavepointer struct {
+	ctrl     *gomock.Controller
+	recorder *MocksavepointerMockRecorder
+}
+
+// MocksavepointerMockRecorder is the mock recorder for Mocksavepointer.
+type MocksavepointerMockRecorder struct {
+	mock *Mocksavepointer
+}
+
+// NewMocksavepointer creates a new mock instance.
+func NewMocksavepointer(ctrl *gomock.Controller) *Mocksavepointer {
+	mock := &Mocksavepointer{ctrl: ctrl}
+	mock.recorder = &MocksavepointerMockRecorder{mock}
+	return mock
+}
+
+// EXPECT returns an object that allows the caller to indicate expected use.
+func (m *Mocksavepointer) EXPECT() *MocksavepointerMockRecorder {
+	return m.recorder
+}
+
+// ReleaseSavepoint mocks base method.
+func (m *Mocksavepointer) ReleaseSavepoint(ctx context.Context, name string) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "ReleaseSavepoint", ctx, name)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// ReleaseSavepoint indicates an expected call of ReleaseSavepoint.
+func (mr *MocksavepointerMockRecorder) ReleaseSavepoint(ctx, name interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ReleaseSavepoint", reflect.TypeOf((*Mocksavepointer)(nil).ReleaseSavepoint), ctx, name)
+}
+
+// RollbackToSavepoint mocks base method.
+func (m *Mocksavepointer) RollbackToSavepoint(ctx context.Context, name string) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "RollbackToSavepoint", ctx, name)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// RollbackToSavepoint indicates an expected call of RollbackToSavepoint.
+func (mr *MocksavepointerMockRecorder) RollbackToSavepoint(ctx, name interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "RollbackToSavepoint", reflect.TypeOf((*Mocksavepointer)(nil).RollbackToSavepoint), ctx, name)
+}
+
+// Savepoint mocks base method.
+func (m *Mocksavepointer) Savepoint(ctx context.Context, name string) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "Savepoint", ctx, name)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// Savepoint indicates an expected call of Savepoint.
+func (mr *MocksavepointerMockRecorder) Savepoint(ctx, name interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Savepoint", reflect.TypeOf((*Mocksavepointer)(nil).Savepoint), ctx, name)
 }
 
 // MockhealthCheck is a mock of healthCheck interface.
@@ -916,37 +981,6 @@ func (mr *MockDBMockRecorder) InsertsQuery(table, data, opts interface{}) *gomoc
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "InsertsQuery", reflect.TypeOf((*MockDB)(nil).InsertsQuery), table, data, opts)
 }
 
-// Upsert mocks base method.
-func (m *MockDB) Upsert(ctx context.Context, table string, data map[string]any, upsertOpts *options.UpsertOptions, opts *options.QueryOptions) (*ExecResult, error) {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "Upsert", ctx, table, data, upsertOpts, opts)
-	ret0, _ := ret[0].(*ExecResult)
-	ret1, _ := ret[1].(error)
-	return ret0, ret1
-}
-
-// Upsert indicates an expected call of Upsert.
-func (mr *MockDBMockRecorder) Upsert(ctx, table, data, upsertOpts, opts interface{}) *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Upsert", reflect.TypeOf((*MockDB)(nil).Upsert), ctx, table, data, upsertOpts, opts)
-}
-
-// UpsertQuery mocks base method.
-func (m *MockDB) UpsertQuery(table string, data map[string]any, upsertOpts *options.UpsertOptions, opts *options.QueryOptions) (string, []any, error) {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "UpsertQuery", table, data, upsertOpts, opts)
-	ret0, _ := ret[0].(string)
-	ret1, _ := ret[1].([]any)
-	ret2, _ := ret[2].(error)
-	return ret0, ret1, ret2
-}
-
-// UpsertQuery indicates an expected call of UpsertQuery.
-func (mr *MockDBMockRecorder) UpsertQuery(table, data, upsertOpts, opts interface{}) *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "UpsertQuery", reflect.TypeOf((*MockDB)(nil).UpsertQuery), table, data, upsertOpts, opts)
-}
-
 // Ping mocks base method.
 func (m *MockDB) Ping(ctx context.Context) error {
 	m.ctrl.T.Helper()
@@ -1045,6 +1079,37 @@ func (m *MockDB) UpdateQuery(table string, data map[string]any, joins []conditio
 func (mr *MockDBMockRecorder) UpdateQuery(table, data, joins, conditions, opts interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "UpdateQuery", reflect.TypeOf((*MockDB)(nil).UpdateQuery), table, data, joins, conditions, opts)
+}
+
+// Upsert mocks base method.
+func (m *MockDB) Upsert(ctx context.Context, table string, data map[string]any, upsertOpts *options.UpsertOptions, opts *options.QueryOptions) (*ExecResult, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "Upsert", ctx, table, data, upsertOpts, opts)
+	ret0, _ := ret[0].(*ExecResult)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// Upsert indicates an expected call of Upsert.
+func (mr *MockDBMockRecorder) Upsert(ctx, table, data, upsertOpts, opts interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Upsert", reflect.TypeOf((*MockDB)(nil).Upsert), ctx, table, data, upsertOpts, opts)
+}
+
+// UpsertQuery mocks base method.
+func (m *MockDB) UpsertQuery(table string, data map[string]any, upsertOpts *options.UpsertOptions, opts *options.QueryOptions) (string, []any, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "UpsertQuery", table, data, upsertOpts, opts)
+	ret0, _ := ret[0].(string)
+	ret1, _ := ret[1].([]any)
+	ret2, _ := ret[2].(error)
+	return ret0, ret1, ret2
+}
+
+// UpsertQuery indicates an expected call of UpsertQuery.
+func (mr *MockDBMockRecorder) UpsertQuery(table, data, upsertOpts, opts interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "UpsertQuery", reflect.TypeOf((*MockDB)(nil).UpsertQuery), table, data, upsertOpts, opts)
 }
 
 // WithTransaction mocks base method.
@@ -1328,37 +1393,6 @@ func (mr *MockTxMockRecorder) InsertsQuery(table, data, opts interface{}) *gomoc
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "InsertsQuery", reflect.TypeOf((*MockTx)(nil).InsertsQuery), table, data, opts)
 }
 
-// Upsert mocks base method.
-func (m *MockTx) Upsert(ctx context.Context, table string, data map[string]any, upsertOpts *options.UpsertOptions, opts *options.QueryOptions) (*ExecResult, error) {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "Upsert", ctx, table, data, upsertOpts, opts)
-	ret0, _ := ret[0].(*ExecResult)
-	ret1, _ := ret[1].(error)
-	return ret0, ret1
-}
-
-// Upsert indicates an expected call of Upsert.
-func (mr *MockTxMockRecorder) Upsert(ctx, table, data, upsertOpts, opts interface{}) *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Upsert", reflect.TypeOf((*MockTx)(nil).Upsert), ctx, table, data, upsertOpts, opts)
-}
-
-// UpsertQuery mocks base method.
-func (m *MockTx) UpsertQuery(table string, data map[string]any, upsertOpts *options.UpsertOptions, opts *options.QueryOptions) (string, []any, error) {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "UpsertQuery", table, data, upsertOpts, opts)
-	ret0, _ := ret[0].(string)
-	ret1, _ := ret[1].([]any)
-	ret2, _ := ret[2].(error)
-	return ret0, ret1, ret2
-}
-
-// UpsertQuery indicates an expected call of UpsertQuery.
-func (mr *MockTxMockRecorder) UpsertQuery(table, data, upsertOpts, opts interface{}) *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "UpsertQuery", reflect.TypeOf((*MockTx)(nil).UpsertQuery), table, data, upsertOpts, opts)
-}
-
 // Query mocks base method.
 func (m *MockTx) Query(ctx context.Context, query string, args ...any) ([]map[string]any, error) {
 	m.ctrl.T.Helper()
@@ -1399,6 +1433,20 @@ func (mr *MockTxMockRecorder) QueryRaw(ctx, query interface{}, args ...interface
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "QueryRaw", reflect.TypeOf((*MockTx)(nil).QueryRaw), varargs...)
 }
 
+// ReleaseSavepoint mocks base method.
+func (m *MockTx) ReleaseSavepoint(ctx context.Context, name string) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "ReleaseSavepoint", ctx, name)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// ReleaseSavepoint indicates an expected call of ReleaseSavepoint.
+func (mr *MockTxMockRecorder) ReleaseSavepoint(ctx, name interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ReleaseSavepoint", reflect.TypeOf((*MockTx)(nil).ReleaseSavepoint), ctx, name)
+}
+
 // Rollback mocks base method.
 func (m *MockTx) Rollback(ctx context.Context) error {
 	m.ctrl.T.Helper()
@@ -1411,20 +1459,6 @@ func (m *MockTx) Rollback(ctx context.Context) error {
 func (mr *MockTxMockRecorder) Rollback(ctx interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Rollback", reflect.TypeOf((*MockTx)(nil).Rollback), ctx)
-}
-
-// Savepoint mocks base method.
-func (m *MockTx) Savepoint(ctx context.Context, name string) error {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "Savepoint", ctx, name)
-	ret0, _ := ret[0].(error)
-	return ret0
-}
-
-// Savepoint indicates an expected call of Savepoint.
-func (mr *MockTxMockRecorder) Savepoint(ctx, name interface{}) *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Savepoint", reflect.TypeOf((*MockTx)(nil).Savepoint), ctx, name)
 }
 
 // RollbackToSavepoint mocks base method.
@@ -1441,18 +1475,18 @@ func (mr *MockTxMockRecorder) RollbackToSavepoint(ctx, name interface{}) *gomock
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "RollbackToSavepoint", reflect.TypeOf((*MockTx)(nil).RollbackToSavepoint), ctx, name)
 }
 
-// ReleaseSavepoint mocks base method.
-func (m *MockTx) ReleaseSavepoint(ctx context.Context, name string) error {
+// Savepoint mocks base method.
+func (m *MockTx) Savepoint(ctx context.Context, name string) error {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "ReleaseSavepoint", ctx, name)
+	ret := m.ctrl.Call(m, "Savepoint", ctx, name)
 	ret0, _ := ret[0].(error)
 	return ret0
 }
 
-// ReleaseSavepoint indicates an expected call of ReleaseSavepoint.
-func (mr *MockTxMockRecorder) ReleaseSavepoint(ctx, name interface{}) *gomock.Call {
+// Savepoint indicates an expected call of Savepoint.
+func (mr *MockTxMockRecorder) Savepoint(ctx, name interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ReleaseSavepoint", reflect.TypeOf((*MockTx)(nil).ReleaseSavepoint), ctx, name)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Savepoint", reflect.TypeOf((*MockTx)(nil).Savepoint), ctx, name)
 }
 
 // Update mocks base method.
@@ -1484,4 +1518,35 @@ func (m *MockTx) UpdateQuery(table string, data map[string]any, joins []conditio
 func (mr *MockTxMockRecorder) UpdateQuery(table, data, joins, conditions, opts interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "UpdateQuery", reflect.TypeOf((*MockTx)(nil).UpdateQuery), table, data, joins, conditions, opts)
+}
+
+// Upsert mocks base method.
+func (m *MockTx) Upsert(ctx context.Context, table string, data map[string]any, upsertOpts *options.UpsertOptions, opts *options.QueryOptions) (*ExecResult, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "Upsert", ctx, table, data, upsertOpts, opts)
+	ret0, _ := ret[0].(*ExecResult)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// Upsert indicates an expected call of Upsert.
+func (mr *MockTxMockRecorder) Upsert(ctx, table, data, upsertOpts, opts interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Upsert", reflect.TypeOf((*MockTx)(nil).Upsert), ctx, table, data, upsertOpts, opts)
+}
+
+// UpsertQuery mocks base method.
+func (m *MockTx) UpsertQuery(table string, data map[string]any, upsertOpts *options.UpsertOptions, opts *options.QueryOptions) (string, []any, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "UpsertQuery", table, data, upsertOpts, opts)
+	ret0, _ := ret[0].(string)
+	ret1, _ := ret[1].([]any)
+	ret2, _ := ret[2].(error)
+	return ret0, ret1, ret2
+}
+
+// UpsertQuery indicates an expected call of UpsertQuery.
+func (mr *MockTxMockRecorder) UpsertQuery(table, data, upsertOpts, opts interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "UpsertQuery", reflect.TypeOf((*MockTx)(nil).UpsertQuery), table, data, upsertOpts, opts)
 }

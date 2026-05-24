@@ -11,7 +11,7 @@ import (
 type MockDBActions struct {
 	*Mockreader
 	*Mockwriter
-	*MockUpserter
+	*Mockupserter
 	*Mockintrospector
 }
 
@@ -21,7 +21,7 @@ func NewMockDBActions(ctrl *gomock.Controller) *MockDBActions {
 	m := &MockDBActions{
 		Mockreader:       NewMockreader(ctrl),
 		Mockwriter:       NewMockwriter(ctrl),
-		MockUpserter:     NewMockUpserter(ctrl),
+		Mockupserter:     NewMockupserter(ctrl),
 		Mockintrospector: NewMockintrospector(ctrl),
 	}
 	return m
@@ -32,7 +32,7 @@ func NewMockDBActions(ctrl *gomock.Controller) *MockDBActions {
 type CompositeRecorder struct {
 	readerRecorder       *MockreaderMockRecorder
 	writerRecorder       *MockwriterMockRecorder
-	upserterRecorder     *MockUpserterMockRecorder
+	upserterRecorder     *MockupserterMockRecorder
 	introspectorRecorder *MockintrospectorMockRecorder
 }
 
@@ -41,7 +41,7 @@ func (m *MockDBActions) EXPECT() *CompositeRecorder {
 	return &CompositeRecorder{
 		readerRecorder:       m.Mockreader.EXPECT(),
 		writerRecorder:       m.Mockwriter.EXPECT(),
-		upserterRecorder:     m.MockUpserter.EXPECT(),
+		upserterRecorder:     m.Mockupserter.EXPECT(),
 		introspectorRecorder: m.Mockintrospector.EXPECT(),
 	}
 }
