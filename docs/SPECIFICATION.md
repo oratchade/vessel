@@ -590,15 +590,40 @@ Primary method groups include:
 
 ```go
 type reader interface {
-    Get(ctx context.Context, table string, columns []string, joins []condition.Join, conditions condition.Condition, opts *options.QueryOptions) ([]map[string]any, error)
-    GetRaw(ctx context.Context, table string, columns []string, joins []condition.Join, conditions condition.Condition, opts *options.QueryOptions) (*RowsAdapter, error)
+    Get(
+        ctx context.Context,
+        table string,
+        columns []string,
+        joins []condition.Join,
+        conditions condition.Condition,
+        opts *options.QueryOptions,
+    ) ([]map[string]any, error)
+    GetRaw(
+        ctx context.Context,
+        table string,
+        columns []string,
+        joins []condition.Join,
+        conditions condition.Condition,
+        opts *options.QueryOptions,
+    ) (*RowsAdapter, error)
     Query(ctx context.Context, query string, args ...any) ([]map[string]any, error)
     QueryRaw(ctx context.Context, query string, args ...any) (*RowsAdapter, error)
 }
 
 type upserter interface {
-    Upsert(ctx context.Context, table string, data map[string]any, upsertOpts *options.UpsertOptions, opts *options.QueryOptions) (*ExecResult, error)
-    UpsertQuery(table string, data map[string]any, upsertOpts *options.UpsertOptions, opts *options.QueryOptions) (string, []any, error)
+    Upsert(
+        ctx context.Context,
+        table string,
+        data map[string]any,
+        upsertOpts *options.UpsertOptions,
+        opts *options.QueryOptions,
+    ) (*ExecResult, error)
+    UpsertQuery(
+        table string,
+        data map[string]any,
+        upsertOpts *options.UpsertOptions,
+        opts *options.QueryOptions,
+    ) (string, []any, error)
 }
 ```
 

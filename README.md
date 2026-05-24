@@ -1035,30 +1035,30 @@ usage.
 
 ## Database Support
 
-| Feature                          | MySQL | PostgreSQL | SQLite | MSSQL |
-| -------------------------------- | ----- | ---------- | ------ | ----- |
-| Basic CRUD execution             | ✅    | ✅         | ✅     | ✅    |
-| Bulk insert execution            | ✅    | ✅         | ✅     | ✅    |
-| Joined SELECT                    | ✅    | ✅         | ✅     | ✅    |
-| Joined UPDATE SQL                | ✅    | ✅         | ✅     | ✅    |
-| Joined DELETE SQL                | ✅    | ✅         | ❌     | ✅    |
-| SELECT limit/offset              | ✅    | ✅         | ✅     | ✅    |
-| UPDATE/DELETE order+limit        | ✅    | explicit error | explicit error | explicit error |
-| Mutation RETURNING/OUTPUT preview | ignored | RETURNING | ignored | OUTPUT |
+| Feature                             | MySQL          | PostgreSQL     | SQLite         | MSSQL          |
+| ----------------------------------- | -------------- | -------------- | -------------- | -------------- |
+| Basic CRUD execution                | yes            | yes            | yes            | yes            |
+| Bulk insert execution               | yes            | yes            | yes            | yes            |
+| Joined SELECT                       | yes            | yes            | yes            | yes            |
+| Joined UPDATE SQL                   | yes            | yes            | yes            | yes            |
+| Joined DELETE SQL                   | yes            | yes            | no             | yes            |
+| SELECT limit/offset                 | yes            | yes            | yes            | yes            |
+| UPDATE/DELETE order+limit           | yes            | explicit error | explicit error | explicit error |
+| Mutation RETURNING/OUTPUT preview   | ignored        | RETURNING      | ignored        | OUTPUT         |
 | Mutation RETURNING/OUTPUT execution | explicit error | explicit error | explicit error | explicit error |
-| Safe parameterized HAVING        | ✅    | ✅         | ✅     | ✅    |
-| Raw HAVING escape hatch          | ✅    | ✅         | ✅     | ✅    |
-| Count row adapter                | ✅    | ✅         | ✅     | ✅    |
-| Upsert                           | ✅    | ✅         | ✅     | explicit error |
-| Portable case-insensitive LIKE   | ✅    | ✅         | ✅     | ✅    |
-| Typed scanning                   | ✅    | ✅         | ✅     | ✅    |
-| Transaction options              | ✅    | ✅         | ✅     | ✅    |
-| Transaction savepoints           | ✅    | ✅         | ✅     | partial |
-| Raw projection helpers           | ✅    | ✅         | ✅     | ✅    |
-| Transactions                     | ✅    | ✅         | ✅     | ✅    |
-| Query introspection              | ✅    | ✅         | ✅     | ✅    |
-| EXPLAIN analysis                 | ✅    | ✅         | ✅     | ✅    |
-| Connection pool stats            | ✅    | ✅         | ✅     | ✅    |
+| Safe parameterized HAVING           | yes            | yes            | yes            | yes            |
+| Raw HAVING escape hatch             | yes            | yes            | yes            | yes            |
+| Count row adapter                   | yes            | yes            | yes            | yes            |
+| Upsert                              | yes            | yes            | yes            | explicit error |
+| Portable case-insensitive LIKE      | yes            | yes            | yes            | yes            |
+| Typed scanning                      | yes            | yes            | yes            | yes            |
+| Transaction options                 | yes            | yes            | yes            | yes            |
+| Transaction savepoints              | yes            | yes            | yes            | partial        |
+| Raw projection helpers              | yes            | yes            | yes            | yes            |
+| Transactions                        | yes            | yes            | yes            | yes            |
+| Query introspection                 | yes            | yes            | yes            | yes            |
+| EXPLAIN analysis                    | yes            | yes            | yes            | yes            |
+| Connection pool stats               | yes            | yes            | yes            | yes            |
 
 Dialect notes:
 
