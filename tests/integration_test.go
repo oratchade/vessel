@@ -129,7 +129,7 @@ var testDatabases = []TestDB{
 		config: v1.MSSQLConfig{
 			User:            getEnv("DB_MSSQL_USER", "sa"),
 			Password:        getEnv("DB_MSSQL_PASSWORD", "TestPassword123!"),
-			Host:            getEnv("DB_MSSQL_HOST", "localhost"),
+			Host:            getEnv("DB_MSSQL_HOST", "127.0.0.1"),
 			Port:            getEnvUint16("DB_MSSQL_PORT", 1433),
 			Database:        getEnv("DB_MSSQL_DATABASE", "test_db"),
 			Encrypt:         "disable",

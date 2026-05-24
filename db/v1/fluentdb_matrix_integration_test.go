@@ -191,7 +191,7 @@ func fluentMatrixDatabases() []fluentMatrixDB {
 			cfg: v1.MSSQLConfig{
 				User:            fluentEnv("DB_MSSQL_USER", "sa"),
 				Password:        fluentEnv("DB_MSSQL_PASSWORD", "TestPassword123!"),
-				Host:            fluentEnv("DB_MSSQL_HOST", "localhost"),
+				Host:            fluentEnv("DB_MSSQL_HOST", "127.0.0.1"),
 				Port:            fluentEnvUint16("DB_MSSQL_PORT", 1433),
 				Database:        fluentEnv("DB_MSSQL_DATABASE", "test_db"),
 				Encrypt:         "disable",

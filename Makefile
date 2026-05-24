@@ -174,7 +174,7 @@ integration-test-mssql:
 	@DB_TYPE=sqlserver \
 		DB_MSSQL_USER=sa \
 		DB_MSSQL_PASSWORD=TestPassword123! \
-		DB_MSSQL_HOST=localhost \
+		DB_MSSQL_HOST=127.0.0.1 \
 		DB_MSSQL_DATABASE=test_db \
 		CGO_ENABLED=$(CGO_ENABLED) gotestsum --format=short-verbose --junitfile $(OUT_JUNIT_DIR)/integration-sqlserver.xml -- -count=1 -timeout 300s -tags=integration ./tests -run "TestIntegration"
 	@docker compose -f docker-compose.test.yml down mssql
@@ -209,7 +209,7 @@ integration-test-all:
 	@DB_TYPE=sqlserver \
 		DB_MSSQL_USER=sa \
 		DB_MSSQL_PASSWORD=TestPassword123! \
-		DB_MSSQL_HOST=localhost \
+		DB_MSSQL_HOST=127.0.0.1 \
 		DB_MSSQL_DATABASE=test_db \
 		CGO_ENABLED=$(CGO_ENABLED) gotestsum --format=short-verbose --junitfile $(OUT_JUNIT_DIR)/integration-sqlserver.xml -- -count=1 -timeout 300s -tags=integration ./tests -run "TestIntegration"
 	@docker compose -f docker-compose.test.yml down
