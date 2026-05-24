@@ -1,4 +1,4 @@
-.PHONY: test coverage cobertura cover-html cover-func tools fmt fmt-check lint lint-markdown lint-docs check all mocks integration-test integration-test-sqlite integration-test-mysql integration-test-postgres integration-test-mssql integration-test-all deps-install deps-validate clean
+.PHONY: test coverage cobertura cover-html cover-func tools fmt fmt-check lint lint-markdown lint-docs check all mocks integration-test integration-test-sqlite integration-test-mysql integration-test-postgres integration-test-mssql integration-test-all wait-mssql deps-install deps-validate clean
 
 TEST_PKGS ?= ./...
 
@@ -90,20 +90,16 @@ test:
 test-integration: GOFLAGS = -tags=integration
 test-integration:
 	@echo "Running all integration tests..."
-	@mkdir -p ./mssql_test_data $(OUT_JUNIT_DIR)
+	@mkdir -p $(OUT_JUNIT_DIR)
 	@docker compose -f docker-compose.test.yml up -d
 	@echo "Waiting for all services to be healthy..."
 	@sleep 10
-	@docker compose -f docker-compose.test.yml exec -T mysql mysqladmin ping -h localhost -u root -proot_password -w 60 -c 10 || true
+	@docker compose -f docker-compose.test.yml exec -T mysql mysqladmin --wait=60 --count=10 ping -h localhost -u root -proot_password || true
 	@docker compose -f docker-compose.test.yml exec -T postgres pg_isready -U test_user -d test_db -t 60 || true
-	@echo "Waiting for MSSQL to be ready (this takes longer)..."
-	@sleep 70
-	@docker compose -f docker-compose.test.yml exec -T mssql /opt/mssql-tools18/bin/sqlcmd -S localhost -U sa -P TestPassword123! -C -Q "SELECT 1" || true
-	@sleep 5
+	@$(MAKE) wait-mssql
 	@echo "Services are ready, running tests..."
 	CGO_ENABLED=$(CGO_ENABLED) gotestsum --format=short-verbose --junitfile $(JUNIT_FILE) -- -count=1 -timeout 300s $(GOFLAGS) $(TEST_PKGS)
-	@docker compose -f docker-compose.test.yml down
-	@rm -rf ./mssql_test_data
+	@docker compose -f docker-compose.test.yml down -v
 
 coverage:
 	@mkdir -p $(OUT_COVER_DIR) $(OUT_JUNIT_DIR)
@@ -136,7 +132,7 @@ integration-test-mysql:
 	@docker compose -f docker-compose.test.yml up -d mysql
 	@echo "Waiting for MySQL to be healthy..."
 	@sleep 5
-	@docker compose -f docker-compose.test.yml exec -T mysql mysqladmin ping -h localhost -u root -proot_password -w 60 -c 10 || true
+	@docker compose -f docker-compose.test.yml exec -T mysql mysqladmin --wait=60 --count=10 ping -h localhost -u root -proot_password || true
 	@sleep 5
 	@mkdir -p $(OUT_JUNIT_DIR)
 	@DB_TYPE=mysql \
@@ -165,33 +161,26 @@ integration-test-postgres:
 
 integration-test-mssql:
 	@echo "Running MSSQL integration tests..."
-	@mkdir -p ./mssql_test_data $(OUT_JUNIT_DIR)
+	@mkdir -p $(OUT_JUNIT_DIR)
 	@docker compose -f docker-compose.test.yml up -d mssql
-	@echo "Waiting for MSSQL to be healthy (this takes ~60-90 seconds)..."
-	@sleep 70
-	@docker compose -f docker-compose.test.yml exec -T mssql /opt/mssql-tools18/bin/sqlcmd -S localhost -U sa -P TestPassword123! -C -Q "SELECT 1" || true
-	@sleep 5
+	@$(MAKE) wait-mssql
 	@DB_TYPE=sqlserver \
 		DB_MSSQL_USER=sa \
 		DB_MSSQL_PASSWORD=TestPassword123! \
 		DB_MSSQL_HOST=127.0.0.1 \
 		DB_MSSQL_DATABASE=test_db \
 		CGO_ENABLED=$(CGO_ENABLED) gotestsum --format=short-verbose --junitfile $(OUT_JUNIT_DIR)/integration-sqlserver.xml -- -count=1 -timeout 300s -tags=integration ./tests -run "TestIntegration"
-	@docker compose -f docker-compose.test.yml down mssql
-	@rm -rf ./mssql_test_data
+	@docker compose -f docker-compose.test.yml down -v
 
 integration-test-all:
 	@echo "Running all integration tests..."
-	@mkdir -p ./mssql_test_data $(OUT_JUNIT_DIR)
+	@mkdir -p $(OUT_JUNIT_DIR)
 	@docker compose -f docker-compose.test.yml up -d
 	@echo "Waiting for all services to be healthy..."
 	@sleep 10
-	@docker compose -f docker-compose.test.yml exec -T mysql mysqladmin ping -h localhost -u root -proot_password -w 60 -c 10 || true
+	@docker compose -f docker-compose.test.yml exec -T mysql mysqladmin --wait=60 --count=10 ping -h localhost -u root -proot_password || true
 	@docker compose -f docker-compose.test.yml exec -T postgres pg_isready -U test_user -d test_db -t 60 || true
-	@echo "Waiting for MSSQL to be ready (this takes longer)..."
-	@sleep 70
-	@docker compose -f docker-compose.test.yml exec -T mssql /opt/mssql-tools18/bin/sqlcmd -S localhost -U sa -P TestPassword123! -C -Q "SELECT 1" || true
-	@sleep 5
+	@$(MAKE) wait-mssql
 	@echo "Services are ready, running tests..."
 	@DB_TYPE=sqlite CGO_ENABLED=$(CGO_ENABLED) gotestsum --format=short-verbose --junitfile $(OUT_JUNIT_DIR)/integration-sqlite.xml -- -count=1 -timeout 300s -tags=integration ./tests -run "TestIntegration"
 	@DB_TYPE=mysql \
@@ -212,8 +201,20 @@ integration-test-all:
 		DB_MSSQL_HOST=127.0.0.1 \
 		DB_MSSQL_DATABASE=test_db \
 		CGO_ENABLED=$(CGO_ENABLED) gotestsum --format=short-verbose --junitfile $(OUT_JUNIT_DIR)/integration-sqlserver.xml -- -count=1 -timeout 300s -tags=integration ./tests -run "TestIntegration"
-	@docker compose -f docker-compose.test.yml down
-	@rm -rf ./mssql_test_data
+	@docker compose -f docker-compose.test.yml down -v
+
+wait-mssql:
+	@echo "Waiting for MSSQL to be ready (this can take several minutes)..."
+	@for i in $$(seq 1 180); do \
+		if docker compose -f docker-compose.test.yml exec -T mssql /opt/mssql-tools18/bin/sqlcmd -S localhost -U sa -P TestPassword123! -C -Q "SELECT 1" >/dev/null 2>&1; then \
+			echo "MSSQL is ready"; \
+			exit 0; \
+		fi; \
+		sleep 1; \
+	done; \
+	echo "MSSQL did not become ready in time. Container logs:"; \
+	docker compose -f docker-compose.test.yml logs mssql; \
+	exit 1
 
 
 # Formatting
