@@ -4,23 +4,92 @@ on:
   push:
     tags:
       - "v*"
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Existing release tag, for example v1.0.0"
+        required: true
+        type: string
+      draft:
+        description: "Create the GitHub Release as a draft"
+        required: false
+        default: false
+        type: boolean
+      prerelease:
+        description: "Mark the GitHub Release as a prerelease"
+        required: false
+        default: false
+        type: boolean
 
 permissions:
   contents: write
 
+env:
+  GO_VERSION: "1.26.x"
+
 jobs:
-  setup-tools:
-    name: Setup Tools Cache
+  validate-release:
+    name: Validate Release
     runs-on: ubuntu-latest
+    outputs:
+      tag: ${{ steps.release.outputs.tag }}
+      version: ${{ steps.release.outputs.version }}
+      draft: ${{ steps.release.outputs.draft }}
+      prerelease: ${{ steps.release.outputs.prerelease }}
     steps:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
+          ref: ${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref }}
+
+      - name: Resolve release metadata
+        id: release
+        run: |
+          set -euo pipefail
+
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            TAG="${{ inputs.tag }}"
+            DRAFT="${{ inputs.draft }}"
+            INPUT_PRERELEASE="${{ inputs.prerelease }}"
+          else
+            TAG="${GITHUB_REF_NAME}"
+            DRAFT="false"
+            INPUT_PRERELEASE="false"
+          fi
+
+          if ! printf '%s' "$TAG" | grep -Eq '^v[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?$'; then
+            echo "Release tag must use semantic version format, for example v1.0.0 or v1.1.0-rc.1"
+            exit 1
+          fi
+
+          if ! git rev-parse --verify --quiet "${TAG}^{commit}" >/dev/null; then
+            echo "Release tag ${TAG} does not exist"
+            exit 1
+          fi
+
+          VERSION="${TAG#v}"
+          if ! grep -qE "^## \\[${VERSION}\\]" CHANGELOG.md; then
+            echo "CHANGELOG.md must contain a section for ${VERSION}"
+            exit 1
+          fi
+
+          PRERELEASE="false"
+          if printf '%s' "$TAG" | grep -q -- '-'; then
+            PRERELEASE="true"
+          fi
+          if [ "$INPUT_PRERELEASE" = "true" ]; then
+            PRERELEASE="true"
+          fi
+
+          echo "tag=${TAG}" >> "$GITHUB_OUTPUT"
+          echo "version=${VERSION}" >> "$GITHUB_OUTPUT"
+          echo "draft=${DRAFT}" >> "$GITHUB_OUTPUT"
+          echo "prerelease=${PRERELEASE}" >> "$GITHUB_OUTPUT"
 
       - name: Set up Go
         uses: actions/setup-go@v4
         with:
-          go-version: "1.26.x"
+          go-version: ${{ env.GO_VERSION }}
           cache: true
 
       - name: Cache Go tools
@@ -36,87 +105,140 @@ jobs:
       - name: Install Go tools
         run: make tools
 
-  validate-release:
-    name: Validate Release
-    needs: [ setup-tools ]
+      - name: Verify modules
+        run: |
+          go mod verify
+          make deps-validate
+
+      - name: Check formatting
+        run: make fmt-check
+
+      - name: Run lint
+        run: make lint
+
+      - name: Run unit tests with coverage
+        run: make coverage
+
+      - name: Run SQLite integration tests
+        run: make integration-test-sqlite
+
+  package-release:
+    name: Package Release
+    needs: validate-release
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
+          ref: ${{ needs.validate-release.outputs.tag }}
 
-      - name: Set up Go
-        uses: actions/setup-go@v4
+      - name: Build source archive
+        run: |
+          set -euo pipefail
+          TAG="${{ needs.validate-release.outputs.tag }}"
+          VERSION="${{ needs.validate-release.outputs.version }}"
+
+          mkdir -p dist
+          git archive \
+            --format=tar.gz \
+            --prefix="fabric-${VERSION}/" \
+            --output="dist/fabric-${TAG}.tar.gz" \
+            "$TAG"
+
+          cd dist
+          sha256sum "fabric-${TAG}.tar.gz" > "fabric-${TAG}.tar.gz.sha256"
+
+      - name: Upload release package
+        uses: actions/upload-artifact@v4
         with:
-          go-version: "1.26.x"
-          cache: true
-
-      - name: Restore Go tools cache
-        uses: actions/cache@v4
-        with:
-          path: ~/go/bin
-          key: go-tools-${{ runner.os }}-${{ hashFiles('**/go.mod') }}
-          restore-keys: go-tools-${{ runner.os }}-
-
-      - name: Run full test suite
-        run: make coverage
-
-      - name: Verify package quality
-        run: make lint
+          name: fabric-release-package
+          path: dist/
 
   create-release:
     name: Create GitHub Release
-    needs: validate-release
+    needs: [validate-release, package-release]
     runs-on: ubuntu-latest
-    if: startsWith(github.ref, 'refs/tags/v')
     steps:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
+          ref: ${{ needs.validate-release.outputs.tag }}
 
-      - name: Extract version
-        id: version
+      - name: Download release package
+        uses: actions/download-artifact@v4
+        with:
+          name: fabric-release-package
+          path: dist/
+
+      - name: Generate release notes
         run: |
-          VERSION=${GITHUB_REF#refs/tags/}
-          echo "version=${VERSION}" >> $GITHUB_OUTPUT
+          set -euo pipefail
+          TAG="${{ needs.validate-release.outputs.tag }}"
+          VERSION="${{ needs.validate-release.outputs.version }}"
 
-      - name: Generate changelog
-        id: changelog
-        run: |
-          VERSION=${GITHUB_REF#refs/tags/}
-          PREV_TAG=$(git tag -l --sort=-version:refname | grep -v $VERSION | head -1)
+          mkdir -p out/release
+          awk -v version="$VERSION" '
+            $0 ~ "^## \\[" version "\\]" { in_section=1; next }
+            in_section && /^## \[/ { exit }
+            in_section { print }
+          ' CHANGELOG.md > out/release/changelog-section.md
 
-          if [ -z "$PREV_TAG" ]; then
-            CHANGELOG=$(git log --oneline --no-decorate)
-          else
-            CHANGELOG=$(git log ${PREV_TAG}..HEAD --oneline --no-decorate)
+          if [ ! -s out/release/changelog-section.md ]; then
+            echo "CHANGELOG.md section for ${VERSION} is empty"
+            exit 1
           fi
 
-          echo "changelog<<EOF" >> $GITHUB_OUTPUT
-          echo "$CHANGELOG" >> $GITHUB_OUTPUT
-          echo "EOF" >> $GITHUB_OUTPUT
+          {
+            echo "# Fabric ${TAG}"
+            echo
+            cat out/release/changelog-section.md
+            echo
+            echo "## Installation"
+            echo
+            echo '```bash'
+            echo "go get tounilab.com/fabric@${TAG}"
+            echo '```'
+            echo
+            echo "## Verification"
+            echo
+            echo "Download the source archive and verify it with:"
+            echo
+            echo '```bash'
+            echo "sha256sum -c fabric-${TAG}.tar.gz.sha256"
+            echo '```'
+            echo
+            echo "## Documentation"
+            echo
+            echo "See https://pkg.go.dev/tounilab.com/fabric@${TAG} for API documentation."
+          } > out/release/body.md
 
-      - name: Create Release
+      - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: ${{ steps.version.outputs.version }}
-          body: |
-            # Release ${{ steps.version.outputs.version }}
-
-            ## Changes
-
-            ${{ steps.changelog.outputs.changelog }}
-
-            ## Installation
-
-            ```bash
-            go get -u tounilab.com/fabric@${{ steps.version.outputs.version }}
-            ```
-
-            ## Documentation
-
-            See [pkg.go.dev](https://pkg.go.dev/tounilab.com/fabric@${{ steps.version.outputs.version }}) for full API documentation.
-          draft: false
-          prerelease: false
+          tag_name: ${{ needs.validate-release.outputs.tag }}
+          name: Fabric ${{ needs.validate-release.outputs.tag }}
+          body_path: out/release/body.md
+          files: dist/*
+          draft: ${{ needs.validate-release.outputs.draft }}
+          prerelease: ${{ needs.validate-release.outputs.prerelease }}
+          fail_on_unmatched_files: true
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  publish-module-metadata:
+    name: Publish Module Metadata
+    needs: [validate-release, create-release]
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    steps:
+      - name: Set up Go
+        uses: actions/setup-go@v4
+        with:
+          go-version: ${{ env.GO_VERSION }}
+
+      - name: Warm Go module proxy
+        run: |
+          set -euo pipefail
+          TAG="${{ needs.validate-release.outputs.tag }}"
+          GOPROXY=https://proxy.golang.org,direct \
+            go list -m "tounilab.com/fabric@${TAG}"

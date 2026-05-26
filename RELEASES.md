@@ -100,6 +100,45 @@ go get tounilab.com/fabric
 go get tounilab.com/fabric@v1.0.0
 ```
 
+## Release Automation
+
+Fabric releases are tag-driven. A release tag starts the `Release` workflow,
+which validates the library, creates a source archive with a checksum, and
+publishes the GitHub Release from the matching `CHANGELOG.md` section.
+
+### Release Requirements
+
+- The tag must use semantic version format, for example `v1.0.0` or
+  `v1.1.0-rc.1`.
+- `CHANGELOG.md` must contain a matching section, for example
+  `## [1.0.0] - 2026-05-23`.
+- Formatting, linting, module tidiness, unit coverage, and SQLite integration
+  tests must pass.
+
+### Release Command
+
+```bash
+git tag -a v1.0.0 -m "Release v1.0.0"
+git push origin v1.0.0
+```
+
+The workflow can also be re-run manually from GitHub Actions with an existing
+tag. Manual runs are useful for recreating a draft release or retrying release
+publication after an external service issue.
+
+### Published Artifacts
+
+- GitHub Release named `Fabric vX.Y.Z`.
+- Release notes generated from `CHANGELOG.md`.
+- Source archive: `fabric-vX.Y.Z.tar.gz`.
+- SHA-256 checksum: `fabric-vX.Y.Z.tar.gz.sha256`.
+
+For Go consumers, the release artifact is the module tag:
+
+```bash
+go get tounilab.com/fabric@vX.Y.Z
+```
+
 ---
 
 ## Quick Start
