@@ -1,82 +1,67 @@
 # Fabric - Go SQL Builder and Multi-Database Abstraction Specification
 
-**Last Updated**: April 18, 2026
-
-## Recent API Changes (v1.0.0+)
-
-**April 15-18, 2026 - Quality & Stability Improvements:**
-
-- ✅ **Context Decoupled from FluentDB**: `NewFluentDB(db)` no longer takes context
-  as constructor parameter. Context is now passed at query execution time
-  (e.g., `.Get(ctx)`, `.Exec(ctx)`). This improves builder reusability and flexibility.
-- ✅ **Standardized Error Wrapping**: All errors now follow pattern
-  `function: operation: %w` (e.g., `Get: scan rows: connection lost`).
-  Enables consistent error handling and better debugging.
-- ✅ **Builder API Simplification**: The `Close()` method is now private.
-  Resources are automatically managed through proper `defer` patterns.
-- ✅ **Improved ScanRowsTo**: Enhanced type-safe row scanning with
-  better error handling and resource cleanup.
-- ✅ **Private validateQueryOptions**: Internal query validation is now private,
-  reducing API surface.
-
----
-
 ## Executive Summary
 
 ### Problem Statement
 
-Go developers building multi-database backend services face a fragmented landscape:
+Go services often need dynamic SQL and operational database behavior without
+committing to a full ORM. Common tradeoffs are:
 
-- **SQL String Concatenation**: Error-prone, vulnerable to injection attacks
-- **Driver Lock-in**: Switching databases requires rewriting data access code
+- **Raw SQL Strings**: Flexible, but repetitive and easy to assemble
+  incorrectly.
+- **Driver Lock-in**: Some dialect details leak into application data access
+  code.
 - **Dialect Differences**: MySQL, PostgreSQL, SQLite, and MSSQL have subtly
   different SQL syntax
-- **Logger Proliferation**: Applications use slog, logrus, zap, apex—Fabric
-  must support all without forcing a choice
-- **Boilerplate**: Raw database/sql requires verbose error handling and type conversions
-- **Missing Observability**: Distributed tracing not built-in to off-the-shelf
-  database libraries
+- **Scanning Boilerplate**: `database/sql` requires repeated error handling and
+  type conversion code.
+- **Operational Wrappers**: Tracing, retries, health checks, pool stats, and
+  transaction helpers are often built separately in each service.
 
 ### Target Users
 
-- **Tier 1**: SaaS platforms with multi-tenant architectures requiring database
-  abstraction
-- **Tier 2**: Backend services needing OpenTelemetry observability
-  and transaction support
-- **Tier 3**: Microservices with pluggable database strategies
+- Go services that need dynamic query construction and explicit SQL behavior.
+- Projects that need portable core CRUD/query flows across MySQL, PostgreSQL,
+  SQLite, and MSSQL.
+- Teams that want tracing, retries, pool stats, transaction helpers, and
+  optional manager routing close to the data layer.
+- Applications that do not want ORM-managed relationships or generated query
+  methods as the primary abstraction.
 
 ### Competitive Analysis
 
-#### Strengths
+#### Adjacent Tools
 
-| Solution          | Strengths                                              |
-| ----------------- | ------------------------------------------------------ |
-| **sqlc**          | Type-safe, compile-time validation                     |
-| **GORM**          | Full ORM, associations                                 |
-| **sqlx**          | Minimal wrapper, fast                                  |
-| **Ent**           | Graph-based, migrations                                |
-| **Fabric** (This) | Builders + multi-DB + pluggable loggers + OTel tracing |
+| Tool         | Strongest fit                                       |
+| ------------ | --------------------------------------------------- |
+| **sqlc**     | Compile-time validation for hand-written SQL        |
+| **sqlx**     | Thin scanning wrapper over explicit SQL             |
+| **pgx**      | PostgreSQL-first access with a strong native driver |
+| **Squirrel** | SQL composition without an execution layer          |
+| **GORM**     | Full ORM workflows and application CRUD speed       |
+| **Ent**      | Schema-first graph/entity modeling                  |
 
-#### Weaknesses
+#### Fabric Fit
 
-| Solution          | Weaknesses                             |
-| ----------------- | -------------------------------------- |
-| **sqlc**          | SQL-first, rigid schema coupling       |
-| **GORM**          | Heavyweight, magic, slow compile times |
-| **sqlx**          | String-based SQL, no builders          |
-| **Ent**           | Opinionated, learning curve            |
-| **Fabric** (This) | Newer, smaller ecosystem               |
+Fabric's fit is narrower: dynamic SQL builders, typed scanning, dialect-aware
+core operations, transaction helpers, observability, retry utilities, and an
+optional operational manager in one package.
+
+Fabric is a poor fit when the main requirement is compile-time SQL validation,
+ORM-managed relationships, migration ownership, or database-specific SQL as the
+primary API.
 
 ### Success Criteria
 
-- ✅ Type-safe queries with zero SQL injection risk
-- ✅ Single API supporting 4+ databases without code changes
-- ✅ Sub-10ms query execution for small result sets
-- ✅ 80%+ test coverage with TDD discipline
-- ✅ Pluggable logger integrations (slog, logrus, zap, apex)
-- ✅ OpenTelemetry distributed tracing out-of-the-box
-- ✅ Clean code: <800 lines per file, <50 lines per function
-- ✅ No runtime SQL injection attacks possible
+- Values are parameterized by default.
+- Identifiers are quoted per dialect by builder-owned paths.
+- Raw SQL escape hatches are explicit and caller-owned.
+- The same public API covers core flows for MySQL, PostgreSQL, SQLite, and
+  MSSQL.
+- Unsupported dialect features return clear errors.
+- OpenTelemetry tracing, retry helpers, transaction helpers, and pool stats are
+  available without extra service-local wrappers.
+- Unit and integration tests cover supported dialect behavior.
 
 ---
 
@@ -85,7 +70,7 @@ Go developers building multi-database backend services face a fragmented landsca
 ### FR1: Multi-Database SQL Abstraction
 
 **Requirement**: Fabric shall support MySQL 5.7+, PostgreSQL 9.6+, SQLite 3.x,
-and MSSQL 2016+ with a single, unified API.
+and MSSQL 2016+ for core query and execution flows through one API.
 
 **Scope**:
 
@@ -103,9 +88,10 @@ and MSSQL 2016+ with a single, unified API.
 
 **Acceptance Criteria**:
 
-- Identical Go code produces correct SQL for MySQL, PostgreSQL, SQLite, MSSQL
+- Identical Go code produces correct SQL for supported cross-dialect features
 - Same test suite passes on all 4 databases
-- No database-specific code in application code
+- Database-specific features are either rendered intentionally or rejected with
+  explicit unsupported errors
 
 ### FR2: Fluent Query Builders with Method Chaining
 
@@ -154,7 +140,8 @@ v1.NewFluentDB(db).
 
 ### FR3: Type-Safe Parameter Binding
 
-**Requirement**: All user input shall be parameterized; SQL injection shall be impossible.
+**Requirement**: All values passed through the condition and mutation APIs shall
+be parameterized.
 
 **Mechanism**:
 
@@ -166,8 +153,7 @@ v1.NewFluentDB(db).
 // ✅ SAFE: Parameterized
 cdt.NewExpr().Column("email").Op("=").Value(userEmail)  // → email = $1
 
-// ❌ UNSAFE: String concat (explicitly prevented)
-// No mechanism to build: "email = '" + userEmail + "'"
+// Raw SQL helpers exist for trusted SQL fragments only.
 ```
 
 **Acceptance Criteria**:
@@ -1246,7 +1232,8 @@ cdt.NewExpr().Column("id").Op("IN").Value([]int{1, 2, 3})
 
 ### Security
 
-- **SQL Injection**: Impossible (parameterized queries only)
+- **SQL Injection**: Values are parameterized by default; raw SQL helpers are
+  caller-owned and must use trusted SQL
 - **Secrets in Logs**: Never logged (password fields excluded)
 - **Error Messages**: Don't leak schema details
 - **Input Validation**: Delegated to database (drivers enforce constraints)
@@ -1280,8 +1267,8 @@ stats := db.PoolStats()  // Monitor connections
 
 ### v1 Stable
 
-- All 4 databases working
-- 80%+ test coverage
+- Core flows covered for MySQL, PostgreSQL, SQLite, and MSSQL
+- Unit and integration coverage for supported dialect behavior
 - Public API frozen (no breaking changes)
 - Documentation complete
 
@@ -1294,9 +1281,9 @@ stats := db.PoolStats()  // Monitor connections
 
 ### Success Metrics
 
-✅ 829 passing tests (100% pass rate)
-✅ <800 lines per file, <50 lines per function
-✅ Clean architecture (layered, testable)
-✅ Pluggable loggers, drivers, dialects
-✅ OpenTelemetry integration
-✅ Type-safe, zero SQL injection
+- Stable public `db/v1` interfaces
+- Layered architecture with dialect-specific rendering isolated internally
+- Pluggable loggers, drivers, and dialects
+- OpenTelemetry integration
+- Parameterized values by default
+- Explicit unsupported errors for dialect gaps

@@ -1,53 +1,41 @@
 # Releases
 
-This file provides a quick overview of Fabric release history. For
-detailed changes, see [CHANGELOG.md](CHANGELOG.md).
+This file describes how Fabric releases are packaged and published. For release
+contents, see [CHANGELOG.md](CHANGELOG.md).
 
 ---
 
-## Current Release
+## Release Contents
 
-### [1.0.0](CHANGELOG.md#100---2026-04-19) — Stable ✅
+### [0.1.0](CHANGELOG.md#010---2026-05-23)
 
-**Release Date**: April 19, 2026
+**Release Date**: May 23, 2026
 
-**Status**: Stable, Production-Ready
+**Scope**:
 
-**Quality Metrics**:
+- Core `db/v1.DB` and `db/v1.Tx` interfaces
+- Fluent builders for select, insert, update, delete, and upsert
+- MySQL, PostgreSQL, SQLite, and MSSQL support for core flows
+- Dialect-specific SQL generation with explicit unsupported-feature errors
+- OpenTelemetry tracing, retry helpers, transactions, pool stats, and manager
+  routing
+- Unit, race, and Docker-backed integration test coverage
 
-- ✅ 429 comprehensive db/v1 tests (100% pass rate)
-- ✅ All 6 internal composition interfaces private
-  (reader, writer, introspector, transactional, healthCheck, closer)
-- ✅ Public API surface reduced to 3 types (DB, Tx, FluentDB)
-- ✅ FluentDB constructor simplified to single composed interface
-- ✅ 0 known CVEs or security issues
-- ✅ 0 linting issues (40+ linters enabled)
-- ✅ A+ code quality grade (95/100)
-- ✅ Full backward compatibility maintained
+## Dialect-Aware Database Support
 
----
+- MySQL, PostgreSQL, SQLite, and MSSQL support for core CRUD/query flows
+- Per-dialect SQL rendering and identifier quoting
+- Clear errors when a dialect cannot support a requested feature
 
-## Release Highlights
+## Fluent Query Builder
 
-### v1.0.0 - Initial Release
+- SQL generation with parameterized values
+- SELECT, INSERT, UPDATE, DELETE, UPSERT, and query preview helpers
+- JOINs, aliases, aggregates, GROUP BY, safe HAVING, and raw escape hatches
+- `UpdateAll()` and `DeleteAll()` for intentional unfiltered mutations
+- PostgreSQL `RETURNING` and MSSQL `OUTPUT` query preview support
 
-**What's Included**:
-
-#### 🗄️ Multi-Database Support
-
-- MySQL 5.7+, PostgreSQL 9.6+, SQLite 3.x, MSSQL 2016+
-- Unified API across all databases
-- Database-specific optimizations
-
-#### 🔄 Fluent Query Builder
-
-- Type-safe SQL generation with parameterized queries
-- SELECT, INSERT, UPDATE, DELETE with full flexibility
-- JOINs, subqueries, aggregates, GROUP BY, HAVING
-- UpdateAll() and DeleteAll() for unfiltered operations
-- RETURNING clause support
-
-#### 🔌 Pluggable Loggers
+## Pluggable Loggers
 
 - **slog** (Go stdlib)
 - **logrus** (sirupsen/logrus)
@@ -55,13 +43,13 @@ detailed changes, see [CHANGELOG.md](CHANGELOG.md).
 - **apex** (github.com/apex/log)
 - Context chaining via `With()` method
 
-#### 🌎 Observability
+## Observability
 
 - OpenTelemetry tracing integration
 - Distributed tracing support
 - Transaction context tracking
 
-#### 🔐 Enterprise Features
+## Operational Features
 
 - Transaction support with atomicity
 - Health check API
@@ -69,35 +57,25 @@ detailed changes, see [CHANGELOG.md](CHANGELOG.md).
 - Manager API for multi-database routing
 - Configuration from YAML/TOML/JSON
 
-#### ✅ Production Ready
+## Test Coverage
 
-- Comprehensive test suite (829 tests)
-- All CRUD operations and edge cases covered
-- Integration tests across real databases
-- Security audit complete (zero SQL injection vectors)
-- Resource pooling for high-throughput scenarios (98-99% allocation reduction)
-- Three resource management patterns: automatic, explicit pooling, and managed cleanup
-
----
-
-## Version Matrix
-
-| Version | Release Date | Status    | Go Version | Databases | Count |
-| ------- | ------------ | --------- | ---------- | --------- | ----- |
-| 1.0.0   | 2026-04-19   | Stable ✅ | 1.26.0     | 4         | 829   |
+- Unit tests for builders, dialects, conditions, transactions, scanning, retry,
+  plugins, and manager behavior
+- Integration tests across SQLite and Docker-backed MySQL/PostgreSQL/MSSQL
+- Race targets for manager, DB, query, internal builder/dialect, and retry
+  packages
+- Resource pooling support for high-throughput row adapter paths
 
 ---
 
 ## Installation
-
-### Latest Release (v1.0.0)
 
 ```bash
 # Get the latest version
 go get tounilab.com/fabric
 
 # Or pin to specific version
-go get tounilab.com/fabric@v1.0.0
+go get tounilab.com/fabric@v0.1.0
 ```
 
 ## Release Automation
@@ -108,18 +86,18 @@ publishes the GitHub Release from the matching `CHANGELOG.md` section.
 
 ### Release Requirements
 
-- The tag must use semantic version format, for example `v1.0.0` or
-  `v1.1.0-rc.1`.
+- The tag must use semantic version format, for example `v0.1.0` or
+  `v0.2.0-rc.1`.
 - `CHANGELOG.md` must contain a matching section, for example
-  `## [1.0.0] - 2026-05-23`.
+  `## [0.1.0] - 2026-05-23`.
 - Formatting, linting, module tidiness, unit coverage, and SQLite integration
   tests must pass.
 
 ### Release Command
 
 ```bash
-git tag -a v1.0.0 -m "Release v1.0.0"
-git push origin v1.0.0
+git tag -a v0.1.0 -m "Release v0.1.0"
+git push origin v0.1.0
 ```
 
 The workflow can also be re-run manually from GitHub Actions with an existing
@@ -197,61 +175,6 @@ func main() {
 }
 ```
 
----
-
-## Upgrade Guide
-
-### Upgrading to 1.0.0
-
-**From Earlier Versions**:
-
-If you've been using pre-release versions of Fabric, here's what changed:
-
-1. **Package Structure**: Now using `db/v1` (not `v1/db`)
-
-   ```go
-   // Old
-   import v1 "tounilab.com/fabric/v1/db"
-
-   // New
-   import "tounilab.com/fabric/db/v1"
-   ```
-
-2. **Logger Interface**: New adapter pattern for logging frameworks
-
-   ```go
-   // Old (custom logger or no logging)
-   db, _ := v1.NewDB(cfg, nil)
-
-   // New (choose your logger)
-   logger := v1.NewSlogAdapter(slog.Default())
-   db, _ := v1.NewDB(cfg, logger)
-   ```
-
-3. **UpdateAll/DeleteAll**: New safe methods for unfiltered updates/deletes
-
-   ```go
-   // Old (workaround with empty Where)
-   v1.NewFluentDB(db, ctx).
-       Update("users", map[string]any{"status": "active"}).
-       Execute()
-
-   // New (explicit intent)
-   v1.NewFluentDB(db, ctx).
-       Update("users", map[string]any{"status": "active"}).
-       UpdateAll().
-       Execute()
-   ```
-
-4. **Error Handling**: Errors now include database prefixes
-
-   ```go
-   // All errors include [database] prefix
-   // e.g., "[postgres] connection refused: host=localhost"
-   ```
-
----
-
 ## Support
 
 ### Documentation
@@ -274,49 +197,6 @@ If you've been using pre-release versions of Fabric, here's what changed:
 
 ---
 
-## Roadmap
-
-### v1.1 (Planned - Q2 2026)
-
-- [ ] Performance benchmarks
-- [ ] Manager API tutorial
-- [ ] Property-based testing (fuzzing)
-- [ ] Performance tuning guide
-
-### v1.2+ (Future)
-
-- [ ] Query result caching
-- [ ] Connection pool auto-tuning
-- [ ] Prometheus metrics export
-- [ ] Schema migration helpers
-
----
-
 ## License
 
 Fabric is licensed under the [MIT License](LICENSE.md).
-
----
-
-## Release Notes Archive
-
-### What Happened to Previous Pre-Release Versions
-
-Fabric v1.0.0 represents the **first official stable release** consolidating:
-
-- Initial project setup and architecture
-- MySQL, PostgreSQL, SQLite, MSSQL driver integration
-- Query builder development and refinement
-- Manager API implementation
-- Logger adapter system
-- Phase 5 comprehensive testing (802 tests)
-- Phase 6 retry integration examples (27 additional test cases, 829 total)
-- Complete documentation suite with retry pattern guidance
-
-All previous work leading to this release is documented in the detailed [CHANGELOG.md](CHANGELOG.md).
-
----
-
-**Last Updated**: April 19, 2026  
-**Current Status**: v1.0.0 Stable ✅  
-**Maintainer**: oratchade

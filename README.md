@@ -1,7 +1,14 @@
 # fabric
 
-A lightweight, multi-database SQL abstraction library for Go with
-support for MySQL, PostgreSQL, SQLite, and MSSQL.
+A lightweight SQL-first data layer for Go services.
+
+Fabric sits between raw `database/sql` and a full ORM. It provides
+dialect-aware query builders, typed row scanning, transaction helpers,
+OpenTelemetry instrumentation, retry utilities, and an optional manager for
+operational routing and async writes.
+
+It is intended for services that want explicit SQL behavior without adopting
+an ORM or generating code for every query.
 
 [![GoDoc](https://godoc.org/tounilab.com/fabric?status.svg)](https://godoc.org/tounilab.com/fabric)
 [![Go Report Card](https://goreportcard.com/badge/tounilab.com/fabric)](https://goreportcard.com/report/tounilab.com/fabric)
@@ -10,19 +17,49 @@ support for MySQL, PostgreSQL, SQLite, and MSSQL.
 
 ## Features
 
-- 🗄️ **Multi-Database Support** - MySQL, PostgreSQL, SQLite,
-  MSSQL with unified API
-- 🔒 **Type-Safe Queries** - Parameterized SQL with automatic escaping
+- 🗄️ **Dialect-Aware SQL** - MySQL, PostgreSQL, SQLite, and MSSQL support for
+  core query and execution paths
+- 🔒 **Parameterized Values** - User values are bound as query parameters;
+  trusted SQL fragments remain explicit
 - 🎯 **Query Builder** - Fluent DSL for dynamic SQL construction
-- 🔄 **Transaction Support** - ACID compliance with automatic rollback on
+- 🔄 **Transaction Support** - Commit, rollback, savepoints, and callback
+  helpers with rollback on
   callback error or panic
 - 📊 **Connection Pooling** - Per-dialect statistics and configuration
-- ✨ **Zero-Copy Row Scanning** - Efficient field mapping to Go types
+- ✨ **Typed Row Scanning** - Field mapping to Go structs and adapter-based
+  row access
 - 📡 **OpenTelemetry Tracing** - Distributed tracing for all
   database operations
 - 🚚 **Manager Insert Batching** - Optional per-worker `InsertAsync`
   coalescing for write-heavy paths
-- 🧪 **Comprehensive Testing** - 946 unit tests with 100% pass rate
+- 🧪 **Tested Dialect Behavior** - Unit and integration coverage for builder,
+  execution, transaction, and manager paths
+
+## Positioning
+
+Fabric is not a replacement for every Go database tool.
+
+Use Fabric when you want:
+
+- dynamic SQL builders without string concatenation;
+- portable core CRUD/query behavior across supported dialects;
+- explicit unsupported-feature errors instead of silent SQL generation;
+- typed scanning and raw row access in the same package;
+- transaction, retry, tracing, pool-stat, and manager utilities close to the
+  data layer.
+
+Prefer another tool when you need:
+
+- compile-time SQL validation and generated methods (`sqlc`);
+- the thinnest possible wrapper over hand-written SQL (`sqlx` or `pgx`);
+- a full ORM with relationships, migrations, hooks, and entity lifecycle
+  management (GORM, Bun, Ent);
+- database-specific SQL as the main abstraction.
+
+Fabric's unique position is operational convenience for SQL-first services: a
+small, explicit data layer that keeps query construction, dialect rules,
+transaction behavior, observability, retries, and optional write routing in one
+place without becoming an ORM.
 
 ## Installation
 
@@ -32,21 +69,16 @@ go get tounilab.com/fabric
 
 Requires Go 1.26.0 or later.
 
-## Status & Releases
+## Scope
 
-**Current Version**: [v1.0.0](RELEASES.md) (Stable ✅)
+- MySQL, PostgreSQL, SQLite, and MSSQL support for core flows
+- dialect-specific feature handling with explicit unsupported errors
+- optional Manager insert coalescing for compatible async writes
+- retry helpers with fixed, linear, exponential, jitter, and random strategies
+- documentation and examples for the main API paths
 
-Fabric v1.0.0 is the first stable release with:
-
-- ✅ Full multi-database support (MySQL, PostgreSQL, SQLite, MSSQL)
-- ✅ 946 comprehensive tests (100% pass rate)
-- ✅ Optional Manager insert coalescing for compatible async writes
-- ✅ Retry integration with automatic backoff strategies
-- ✅ Production-ready and battle-tested
-- ✅ Complete documentation and examples
-
-**See**: [RELEASES.md](RELEASES.md) for release highlights |
-[CHANGELOG.md](CHANGELOG.md) for detailed changes
+See [RELEASES.md](RELEASES.md) for release commands and
+[CHANGELOG.md](CHANGELOG.md) for the release contents.
 
 ## OpenTelemetry Tracing & Observability
 
@@ -201,15 +233,15 @@ Traces include:
 - Semantic conventions from OpenTelemetry specification
 - Span status and error recording for observability
 
-### Zero Overhead When Disabled
+### Disabled Tracing
 
 When `OTEL_ENABLED=false`, the library uses OpenTelemetry's
-no-op tracer provider, resulting in:
+no-op tracer provider:
 
-- ✅ No performance impact
-- ✅ No memory allocations for tracing
-- ✅ Complete trace API compatibility
-- ✅ Easy enable/disable via environment variable
+- no exported spans;
+- no tracer setup required in application code;
+- the same API remains available;
+- tracing can be enabled again through the environment variable.
 
 ## Quick Start
 
@@ -269,9 +301,9 @@ for _, user := range users {
 }
 ```
 
-#### Type-Safe Queries (Recommended for Production)
+#### Typed Scanning
 
-For better performance and type safety, use `GetRaw()` with `ScanRowsTo[T]()`:
+When you want typed structs, use `GetRaw()` with `ScanRowsTo[T]()`:
 
 ```go
 import db "tounilab.com/fabric/db/v1"
@@ -303,12 +335,13 @@ for _, user := range users {
 }
 ```
 
-**Why use `ScanRowsTo[T]`?**
+`ScanRowsTo[T]` is useful when you want typed structs instead of map-based row
+access:
 
-- ✅ **Zero-copy** - Efficient field scanning without map allocations
-- ✅ **Type-safe** - Compile-time column mapping, no casting needed
-- ✅ **Performance** - 3-5x faster on large datasets vs map-based approach
-- ✅ **Memory** - Reduced GC pressure on massive result sets
+- it avoids map allocation for each row;
+- it keeps scan targets explicit through the destination struct;
+- it supports common `database/sql` nullable types;
+- it works alongside raw `RowsAdapter` access when dynamic results are needed.
 
 ### Inserting Data
 
@@ -482,8 +515,8 @@ make coverage
 make cover-html  # Opens HTML coverage report in browser
 ```
 
-**All 694 unit tests passing** ✅ with comprehensive coverage across
-MySQL, PostgreSQL, SQLite, and MSSQL.
+The test suite includes unit coverage for builders and dialect rendering, plus
+integration targets for SQLite and Docker-backed MySQL, PostgreSQL, and MSSQL.
 
 See [CODE_REVIEW.md](./docs/CODE_REVIEW.md) for code quality standards
 and testing requirements.
@@ -626,12 +659,8 @@ func ProcessOrdersInBatch(ctx context.Context, db v1.DB, orderIDs []int) error {
 - Without pooling: 10,000 queries = 10,000 allocations (1 per query)
 - With pooling: 10,000 queries = ~1-5 allocations (reuses same objects)
 
-**Benefits:**
-
-- ✅ **98-99% allocation reduction** in tight loops
-- ✅ **40-60% GC reduction** - Dramatically less garbage collection
-- ✅ **Thread-safe** - Safe to share across goroutines
-- ✅ **Works with ScanRowsTo[T]** - Full type safety retained
+Pooling is useful in tight loops where repeated adapter allocation shows up in
+profiles. It keeps adapter reuse explicit and still works with `ScanRowsTo[T]`.
 
 ## Optional: Monitor Pool Health
 
@@ -682,12 +711,8 @@ for _, user := range users {
 // Resources automatically cleaned up when managed.Close() called
 ```
 
-**Benefits:**
-
-- ✅ **Explicit semantics** - Crystal-clear resource lifecycle
-- ✅ **Finalizer fallback** - Resources cleaned up even if Close() forgotten
-- ✅ **Idempotent Close** - Safe to call multiple times
-- ✅ **No panic** - Checks if already closed before cleanup
+Managed adapters make cleanup explicit, keep `Close()` idempotent, and provide a
+fallback finalizer for missed cleanup paths.
 
 #### Real-World Service Pattern
 
@@ -771,15 +796,15 @@ func (s *UserService) SearchUsers(ctx context.Context, query string) ([]User, er
 }
 ```
 
-**Performance Comparison:**
+**Resource Pattern Comparison:**
 
-| Pattern                | Allocations         | GC Pressure | Best For                     |
-| ---------------------- | ------------------- | ----------- | ---------------------------- |
-| Pattern 1 (ScanRowsTo) | 1 per query         | Normal      | Single queries, most cases   |
-| Pattern 2 (Pool)       | 1-5 for 10K queries | 40-60% less | Bulk operations, tight loops |
-| Pattern 3 (Managed)    | 1 per query         | Normal      | Explicit semantics needed    |
+- Pattern 1 (`ScanRowsTo`): simple per-query allocation for single queries and
+  most normal paths.
+- Pattern 2 (pool): explicit adapter reuse for hot paths and tight loops.
+- Pattern 3 (managed): explicit cleanup with fallback for complex control flow.
 
-**See Also:** [Resource Pooling Guide](./docs/RESOURCE_POOLING.md) for comprehensive benchmarks and advanced pool tuning
+**See Also:** [Resource Pooling Guide](./docs/RESOURCE_POOLING.md) for
+benchmarks and pool tuning details.
 
 ### Query Introspection and Performance Analysis
 
@@ -834,15 +859,9 @@ for explainRows.Next() {
 - `DeleteQuery()` - Preview DELETE queries
 - `Explain()` - Execute EXPLAIN to analyze query performance
 
-**Benefits:**
-
-- ✅ **SQL Injection Prevention** - When combined with xxxQuery methods,
-  ensures safe, parameterized SQL
-- ✅ **Query Debugging** - Verify the actual SQL before execution
-- ✅ **Performance Analysis** - Run EXPLAIN to understand query plans
-- ✅ **Query Logging** - Log all generated SQL for audit trails
-- ✅ **Batch Operations** - Build and verify multiple queries before
-  execution
+Query preview is intended for debugging, logging, tests, and EXPLAIN workflows.
+Generated SQL uses placeholders for values when built through Fabric's query and
+condition APIs.
 
 ### FluentDB - Fluent Query Builder API
 
@@ -894,16 +913,8 @@ user, err := fdb.Select("users", "id", "name").
     One()
 ```
 
-**FluentDB Features:**
-
-- ✅ **Chainable API** - Methods return builders for fluent method chaining
-- ✅ **Readable** - Code reads naturally from left-to-right like SQL
-- ✅ **Type-Safe** - Compiler catches method order errors
-- ✅ **100% Code Reuse** - Delegates to existing DBActions (no duplication)
-- ✅ **JOINs** - INNER, LEFT, RIGHT joins with multiple conditions
-- ✅ **Transactions** - Works seamlessly with transactions via `WithTx()`
-- ✅ **Pagination** - Built-in LIMIT and OFFSET
-- ✅ **Sorting** - Chainable ORDER BY with multiple columns
+FluentDB supports chainable query construction, joins, transaction binding,
+pagination, sorting, aggregate helpers, raw escape hatches, and query preview.
 
 **Examples:**
 
@@ -1687,7 +1698,7 @@ MIT License - see [LICENSE.md](./LICENSE.md)
 
 **Release & Changelog**:
 
-- 🎉 **[RELEASES.md](./RELEASES.md)** - Quick release overview and version history
+- 🎉 **[RELEASES.md](./RELEASES.md)** - Release packaging and publication notes
 - 📝 **[CHANGELOG.md](./CHANGELOG.md)** - Detailed changelog (Keep a Changelog format)
 
 **Guides & References**:
@@ -1714,12 +1725,6 @@ MIT License - see [LICENSE.md](./LICENSE.md)
 
 ## Changelog
 
-See [RELEASES.md](./RELEASES.md) for version history and release notes.
+See [RELEASES.md](./RELEASES.md) for release packaging and publication notes.
 
-For detailed changes between versions, see [CHANGELOG.md](./CHANGELOG.md)
-(Keep a Changelog format).
-
----
-
-**Last Updated:** March 2026  
-**Status:** ✅ Production Ready
+For release contents, see [CHANGELOG.md](./CHANGELOG.md).

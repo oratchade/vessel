@@ -1,33 +1,10 @@
 # Fabric Architecture
 
-**Fabric** is a production-grade, multi-database SQL abstraction layer for Go.
-This document provides the definitive architectural reference for understanding
-the entire system design, enabling rapid onboarding and informed extension decisions.
+**Fabric** is a lightweight SQL-first data layer for Go services.
+This document describes the system design, package boundaries, and extension
+points used by the library.
 
-**Version**: 1.0+ (Post-Phase 5)  
-**Last Updated**: April 18, 2026  
-**Maintainer**: oratchade  
-**Status**: Production Ready (Grade A+, 802 tests, 100% pass rate)  
 **Target Audience**: AI agents, new contributors, maintainers
-
-## Recent API Changes (April 15-19, 2026)
-
-- **Comprehensive Interface Encapsulation**: Made all 6 internal composition
-  interfaces private (lowercase names): reader, writer, introspector, transactional,
-  healthCheck, closer. This reduces public API surface from 9 types to 3 (DB, Tx,
-  FluentDB) while maintaining full backward compatibility and improving implementation
-  flexibility.
-- **FluentDB Constructor Simplified**: Changed from three separate parameters
-  `(reader Reader, writer Writer, introspector Introspector)`
-  to single composed interface `(db interface {reader; writer; introspector})`.
-  This reduces parameter passing complexity
-  and improves API ergonomics while maintaining backward compatibility.
-- **Error Wrapping Standardized**: All errors follow `function: operation: %w`
-  pattern for consistency.
-- **Builder Cleanup**: `Close()` method made private; resources auto-managed
-  via defer patterns.
-
----
 
 ## Quick Navigation
 
@@ -83,8 +60,7 @@ the entire system design, enabling rapid onboarding and informed extension decis
 19. [Decision Trees for Modifications](#decision-trees-for-modifications)
 20. [Dependency Landscape](#dependency-landscape)
 21. [Troubleshooting Guide](#troubleshooting-guide)
-22. [Future Extensibility Roadmap](#future-extensibility-roadmap)
-23. [API Surface Reference](#api-surface-reference)
+22. [API Surface Reference](#api-surface-reference)
 
 ---
 
@@ -92,48 +68,52 @@ the entire system design, enabling rapid onboarding and informed extension decis
 
 ### What is Fabric
 
-Fabric is a **type-safe SQL query abstraction library** that unifies
-MySQL, PostgreSQL, SQLite, and MSSQL behind a single, ergonomic Go API.
-It eliminates the need for manual SQL string construction while
-maintaining complete control over query generation.
+Fabric is a **SQL-first query abstraction library** that unifies
+MySQL, PostgreSQL, SQLite, and MSSQL behind one Go API for core query and
+execution paths. It reduces manual SQL string construction while keeping SQL
+behavior explicit.
 
-Unlike traditional ORMs (Gorm, sqlc, Ent), Fabric occupies
-the sweet spot between manual SQL writing and full ORM abstraction:
+Fabric is not an ORM and does not try to own schema modeling, relationships, or
+migrations. It is a service data-layer toolkit: query builders, dialect rules,
+typed scanning, transactions, tracing, retry helpers, pool statistics, and an
+optional manager for operational routing and async write handling.
 
-| Aspect               | Manual SQL        | Fabric         | Full ORM |
-| -------------------- | ----------------- | -------------- | -------- |
-| **Control**          | 100%              | 100%           | Limited  |
-| **Type Safety**      | None              | 100%           | 100%     |
-| **Flexibility**      | 100%              | 100%           | Limited  |
-| **Boilerplate**      | High              | Low            | Very Low |
-| **Performance**      | Excellent         | Excellent      | Good     |
-| **Database Support** | Database-specific | Multi-database | Limited  |
+| Need                               | Fabric stance                           |
+| ---------------------------------- | --------------------------------------- |
+| Dynamic SQL construction           | Fluent builders and condition DSL       |
+| Hand-written SQL                   | Raw query and raw projection helpers    |
+| ORM-managed relationships          | Out of scope                            |
+| Compile-time SQL validation        | Out of scope                            |
+| Cross-dialect core CRUD/query flow | Supported where dialects can express it |
+| Dialect-specific edge features     | Rendered explicitly or rejected         |
+| Operational database behavior      | Tracing, retries, pool stats, manager   |
 
 ### Why Fabric Exists
 
-**Problem**: Go developers face a false choice:
-
-- Write database code with raw SQL strings (error-prone, dialect-specific, repeatable)
-- Use a heavy ORM (opinionated, limited flexibility, significant overhead)
+**Problem**: Go services often need more structure than raw `database/sql`, but
+less abstraction than a full ORM.
 
 **Solution**: Fabric provides:
 
-- **Fluent Query Builders**: Method chaining for readable SQL construction
-- **Zero SQL Injection**: All parameters automatically parameterized
-- **Multi-Database**: Single codebase works across MySQL, PostgreSQL, SQLite, MSSQL
-- **Minimal Runtime Overhead**: No reflection-based magic, compiled type-safety
-- **Pluggable Everything**: Loggers, drivers, dialects—no lock-in
+- **Fluent Query Builders**: Method chaining for dynamic SQL construction
+- **Parameterized Values**: Values flow through driver placeholders
+- **Dialect-Aware Rendering**: MySQL, PostgreSQL, SQLite, and MSSQL syntax where
+  supported
+- **Explicit Unsupported Errors**: Dialect gaps do not silently generate invalid
+  SQL
+- **Operational Helpers**: Transactions, tracing, retries, pool stats, health
+  checks, and manager routing
 
 ### Key Metrics
 
-| Metric     | Value          |
-| ---------- | -------------- |
-| Test Suite | 802 tests pass |
-| Code Grade | A+ (94/100)    |
-| Coverage   | 85%+           |
-| Linting    | 0 issues       |
-| Security   | 0 advisories   |
-| Status     | Production     |
+| Metric     | Value                                      |
+| ---------- | ------------------------------------------ |
+| API        | Stable v1 public interfaces                |
+| Dialects   | MySQL, PostgreSQL, SQLite, MSSQL           |
+| Testing    | Unit, race, and Docker-backed integration  |
+| Linting    | Checked in CI                              |
+| Security   | Parameterized values and explicit raw APIs |
+| Scope      | SQL-first data layer, not ORM              |
 
 ---
 
@@ -2230,7 +2210,7 @@ func TestBug_SelectWithJsonOperator(t *testing.T) {
     // Act
     sql, _ := builder.Build()
 
-    // Assert - this should pass but currently fails
+    // Assert
     assert.Contains(t, sql, "@>")  // Should use PostgreSQL's JSON operator
 }
 ```
@@ -2769,35 +2749,6 @@ rows, _ := db.Get(ctx, "SELECT ...", args)  // Conn returned after Get()
 
 ---
 
-## Future Extensibility Roadmap
-
-### Short-term (v1.x)
-
-- [ ] Connection pool metrics export (Prometheus)
-- [ ] More logger adapters (structured logging)
-- [ ] Query result pagination utilities
-- [ ] Bulk insert optimization per database
-- [ ] Transaction save point support
-
-### Medium-term (v2.0)
-
-- [ ] Query builder caching (prepare frequently-used queries)
-- [ ] Async query execution (channels/streams)
-- [ ] Connection circuit breaker
-- [ ] Built-in connection retry logic
-- [ ] Query result caching layer
-
-### Long-term (v3.0+)
-
-- [ ] Query optimization hints
-- [ ] Distributed transaction support (2PC)
-- [ ] Read replicas support
-- [ ] Sharding/partitioning utilities
-- [ ] GraphQL query builder integration
-- [ ] Machine learning query performance predictions
-
----
-
 ## API Surface Reference
 
 ### Main Entry Points
@@ -2935,18 +2886,3 @@ cdt.NewExpr().Column("email").Op("LIKE").Value("%@example.com")
 | `internal/pkg/sqldialect/` | DB-specific rendering | Quoting, operators, keywords      |
 | `pkg/query/`               | Query DSL             | Condition/option expressions      |
 | `tests/`                   | Integration tests     | Real database validation          |
-
-Good luck maintaining Fabric!
-
-```text
-
-This comprehensive architecture document is ready to replace the current one.
-It provides:
-
-- **Agent-friendly structure** with clear sections and decision trees
-- **Complete technical depth** on all major components
-- **Code examples** from actual patterns in the codebase
-- **Practical workflows** for common modifications
-- **Troubleshooting guide** for real-world issues
-- **Security, performance, and testing** deep dives
-```

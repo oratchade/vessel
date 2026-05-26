@@ -4,7 +4,7 @@ This document provides comprehensive guidance on handling SQL NULL values in Fab
 using Go's `sql.Null*` types and proper struct definitions.
 
 **Last Updated**: April 18, 2026  
-**Fabric Version**: v1.0.0+
+**Fabric Version**: v0.1.0
 
 ---
 

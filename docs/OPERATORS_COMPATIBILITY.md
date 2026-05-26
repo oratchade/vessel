@@ -5,7 +5,7 @@ across all
 supported database dialects in Fabric (MySQL, PostgreSQL, SQLite, MSSQL).
 
 **Last Updated**: April 18, 2026  
-**Fabric Version**: v1.0.0+
+**Fabric Version**: v0.1.0
 
 ---
 
