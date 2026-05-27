@@ -1,14 +1,15 @@
 # vessel
 
-A lightweight SQL-first data layer for Go services.
+A personal SQL toolkit for my Go services.
 
-Vessel sits between raw `database/sql` and a full ORM. It provides
+Vessel collects the database helpers I keep reaching for in service code:
 dialect-aware query builders, typed row scanning, transaction helpers,
 OpenTelemetry instrumentation, retry utilities, and an optional manager for
-operational routing and async writes.
+routing and async writes.
 
-It is intended for services that want explicit SQL behavior without adopting
-an ORM or generating code for every query.
+It is intentionally modest. The goal is to keep SQL explicit while avoiding the
+same hand-written plumbing around placeholders, scanning, transactions, and
+small cross-database differences.
 
 [![GoDoc](https://godoc.org/tounilab.com/vessel?status.svg)](https://godoc.org/tounilab.com/vessel)
 [![Go Report Card](https://goreportcard.com/badge/tounilab.com/vessel)](https://goreportcard.com/report/tounilab.com/vessel)
@@ -35,11 +36,12 @@ an ORM or generating code for every query.
 - 🧪 **Tested Dialect Behavior** - Unit and integration coverage for builder,
   execution, transaction, and manager paths
 
-## Positioning
+## Fit
 
-Vessel is not a replacement for every Go database tool.
+Vessel is a small toolkit, not a claim that every service needs another data
+layer.
 
-Use Vessel when you want:
+I use it when I want:
 
 - dynamic SQL builders without string concatenation;
 - portable core CRUD/query behavior across supported dialects;
@@ -48,7 +50,7 @@ Use Vessel when you want:
 - transaction, retry, tracing, pool-stat, and manager utilities close to the
   data layer.
 
-Prefer another tool when you need:
+I reach for another tool when I need:
 
 - compile-time SQL validation and generated methods (`sqlc`);
 - the thinnest possible wrapper over hand-written SQL (`sqlx` or `pgx`);
@@ -56,10 +58,8 @@ Prefer another tool when you need:
   management (GORM, Bun, Ent);
 - database-specific SQL as the main abstraction.
 
-Vessel's unique position is operational convenience for SQL-first services: a
-small, explicit data layer that keeps query construction, dialect rules,
-transaction behavior, observability, retries, and optional write routing in one
-place without becoming an ORM.
+That is the whole framing: a personal, SQL-first toolkit that keeps common
+database chores in one place without trying to become an ORM.
 
 ## Installation
 
@@ -579,7 +579,7 @@ three patterns for safe resource management—**choose based on your use case**:
 #### Pattern 1: Type-Safe Automatic Cleanup (Recommended for Most)
 
 Use `ScanRowsTo[T]` for automatic resource management and type-safe results.
-**Best for:** Request handlers, simple queries, most production use cases.
+**Best for:** Request handlers, simple queries, and ordinary service code.
 
 ```go
 type User struct {
@@ -722,9 +722,9 @@ for _, user := range users {
 Managed adapters make cleanup explicit, keep `Close()` idempotent, and provide a
 fallback finalizer for missed cleanup paths.
 
-#### Real-World Service Pattern
+#### Service Pattern
 
-Here's how to combine these patterns in a production service:
+Here's how to combine these patterns in a service:
 
 ```go
 type UserService struct {
@@ -1684,12 +1684,12 @@ For detailed NULL handling patterns, see [ERROR_HANDLING.md](./docs/ERROR_HANDLI
 
 ## Contributing
 
-Contributions are welcome! Please read our [CONTRIBUTING.md](./CONTRIBUTING.md)
-guidelines before submitting PRs.
+This is primarily a personal toolkit, but issues and small fixes are welcome.
+Please read [CONTRIBUTING.md](./CONTRIBUTING.md) before submitting PRs.
 
 ## Performance
 
-The library is designed for production use with focus on:
+The performance work focuses on practical hot paths:
 
 - **Zero-copy scanning** - Efficient field mapping without intermediate
   allocations
