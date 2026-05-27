@@ -166,7 +166,6 @@ for i := 0; i < 10000; i++ {
 
     adapter, err := pool.Acquire(rows)
     if err != nil { break }
-    defer pool.Release(adapter)
 
     // Process rows...
     for adapter.Next() {
@@ -175,6 +174,7 @@ for i := 0; i < 10000; i++ {
         adapter.Scan(&id, &name)
         // ...
     }
+    pool.Release(adapter)
 }
 ```
 

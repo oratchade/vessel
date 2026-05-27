@@ -151,7 +151,7 @@ func main() {
         Port:     5432,
         User:     "postgres",
         Password: os.Getenv("DB_PASSWORD"),
-        DBName:   "myapp",
+        Database: "myapp",
     }
 
     // Create logger adapter
@@ -166,14 +166,14 @@ func main() {
 
     // Execute a query
     ctx := context.Background()
-    rows, err := v1.NewFluentDB(db, ctx).
+    rows, err := v1.NewFluentDB(db).
         Select("users", "id", "name", "email").
         Where(
             cdt.NewExpr().Column("age").Op(">").Value(18),
         ).
-        OrderBy("name ASC").
+        OrderByAsc("name").
         Limit(10).
-        Execute()
+        Get(ctx)
 
     if err != nil {
         panic(err)

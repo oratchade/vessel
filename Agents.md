@@ -31,7 +31,7 @@ database dialects, and ensure all code is well-tested.
 - Maintaining clean interfaces and extensible architecture
 - Optimizing performance in hot paths
 - Optimizing for maintainability and readability
-- Ensuring high code quality with 0 linting issues
+- Keeping lint output clean before merging changes
 - Documenting all features and changes clearly
 - Handling errors gracefully and consistently
 - Providing a seamless developer experience with type safety and clear APIs
@@ -518,7 +518,7 @@ Before releasing a new version:
 
 ### ⚠️ Code Style
 
-- 100% comment compliance required
+- Keep exported API documentation accurate and useful
 - No global state except plugin registry
 - Prefer composition over inheritance
 
@@ -550,8 +550,8 @@ Before releasing a new version:
 
 - **Go Version:** 1.26.0+
 - **License:** MIT
-- **Status:** Production-Ready
-- **Test Coverage:** 100+ tests, 100% pass rate
+- **Status:** v0.x, used by the author, not broadly battle hardened
+- **Test Coverage:** Unit and integration coverage across supported dialects
 - **Last Updated:** March 15, 2026
 
 ---
@@ -562,14 +562,14 @@ Vessel is a personal SQL toolkit with:
 
 - ✅ Multi-database support (MySQL, PostgreSQL, SQLite, MSSQL)
 - ✅ Type-safe fluent query builder
-- ✅ Comprehensive testing (100+ tests)
+- ✅ Unit and integration tests
 - ✅ Practical documentation
-- ✅ Zero linting issues
-- ✅ Service-oriented code quality
+- ✅ Linting in the normal quality gate
+- ✅ Production-style service APIs
 
 When working with Vessel, prioritize:
 
-1. Maintaining backward compatibility
+1. Avoiding unnecessary breaking changes
 2. Testing across all dialects
 3. Clear documentation
 4. Type safety and error handling

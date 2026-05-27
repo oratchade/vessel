@@ -244,34 +244,34 @@ for _, user := range users {
 
 ## Struct Mapping
 
-### Column-to-Field Alignment
+### Column-to-Field Mapping
 
-Vessel uses Go's database/sql package for scanning. Fields are mapped by position:
+`ScanRowsTo`, `ScanAll`, and `ScanOne` map result columns to exported struct
+fields by column name. Matching is case-insensitive and uses `db` tags first,
+then `json` tags, then the Go field name.
 
 ```go
 type User struct {
-    ID           int64
-    Email        string
-    FirstName    sql.NullString
-    PhoneNumber  sql.NullString
+    ID          int64          `db:"id"`
+    Email       string         `db:"email"`
+    FirstName   sql.NullString `db:"first_name"`
+    PhoneNumber sql.NullString `db:"phone_number"`
 }
 
-// Query selects columns in order: id, email, first_name, phone_number
-// Vessel scans into: ID, Email, FirstName, PhoneNumber (by position, not name)
+// Column order does not need to match struct field order.
 users, err := db.ScanRowsTo[User](ctx, rowsAdapter)
 ```
 
-**Column Order Must Match Field Order:**
+**Column order does not control field mapping:**
 
 ```go
-// ✅ CORRECT: Column order matches struct field order
+// Both projections map to the same fields.
 rowsAdapter, _ := database.GetRaw(ctx, "users",
-    []string{"id", "email", "first_name", "phone_number"}, // ← order matters
+    []string{"id", "email", "first_name", "phone_number"},
     nil, nil, nil)
 
-// ❌ WRONG: Column order doesn't match
 rowsAdapter, _ := database.GetRaw(ctx, "users",
-    []string{"first_name", "id", "email", "phone_number"}, // ← different order
+    []string{"first_name", "id", "email", "phone_number"},
     nil, nil, nil)
 ```
 
@@ -740,10 +740,11 @@ users, err := db.ScanRowsTo[User](ctx, rowsAdapter)
 // err: "scan: error reading column Email: unsupported scan of NULL into type string"
 ```
 
-**Q: Can I use struct tags to customize NULL handling?**
+**Q: Can I use struct tags to customize field mapping?**
 
-A: The standard database/sql package doesn't use struct tags for NULL handling.
-Use field names and positions instead. For custom mapping, create a conversion function:
+A: Yes. `ScanRowsTo`, `ScanAll`, and `ScanOne` use `db` tags, then `json`
+tags, then field names. Tags do not change NULL semantics; use nullable Go
+types such as `sql.NullString` when the database column can be NULL.
 
 ```go
 type UserDB struct {
