@@ -1,11 +1,22 @@
 # Releases
 
-This file describes how Fabric releases are packaged and published. For release
+This file describes how Vessel releases are packaged and published. For release
 contents, see [CHANGELOG.md](CHANGELOG.md).
 
 ---
 
 ## Release Contents
+
+### [0.1.1](CHANGELOG.md#011---2026-05-27)
+
+**Release Date**: May 27, 2026
+
+**Scope**:
+
+- Complete project rename to Vessel.
+- Public module path updated to `tounilab.com/vessel`.
+- Documentation, examples, and release metadata refreshed for the Vessel name.
+- Integration strict-mode flag renamed to `VESSEL_INTEGRATION_STRICT`.
 
 ### [0.1.0](CHANGELOG.md#010---2026-05-23)
 
@@ -72,32 +83,32 @@ contents, see [CHANGELOG.md](CHANGELOG.md).
 
 ```bash
 # Get the latest version
-go get tounilab.com/fabric
+go get tounilab.com/vessel
 
 # Or pin to specific version
-go get tounilab.com/fabric@v0.1.0
+go get tounilab.com/vessel@v0.1.1
 ```
 
 ## Release Automation
 
-Fabric releases are tag-driven. A release tag starts the `Release` workflow,
+Vessel releases are tag-driven. A release tag starts the `Release` workflow,
 which validates the library, creates a source archive with a checksum, and
 publishes the GitHub Release from the matching `CHANGELOG.md` section.
 
 ### Release Requirements
 
-- The tag must use semantic version format, for example `v0.1.0` or
+- The tag must use semantic version format, for example `v0.1.1` or
   `v0.2.0-rc.1`.
 - `CHANGELOG.md` must contain a matching section, for example
-  `## [0.1.0] - 2026-05-23`.
+  `## [0.1.1] - 2026-05-27`.
 - Formatting, linting, module tidiness, unit coverage, and SQLite integration
   tests must pass.
 
 ### Release Command
 
 ```bash
-git tag -a v0.1.0 -m "Release v0.1.0"
-git push origin v0.1.0
+git tag -a v0.1.1 -m "Release v0.1.1"
+git push origin v0.1.1
 ```
 
 The workflow can also be re-run manually from GitHub Actions with an existing
@@ -106,15 +117,15 @@ publication after an external service issue.
 
 ### Published Artifacts
 
-- GitHub Release named `Fabric vX.Y.Z`.
+- GitHub Release named `Vessel vX.Y.Z`.
 - Release notes generated from `CHANGELOG.md`.
-- Source archive: `fabric-vX.Y.Z.tar.gz`.
-- SHA-256 checksum: `fabric-vX.Y.Z.tar.gz.sha256`.
+- Source archive: `vessel-vX.Y.Z.tar.gz`.
+- SHA-256 checksum: `vessel-vX.Y.Z.tar.gz.sha256`.
 
 For Go consumers, the release artifact is the module tag:
 
 ```bash
-go get tounilab.com/fabric@vX.Y.Z
+go get tounilab.com/vessel@vX.Y.Z
 ```
 
 ---
@@ -129,8 +140,8 @@ import (
     "log/slog"
     "os"
 
-    "tounilab.com/fabric/db/v1"
-    cdt "tounilab.com/fabric/pkg/query/condition"
+    "tounilab.com/vessel/db/v1"
+    cdt "tounilab.com/vessel/pkg/query/condition"
 )
 
 func main() {
@@ -199,4 +210,4 @@ func main() {
 
 ## License
 
-Fabric is licensed under the [MIT License](LICENSE.md).
+Vessel is licensed under the [MIT License](LICENSE.md).

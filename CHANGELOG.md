@@ -1,9 +1,25 @@
 # Changelog
 
-All notable changes to Fabric are documented in this file.
+All notable changes to Vessel are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
+
+## [0.1.1] - 2026-05-27
+
+### Changed
+
+- Renamed the module and all public documentation to Vessel.
+- Updated public import paths to `tounilab.com/vessel`.
+- Renamed integration strict-mode environment variable to
+  `VESSEL_INTEGRATION_STRICT`.
+- Refreshed package documentation, examples, and release automation metadata for
+  the Vessel module path.
+
+### Removed
+
+- Removed remaining previous-name references from the Vessel repository with no backward
+  compatibility aliases.
 
 ## [0.1.0] - 2026-05-23
 
@@ -82,7 +98,7 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
   - callback panics roll back and return non-nil errors with stack details
   - rollback and commit failures are surfaced
 - Transaction savepoints on `Tx`.
-- Driver error mapping to Fabric sentinel errors for duplicate key, foreign key,
+- Driver error mapping to Vessel sentinel errors for duplicate key, foreign key,
   syntax, timeout, connection, and cancellation scenarios.
 - Explicit mutation returning/output execution rejection to avoid silently
   discarding returned rows.
