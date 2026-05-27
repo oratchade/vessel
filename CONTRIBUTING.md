@@ -466,7 +466,7 @@ Include:
 **Example:**
 
 ```markdown
-## Feature Request: Batch Insert
+## Feature Request: Bulk Insert
 
 ### Description
 Support batch/bulk insert operations for better performance with large datasets.
@@ -477,10 +477,10 @@ Inserting 10,000+ records is slow with individual insert calls.
 ### Proposed API
 
 ```go
-results, err := db.BatchInsert(ctx, "users", []map[string]any{
+result, err := database.Inserts(ctx, "users", []map[string]any{
     {"name": "Alice"},
     {"name": "Bob"},
-})
+}, nil)
 ```
 
 ### Alternatives
@@ -540,7 +540,7 @@ go doc tounilab.com/vessel/db/v1
 - **OPERATORS_COMPATIBILITY.md** - Dialect-specific operator support
 - **SQL_NULL_TYPES.md** - NULL type handling guide
   ([docs/SQL_NULL_TYPES.md](./docs/SQL_NULL_TYPES.md))
-- **CODE_REVIEW.md** - Code quality assessment and metrics
+- **docs/ARCHITECTURE.md** - Current architecture notes
 
 ## Performance Considerations
 

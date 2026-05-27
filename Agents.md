@@ -252,14 +252,12 @@ testCases := []struct {
 | File                              | Purpose                    |
 | --------------------------------- | -------------------------- |
 | `README.md`                       | Feature overview and quick |
-| `MIGRATION_FLUENTDB.md`           | Migration from DBActions   |
-| `ORDERBY_CHANGES.md`              | OrderBy redesign           |
-| `docs/CHANGELOG.md`               | Version history            |
-| `docs/CODE_REVIEW.md`             | Architecture docs          |
+| `CHANGELOG.md`                    | Version history            |
+| `docs/ARCHITECTURE.md`            | Current architecture docs  |
 | `docs/ERROR_HANDLING.md`          | Error handling             |
 | `docs/OPERATORS_COMPATIBILITY.md` | Operator support           |
 | `docs/SQL_NULL_TYPES.md`          | Null type handling         |
-| `docs/CONTRIBUTING.md`            | Contributing guide         |
+| `CONTRIBUTING.md`                 | Contributing guide         |
 
 **When to Update Documentation:**
 
@@ -330,7 +328,7 @@ make lint  # Run golangci-lint
 
 **Code Style:**
 
-- ✅ Follow Go effective comments (100% documented)
+- ✅ Document exported APIs and behavior changes clearly
 - ✅ Use interfaces for abstraction
 - ✅ Proper error handling with context
 - ✅ No global state (except for registry in plugin system)
@@ -490,7 +488,7 @@ Before releasing a new version:
 - [ ] Linting clean: `make lint`
 - [ ] Coverage acceptable: `go test -cover ./...`
 - [ ] Documentation updated
-- [ ] Changelog updated in `docs/CHANGELOG.md`
+- [ ] Changelog updated in `CHANGELOG.md`
 - [ ] Example code tested and working
 - [ ] Integration tests pass
 - [ ] No breaking changes (or documented migration)
@@ -539,10 +537,9 @@ Before releasing a new version:
 ## Resources
 
 - **README.md** - Feature overview and quick start
-- **docs/CODE_REVIEW.md** - Detailed architecture review
-- **docs/CONTRIBUTING.md** - Contribution guidelines
-- **MIGRATION_FLUENTDB.md** - Migration guide
-- **ORDERBY_CHANGES.md** - Struct redesign documentation
+- **docs/ARCHITECTURE.md** - Current architecture notes
+- **CONTRIBUTING.md** - Contribution guidelines
+- **CHANGELOG.md** - Version history
 
 ---
 

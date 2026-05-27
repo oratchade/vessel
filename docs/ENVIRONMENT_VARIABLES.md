@@ -201,30 +201,32 @@ test:integration:
 
 ### Docker Compose
 
-The `docker-compose.test.yml` automatically exports environment variables:
+`docker-compose.test.yml` uses the same local defaults expected by the test
+helpers:
 
 ```yaml
 services:
   mysql:
     environment:
-      MYSQL_ROOT_PASSWORD: ${DB_MYSQL_PASSWORD:-root_password}
+      MYSQL_ROOT_PASSWORD: root_password
   postgres:
     environment:
-      POSTGRES_PASSWORD: ${DB_POSTGRES_PASSWORD:-test_password}
+      POSTGRES_PASSWORD: test_password
   mssql:
     environment:
-      SA_PASSWORD: ${DB_MSSQL_PASSWORD:-TestPassword123!}
+      MSSQL_SA_PASSWORD: TestPassword123!
+      SA_PASSWORD: TestPassword123!
 ```
 
-Set credentials before `docker-compose up`:
+When using the checked-in Compose file, run the tests with matching defaults:
 
 ```bash
-export DB_MYSQL_PASSWORD=custom_password
-export DB_POSTGRES_PASSWORD=custom_password
-export DB_MSSQL_PASSWORD=CustomPassword123!
 docker-compose -f docker-compose.test.yml up -d
 make integration-test-all
 ```
+
+If you change container credentials, set the matching `DB_*` variables before
+running the tests.
 
 ---
 

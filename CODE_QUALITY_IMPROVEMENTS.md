@@ -108,10 +108,8 @@ Simplified FluentDB constructor and comprehensively improved interface encapsula
 
 **Before Phase 5**:
 
-```go
-// Three separate parameters required
-func NewFluentDB(db Reader, writer Writer, introspector Introspector) *FluentDB
-```
+The constructor previously required multiple narrow operation dependencies,
+which made call sites more verbose and leaked too much composition detail.
 
 **After Phase 5**:
 
@@ -120,6 +118,7 @@ func NewFluentDB(db Reader, writer Writer, introspector Introspector) *FluentDB
 func NewFluentDB(db interface {
     reader
     writer
+    upserter
     introspector
 }) *FluentDB
 ```
@@ -127,7 +126,7 @@ func NewFluentDB(db interface {
 **Interface Visibility Changes** (Comprehensive Encapsulation):
 
 - Made **all internal composition interfaces private** (lowercase names):
-  - `reader`, `writer`, `introspector` - Core operations (internal)
+  - `reader`, `writer`, `upserter`, `introspector` - Core operations (internal)
   - `transactional` - Transaction management (internal)
   - `healthCheck` - Connection health diagnostics (internal)
   - `closer` - Resource cleanup (internal)
@@ -307,7 +306,7 @@ All changes maintain existing API and error handling patterns:
 
 - [`.claude/claude.md`](./.claude/claude.md) - Project onboarding
   (2,500+ lines)
-- [`CODE_REVIEW.md`](./docs/CODE_REVIEW.md) - Full code review results
+- [`ARCHITECTURE.md`](./docs/ARCHITECTURE.md) - Current architecture notes
 - [`ERROR_MESSAGE_STANDARDIZATION.md`](./docs/ERROR_MESSAGE_STANDARDIZATION.md)
   - Phase 4d details
 - [`ENVIRONMENT_VARIABLES.md`](./docs/ENVIRONMENT_VARIABLES.md) - Phase 4a

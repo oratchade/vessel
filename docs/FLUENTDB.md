@@ -66,9 +66,9 @@ users, err := db.ScanRowsTo[User](ctx, rawRows)
 Use `pkg/query/condition` for parameterized predicates:
 
 ```go
-cond := cdt.And(
+cond := cdt.NewAnd().Conditions(
     cdt.NewExpr().Column("active").Op("=").Value(true),
-    cdt.Or(
+    cdt.NewOr().Conditions(
         cdt.In("status", "paid", "pending"),
         cdt.IsNull("reviewed_at"),
     ),
