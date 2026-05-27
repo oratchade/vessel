@@ -135,7 +135,7 @@ cfg := &cockroachdb.Config{
 ```go
 database, err := db.NewDB(cfg, nil)
 if err != nil {
-    log.Fatal(err)
+    log.Fatal("failed to connect to CockroachDB")
 }
 defer database.Close()
 ```
