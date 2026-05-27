@@ -1,6 +1,6 @@
 # Vessel Architecture
 
-**Vessel** is a lightweight SQL-first data layer for Go services.
+**Vessel** is a personal SQL toolkit for Go services.
 This document describes the system design, package boundaries, and extension
 points used by the library.
 
@@ -68,10 +68,9 @@ points used by the library.
 
 ### What is Vessel
 
-Vessel is a **SQL-first query abstraction library** that unifies
-MySQL, PostgreSQL, SQLite, and MSSQL behind one Go API for core query and
-execution paths. It reduces manual SQL string construction while keeping SQL
-behavior explicit.
+Vessel is a **SQL-first toolkit** for recurring database helpers in Go services.
+It keeps MySQL, PostgreSQL, SQLite, and MSSQL core query and execution paths
+behind one API while keeping SQL behavior explicit.
 
 Vessel is not an ORM and does not try to own schema modeling, relationships, or
 migrations. It is a service data-layer toolkit: query builders, dialect rules,
@@ -90,10 +89,10 @@ optional manager for operational routing and async write handling.
 
 ### Why Vessel Exists
 
-**Problem**: Go services often need more structure than raw `database/sql`, but
-less abstraction than a full ORM.
+**Problem**: Service code often needs more structure than raw `database/sql`,
+but less abstraction than a full ORM.
 
-**Solution**: Vessel provides:
+**Solution**: Vessel keeps these recurring helpers in one place:
 
 - **Fluent Query Builders**: Method chaining for dynamic SQL construction
 - **Parameterized Values**: Values flow through driver placeholders
@@ -113,7 +112,7 @@ less abstraction than a full ORM.
 | Testing    | Unit, race, and Docker-backed integration  |
 | Linting    | Checked in CI                              |
 | Security   | Parameterized values and explicit raw APIs |
-| Scope      | SQL-first data layer, not ORM              |
+| Scope      | Personal SQL toolkit, not ORM              |
 
 ---
 
