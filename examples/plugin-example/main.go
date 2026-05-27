@@ -34,7 +34,7 @@ func main() {
 	// NewDB checks the plugin registry first, then falls back to built-in drivers
 	database, err := db.NewDB(cfg, nil)
 	if err != nil {
-		log.Fatalf("Failed to connect: %v", err)
+		log.Fatal("Failed to connect to CockroachDB")
 	}
 	defer func() {
 		if closeErr := database.Close(); closeErr != nil {
