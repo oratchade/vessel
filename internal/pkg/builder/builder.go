@@ -1,4 +1,3 @@
-// Package builder provides SQL query building for multiple database engines.
 package builder
 
 import (
@@ -7,11 +6,11 @@ import (
 	"sort"
 	"strings"
 
-	"tounilab.com/fabric/internal/pkg/helpers"
-	"tounilab.com/fabric/internal/pkg/sqldialect"
-	cdt "tounilab.com/fabric/pkg/query/condition"
-	"tounilab.com/fabric/pkg/query/definition"
-	"tounilab.com/fabric/pkg/query/options"
+	"tounilab.com/vessel/internal/pkg/helpers"
+	"tounilab.com/vessel/internal/pkg/sqldialect"
+	cdt "tounilab.com/vessel/pkg/query/condition"
+	"tounilab.com/vessel/pkg/query/definition"
+	"tounilab.com/vessel/pkg/query/options"
 )
 
 var sqlFunctionPattern = regexp.MustCompile(`(?i)^([a-z_][a-z0-9_]*)\s*\(.*\)$`)
@@ -21,7 +20,7 @@ type optionDialect interface {
 	SupportedOptions(definition.QueryType, *options.QueryOptions, int) (string, []any, error)
 }
 
-//go:generate mockgen -source=builder.go -destination=builder_mocks.go -package=builder QueryBuilder
+//go:generate mockgen -source=builder.go -destination=builder_mocks.go -package=builder
 
 // QueryBuilder defines methods for building SQL queries, including support for SQL joins.
 // Each method returns the SQL string, its arguments, and an error if building fails.

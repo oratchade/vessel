@@ -3,7 +3,7 @@
 package builder
 
 import (
-	"tounilab.com/fabric/pkg/query/condition"
+	"tounilab.com/vessel/pkg/query/condition"
 )
 
 // ExportSanitizeColumn is a test-only wrapper to allow external-package tests

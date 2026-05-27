@@ -1,12 +1,11 @@
-// Package sqldialect provides SQL dialect implementations for various database engines.
 package sqldialect
 
 import (
 	"strings"
 
-	"tounilab.com/fabric/internal/pkg/operator"
-	"tounilab.com/fabric/pkg/query/definition"
-	"tounilab.com/fabric/pkg/query/options"
+	"tounilab.com/vessel/internal/pkg/operator"
+	"tounilab.com/vessel/pkg/query/definition"
+	"tounilab.com/vessel/pkg/query/options"
 )
 
 // MySQLDialect implements SQL dialect behavior used by MySQL and SQLite.

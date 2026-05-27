@@ -1,4 +1,3 @@
-// Package v1 provides database abstraction interfaces and implementations for multiple database engines.
 package v1
 
 import (
@@ -17,13 +16,13 @@ const (
 	logLevelError = "error"
 )
 
-// SlogAdapter adapts Go's standard library log/slog.Logger to the Fabric Logger interface.
-// This allows using slog with Fabric's database manager without modification.
+// SlogAdapter adapts Go's standard library log/slog.Logger to the Vessel Logger interface.
+// This allows using slog with Vessel's database manager without modification.
 type SlogAdapter struct {
 	logger *slog.Logger
 }
 
-// NewSlogAdapter creates a new Fabric Logger adapter wrapping slog.Logger.
+// NewSlogAdapter creates a new Vessel Logger adapter wrapping slog.Logger.
 // If logger is nil, it uses slog.Default().
 //
 // Example:
@@ -65,8 +64,8 @@ func (a *SlogAdapter) With(fields ...any) Logger {
 	return &SlogAdapter{logger: a.logger.With(fields...)}
 }
 
-// LogrusAdapter adapts github.com/sirupsen/logrus.Logger or logrus.Entry to the Fabric Logger interface.
-// This allows using logrus with Fabric's database manager without modification.
+// LogrusAdapter adapts github.com/sirupsen/logrus.Logger or logrus.Entry to the Vessel Logger interface.
+// This allows using logrus with Vessel's database manager without modification.
 //
 // Example:
 //
@@ -78,7 +77,7 @@ type LogrusAdapter struct {
 	entry *logrus.Entry
 }
 
-// NewLogrusAdapter creates a new Fabric Logger adapter wrapping logrus.Logger or logrus.Entry.
+// NewLogrusAdapter creates a new Vessel Logger adapter wrapping logrus.Logger or logrus.Entry.
 // If a *logrus.Logger is passed, it wraps it with a new Entry.
 func NewLogrusAdapter(logger any) Logger {
 	var entry *logrus.Entry
@@ -141,8 +140,8 @@ func (a *LogrusAdapter) logWithFields(msg string, args []any, level string) {
 	}
 }
 
-// ZapAdapter adapts go.uber.org/zap.Logger to the Fabric Logger interface.
-// This allows using zap with Fabric's database manager without modification.
+// ZapAdapter adapts go.uber.org/zap.Logger to the Vessel Logger interface.
+// This allows using zap with Vessel's database manager without modification.
 //
 // Example:
 //
@@ -154,7 +153,7 @@ type ZapAdapter struct {
 	logger *zap.Logger
 }
 
-// NewZapAdapter creates a new Fabric Logger adapter wrapping zap.Logger.
+// NewZapAdapter creates a new Vessel Logger adapter wrapping zap.Logger.
 func NewZapAdapter(logger *zap.Logger) Logger {
 	return &ZapAdapter{logger: logger}
 }
@@ -215,8 +214,8 @@ func argsToZapFields(args []any) []zap.Field {
 	return fields
 }
 
-// ApexAdapter adapts github.com/apex/log.Logger to the Fabric Logger interface.
-// This allows using Apex log with Fabric's database manager without modification.
+// ApexAdapter adapts github.com/apex/log.Logger to the Vessel Logger interface.
+// This allows using Apex log with Vessel's database manager without modification.
 //
 // Example:
 //
@@ -229,7 +228,7 @@ type ApexAdapter struct {
 	entry  *log.Entry
 }
 
-// NewApexAdapter creates a new Fabric Logger adapter wrapping apex/log.Logger.
+// NewApexAdapter creates a new Vessel Logger adapter wrapping apex/log.Logger.
 func NewApexAdapter(logger *log.Logger) Logger {
 	return &ApexAdapter{
 		logger: logger,

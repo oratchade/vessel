@@ -10,7 +10,7 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/assert"
-	"tounilab.com/fabric/pkg/retry"
+	"tounilab.com/vessel/pkg/retry"
 )
 
 // ExponentialBackoff tests

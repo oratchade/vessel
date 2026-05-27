@@ -9,7 +9,7 @@ import (
 	"testing"
 	"time"
 
-	db "tounilab.com/fabric/db/v1"
+	db "tounilab.com/vessel/db/v1"
 )
 
 // TestClassifyError_ConnectionErrors tests connection error classification.

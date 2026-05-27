@@ -7,8 +7,8 @@ import (
 	"strings"
 	"time"
 
-	db "tounilab.com/fabric/db/v1"
-	"tounilab.com/fabric/pkg/query/options"
+	db "tounilab.com/vessel/db/v1"
+	"tounilab.com/vessel/pkg/query/options"
 )
 
 type insertBatch struct {

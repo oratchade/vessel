@@ -1,5 +1,3 @@
-// Package otel provides OpenTelemetry instrumentation for the library
-// to enable tracing and monitoring of database operations.
 package otel
 
 import (
@@ -30,7 +28,7 @@ var (
 func initTracer() {
 	once.Do(func() {
 		enabled = isOTELEnabled()
-		tracer = otel.Tracer("tounilab.com/fabric")
+		tracer = otel.Tracer("tounilab.com/vessel")
 		noopTracer = noop.NewTracerProvider().Tracer("noop")
 	})
 }

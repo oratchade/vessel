@@ -1,7 +1,5 @@
 package retry
 
-// Package retry provides configurable retry logic with various backoff strategies.
-
 import (
 	"context"
 	"fmt"

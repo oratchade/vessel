@@ -8,10 +8,10 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"tounilab.com/fabric/internal/pkg/builder"
-	"tounilab.com/fabric/internal/pkg/sqldialect"
-	cdt "tounilab.com/fabric/pkg/query/condition"
-	"tounilab.com/fabric/pkg/query/options"
+	"tounilab.com/vessel/internal/pkg/builder"
+	"tounilab.com/vessel/internal/pkg/sqldialect"
+	cdt "tounilab.com/vessel/pkg/query/condition"
+	"tounilab.com/vessel/pkg/query/options"
 )
 
 // TestMysqlQueryBuilderSelect tests MySQL query building

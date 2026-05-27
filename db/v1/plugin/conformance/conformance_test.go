@@ -10,8 +10,8 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	db "tounilab.com/fabric/db/v1"
-	"tounilab.com/fabric/db/v1/plugin/conformance"
+	db "tounilab.com/vessel/db/v1"
+	"tounilab.com/vessel/db/v1/plugin/conformance"
 )
 
 type testConfig struct{}

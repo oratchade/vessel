@@ -1,7 +1,3 @@
-// Package v1 provides a lightweight abstraction layer for SQLite 3.x,
-// optimized for embedded and serverless use cases. Supports in-memory databases,
-// file-backed persistence, automatic identifier quoting with no special characters,
-// and seamless foreign key enforcement. Ideal for local development and edge deployment.
 package v1
 
 import (
@@ -18,13 +14,13 @@ import (
 	// Register the pure-Go SQLite driver under the "sqlite" driver name.
 	_ "modernc.org/sqlite"
 
-	"tounilab.com/fabric/db/v1/dberror"
-	builder "tounilab.com/fabric/internal/pkg/builder"
-	oh "tounilab.com/fabric/internal/pkg/otel"
-	"tounilab.com/fabric/internal/pkg/sqldialect"
-	cdt "tounilab.com/fabric/pkg/query/condition"
-	"tounilab.com/fabric/pkg/query/definition"
-	"tounilab.com/fabric/pkg/query/options"
+	"tounilab.com/vessel/db/v1/dberror"
+	builder "tounilab.com/vessel/internal/pkg/builder"
+	oh "tounilab.com/vessel/internal/pkg/otel"
+	"tounilab.com/vessel/internal/pkg/sqldialect"
+	cdt "tounilab.com/vessel/pkg/query/condition"
+	"tounilab.com/vessel/pkg/query/definition"
+	"tounilab.com/vessel/pkg/query/options"
 )
 
 // SQLiteConfig holds configuration for connecting to a SQLITE database.

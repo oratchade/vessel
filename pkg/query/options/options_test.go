@@ -8,7 +8,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"tounilab.com/fabric/pkg/query/options"
+	"tounilab.com/vessel/pkg/query/options"
 )
 
 // TestOrderByCreation tests OrderBy struct creation and validation

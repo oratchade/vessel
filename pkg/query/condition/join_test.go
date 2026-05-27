@@ -7,8 +7,8 @@ import (
 
 	"github.com/stretchr/testify/assert"
 
-	"tounilab.com/fabric/pkg/query/condition"
-	"tounilab.com/fabric/tests"
+	"tounilab.com/vessel/pkg/query/condition"
+	"tounilab.com/vessel/tests"
 )
 
 func TestJoin_ToSQL_OnClause(t *testing.T) {

@@ -1,5 +1,3 @@
-// Package v1 provides database manager entrypoint and implementation for multiple database engines management.
-// This file contains synchronous wrapper methods that provide a synchronous interface to the async channel-based API.
 package v1
 
 import (
@@ -7,9 +5,9 @@ import (
 	"fmt"
 	"time"
 
-	db "tounilab.com/fabric/db/v1"
-	"tounilab.com/fabric/pkg/query/condition"
-	"tounilab.com/fabric/pkg/query/options"
+	db "tounilab.com/vessel/db/v1"
+	"tounilab.com/vessel/pkg/query/condition"
+	"tounilab.com/vessel/pkg/query/options"
 )
 
 const (

@@ -11,7 +11,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 
-	v1 "tounilab.com/fabric/manager/v1"
+	v1 "tounilab.com/vessel/manager/v1"
 )
 
 // TestQueryData tests the QueryData structure for different query types.

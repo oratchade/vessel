@@ -20,9 +20,9 @@ import (
 	_ "github.com/lib/pq"
 	_ "modernc.org/sqlite"
 
-	v1 "tounilab.com/fabric/db/v1"
-	"tounilab.com/fabric/db/v1/dberror"
-	"tounilab.com/fabric/pkg/query/condition"
+	v1 "tounilab.com/vessel/db/v1"
+	"tounilab.com/vessel/db/v1/dberror"
+	"tounilab.com/vessel/pkg/query/condition"
 )
 
 // getEnv retrieves environment variable with fallback default
@@ -183,7 +183,7 @@ func getFilteredDatabases() []TestDB {
 }
 
 func integrationStrict() bool {
-	switch strings.ToLower(os.Getenv("FABRIC_INTEGRATION_STRICT")) {
+	switch strings.ToLower(os.Getenv("VESSEL_INTEGRATION_STRICT")) {
 	case "1", "true", "yes", "on":
 		return true
 	default:

@@ -19,8 +19,8 @@ import (
 	"github.com/stretchr/testify/require"
 	_ "modernc.org/sqlite"
 
-	v1 "tounilab.com/fabric/db/v1"
-	cdt "tounilab.com/fabric/pkg/query/condition"
+	v1 "tounilab.com/vessel/db/v1"
+	cdt "tounilab.com/vessel/pkg/query/condition"
 )
 
 type fluentMatrixDB struct {
@@ -388,7 +388,7 @@ func fluentEnvUint16(key string, defaultVal uint16) uint16 {
 }
 
 func fluentStrict() bool {
-	switch strings.ToLower(os.Getenv("FABRIC_INTEGRATION_STRICT")) {
+	switch strings.ToLower(os.Getenv("VESSEL_INTEGRATION_STRICT")) {
 	case "1", "true", "yes", "on":
 		return true
 	default:

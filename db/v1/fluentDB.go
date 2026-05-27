@@ -1,4 +1,3 @@
-// Package v1 provides database abstraction interfaces and implementations for multiple database engines.
 package v1
 
 import (
@@ -6,9 +5,9 @@ import (
 	"fmt"
 	"strings"
 
-	"tounilab.com/fabric/internal/pkg/helpers"
-	cdt "tounilab.com/fabric/pkg/query/condition"
-	"tounilab.com/fabric/pkg/query/options"
+	"tounilab.com/vessel/internal/pkg/helpers"
+	cdt "tounilab.com/vessel/pkg/query/condition"
+	"tounilab.com/vessel/pkg/query/options"
 )
 
 // Direction constants for ORDER BY clauses.
@@ -282,7 +281,7 @@ func (s *SelectBuilder) Joins(joins []cdt.Join) *SelectBuilder {
 
 // JoinOn adds a JOIN with a condition-based ON clause.
 //
-// The ON condition is rendered by Fabric. Conditions with values are rejected
+// The ON condition is rendered by Vessel. Conditions with values are rejected
 // by the current join builder; use this for column predicates and unary checks
 // such as condition.IsNull("tu.deleted_at").
 func (s *SelectBuilder) JoinOn(joinType, table, alias string, on cdt.Condition) *SelectBuilder {
@@ -790,7 +789,7 @@ func (i *InsertBuilder) Returning(columns ...string) *InsertBuilder {
 // OnConflict configures the uniqueness target for a portable upsert.
 //
 // PostgreSQL and SQLite render ON CONFLICT with these columns. MySQL uses the
-// table's duplicate-key constraints but still accepts the columns so Fabric can
+// table's duplicate-key constraints but still accepts the columns so Vessel can
 // choose default update columns and no-op update behavior.
 func (i *InsertBuilder) OnConflict(columns ...string) *InsertBuilder {
 	if i.upsertOpts == nil {

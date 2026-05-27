@@ -7,7 +7,7 @@ import (
 )
 
 // ExampleRowsAdapterPoolBasicUsage demonstrates basic pooling with Acquire/Release.
-func ExampleRowsAdapterPoolBasicUsage() {
+func Example_rowsAdapterPoolBasicUsage() {
 	// Create a pool (typically once at application startup)
 	pool := NewRowsAdapterPool()
 
@@ -21,7 +21,7 @@ func ExampleRowsAdapterPoolBasicUsage() {
 }
 
 // ExampleRowsAdapterPoolWithStats demonstrates pool statistics monitoring.
-func ExampleRowsAdapterPoolWithStats() {
+func Example_rowsAdapterPoolWithStats() {
 	pool := NewRowsAdapterPoolWithStats()
 
 	// Simulate some acquire/release cycles
@@ -34,7 +34,7 @@ func ExampleRowsAdapterPoolWithStats() {
 }
 
 // ExampleRowsAdapterPoolHighThroughput shows how to use pool in a tight loop.
-func ExampleRowsAdapterPoolHighThroughput() {
+func Example_rowsAdapterPoolHighThroughput() {
 	// This example shows the pattern for high-throughput scenarios
 	pool := NewRowsAdapterPool()
 
@@ -55,7 +55,7 @@ func ExampleRowsAdapterPoolHighThroughput() {
 }
 
 // ExampleManagedRowsAdapterAutomaticCleanup shows automatic resource cleanup.
-func ExampleManagedRowsAdapterAutomaticCleanup() {
+func Example_managedRowsAdapterAutomaticCleanup() {
 	// In a function that receives rows from somewhere:
 	// managed, err := WrapManagedRowsAdapter(rows)
 	// if err != nil {
@@ -82,7 +82,7 @@ func ExampleManagedRowsAdapterAutomaticCleanup() {
 }
 
 // ExampleScanRowsToRecommended shows the recommended approach.
-func ExampleScanRowsToRecommended() {
+func Example_scanRowsToRecommended() {
 	// This is the recommended pattern for most users
 	type User struct {
 		ID    int    `db:"id"`
@@ -112,7 +112,7 @@ func ExampleScanRowsToRecommended() {
 }
 
 // ExamplePoolConcurrency shows thread-safe pool usage from multiple goroutines.
-func ExamplePoolConcurrency() {
+func Example_poolConcurrency() {
 	pool := NewRowsAdapterPool()
 	var wg sync.WaitGroup
 
@@ -141,7 +141,7 @@ func ExamplePoolConcurrency() {
 }
 
 // ExampleResourceManagementMigrationPath shows the progression of patterns.
-func ExampleResourceManagementMigrationPath() {
+func Example_resourceManagementMigrationPath() {
 	log.Println("Pattern 1: Manual (Simplest, works for most)")
 	log.Println("  rows, _ := db.GetRaw(ctx, table, cols, joins, cond, opts)")
 	log.Println("  defer rows.Close()")

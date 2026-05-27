@@ -7,8 +7,8 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/assert"
-	db "tounilab.com/fabric/db/v1"
-	"tounilab.com/fabric/manager/v1/config"
+	db "tounilab.com/vessel/db/v1"
+	"tounilab.com/vessel/manager/v1/config"
 )
 
 func TestConfigEntryValidateExactlyOneDB(t *testing.T) {

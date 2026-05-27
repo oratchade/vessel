@@ -1,6 +1,5 @@
 //go:build test
 
-// Package v1 provides database abstraction interfaces and implementations for multiple database engines.
 package v1
 
 import (
@@ -9,7 +8,7 @@ import (
 	"fmt"
 	"reflect"
 
-	"tounilab.com/fabric/pkg/query/options"
+	"tounilab.com/vessel/pkg/query/options"
 )
 
 func ExportValidateQueryOptions(opts *options.QueryOptions) error {
@@ -39,6 +38,21 @@ func ExportScanRows(rows any, cols []string) ([]map[string]any, error) {
 // BuildFieldMapForTest exposes the buildFieldMap function for testing.
 func BuildFieldMapForTest(tType reflect.Type) map[string][]int {
 	return buildFieldMap(tType)
+}
+
+// GetFieldMapCacheForTest returns the global field map cache for testing purposes.
+func GetFieldMapCacheForTest() *fieldMapCacheTest {
+	return &fieldMapCacheTest{cache: globalFieldMapCache}
+}
+
+// fieldMapCacheTest is a test wrapper around fieldMapCache that exposes Get.
+type fieldMapCacheTest struct {
+	cache *fieldMapCache
+}
+
+// Get retrieves a field map from the cache, building and caching it if necessary.
+func (fct *fieldMapCacheTest) Get(tType reflect.Type) map[string][]int {
+	return fct.cache.get(tType)
 }
 
 // ============================================

@@ -38,8 +38,8 @@ type envResolver struct {
 //
 // Example:
 //
-//	fabricmgr.NewDBManager(ctx, path, logger,
-//	    fabricmgr.WithEnvVars(map[string]string{
+//	vesselmgr.NewDBManager(ctx, path, logger,
+//	    vesselmgr.WithEnvVars(map[string]string{
 //	        "DB_HOST":     "localhost",
 //	        "DB_PASSWORD": os.Getenv("DB_PASSWORD"),
 //	    }),
@@ -56,8 +56,8 @@ func WithEnvVars(vars map[string]string) EnvOption {
 //
 // Example:
 //
-//	fabricmgr.NewDBManager(ctx, path, logger,
-//	    fabricmgr.WithEnvPrefix("DB_", "FABRIC_"),
+//	vesselmgr.NewDBManager(ctx, path, logger,
+//	    vesselmgr.WithEnvPrefix("DB_", "VESSEL_"),
 //	)
 func WithEnvPrefix(prefixes ...string) EnvOption {
 	return func(r *envResolver) {
@@ -71,8 +71,8 @@ func WithEnvPrefix(prefixes ...string) EnvOption {
 //
 // Example:
 //
-//	fabricmgr.NewDBManager(ctx, path, logger,
-//	    fabricmgr.WithEnvFile(".env"),
+//	vesselmgr.NewDBManager(ctx, path, logger,
+//	    vesselmgr.WithEnvFile(".env"),
 //	)
 func WithEnvFile(path string) EnvOption {
 	return func(r *envResolver) {

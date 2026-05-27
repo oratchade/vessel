@@ -11,10 +11,10 @@ import (
 	"github.com/golang/mock/gomock"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	v1 "tounilab.com/fabric/db/v1"
-	"tounilab.com/fabric/internal/pkg/helpers"
-	cdt "tounilab.com/fabric/pkg/query/condition"
-	"tounilab.com/fabric/pkg/query/options"
+	v1 "tounilab.com/vessel/db/v1"
+	"tounilab.com/vessel/internal/pkg/helpers"
+	cdt "tounilab.com/vessel/pkg/query/condition"
+	"tounilab.com/vessel/pkg/query/options"
 )
 
 // TestNewFluentDB tests FluentDB creation

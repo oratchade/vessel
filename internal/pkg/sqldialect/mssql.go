@@ -1,13 +1,12 @@
-// Package sqldialect provides SQL dialect implementations for various database engines.
 package sqldialect
 
 import (
 	"fmt"
 	"strings"
 
-	"tounilab.com/fabric/internal/pkg/operator"
-	"tounilab.com/fabric/pkg/query/definition"
-	"tounilab.com/fabric/pkg/query/options"
+	"tounilab.com/vessel/internal/pkg/operator"
+	"tounilab.com/vessel/pkg/query/definition"
+	"tounilab.com/vessel/pkg/query/options"
 )
 
 // MSSQLDialect implements SQL dialect behavior specific to Microsoft SQL Server.

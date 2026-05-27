@@ -12,8 +12,8 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	v1 "tounilab.com/fabric/db/v1"
-	cdt "tounilab.com/fabric/pkg/query/condition"
+	v1 "tounilab.com/vessel/db/v1"
+	cdt "tounilab.com/vessel/pkg/query/condition"
 )
 
 const (
@@ -29,7 +29,7 @@ type IntegrationTest struct {
 
 // setupIntegration creates a test database connection
 // Requires docker-compose.test.yml to be running:
-// cd fabric && docker-compose -f docker-compose.test.yml up
+// cd vessel && docker-compose -f docker-compose.test.yml up
 func setupIntegration(t *testing.T) *IntegrationTest {
 	t.Helper()
 
@@ -54,14 +54,14 @@ func setupIntegration(t *testing.T) *IntegrationTest {
 
 	db, err := v1.NewDB(cfg, nil)
 	if err != nil {
-		if os.Getenv("FABRIC_INTEGRATION_STRICT") == "1" || dbType != "" {
+		if fluentStrict() || dbType != "" {
 			require.NoError(t, err, "failed to connect to test database")
 		}
 		t.Skipf("PostgreSQL integration database unavailable: %v", err)
 	}
 	if err := db.Ping(ctx); err != nil {
 		_ = db.Close()
-		if os.Getenv("FABRIC_INTEGRATION_STRICT") == "1" || dbType != "" {
+		if fluentStrict() || dbType != "" {
 			require.NoError(t, err, "failed to ping test database")
 		}
 		t.Skipf("PostgreSQL integration database unavailable: %v", err)

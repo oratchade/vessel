@@ -7,8 +7,8 @@ import (
 
 	"github.com/stretchr/testify/assert"
 
-	v1 "tounilab.com/fabric/db/v1"
-	"tounilab.com/fabric/pkg/query/definition"
+	v1 "tounilab.com/vessel/db/v1"
+	"tounilab.com/vessel/pkg/query/definition"
 )
 
 // TestSQLiteNewDB tests SQLite database initialization

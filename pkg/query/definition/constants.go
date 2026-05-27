@@ -1,4 +1,3 @@
-// Package definition contains constants for query types and database driver names.
 package definition
 
 type QueryType = string

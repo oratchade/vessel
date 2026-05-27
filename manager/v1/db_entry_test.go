@@ -7,8 +7,8 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
-	db "tounilab.com/fabric/db/v1"
-	v1 "tounilab.com/fabric/manager/v1"
+	db "tounilab.com/vessel/db/v1"
+	v1 "tounilab.com/vessel/manager/v1"
 )
 
 // MockDB implements db.DB interface for testing

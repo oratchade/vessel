@@ -8,7 +8,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"tounilab.com/fabric/db/v1/dberror"
+	"tounilab.com/vessel/db/v1/dberror"
 )
 
 // TestMySQLErrorPrefixing verifies MySQL errors include [mysql] prefix.

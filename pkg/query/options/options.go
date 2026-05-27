@@ -1,7 +1,6 @@
-// Package options defines query option structures for controlling query behavior.
 package options
 
-import "tounilab.com/fabric/pkg/query/condition"
+import "tounilab.com/vessel/pkg/query/condition"
 
 // UpsertAction describes what an upsert should do when a uniqueness conflict occurs.
 type UpsertAction string

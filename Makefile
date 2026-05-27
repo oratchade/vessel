@@ -255,6 +255,19 @@ lint-docs:
 mocks:
 	@echo "Generating mocks using go generate..."
 	@go generate ./...
+	@for file in $$(find . -name '*_mocks.go' -type f); do \
+		if ! head -n 1 "$$file" | grep -q '^//go:build test || mocks$$'; then \
+			tmp=$$(mktemp); \
+			printf '//go:build test || mocks\n\n' > "$$tmp"; \
+			cat "$$file" >> "$$tmp"; \
+			mv "$$tmp" "$$file"; \
+		fi; \
+		if grep -q '^// Package .* is a generated GoMock package\.$$' "$$file"; then \
+			tmp=$$(mktemp); \
+			sed '/^\/\/ Package .* is a generated GoMock package\.$$/d' "$$file" > "$$tmp"; \
+			mv "$$tmp" "$$file"; \
+		fi; \
+	done
 	@echo "Mocks generated successfully!"
 
 # Clean cache to ensure clean test runs, especially important for coverage and integration tests

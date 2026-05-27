@@ -657,19 +657,3 @@ func setFieldFromValue(f reflect.Value, cv any) error {
 	// Last-resort coercion by field kind.
 	return setFieldByKind(f, cv)
 }
-
-// GetFieldMapCacheForTest returns the global field map cache for testing purposes.
-// This function is only available during tests.
-func GetFieldMapCacheForTest() *fieldMapCacheTest {
-	return &fieldMapCacheTest{cache: globalFieldMapCache}
-}
-
-// fieldMapCacheTest is a test wrapper around fieldMapCache that exposes the Get method.
-type fieldMapCacheTest struct {
-	cache *fieldMapCache
-}
-
-// Get retrieves a field map from the cache, building and caching it if necessary.
-func (fct *fieldMapCacheTest) Get(tType reflect.Type) map[string][]int {
-	return fct.cache.get(tType)
-}

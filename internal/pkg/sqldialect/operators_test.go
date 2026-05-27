@@ -8,8 +8,8 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"tounilab.com/fabric/internal/pkg/sqldialect"
-	cdt "tounilab.com/fabric/pkg/query/condition"
+	"tounilab.com/vessel/internal/pkg/sqldialect"
+	cdt "tounilab.com/vessel/pkg/query/condition"
 )
 
 // TestDialectComparisonOperators tests comparison operators across all dialects

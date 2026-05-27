@@ -1,4 +1,3 @@
-// Package v1 provides database abstraction interfaces and implementations for multiple database engines.
 package v1
 
 import (
@@ -11,11 +10,11 @@ import (
 
 	"go.opentelemetry.io/otel/codes"
 	"go.opentelemetry.io/otel/trace"
-	"tounilab.com/fabric/db/v1/plugin"
-	"tounilab.com/fabric/internal/pkg/otel"
-	cdt "tounilab.com/fabric/pkg/query/condition"
-	"tounilab.com/fabric/pkg/query/definition"
-	"tounilab.com/fabric/pkg/query/options"
+	"tounilab.com/vessel/db/v1/plugin"
+	"tounilab.com/vessel/internal/pkg/otel"
+	cdt "tounilab.com/vessel/pkg/query/condition"
+	"tounilab.com/vessel/pkg/query/definition"
+	"tounilab.com/vessel/pkg/query/options"
 )
 
 // ExecResult holds metadata returned by mutation statements such as INSERT,
@@ -45,7 +44,7 @@ func fromSQLResult(res sql.Result) (*ExecResult, error) {
 	return &ExecResult{RowsAffected: ra}, nil
 }
 
-//go:generate mockgen -source=db.go -destination=db_mocks.go -package=v1 DBConfig
+//go:generate mockgen -source=db.go -destination=db_mocks.go -package=v1
 
 // DBConfig represents configuration needed to create a DB connection. It
 // exposes the driver name and a DSN builder for connecting to the database.
@@ -91,8 +90,6 @@ func NewDB(cfg DBConfig, logger Logger) (DB, error) {
 		return nil, fmt.Errorf("NewDB: unsupported driver: %s", driverName)
 	}
 }
-
-//go:generate mockgen -source=db.go -destination=db_mocks.go -package=v1 reader
 
 // reader provides context-aware read operations for querying data without modifying it.
 // Methods accept context.Context for cancellation and deadlines.
@@ -181,8 +178,6 @@ type reader interface {
 	//   error: Error if the query fails.
 	QueryRaw(ctx context.Context, query string, args ...any) (*RowsAdapter, error)
 }
-
-//go:generate mockgen -source=db.go -destination=db_mocks.go -package=v1 writer
 
 // writer provides context-aware write operations for modifying data.
 // Methods accept context.Context for cancellation and deadlines.
@@ -289,8 +284,6 @@ type upserter interface {
 		opts *options.QueryOptions,
 	) (string, []any, error)
 }
-
-//go:generate mockgen -source=db.go -destination=db_mocks.go -package=v1 introspector
 
 // introspector provides access to SQL queries without executing them.
 // Useful for query introspection, logging, validation, and preview purposes.
@@ -435,8 +428,6 @@ type introspector interface {
 	) (*RowsAdapter, error)
 }
 
-//go:generate mockgen -source=db.go -destination=db_mocks.go -package=v1 transactional
-
 // transactional provides transaction management operations.
 type transactional interface {
 	// Begin starts a new transaction and returns a Tx.
@@ -471,8 +462,6 @@ type savepointer interface {
 	ReleaseSavepoint(ctx context.Context, name string) error
 }
 
-//go:generate mockgen -source=db.go -destination=db_mocks.go -package=v1 healthCheck
-
 // healthCheck provides connection health diagnostics and monitoring.
 type healthCheck interface {
 	// Ping checks the database connection.
@@ -493,8 +482,6 @@ type healthCheck interface {
 	PoolStats() (*PoolStatistics, error)
 }
 
-//go:generate mockgen -source=db.go -destination=db_mocks.go -package=v1 closer
-
 // closer provides resource cleanup.
 type closer interface {
 	// Close closes the database connection.
@@ -503,8 +490,6 @@ type closer interface {
 	//   error: Error if the closure fails.
 	Close() error
 }
-
-//go:generate mockgen -source=db.go -destination=db_mocks.go -package=v1 DB
 
 // DB represents a complete database connection interface combining read, write,
 // introspection, transaction management, health checks, and resource cleanup.
@@ -517,8 +502,6 @@ type DB interface {
 	healthCheck
 	closer
 }
-
-//go:generate mockgen -source=db.go -destination=db_mocks.go -package=v1 Tx
 
 // Tx represents a database transaction supporting all query operations plus commit/rollback.
 type Tx interface {

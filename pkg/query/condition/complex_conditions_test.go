@@ -8,8 +8,8 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	cdt "tounilab.com/fabric/pkg/query/condition"
-	"tounilab.com/fabric/tests"
+	cdt "tounilab.com/vessel/pkg/query/condition"
+	"tounilab.com/vessel/tests"
 )
 
 // TestSimpleCondition tests basic condition building

@@ -1,11 +1,10 @@
-// Package config provides all configuration needs.
 package config
 
 import (
 	"fmt"
 	"time"
 
-	db "tounilab.com/fabric/db/v1"
+	db "tounilab.com/vessel/db/v1"
 )
 
 type DBType = string

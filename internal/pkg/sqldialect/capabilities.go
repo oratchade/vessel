@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"strings"
 
-	"tounilab.com/fabric/pkg/query/condition"
+	"tounilab.com/vessel/pkg/query/condition"
 )
 
 // Capabilities describes syntax features the SQL builder can safely render for a dialect.

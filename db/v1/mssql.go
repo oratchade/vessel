@@ -1,7 +1,3 @@
-// Package v1 provides a high-performance abstraction layer for Microsoft SQL Server 2016+,
-// with support for parameterized queries, connection pooling via go-mssqldb,
-// automatic identifier quoting using square brackets ([]), and T-SQL specific
-// features like @@IDENTITY, WAITFOR clauses, and table-valued parameters.
 package v1
 
 import (
@@ -16,13 +12,13 @@ import (
 	semconv "go.opentelemetry.io/otel/semconv/v1.37.0"
 	"go.opentelemetry.io/otel/trace"
 
-	"tounilab.com/fabric/db/v1/dberror"
-	"tounilab.com/fabric/internal/pkg/builder"
-	oh "tounilab.com/fabric/internal/pkg/otel"
-	"tounilab.com/fabric/internal/pkg/sqldialect"
-	cdt "tounilab.com/fabric/pkg/query/condition"
-	"tounilab.com/fabric/pkg/query/definition"
-	"tounilab.com/fabric/pkg/query/options"
+	"tounilab.com/vessel/db/v1/dberror"
+	"tounilab.com/vessel/internal/pkg/builder"
+	oh "tounilab.com/vessel/internal/pkg/otel"
+	"tounilab.com/vessel/internal/pkg/sqldialect"
+	cdt "tounilab.com/vessel/pkg/query/condition"
+	"tounilab.com/vessel/pkg/query/definition"
+	"tounilab.com/vessel/pkg/query/options"
 )
 
 // MSSQLConfig holds configuration for connecting to a MSSQL database.

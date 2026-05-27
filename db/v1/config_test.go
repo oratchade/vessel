@@ -8,8 +8,8 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	v1 "tounilab.com/fabric/db/v1"
-	"tounilab.com/fabric/pkg/query/definition"
+	v1 "tounilab.com/vessel/db/v1"
+	"tounilab.com/vessel/pkg/query/definition"
 )
 
 // TestMysqlConfigDriver tests the Driver method for MySQL config

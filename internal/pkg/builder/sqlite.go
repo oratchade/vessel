@@ -4,9 +4,9 @@ import (
 	"fmt"
 	"strings"
 
-	"tounilab.com/fabric/internal/pkg/operator"
-	cdt "tounilab.com/fabric/pkg/query/condition"
-	"tounilab.com/fabric/pkg/query/options"
+	"tounilab.com/vessel/internal/pkg/operator"
+	cdt "tounilab.com/vessel/pkg/query/condition"
+	"tounilab.com/vessel/pkg/query/options"
 )
 
 // SQLiteQueryBuilder builds SQL queries compatible with SQLite dialects.

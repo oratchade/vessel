@@ -1,4 +1,3 @@
-// Package v1 provides database manager entrypoint and implementation for multiple database engines management.
 package v1
 
 import (
@@ -8,8 +7,8 @@ import (
 	"sync/atomic"
 	"time"
 
-	db "tounilab.com/fabric/db/v1"
-	"tounilab.com/fabric/manager/v1/config"
+	db "tounilab.com/vessel/db/v1"
+	"tounilab.com/vessel/manager/v1/config"
 )
 
 // dbEntryWorker represents a worker that processes queries for a DBEntry. Each worker has its own queue of QueryData.

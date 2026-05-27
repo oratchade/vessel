@@ -1,15 +1,14 @@
-// Package sqldialect provides SQL dialect implementations for various database engines.
 package sqldialect
 
 import (
 	"fmt"
 	"strings"
 
-	"tounilab.com/fabric/internal/pkg/helpers"
-	"tounilab.com/fabric/internal/pkg/operator"
-	"tounilab.com/fabric/pkg/query/condition"
-	"tounilab.com/fabric/pkg/query/definition"
-	"tounilab.com/fabric/pkg/query/options"
+	"tounilab.com/vessel/internal/pkg/helpers"
+	"tounilab.com/vessel/internal/pkg/operator"
+	"tounilab.com/vessel/pkg/query/condition"
+	"tounilab.com/vessel/pkg/query/definition"
+	"tounilab.com/vessel/pkg/query/options"
 )
 
 // supportedOptions builds SQL fragments for query options like ORDER BY, LIMIT, OFFSET, and RETURNING

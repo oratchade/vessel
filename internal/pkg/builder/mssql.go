@@ -3,8 +3,8 @@ package builder
 import (
 	"fmt"
 
-	cdt "tounilab.com/fabric/pkg/query/condition"
-	"tounilab.com/fabric/pkg/query/options"
+	cdt "tounilab.com/vessel/pkg/query/condition"
+	"tounilab.com/vessel/pkg/query/options"
 )
 
 // MSSQLQueryBuilder builds SQL queries compatible with Microsoft SQL Server.

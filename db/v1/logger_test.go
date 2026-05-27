@@ -7,7 +7,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	v1 "tounilab.com/fabric/db/v1"
+	v1 "tounilab.com/vessel/db/v1"
 )
 
 // TestLoggerInterface verifies Logger interface contract

@@ -1,4 +1,3 @@
-// Package v1 provides database abstraction interfaces and implementations for multiple database engines.
 package v1
 
 import (

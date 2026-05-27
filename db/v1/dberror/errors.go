@@ -1,31 +1,3 @@
-// Package dberror provides sentinel error types and error mapping utilities for database operations.
-//
-// Sentinel Errors:
-// - ErrNotFound: Query returned no rows
-// - ErrDuplicateKey: Unique or primary key constraint violated
-// - ErrForeignKeyViolation: Foreign key constraint violated
-// - ErrConnectionFailed: Database connection failed or unreachable
-// - ErrConstraintViolation: General constraint violations
-// - ErrSyntaxError: SQL query has invalid syntax
-// - ErrQueryTimeout: Query execution exceeded timeout threshold
-//
-// Error Detection:
-// The package provides database-specific mappers (MySQL, PostgreSQL, SQLite, MSSQL)
-// that detect and map database errors to sentinel errors. Use GetMapper(dialect)
-// to get the appropriate mapper for your database, then call mapper.MapError(err)
-// to convert database-specific errors to sentinel errors.
-//
-// Example:
-//
-//	if resp.Error == nil {
-//	    // Success
-//	} else if errors.Is(resp.Error, dberror.ErrDuplicateKey) {
-//	    // Handle duplicate key
-//	} else if errors.Is(resp.Error, dberror.ErrQueryTimeout) {
-//	    // Handle timeout
-//	} else if errors.Is(resp.Error, dberror.ErrSyntaxError) {
-//	    // Handle syntax error
-//	}
 package dberror
 
 import (

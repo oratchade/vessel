@@ -1,25 +1,3 @@
-// Package v1 provides database abstraction interfaces and implementations for multiple database engines.
-//
-// The v1 package includes database connection management, query building, row scanning,
-// error handling, and logging. It supports multiple database engines (MySQL, PostgreSQL,
-// SQLite, MSSQL) with a unified API.
-//
-// Key types:
-//   - DB: Main database connection interface
-//   - FluentDB: Builder-style API for constructing queries
-//   - RowsAdapter: Unified row scanning interface across database drivers
-//   - RowsProvider: Interface for custom row implementations (e.g., plugins)
-//
-// Row Management:
-// RowsAdapter should always be properly closed to avoid connection leaks:
-//
-//	rows, err := db.Query(ctx, ...)
-//	if err != nil { ... }
-//	defer rows.Close()  // IMPORTANT: Always close rows when done
-//
-// For extensibility details, see rows_provider.go.
-// For scanning and field mapping, see rows_scanning.go.
-// For pooling strategies, see rows_pool.go.
 package v1
 
 import (

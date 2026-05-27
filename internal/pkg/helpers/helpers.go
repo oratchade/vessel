@@ -1,16 +1,15 @@
-// Package helpers provides utility functions for SQL query building and formatting.
 package helpers
 
 import (
 	"strings"
 
-	"tounilab.com/fabric/pkg/query/condition"
+	"tounilab.com/vessel/pkg/query/condition"
 )
 
-const rawProjectionPrefix = "\x00fabric:raw-projection:"
+const rawProjectionPrefix = "\x00vessel:raw-projection:"
 
 // RawProjection marks a trusted projection fragment so builders render it
-// without identifier quoting. The marker is internal to Fabric.
+// without identifier quoting. The marker is internal to Vessel.
 func RawProjection(sql string) string {
 	return rawProjectionPrefix + sql
 }

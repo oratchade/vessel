@@ -1,4 +1,3 @@
-// Package config provides all configuration needs.
 package config
 
 import "time"

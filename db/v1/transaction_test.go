@@ -10,7 +10,7 @@ import (
 	"github.com/golang/mock/gomock"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	v1 "tounilab.com/fabric/db/v1"
+	v1 "tounilab.com/vessel/db/v1"
 )
 
 func TestRunTransactionSuccessCommits(t *testing.T) {

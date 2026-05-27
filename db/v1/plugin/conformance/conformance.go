@@ -1,15 +1,14 @@
-// Package conformance provides test helpers for Fabric database plugins.
 package conformance
 
 import (
 	"context"
 	"fmt"
 
-	db "tounilab.com/fabric/db/v1"
-	"tounilab.com/fabric/db/v1/plugin"
+	db "tounilab.com/vessel/db/v1"
+	"tounilab.com/vessel/db/v1/plugin"
 )
 
-// CheckFactory verifies that a plugin factory has a usable name and returns a Fabric DB.
+// CheckFactory verifies that a plugin factory has a usable name and returns a Vessel DB.
 //
 // Plugin authors can call this from their own tests to catch registry contract
 // mistakes before integrating with db.NewDB.

@@ -6,7 +6,7 @@ import (
 	"sync"
 	"time"
 
-	"tounilab.com/fabric/pkg/retry"
+	"tounilab.com/vessel/pkg/retry"
 )
 
 // Example: Query Retry with Replica Failover

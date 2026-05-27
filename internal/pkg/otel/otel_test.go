@@ -10,7 +10,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	otelutil "tounilab.com/fabric/internal/pkg/otel"
+	otelutil "tounilab.com/vessel/internal/pkg/otel"
 )
 
 // TestUseTracerEnabled tests UseTracer when OTEL is enabled

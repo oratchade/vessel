@@ -16,7 +16,7 @@ import (
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
 
-	v1 "tounilab.com/fabric/db/v1"
+	v1 "tounilab.com/vessel/db/v1"
 )
 
 // SLOG ADAPTER TESTS

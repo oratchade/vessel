@@ -24,7 +24,7 @@ func NotLike(column string, pattern any) Condition {
 
 // ILike creates a portable case-insensitive LIKE condition.
 //
-// Fabric renders this as LOWER(column) LIKE LOWER(?) for all built-in dialects.
+// Vessel renders this as LOWER(column) LIKE LOWER(?) for all built-in dialects.
 func ILike(column string, pattern any) Condition {
 	return &insensitiveLike{column: column, pattern: pattern}
 }

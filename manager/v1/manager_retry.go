@@ -6,8 +6,8 @@ import (
 	"sync"
 	"time"
 
-	db "tounilab.com/fabric/db/v1"
-	"tounilab.com/fabric/pkg/retry"
+	db "tounilab.com/vessel/db/v1"
+	"tounilab.com/vessel/pkg/retry"
 )
 
 // QueryWithRetryConfig holds configuration for query retry behavior

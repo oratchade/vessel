@@ -1,4 +1,3 @@
-// Package sqldialect provides SQL dialect implementations for various database engines.
 package sqldialect
 
 // SQLiteDialect implements SQLite SQL dialect behavior.

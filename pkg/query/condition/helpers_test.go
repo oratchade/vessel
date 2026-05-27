@@ -8,8 +8,8 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"tounilab.com/fabric/pkg/query/condition"
-	"tounilab.com/fabric/tests"
+	"tounilab.com/vessel/pkg/query/condition"
+	"tounilab.com/vessel/tests"
 )
 
 func TestConditionHelpers_ToSQL(t *testing.T) {

@@ -1,5 +1,5 @@
 #!/bin/bash
-# filepath: /Users/tounilab/Workspace/tounilab.com/fabric/dockerfiles/entrypoint-sqlserver.sh
+# filepath: /Users/tounilab/Workspace/tounilab.com/vessel/dockerfiles/entrypoint-sqlserver.sh
 
 # Start SQL Server in background
 /opt/mssql/bin/sqlservr &

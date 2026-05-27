@@ -6,7 +6,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
-	"tounilab.com/fabric/internal/pkg/helpers"
+	"tounilab.com/vessel/internal/pkg/helpers"
 )
 
 type mockDialect struct {

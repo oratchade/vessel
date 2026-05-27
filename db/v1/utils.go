@@ -1,14 +1,13 @@
-// Package v1 provides database abstraction and query execution utilities.
 package v1
 
 import (
 	"context"
 	"fmt"
 
-	"tounilab.com/fabric/db/v1/dberror"
-	builder "tounilab.com/fabric/internal/pkg/builder"
-	cdt "tounilab.com/fabric/pkg/query/condition"
-	"tounilab.com/fabric/pkg/query/options"
+	"tounilab.com/vessel/db/v1/dberror"
+	builder "tounilab.com/vessel/internal/pkg/builder"
+	cdt "tounilab.com/vessel/pkg/query/condition"
+	"tounilab.com/vessel/pkg/query/options"
 )
 
 // dbOpts holds common database operation dependencies used by helper functions.

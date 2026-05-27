@@ -8,7 +8,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	v1 "tounilab.com/fabric/manager/v1"
+	v1 "tounilab.com/vessel/manager/v1"
 )
 
 // TestNewAtomicWrapCounterErrorHandling tests that NewAtomicWrapCounter returns error on invalid max value.

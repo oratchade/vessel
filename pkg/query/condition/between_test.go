@@ -6,8 +6,8 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
-	"tounilab.com/fabric/pkg/query/condition"
-	"tounilab.com/fabric/tests"
+	"tounilab.com/vessel/pkg/query/condition"
+	"tounilab.com/vessel/tests"
 )
 
 func TestBetween_ToSQL_AllFieldsSet(t *testing.T) {

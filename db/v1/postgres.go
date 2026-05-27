@@ -1,7 +1,3 @@
-// Package v1 provides a high-performance abstraction layer for PostgreSQL 9.6+,
-// with support for parameterized queries, connection pooling via pgxpool,
-// automatic identifier quoting using double quotes ("), and advanced features
-// like RETURNING clauses, LISTEN/NOTIFY, window functions, CTEs, and custom types.
 package v1
 
 import (
@@ -19,13 +15,13 @@ import (
 	"go.opentelemetry.io/otel/codes"
 	semconv "go.opentelemetry.io/otel/semconv/v1.37.0"
 	"go.opentelemetry.io/otel/trace"
-	"tounilab.com/fabric/db/v1/dberror"
-	builder "tounilab.com/fabric/internal/pkg/builder"
-	"tounilab.com/fabric/internal/pkg/otel"
-	sqldialect "tounilab.com/fabric/internal/pkg/sqldialect"
-	cdt "tounilab.com/fabric/pkg/query/condition"
-	"tounilab.com/fabric/pkg/query/definition"
-	"tounilab.com/fabric/pkg/query/options"
+	"tounilab.com/vessel/db/v1/dberror"
+	builder "tounilab.com/vessel/internal/pkg/builder"
+	"tounilab.com/vessel/internal/pkg/otel"
+	sqldialect "tounilab.com/vessel/internal/pkg/sqldialect"
+	cdt "tounilab.com/vessel/pkg/query/condition"
+	"tounilab.com/vessel/pkg/query/definition"
+	"tounilab.com/vessel/pkg/query/options"
 )
 
 func fromCommandTag(tag pgconn.CommandTag) *ExecResult {

@@ -1,4 +1,3 @@
-// Package v1 provides database manager entrypoint and implementation for multiple database engines management.
 package v1
 
 import (
@@ -13,10 +12,10 @@ import (
 	"github.com/pelletier/go-toml/v2"
 	"gopkg.in/yaml.v3"
 
-	db "tounilab.com/fabric/db/v1"
-	"tounilab.com/fabric/manager/v1/config"
-	"tounilab.com/fabric/pkg/query/condition"
-	"tounilab.com/fabric/pkg/query/options"
+	db "tounilab.com/vessel/db/v1"
+	"tounilab.com/vessel/manager/v1/config"
+	"tounilab.com/vessel/pkg/query/condition"
+	"tounilab.com/vessel/pkg/query/options"
 )
 
 // setupDBs initializes DBEntry maps for read-only and read-write databases
