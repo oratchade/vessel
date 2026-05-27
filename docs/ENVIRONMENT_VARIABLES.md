@@ -1,6 +1,6 @@
 # Test Environment Variables
 
-This guide explains how to configure test credentials for the fabric
+This guide explains how to configure test credentials for the vessel
 SQL abstraction library without exposing sensitive information in
 source code.
 
@@ -19,7 +19,7 @@ with sensible fallbacks for local development. This approach:
 ### 1. Copy the Example Environment File
 
 ```bash
-cd fabric
+cd vessel
 cp .env.example .env
 ```
 
@@ -69,13 +69,13 @@ is the recommended mode for CI and for debugging one dialect:
 
 ```bash
 DB_TYPE=sqlite rtk go test -tags=integration ./tests ./db/v1 -count=1
-DB_TYPE=mysql FABRIC_INTEGRATION_STRICT=1 rtk go test -tags=integration ./tests ./db/v1 -count=1
-DB_TYPE=postgres FABRIC_INTEGRATION_STRICT=1 rtk go test -tags=integration ./tests ./db/v1 -count=1
-DB_TYPE=mssql FABRIC_INTEGRATION_STRICT=1 rtk go test -tags=integration ./tests ./db/v1 -count=1
+DB_TYPE=mysql VESSEL_INTEGRATION_STRICT=1 rtk go test -tags=integration ./tests ./db/v1 -count=1
+DB_TYPE=postgres VESSEL_INTEGRATION_STRICT=1 rtk go test -tags=integration ./tests ./db/v1 -count=1
+DB_TYPE=mssql VESSEL_INTEGRATION_STRICT=1 rtk go test -tags=integration ./tests ./db/v1 -count=1
 ```
 
 When `DB_TYPE` is set, connection/setup failures are test failures. When
-running the full matrix without `FABRIC_INTEGRATION_STRICT=1`, unavailable
+running the full matrix without `VESSEL_INTEGRATION_STRICT=1`, unavailable
 external services may be skipped with a diagnostic message so local SQLite-only
 workflows stay lightweight.
 
@@ -160,7 +160,7 @@ test database. If MSSQL keeps skipping or failing:
   `TestPassword123!`.
 - Keep `DB_MSSQL_ENCRYPT=disable` or `DB_MSSQL_TRUST_SERVER_CERT=true` for
   local containers unless you have configured a trusted certificate.
-- Run with `DB_TYPE=mssql FABRIC_INTEGRATION_STRICT=1` to turn availability
+- Run with `DB_TYPE=mssql VESSEL_INTEGRATION_STRICT=1` to turn availability
   problems into a single actionable failure.
 
 ### SQLite Configuration
@@ -179,7 +179,7 @@ recommended for test isolation.
 ### GitHub Actions
 
 ```yaml
-- name: Run Fabric Tests
+- name: Run Vessel Tests
   env:
     DB_MYSQL_PASSWORD: ${{ secrets.DB_MYSQL_PASSWORD }}
     DB_POSTGRES_PASSWORD: ${{ secrets.DB_POSTGRES_PASSWORD }}

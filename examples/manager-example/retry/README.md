@@ -1,7 +1,7 @@
 # Retry Integration Examples
 
 Comprehensive examples demonstrating the retry integration system in
-fabric's DBManager.
+vessel's DBManager.
 
 ## Overview
 

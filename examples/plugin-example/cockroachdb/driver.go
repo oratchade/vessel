@@ -4,8 +4,8 @@ import (
 	"context"
 	"fmt"
 
-	db "tounilab.com/fabric/db/v1"
-	"tounilab.com/fabric/db/v1/plugin"
+	db "tounilab.com/vessel/db/v1"
+	"tounilab.com/vessel/db/v1/plugin"
 )
 
 // Config represents CockroachDB connection configuration.

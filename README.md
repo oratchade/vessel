@@ -1,8 +1,8 @@
-# fabric
+# vessel
 
 A lightweight SQL-first data layer for Go services.
 
-Fabric sits between raw `database/sql` and a full ORM. It provides
+Vessel sits between raw `database/sql` and a full ORM. It provides
 dialect-aware query builders, typed row scanning, transaction helpers,
 OpenTelemetry instrumentation, retry utilities, and an optional manager for
 operational routing and async writes.
@@ -10,9 +10,9 @@ operational routing and async writes.
 It is intended for services that want explicit SQL behavior without adopting
 an ORM or generating code for every query.
 
-[![GoDoc](https://godoc.org/tounilab.com/fabric?status.svg)](https://godoc.org/tounilab.com/fabric)
-[![Go Report Card](https://goreportcard.com/badge/tounilab.com/fabric)](https://goreportcard.com/report/tounilab.com/fabric)
-[![Tests](https://github.com/oratchade/fabric/actions/workflows/test.yml/badge.svg)](https://github.com/oratchade/fabric/actions/workflows/test.yml)
+[![GoDoc](https://godoc.org/tounilab.com/vessel?status.svg)](https://godoc.org/tounilab.com/vessel)
+[![Go Report Card](https://goreportcard.com/badge/tounilab.com/vessel)](https://goreportcard.com/report/tounilab.com/vessel)
+[![Tests](https://github.com/oratchade/vessel/actions/workflows/test.yml/badge.svg)](https://github.com/oratchade/vessel/actions/workflows/test.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
 ## Features
@@ -37,9 +37,9 @@ an ORM or generating code for every query.
 
 ## Positioning
 
-Fabric is not a replacement for every Go database tool.
+Vessel is not a replacement for every Go database tool.
 
-Use Fabric when you want:
+Use Vessel when you want:
 
 - dynamic SQL builders without string concatenation;
 - portable core CRUD/query behavior across supported dialects;
@@ -56,7 +56,7 @@ Prefer another tool when you need:
   management (GORM, Bun, Ent);
 - database-specific SQL as the main abstraction.
 
-Fabric's unique position is operational convenience for SQL-first services: a
+Vessel's unique position is operational convenience for SQL-first services: a
 small, explicit data layer that keeps query construction, dialect rules,
 transaction behavior, observability, retries, and optional write routing in one
 place without becoming an ORM.
@@ -64,7 +64,7 @@ place without becoming an ORM.
 ## Installation
 
 ```bash
-go get tounilab.com/fabric
+go get tounilab.com/vessel
 ```
 
 Requires Go 1.26.0 or later.
@@ -123,7 +123,7 @@ import (
  tracesdk "go.opentelemetry.io/otel/sdk/trace"
  semconv "go.opentelemetry.io/otel/semconv/v1.26.0"
 
- db "tounilab.com/fabric/db/v1"
+ db "tounilab.com/vessel/db/v1"
 )
 
 func initTracer() (*tracesdk.TracerProvider, error) {
@@ -254,7 +254,7 @@ import (
     "context"
     "log"
 
-    db "tounilab.com/fabric/db/v1"
+    db "tounilab.com/vessel/db/v1"
 )
 
 func main() {
@@ -306,7 +306,7 @@ for _, user := range users {
 When you want typed structs, use `GetRaw()` with `ScanRowsTo[T]()`:
 
 ```go
-import db "tounilab.com/fabric/db/v1"
+import db "tounilab.com/vessel/db/v1"
 
 // Define struct matching SELECT columns
 type User struct {
@@ -387,8 +387,8 @@ log.Printf("Inserted %d rows\n", result.RowsAffected)
 
 ```go
 import (
-    db "tounilab.com/fabric/db/v1"
-    cdt "tounilab.com/fabric/pkg/query/condition"
+    db "tounilab.com/vessel/db/v1"
+    cdt "tounilab.com/vessel/pkg/query/condition"
 )
 
 updates := map[string]any{
@@ -464,7 +464,7 @@ for _, row := range results {
 
 ## Setting Up Test Environment
 
-Fabric uses environment variables for database test credentials,
+Vessel uses environment variables for database test credentials,
 making it easy to configure testing for any database.
 
 ### Quick Setup
@@ -502,6 +502,12 @@ see [docs/ENVIRONMENT_VARIABLES.md](./docs/ENVIRONMENT_VARIABLES.md).
 # Run all unit tests (no Docker needed)
 make test
 
+# Regenerate test mocks
+make mocks
+
+# Use generated mocks from external packages
+go test -tags=mocks ./...
+
 # Run SQLite integration tests (fast, no Docker)
 make integration-test-sqlite
 
@@ -517,6 +523,8 @@ make cover-html  # Opens HTML coverage report in browser
 
 The test suite includes unit coverage for builders and dialect rendering, plus
 integration targets for SQLite and Docker-backed MySQL, PostgreSQL, and MSSQL.
+Generated GoMock files are built only with the `test` or `mocks` build tags, so
+they stay available for tests without appearing in the normal package API.
 
 See [CODE_REVIEW.md](./docs/CODE_REVIEW.md) for code quality standards
 and testing requirements.
@@ -527,7 +535,7 @@ For advanced use cases, use `ScanRowsTo` to efficiently scan rows into
 strongly-typed structs:
 
 ```go
-import db "tounilab.com/fabric/db/v1"
+import db "tounilab.com/vessel/db/v1"
 
 // Define your struct matching SELECT columns
 type User struct {
@@ -559,7 +567,7 @@ for _, user := range users {
 ### RowsAdapter Resource Management
 
 The methods `GetRaw()`, `GetByIDRaw()`, and `QueryRaw()` return a `RowsAdapter`
-that holds database resources (connections, prepared statements). Fabric provides
+that holds database resources (connections, prepared statements). Vessel provides
 three patterns for safe resource management—**choose based on your use case**:
 
 **Decision Tree:**
@@ -860,7 +868,7 @@ for explainRows.Next() {
 - `Explain()` - Execute EXPLAIN to analyze query performance
 
 Query preview is intended for debugging, logging, tests, and EXPLAIN workflows.
-Generated SQL uses placeholders for values when built through Fabric's query and
+Generated SQL uses placeholders for values when built through Vessel's query and
 condition APIs.
 
 ### FluentDB - Fluent Query Builder API
@@ -871,8 +879,8 @@ SQL-like syntax:
 
 ```go
 import (
-    db "tounilab.com/fabric/db/v1"
-    cdt "tounilab.com/fabric/pkg/query/condition"
+    db "tounilab.com/vessel/db/v1"
+    cdt "tounilab.com/vessel/pkg/query/condition"
 )
 
 fdb := db.NewFluentDB(database, ctx)
@@ -1082,7 +1090,7 @@ Dialect notes:
 - MySQL supports mutation `OrderBy`/`Limit` only for non-joined UPDATE and
   DELETE. Other dialects return explicit unsupported-option errors.
 - MSSQL pagination uses `ORDER BY ... OFFSET ... FETCH NEXT`; `Limit` requires
-  `OrderBy`, and Fabric emits `OFFSET 0 ROWS` when only `Limit` is set.
+  `OrderBy`, and Vessel emits `OFFSET 0 ROWS` when only `Limit` is set.
 - Prefer `Having(condition)` for parameterized aggregate filters. `HavingRaw`
   renders a raw SQL clause string. Table names, column names, raw expressions,
   and raw HAVING clauses must be trusted or allowlisted; values should use
@@ -1090,7 +1098,7 @@ Dialect notes:
 - Use `condition.In(column, values...)` for portable membership checks, including
   expanded UUID slices. PostgreSQL `ANY` and array operators remain raw SQL.
 - Use `condition.ILike(column, pattern)` for portable case-insensitive search;
-  Fabric renders it as `LOWER(column) LIKE LOWER(?)` across built-in dialects.
+  Vessel renders it as `LOWER(column) LIKE LOWER(?)` across built-in dialects.
 - `ColumnRaw` and `ColumnRawAs` are trusted projection escape hatches for casts,
   functions, and dialect-specific expressions. Keep user values in conditions.
 - For portable "insert and return row" flows, prefer application-generated IDs
@@ -1173,9 +1181,9 @@ database, err := db.NewDB(db.MSSQLConfig{
 
 ## Logger Adapters
 
-Fabric supports structured logging with multiple popular Go logging
+Vessel supports structured logging with multiple popular Go logging
 libraries through its logger adapter system. You can use your preferred
-logging library without modifying Fabric's code.
+logging library without modifying Vessel's code.
 
 ### Using slog (Standard Library - Recommended)
 
@@ -1191,7 +1199,7 @@ import (
     "log/slog"
     "os"
 
-    db "tounilab.com/fabric/db/v1"
+    db "tounilab.com/vessel/db/v1"
 )
 
 func main() {
@@ -1226,7 +1234,7 @@ package main
 import (
     "github.com/sirupsen/logrus"
 
-    db "tounilab.com/fabric/db/v1"
+    db "tounilab.com/vessel/db/v1"
 )
 
 func main() {
@@ -1262,7 +1270,7 @@ package main
 import (
     "go.uber.org/zap"
 
-    db "tounilab.com/fabric/db/v1"
+    db "tounilab.com/vessel/db/v1"
 )
 
 func main() {
@@ -1302,7 +1310,7 @@ import (
     apexlog "github.com/apex/log"
     "github.com/apex/log/handlers/json"
 
-    db "tounilab.com/fabric/db/v1"
+    db "tounilab.com/vessel/db/v1"
 )
 
 func main() {
@@ -1348,7 +1356,7 @@ database-dialect-specific error mapping. See
 error handling patterns.
 
 ```go
-import "tounilab.com/fabric/db/v1/dberror"
+import "tounilab.com/vessel/db/v1/dberror"
 
 result, err := database.Insert(ctx, "users", data, nil)
 if err != nil {
@@ -1405,7 +1413,7 @@ For complete guide, configuration examples, and use cases, see
 
 ## Plugin System
 
-The fabric supports a registry-based plugin system that allows you to
+The vessel supports a registry-based plugin system that allows you to
 register custom database drivers without modifying the core library.
 
 ### Creating a Custom Driver
@@ -1418,8 +1426,8 @@ package mydb
 import (
     "context"
     "fmt"
-    db "tounilab.com/fabric/db/v1"
-    "tounilab.com/fabric/db/v1/plugin"
+    db "tounilab.com/vessel/db/v1"
+    "tounilab.com/vessel/db/v1/plugin"
 )
 
 // Config implements db.DBConfig for your custom database
@@ -1462,7 +1470,7 @@ Simply import the plugin package (with blank import `_`) and use it:
 
 ```go
 import (
-    "tounilab.com/fabric/db/v1"
+    "tounilab.com/vessel/db/v1"
     _ "mydb"  // Auto-registers via init()
 )
 
@@ -1573,7 +1581,7 @@ type RowsProvider interface {
 package mydb
 
 import (
-    db "tounilab.com/fabric/db/v1"
+    db "tounilab.com/vessel/db/v1"
 )
 
 // CustomRows implements v1.RowsProvider
@@ -1642,7 +1650,7 @@ func (db *MyDB) GetRaw(
 }
 ```
 
-Now your custom rows work seamlessly with the fabric library's
+Now your custom rows work seamlessly with the vessel library's
 query and scanning operations.
 
 ## Examples
@@ -1720,8 +1728,8 @@ MIT License - see [LICENSE.md](./LICENSE.md)
 
 ## Support
 
-- 🐛 [Issue Tracker](https://github.com/oratchade/fabric/issues)
-- 💬 [Discussions](https://github.com/oratchade/fabric/discussions)
+- 🐛 [Issue Tracker](https://github.com/oratchade/vessel/issues)
+- 💬 [Discussions](https://github.com/oratchade/vessel/discussions)
 
 ## Changelog
 

@@ -366,5 +366,5 @@ for i := 0; i < 1000; i++ {
 ## See Also
 
 - [DBManager Documentation](../../docs/DBManager.md) - Complete guide
-- [fabric README](../../README.md) - Library overview
-- [examples/](../) - Other fabric examples
+- [vessel README](../../README.md) - Library overview
+- [examples/](../) - Other vessel examples

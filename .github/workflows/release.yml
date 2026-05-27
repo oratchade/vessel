@@ -141,17 +141,17 @@ jobs:
           mkdir -p dist
           git archive \
             --format=tar.gz \
-            --prefix="fabric-${VERSION}/" \
-            --output="dist/fabric-${TAG}.tar.gz" \
+            --prefix="vessel-${VERSION}/" \
+            --output="dist/vessel-${TAG}.tar.gz" \
             "$TAG"
 
           cd dist
-          sha256sum "fabric-${TAG}.tar.gz" > "fabric-${TAG}.tar.gz.sha256"
+          sha256sum "vessel-${TAG}.tar.gz" > "vessel-${TAG}.tar.gz.sha256"
 
       - name: Upload release package
         uses: actions/upload-artifact@v4
         with:
-          name: fabric-release-package
+          name: vessel-release-package
           path: dist/
 
   create-release:
@@ -167,7 +167,7 @@ jobs:
       - name: Download release package
         uses: actions/download-artifact@v4
         with:
-          name: fabric-release-package
+          name: vessel-release-package
           path: dist/
 
       - name: Generate release notes
@@ -189,14 +189,14 @@ jobs:
           fi
 
           {
-            echo "# Fabric ${TAG}"
+            echo "# Vessel ${TAG}"
             echo
             cat out/release/changelog-section.md
             echo
             echo "## Installation"
             echo
             echo '```bash'
-            echo "go get tounilab.com/fabric@${TAG}"
+            echo "go get tounilab.com/vessel@${TAG}"
             echo '```'
             echo
             echo "## Verification"
@@ -204,19 +204,19 @@ jobs:
             echo "Download the source archive and verify it with:"
             echo
             echo '```bash'
-            echo "sha256sum -c fabric-${TAG}.tar.gz.sha256"
+            echo "sha256sum -c vessel-${TAG}.tar.gz.sha256"
             echo '```'
             echo
             echo "## Documentation"
             echo
-            echo "See https://pkg.go.dev/tounilab.com/fabric@${TAG} for API documentation."
+            echo "See https://pkg.go.dev/tounilab.com/vessel@${TAG} for API documentation."
           } > out/release/body.md
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ needs.validate-release.outputs.tag }}
-          name: Fabric ${{ needs.validate-release.outputs.tag }}
+          name: Vessel ${{ needs.validate-release.outputs.tag }}
           body_path: out/release/body.md
           files: dist/*
           draft: ${{ needs.validate-release.outputs.draft }}
@@ -241,4 +241,4 @@ jobs:
           set -euo pipefail
           TAG="${{ needs.validate-release.outputs.tag }}"
           GOPROXY=https://proxy.golang.org,direct \
-            go list -m "tounilab.com/fabric@${TAG}"
+            go list -m "tounilab.com/vessel@${TAG}"

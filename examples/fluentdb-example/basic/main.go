@@ -5,8 +5,8 @@ import (
 	"fmt"
 	"log"
 
-	db "tounilab.com/fabric/db/v1"
-	cdt "tounilab.com/fabric/pkg/query/condition"
+	db "tounilab.com/vessel/db/v1"
+	cdt "tounilab.com/vessel/pkg/query/condition"
 )
 
 // Example: Basic CRUD operations using FluentDB builder API

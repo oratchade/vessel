@@ -117,8 +117,8 @@ plan, _ := database.Explain(ctx, query, args...)
 ## Running the Example
 
 ```bash
-# Navigate to the fabric directory
-cd fabric
+# Navigate to the vessel directory
+cd vessel
 
 # Run the example (this outputs expected results and explanations)
 go run ./examples/explain-example
@@ -170,9 +170,9 @@ SCAN users WHERE age > ?
 ✓ **Auditable**: Log all queries without side effects
 ✓ **Optimizable**: Identify missing indexes and opportunities
 
-- [Query Introspection Guide](https://github.com/oratchade/fabric#query-introspection-and-performance-analysis)
-- [DBQueries Interface](https://github.com/oratchade/fabric/blob/main/docs/CODE_REVIEW.md#dbqueries-interface)
-- [Operators Compatibility](https://github.com/oratchade/fabric/blob/main/docs/OPERATORS_COMPATIBILITY.md)
+- [Query Introspection Guide](https://github.com/oratchade/vessel#query-introspection-and-performance-analysis)
+- [DBQueries Interface](https://github.com/oratchade/vessel/blob/main/docs/CODE_REVIEW.md#dbqueries-interface)
+- [Operators Compatibility](https://github.com/oratchade/vessel/blob/main/docs/OPERATORS_COMPATIBILITY.md)
 
 ## Common Use Cases
 

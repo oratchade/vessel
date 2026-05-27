@@ -6,9 +6,9 @@ import (
 	"fmt"
 	"time"
 
-	db "tounilab.com/fabric/db/v1"
-	v1 "tounilab.com/fabric/manager/v1"
-	"tounilab.com/fabric/pkg/retry"
+	db "tounilab.com/vessel/db/v1"
+	v1 "tounilab.com/vessel/manager/v1"
+	"tounilab.com/vessel/pkg/retry"
 )
 
 func main() {

@@ -1,7 +1,7 @@
 # Documentation Linting Guide
 
 This project includes comprehensive markdown and documentation linting
-tools to maintain consistent documentation quality across the fabric
+tools to maintain consistent documentation quality across the vessel
 project.
 
 ## Available Tools
@@ -83,7 +83,7 @@ Custom project terms are defined in `.vale/styles/Project.yml` to avoid
 false positives:
 
 ```yaml
-- fabric
+- vessel
 - DBActions
 - PostgreSQL
 - CockroachDB
@@ -102,6 +102,10 @@ Both tools are integrated into the `make check` target:
 ```bash
 make check  # Runs all: fmt-check, lint, lint-markdown, lint-docs, mocks, coverage
 ```
+
+Generated mocks use the `test || mocks` build constraint. Use `make mocks` after
+interface changes and `go test -tags=mocks ./...` when a downstream package
+needs Vessel's generated mocks without enabling all test-only helpers.
 
 ---
 
@@ -208,7 +212,7 @@ extension and point it to your configuration files.
 ````markdown
 ## Project Structure Overview
 
-The fabric library provides multiple database drivers:
+The vessel library provides multiple database drivers:
 
 - **MySQL**: Use for relational data
 - **PostgreSQL**: Advanced features and extensions
@@ -218,7 +222,7 @@ The fabric library provides multiple database drivers:
 ### Code Example
 
 ```go
-db, err := fabric.NewDB(config)
+db, err := vessel.NewDB(config)
 ```
 
 ```text

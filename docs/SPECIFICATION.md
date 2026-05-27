@@ -1,4 +1,4 @@
-# Fabric - Go SQL Builder and Multi-Database Abstraction Specification
+# Vessel - Go SQL Builder and Multi-Database Abstraction Specification
 
 ## Executive Summary
 
@@ -41,13 +41,13 @@ committing to a full ORM. Common tradeoffs are:
 | **GORM**     | Full ORM workflows and application CRUD speed       |
 | **Ent**      | Schema-first graph/entity modeling                  |
 
-#### Fabric Fit
+#### Vessel Fit
 
-Fabric's fit is narrower: dynamic SQL builders, typed scanning, dialect-aware
+Vessel's fit is narrower: dynamic SQL builders, typed scanning, dialect-aware
 core operations, transaction helpers, observability, retry utilities, and an
 optional operational manager in one package.
 
-Fabric is a poor fit when the main requirement is compile-time SQL validation,
+Vessel is a poor fit when the main requirement is compile-time SQL validation,
 ORM-managed relationships, migration ownership, or database-specific SQL as the
 primary API.
 
@@ -69,7 +69,7 @@ primary API.
 
 ### FR1: Multi-Database SQL Abstraction
 
-**Requirement**: Fabric shall support MySQL 5.7+, PostgreSQL 9.6+, SQLite 3.x,
+**Requirement**: Vessel shall support MySQL 5.7+, PostgreSQL 9.6+, SQLite 3.x,
 and MSSQL 2016+ for core query and execution flows through one API.
 
 **Scope**:
@@ -164,7 +164,7 @@ cdt.NewExpr().Column("email").Op("=").Value(userEmail)  // → email = $1
 
 ### FR4: Logger Abstraction with Pluggable Adapters
 
-**Requirement**: Fabric shall support popular Go loggers (slog, logrus, zap, apex)
+**Requirement**: Vessel shall support popular Go loggers (slog, logrus, zap, apex)
 without forcing a choice.
 
 **Adapter Pattern**:
@@ -195,7 +195,7 @@ type Logger interface {
 **Acceptance Criteria**:
 
 - Developers can swap loggers at init time
-- No Fabric code locks to one logger
+- No Vessel code locks to one logger
 - Context chaining via `With()` works across all adapters
 - Each adapter tested independently (9-10 tests per adapter)
 
@@ -270,7 +270,7 @@ db.WithTransaction(ctx, func(tx Tx) error {
 ### FR8: Plugin Registry for Custom Drivers
 
 **Requirement**: Power users shall be able to register custom SQL dialects
-without forking Fabric.
+without forking Vessel.
 
 **Mechanism**:
 
@@ -285,7 +285,7 @@ type DriverFactory interface {
 }
 
 // User code
-fabric.RegisterDriver(CustomSQLDriver{})
+vessel.RegisterDriver(CustomSQLDriver{})
 db, _ := v1.NewDB(myCustomConfig, logger)  // Uses custom driver
 ```
 
@@ -293,11 +293,11 @@ db, _ := v1.NewDB(myCustomConfig, logger)  // Uses custom driver
 
 - Custom driver can be registered at init time
 - Registry checked before built-in drivers
-- No code changes to Fabric core needed
+- No code changes to Vessel core needed
 
 ### FR9: Error Handling and Type Safety
 
-**Requirement**: Fabric shall provide clear, actionable error types.
+**Requirement**: Vessel shall provide clear, actionable error types.
 
 **Error Types**:
 
@@ -370,7 +370,7 @@ for _, row := range rows {
 
 ### NFR2: Scalability
 
-**Requirement**: Fabric shall scale horizontally with multiple service instances.
+**Requirement**: Vessel shall scale horizontally with multiple service instances.
 
 **Assumptions**:
 
@@ -454,7 +454,7 @@ distributed tracing.
 
 ### NFR7: Testability
 
-**Requirement**: Fabric shall be fully testable with both mocks and real databases.
+**Requirement**: Vessel shall be fully testable with both mocks and real databases.
 
 **Mechanisms**:
 
@@ -468,7 +468,8 @@ distributed tracing.
 - Unit tests use mocks (no DB needed)
 - Integration tests use Docker or SQLite
 - Coverage ≥80% on all code
-- Build tag `test` isolates test code
+- Build tags `test` and `mocks` isolate test helpers and generated mocks from
+  normal package builds
 
 ---
 
@@ -826,7 +827,7 @@ type Dialect interface {
 **Problem**: Applications use different loggers (slog, logrus, zap, apex)
 **Solution**: Define minimal `Logger` interface, provide adapters
 **Files**: `db/v1/logger_adapters.go`
-**Benefits**: Users can swap loggers without Fabric changes
+**Benefits**: Users can swap loggers without Vessel changes
 
 ### 2. Builder Pattern (Query Construction)
 
@@ -998,7 +999,7 @@ db, _ := v1.NewDB(cfg, logger)
 - Location: `*_test.go` files alongside code
 - Scope: Builders, dialects, adapters, error handling
 - Tool: testify asserts, table-driven tests
-- Mocks: mockgen-generated mocks for interfaces
+- Mocks: mockgen-generated mocks for interfaces, built with `test` or `mocks`
 
 **Integration Tests**: Real databases
 
@@ -1007,7 +1008,8 @@ db, _ := v1.NewDB(cfg, logger)
 - Databases: SQLite (fast), MySQL, PostgreSQL, MSSQL (Docker)
 - Parallelization: Run 4 databases in parallel
 
-**Test Build Tag**: `//go:build test` isolates test code
+**Test Build Tags**: `//go:build test` isolates test helpers and
+`//go:build test || mocks` keeps generated mocks out of normal package builds.
 
 ### Coverage Targets
 
@@ -1193,7 +1195,7 @@ err := db.WithTransaction(ctx, func(tx v1.Tx) error {
 #### Conditions
 
 ```go
-import "tounilab.com/fabric/pkg/query/condition"
+import "tounilab.com/vessel/pkg/query/condition"
 
 cdt.NewAnd().Conditions(
     cdt.NewExpr().Column("age").Op(">").Value(18),

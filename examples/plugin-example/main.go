@@ -4,12 +4,12 @@ import (
 	"context"
 	"log"
 
-	db "tounilab.com/fabric/db/v1"
-	"tounilab.com/fabric/db/v1/plugin"
+	db "tounilab.com/vessel/db/v1"
+	"tounilab.com/vessel/db/v1/plugin"
 
 	// Blank import registers the CockroachDB plugin via init()
-	"tounilab.com/fabric/examples/plugin-example/cockroachdb"
-	_ "tounilab.com/fabric/examples/plugin-example/cockroachdb"
+	"tounilab.com/vessel/examples/plugin-example/cockroachdb"
+	_ "tounilab.com/vessel/examples/plugin-example/cockroachdb"
 )
 
 func main() {

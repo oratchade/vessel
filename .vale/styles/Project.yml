@@ -6,7 +6,7 @@ action:
 
 terms:
   # Project names
-  - fabric
+  - vessel
   - DBActions
   - DBQueries
   - PoolStatistics

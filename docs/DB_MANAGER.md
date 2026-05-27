@@ -1,6 +1,6 @@
 # DBManager - Multi-Database Management
 
-The `DBManager` is an advanced component of fabric that manages multiple
+The `DBManager` is an advanced component of vessel that manages multiple
 database connections simultaneously with intelligent routing, automatic
 failover, and async operations.
 
@@ -157,7 +157,7 @@ the manager stops.
 
 Batch errors are returned to every original caller. When database rows affected
 matches the batch size, each caller receives `RowsAffected: 1`; otherwise each
-caller receives the aggregate rows affected value because Fabric cannot infer
+caller receives the aggregate rows affected value because Vessel cannot infer
 per-row effects from a database-level bulk result.
 
 ## Health Monitoring
@@ -274,8 +274,8 @@ v1.WithEnvVars(map[string]string{
 **WithEnvPrefix** - Filter process environment by prefix:
 
 ```go
-v1.WithEnvPrefix("DB_", "FABRIC_")
-// Expands ${DB_HOST}, ${DB_PORT}, ${FABRIC_NAME}, etc.
+v1.WithEnvPrefix("DB_", "VESSEL_")
+// Expands ${DB_HOST}, ${DB_PORT}, ${VESSEL_NAME}, etc.
 // Other vars like ${SECRET_KEY} are protected (not expanded)
 ```
 
@@ -292,7 +292,7 @@ v1.WithEnvFile(".env")
 dm, err := v1.NewDBManager(ctx, "config.yaml", logger,
     v1.WithEnvVars(map[string]string{"DB_HOST": "localhost"}),
     v1.WithEnvFile(".env"),
-    v1.WithEnvPrefix("DB_", "FABRIC_"),
+    v1.WithEnvPrefix("DB_", "VESSEL_"),
 )
 // Priority: explicit vars > file vars > prefix env
 ```
@@ -652,7 +652,7 @@ package main
 import (
     "context"
     "log"
-    "tounilab.com/fabric/manager/v1"
+    "tounilab.com/vessel/manager/v1"
 )
 
 func main() {
@@ -1368,6 +1368,6 @@ if _, err := dm.Ping(ctx); err != nil {
 
 ## See Also
 
-- [fabric README](../README.md)
+- [vessel README](../README.md)
 - [ERROR_HANDLING.md](./ERROR_HANDLING.md)
 - [examples/manager-example/](../examples/manager-example/)

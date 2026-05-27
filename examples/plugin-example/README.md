@@ -1,11 +1,11 @@
 # Plugin System Example
 
 This directory demonstrates how to implement custom database drivers
-using the **fabric plugin system**.
+using the **vessel plugin system**.
 
 ## Overview
 
-The fabric plugin system allows you to register custom database drivers without
+The vessel plugin system allows you to register custom database drivers without
 modifying the core library. This example shows:
 
 1. **CockroachDB Plugin** - A complete driver implementation wrapping
@@ -149,7 +149,7 @@ defer database.Close()
 
 ### 3. Use the Database
 
-All standard fabric operations work:
+All standard vessel operations work:
 
 ```go
 // Insert
@@ -183,8 +183,8 @@ package myplugin
 import (
     "context"
     "fmt"
-    "tounilab.com/fabric/db/v1"
-    "tounilab.com/fabric/db/v1/plugin"
+    "tounilab.com/vessel/db/v1"
+    "tounilab.com/vessel/db/v1/plugin"
 )
 
 // Config implements db.DBConfig

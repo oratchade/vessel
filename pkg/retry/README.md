@@ -18,7 +18,7 @@ handles context cancellation, error propagation, and timing.
 ## Installation
 
 ```go
-import "tounilab.com/fabric/pkg/retry"
+import "tounilab.com/vessel/pkg/retry"
 ```
 
 ## Core Concepts
@@ -411,4 +411,4 @@ Typical results:
 
 ## License
 
-Fabric is licensed under the MIT License. See LICENSE.md for details.
+Vessel is licensed under the MIT License. See LICENSE.md for details.

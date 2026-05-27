@@ -1,6 +1,6 @@
-# Contributing to fabric
+# Contributing to vessel
 
-Thank you for your interest in contributing to fabric! This document
+Thank you for your interest in contributing to vessel! This document
 provides guidelines and instructions for contributing to the project.
 
 ## Table of Contents
@@ -39,15 +39,15 @@ participating, you are expected to uphold this code.
 2. Clone your fork locally:
 
    ```bash
-   git clone https://github.com/YOUR_USERNAME/fabric.git
-   cd fabric
+   git clone https://github.com/YOUR_USERNAME/vessel.git
+   cd vessel
    ```
 
 3. Add upstream remote:
 
    ```bash
    git remote add upstream https://github.com/oratchade/\
-   fabric.git
+   vessel.git
    ```
 
 ## Development Setup
@@ -422,7 +422,7 @@ Include:
 
 **Go Version:** go 1.26.0
 **Database:** PostgreSQL 15.2
-**fabric Version:** v1.0.0
+**vessel Version:** v1.0.0
 
 ### Description
 
@@ -495,7 +495,7 @@ results, err := db.BatchInsert(ctx, "users", []map[string]any{
 ### Package Structure
 
 ```text
-fabric/
+vessel/
 ├── db/v1/ # Public API (stable, versioned)
 ├── internal/pkg/ # Internal packages (no stability guarantee)
 ├── pkg/query/ # Query building DSL
@@ -530,7 +530,7 @@ All public packages, types, and functions must have comments:
 ```bash
 # Check documentation coverage
 go doc ./db/v1
-go doc tounilab.com/fabric/db/v1
+go doc tounilab.com/vessel/db/v1
 ```
 
 ### User Documentation
@@ -606,7 +606,7 @@ Contributors are recognized in:
 
 ---
 
-Thank you for contributing to fabric! Your efforts help make this
+Thank you for contributing to vessel! Your efforts help make this
 library better for everyone.
 
 Happy contributing! 🎉

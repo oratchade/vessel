@@ -1,10 +1,10 @@
 # SQL NULL Types Implementation Guide
 
-This document provides comprehensive guidance on handling SQL NULL values in Fabric
+This document provides comprehensive guidance on handling SQL NULL values in Vessel
 using Go's `sql.Null*` types and proper struct definitions.
 
 **Last Updated**: April 18, 2026  
-**Fabric Version**: v0.1.0
+**Vessel Version**: v0.1.1
 
 ---
 
@@ -209,7 +209,7 @@ type User struct {
 
 ```go
 import (
-    db "tounilab.com/fabric/db/v1"
+    db "tounilab.com/vessel/db/v1"
     "database/sql"
 )
 
@@ -246,7 +246,7 @@ for _, user := range users {
 
 ### Column-to-Field Alignment
 
-Fabric uses Go's database/sql package for scanning. Fields are mapped by position:
+Vessel uses Go's database/sql package for scanning. Fields are mapped by position:
 
 ```go
 type User struct {
@@ -257,7 +257,7 @@ type User struct {
 }
 
 // Query selects columns in order: id, email, first_name, phone_number
-// Fabric scans into: ID, Email, FirstName, PhoneNumber (by position, not name)
+// Vessel scans into: ID, Email, FirstName, PhoneNumber (by position, not name)
 users, err := db.ScanRowsTo[User](ctx, rowsAdapter)
 ```
 
@@ -277,7 +277,7 @@ rowsAdapter, _ := database.GetRaw(ctx, "users",
 
 ### Type Compatibility
 
-Fabric automatically handles type conversions:
+Vessel automatically handles type conversions:
 
 | SQL Type                  | Go Type     | Nullable Type     |
 | ------------------------- | ----------- | ----------------- |
@@ -295,7 +295,7 @@ Fabric automatically handles type conversions:
 
 ```go
 import (
-    db "tounilab.com/fabric/db/v1"
+    db "tounilab.com/vessel/db/v1"
     "database/sql"
     "context"
 )

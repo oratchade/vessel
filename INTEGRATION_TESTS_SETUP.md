@@ -3,7 +3,7 @@
 ## Overview
 
 This document summarizes the complete integration testing and database
-seeding infrastructure created for the fabric project. The setup supports
+seeding infrastructure created for the vessel project. The setup supports
 testing against SQLite, MySQL, PostgreSQL, and MSSQL databases with
 automated setup, seeding, and teardown.
 
@@ -93,8 +93,8 @@ For now, run tests locally:
 - `make test` - Unit tests
 - `make integration-test-all` - All database tests with Docker Compose
 
-See the comprehensive test setup in the [Makefile](../fabric/Makefile) and
-[docker-compose.test.yml](../fabric/dockerfiles/docker-compose.yml) for local validation before
+See the comprehensive test setup in the [Makefile](../vessel/Makefile) and
+[docker-compose.test.yml](../vessel/dockerfiles/docker-compose.yml) for local validation before
 creating pull requests.
 
 ## Quick Start
@@ -102,7 +102,7 @@ creating pull requests.
 ### Minimal Setup (SQLite Only)
 
 ```bash
-cd fabric
+cd vessel
 make integration-test
 ```
 
@@ -116,7 +116,7 @@ chmod +x scripts/run-integration-tests.sh
 ### Full Setup (All Databases with Docker)
 
 ```bash
-cd fabric
+cd vessel
 
 # Start database services
 docker-compose -f docker-compose.test.yml up -d
@@ -136,7 +136,7 @@ docker-compose -f docker-compose.test.yml down
 ### With Verbose Output and Coverage
 
 ```bash
-cd fabric
+cd vessel
 ./scripts/run-integration-tests.sh sqlite --verbose --coverage
 go tool cover -html=coverage.out
 ```
@@ -257,7 +257,7 @@ sslmode=disable`
 ### Run Specific Test
 
 ```bash
-cd fabric
+cd vessel
 go test -v -run TestIntegration_SelectWithWhere ./tests
 ```
 
@@ -445,7 +445,7 @@ func runNewFeatureTest(t *testing.T, tdb TestDB) {
 
 - [Integration Testing Guide](../tests/README.md)
 - [Best Practices](../docs/INTEGRATION_TESTING.md)
-- [Fabric README](../README.md)
+- [Vessel README](../README.md)
 - [Builder Documentation](../internal/pkg/builder/)
 - [Query Package](../pkg/query/)
 

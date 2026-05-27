@@ -18,7 +18,7 @@ entries:
     port: 5432
     user: postgres
     password: secret
-    dbname: fabric_db
+    dbname: vessel_db
     sslmode: disable
 
   # Read replica 1 - fallback for queries
@@ -30,7 +30,7 @@ entries:
     port: 5432
     user: postgres
     password: secret
-    dbname: fabric_db
+    dbname: vessel_db
     sslmode: require
 
   # Read replica 2 - second fallback
@@ -42,5 +42,5 @@ entries:
     port: 5432
     user: postgres
     password: secret
-    dbname: fabric_db
+    dbname: vessel_db
     sslmode: require

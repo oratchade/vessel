@@ -1,7 +1,7 @@
 # FluentDB Examples
 
 Complete working examples demonstrating FluentDB builder API: a fluent and
-chainable query builder for Fabric's multi-database abstraction layer.
+chainable query builder for Vessel's multi-database abstraction layer.
 
 ## Overview
 
@@ -12,7 +12,7 @@ providing a more intuitive API for common database operations.
 ## Prerequisites
 
 - Go 1.20+
-- PostgreSQL 12+ (or MySQL/SQLite/MSSQL supported by Fabric)
+- PostgreSQL 12+ (or MySQL/SQLite/MSSQL supported by Vessel)
 - A running database instance with test tables
 
 ### Setup Test Database
@@ -429,5 +429,5 @@ if err != nil {
 
 - [FluentDB Implementation](../../../db/v1/fluentDB.go) - Source code
 - [Condition Package](../../../pkg/query/condition) - Building conditions
-- [fabric README](../../README.md) - Library overview
+- [vessel README](../../README.md) - Library overview
 - [DBManager Examples](../manager-example) - Multi-database routing

@@ -1,6 +1,6 @@
-# Integration Tests for fabric
+# Integration Tests for vessel
 
-This directory contains comprehensive integration tests for the fabric
+This directory contains comprehensive integration tests for the vessel
 library, testing support for SQLite, MySQL, PostgreSQL, and MSSQL
 databases.
 
@@ -358,7 +358,7 @@ When adding new tests:
 
 ## Related Documentation
 
-- [fabric README](../README.md)
+- [vessel README](../README.md)
 - [Builder Documentation](../internal/pkg/builder/)
 - [Query Documentation](../pkg/query/)
 - [SQL Dialect Documentation](../internal/pkg/sqldialect/)

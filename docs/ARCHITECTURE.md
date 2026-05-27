@@ -1,6 +1,6 @@
-# Fabric Architecture
+# Vessel Architecture
 
-**Fabric** is a lightweight SQL-first data layer for Go services.
+**Vessel** is a lightweight SQL-first data layer for Go services.
 This document describes the system design, package boundaries, and extension
 points used by the library.
 
@@ -66,19 +66,19 @@ points used by the library.
 
 ## Executive Summary
 
-### What is Fabric
+### What is Vessel
 
-Fabric is a **SQL-first query abstraction library** that unifies
+Vessel is a **SQL-first query abstraction library** that unifies
 MySQL, PostgreSQL, SQLite, and MSSQL behind one Go API for core query and
 execution paths. It reduces manual SQL string construction while keeping SQL
 behavior explicit.
 
-Fabric is not an ORM and does not try to own schema modeling, relationships, or
+Vessel is not an ORM and does not try to own schema modeling, relationships, or
 migrations. It is a service data-layer toolkit: query builders, dialect rules,
 typed scanning, transactions, tracing, retry helpers, pool statistics, and an
 optional manager for operational routing and async write handling.
 
-| Need                               | Fabric stance                           |
+| Need                               | Vessel stance                           |
 | ---------------------------------- | --------------------------------------- |
 | Dynamic SQL construction           | Fluent builders and condition DSL       |
 | Hand-written SQL                   | Raw query and raw projection helpers    |
@@ -88,12 +88,12 @@ optional manager for operational routing and async write handling.
 | Dialect-specific edge features     | Rendered explicitly or rejected         |
 | Operational database behavior      | Tracing, retries, pool stats, manager   |
 
-### Why Fabric Exists
+### Why Vessel Exists
 
 **Problem**: Go services often need more structure than raw `database/sql`, but
 less abstraction than a full ORM.
 
-**Solution**: Fabric provides:
+**Solution**: Vessel provides:
 
 - **Fluent Query Builders**: Method chaining for dynamic SQL construction
 - **Parameterized Values**: Values flow through driver placeholders
@@ -119,7 +119,7 @@ less abstraction than a full ORM.
 
 ## Architectural Philosophy
 
-Fabric is built on **clean architecture principles** with these core values:
+Vessel is built on **clean architecture principles** with these core values:
 
 ### 1. Separation of Concerns
 
@@ -381,7 +381,7 @@ not runtime. Performance is predictable and consistent.
 ### Complete Project Layout
 
 ```text
-fabric/
+vessel/
 │
 ├── .github/
 │   ├── workflows/                    # CI/CD pipelines (testing, linting)
@@ -407,8 +407,8 @@ fabric/
 │       ├── fluentDB_test.go          # Builder tests
 │       ├── logger_adapters_test.go   # Logger adapter tests (77+ tests)
 │       ├── mysql_test.go, postgres_test.go, etc  # Driver-specific tests
-│       ├── db_mocks.go               # Auto-generated mocks
-│       └── logger_mocks.go           # Auto-generated logger mocks
+│       ├── db_mocks.go               # Auto-generated mocks (test || mocks)
+│       └── logger_mocks.go           # Auto-generated logger mocks (test || mocks)
 │
 ├── internal/
 │   └── pkg/
@@ -1212,8 +1212,8 @@ package main
 import (
     "context"
     "log"
-    v1 "tounilab.com/fabric/db/v1"
-    "tounilab.com/fabric/pkg/query/condition"
+    v1 "tounilab.com/vessel/db/v1"
+    "tounilab.com/vessel/pkg/query/condition"
 )
 
 func main() {
@@ -1989,7 +1989,7 @@ package otel
 // Trace each database operation
 func (db *DatabaseWrapper) Get(ctx context.Context, query string, args ...any)
  ([]Row, error) {
-    tracer := otel.Tracer("fabric")
+    tracer := otel.Tracer("vessel")
     ctx, span := tracer.Start(ctx, "database.query",
         trace.WithAttributes(
             attribute.String("db.statement", query),
@@ -2017,7 +2017,7 @@ func (db *DatabaseWrapper) Get(ctx context.Context, query string, args ...any)
 
 ```go
 // Record query latency
-meter := otel.Meter("fabric")
+meter := otel.Meter("vessel")
 latencyHist, _ := meter.Float64Histogram("db.client.latency.ms")
 rowCountHist, _ := meter.Int64Histogram("db.rows.returned")
 
@@ -2335,7 +2335,7 @@ Does your feature affect:
 
    ```go
    func init() {
-       fabric.RegisterDriver(&CustomSQLDriver{})
+       vessel.RegisterDriver(&CustomSQLDriver{})
    }
    ```
 
@@ -2346,7 +2346,7 @@ Does your feature affect:
    ```
 
 **Why it works**: Plugin registry checked before built-in drivers;
-no Fabric code modification needed.
+no Vessel code modification needed.
 
 ### Pattern 2: Extending the Dialect System
 
@@ -2414,7 +2414,7 @@ existing renderer logic.
    }
    ```
 
-2. **Initialize and Pass to Fabric**:
+2. **Initialize and Pass to Vessel**:
 
    ```go
    customLogger := &CustomLogger{underlying: myLogger}

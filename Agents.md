@@ -1,6 +1,6 @@
-# Agents.md - Fabric Database Library
+# Agents.md - Vessel Database Library
 
-**Project:** Fabric - Multi-Database SQL Abstraction Library  
+**Project:** Vessel - Multi-Database SQL Abstraction Library  
 **Language:** Go 1.26.0+  
 **Last Updated:** March 15, 2026
 
@@ -9,7 +9,7 @@
 ## Overview
 
 This file documents agent instructions and workflows for working with the
-Fabric database abstraction library. Use this guide to understand how to
+Vessel database abstraction library. Use this guide to understand how to
 approach common tasks, maintain code quality, and contribute to the project.
 
 ---
@@ -49,7 +49,7 @@ database dialects, and ensure all code is well-tested.
 ## Project Structure
 
 ```text
-fabric/
+vessel/
 ├── db/v1/                           # Public API (version 1)
 │   ├── db.go                        # Core DB/DBActions/Tx interfaces
 │   ├── fluentDB.go                  # Fluent query builder
@@ -340,7 +340,7 @@ make lint  # Run golangci-lint
 
 - Use sentinel errors from `db/v1/dberror/errors.go`
 - Wrap errors with context using `fmt.Errorf`
-- Map database-specific errors to Fabric errors
+- Map database-specific errors to Vessel errors
 - Never ignore errors silently
 
 **Example:**
@@ -558,7 +558,7 @@ Before releasing a new version:
 
 ## Summary
 
-Fabric is a well-engineered database abstraction library with:
+Vessel is a well-engineered database abstraction library with:
 
 - ✅ Multi-database support (MySQL, PostgreSQL, SQLite, MSSQL)
 - ✅ Type-safe fluent query builder
@@ -567,7 +567,7 @@ Fabric is a well-engineered database abstraction library with:
 - ✅ Zero linting issues
 - ✅ Production-ready code quality
 
-When working with Fabric, prioritize:
+When working with Vessel, prioritize:
 
 1. Maintaining backward compatibility
 2. Testing across all dialects

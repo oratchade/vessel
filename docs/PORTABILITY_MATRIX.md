@@ -1,6 +1,6 @@
-# Fabric Portability Matrix
+# Vessel Portability Matrix
 
-Fabric is portable-first for common SQL and explicit about dialect-specific
+Vessel is portable-first for common SQL and explicit about dialect-specific
 behavior. Values are parameterized; identifiers and raw SQL fragments remain
 caller-owned inputs and should be trusted or allowlisted.
 

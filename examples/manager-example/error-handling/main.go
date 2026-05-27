@@ -8,9 +8,9 @@ import (
 	"os"
 	"time"
 
-	dbv1 "tounilab.com/fabric/db/v1"
-	"tounilab.com/fabric/db/v1/dberror"
-	v1 "tounilab.com/fabric/manager/v1"
+	dbv1 "tounilab.com/vessel/db/v1"
+	"tounilab.com/vessel/db/v1/dberror"
+	v1 "tounilab.com/vessel/manager/v1"
 )
 
 // Example: Error Handling with DBManager

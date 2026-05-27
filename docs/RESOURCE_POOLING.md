@@ -2,7 +2,7 @@
 
 ## Overview
 
-The `RowsAdapter` is a critical resource that holds database connections. Fabric now provides
+The `RowsAdapter` is a critical resource that holds database connections. Vessel now provides
 **explicit resource pooling patterns** to improve lifecycle management and reduce allocation pressure
 in high-throughput scenarios.
 
@@ -28,7 +28,7 @@ defer rows.Close()  // Easy to forget!
 
 ## The Solution (After)
 
-Fabric now provides three patterns for safe resource management:
+Vessel now provides three patterns for safe resource management:
 
 ### 1. RowsAdapterPool - Explicit Pooling (Recommended for High-Throughput)
 

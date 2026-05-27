@@ -2,10 +2,10 @@
 
 This document provides a comprehensive reference for SQL operator support
 across all
-supported database dialects in Fabric (MySQL, PostgreSQL, SQLite, MSSQL).
+supported database dialects in Vessel (MySQL, PostgreSQL, SQLite, MSSQL).
 
 **Last Updated**: April 18, 2026  
-**Fabric Version**: v0.1.0
+**Vessel Version**: v0.1.1
 
 ---
 
@@ -62,8 +62,8 @@ across all dialects.
 
 ```go
 import (
-    db "tounilab.com/fabric/db/v1"
-    cdt "tounilab.com/fabric/pkg/query/condition"
+    db "tounilab.com/vessel/db/v1"
+    cdt "tounilab.com/vessel/pkg/query/condition"
 )
 
 // Equal to (=)
@@ -99,7 +99,7 @@ expr := cdt.NewExpr().Column("price").Op("<=").Value(100.00)
 
 - All databases handle numeric and string comparisons identically
 - Date/time comparisons work with native types via parameter binding
-- No special quoting required by Fabric (handled automatically)
+- No special quoting required by Vessel (handled automatically)
 
 ---
 
@@ -111,8 +111,8 @@ Logical operators combine multiple conditions into complex expressions.
 
 ```go
 import (
-    db "tounilab.com/fabric/db/v1"
-    cdt "tounilab.com/fabric/pkg/query/condition"
+    db "tounilab.com/vessel/db/v1"
+    cdt "tounilab.com/vessel/pkg/query/condition"
 )
 
 // Combine conditions with AND
@@ -195,8 +195,8 @@ Pattern matching is used for string search operations.
 
 ```go
 import (
-    db "tounilab.com/fabric/db/v1"
-    cdt "tounilab.com/fabric/pkg/query/condition"
+    db "tounilab.com/vessel/db/v1"
+    cdt "tounilab.com/vessel/pkg/query/condition"
 )
 
 // Pattern matching with LIKE
@@ -218,7 +218,7 @@ cdt.NewExpr().Column("code").Op("LIKE").Value("ABC_123")  // Matches "ABCX123" w
 | Database       | Case-Sens | Notes                                                       |
 | -------------- | :-------: | ----------------------------------------------------------- |
 | **MySQL**      |   No\*    | By default, case-insensitive (depends on collation)         |
-| **PostgreSQL** |    Yes    | Use `ILIKE` for case-insensitive (Fabric doesn't wrap this) |
+| **PostgreSQL** |    Yes    | Use `ILIKE` for case-insensitive (Vessel doesn't wrap this) |
 | **SQLite**     |   No\*    | By default, case-insensitive (depends on collation)         |
 | **MSSQL**      |   No\*    | By default, case-insensitive (depends on collation)         |
 
@@ -241,8 +241,8 @@ The `BETWEEN` operator checks if a value falls within an inclusive range.
 
 ```go
 import (
-    db "tounilab.com/fabric/db/v1"
-    cdt "tounilab.com/fabric/pkg/query/condition"
+    db "tounilab.com/vessel/db/v1"
+    cdt "tounilab.com/vessel/pkg/query/condition"
 )
 
 // Numeric range
@@ -275,8 +275,8 @@ The `IN` operator checks if a value exists in a set of values.
 
 ```go
 import (
-    db "tounilab.com/fabric/db/v1"
-    cdt "tounilab.com/fabric/pkg/query/condition"
+    db "tounilab.com/vessel/db/v1"
+    cdt "tounilab.com/vessel/pkg/query/condition"
 )
 
 // Check if value is in set
@@ -312,8 +312,8 @@ expr := cdt.NotIn("status", "deleted", "banned", "suspended")
 
 ```go
 import (
-    db "tounilab.com/fabric/db/v1"
-    cdt "tounilab.com/fabric/pkg/query/condition"
+    db "tounilab.com/vessel/db/v1"
+    cdt "tounilab.com/vessel/pkg/query/condition"
 )
 
 // Check if value is NULL (no parameter needed)
@@ -353,8 +353,8 @@ expr := cdt.NewExpr().Column("deleted_at").Op("IS NOT NULL")
 
 ```go
 import (
-    db "tounilab.com/fabric/db/v1"
-    cdt "tounilab.com/fabric/pkg/query/condition"
+    db "tounilab.com/vessel/db/v1"
+    cdt "tounilab.com/vessel/pkg/query/condition"
 )
 
 // Complex query combining multiple operators
@@ -388,8 +388,8 @@ cond := cdt.NewNot().Condition(
 
 ```go
 import (
-    db "tounilab.com/fabric/db/v1"
-    cdt "tounilab.com/fabric/pkg/query/condition"
+    db "tounilab.com/vessel/db/v1"
+    cdt "tounilab.com/vessel/pkg/query/condition"
     "time"
 )
 
@@ -506,7 +506,7 @@ db.Update(ctx, "users", map[string]any{"verified": true},
 
 ## Summary
 
-Fabric provides a unified operator interface across all supported databases.
+Vessel provides a unified operator interface across all supported databases.
 The same Go code generates correct SQL for MySQL, PostgreSQL, SQLite, and MSSQL.
 All 20+ operators are supported uniformly, with no dialect-specific syntax
 required by the application developer.
