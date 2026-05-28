@@ -164,10 +164,10 @@ The tests respect the following environment variables:
 export DB_TYPE=sqlite  # or mysql, postgres, sqlserver
 
 # Database connection strings
-export MYSQL_DSN="root:password@tcp(localhost:3306)/test_db?parseTime=true"
-export POSTGRES_DSN="host=localhost user=postgres password=password \
+export MYSQL_DSN="root:root_password@tcp(localhost:3306)/test_db?parseTime=true"
+export POSTGRES_DSN="host=localhost user=test_user password=test_password \
   dbname=test_db sslmode=disable"
-export MSSQL_DSN="sqlserver://sa:YourPassword123@localhost:1433?database=TestDB"
+export MSSQL_DSN="sqlserver://sa:TestPassword123%21@localhost:1433?database=test_db"
 
 # Test timeout
 export TIMEOUT=300
@@ -179,18 +179,18 @@ The `docker-compose.test.yml` file provides:
 
 - **MySQL 8.0** - Port 3306
   - Default user: `root`
-  - Default password: `password`
+  - Default password: `root_password`
   - Default database: `test_db`
 
 - **PostgreSQL 15** - Port 5432
-  - Default user: `postgres`
-  - Default password: `password`
+  - Default user: `test_user`
+  - Default password: `test_password`
   - Default database: `test_db`
 
 - **MSSQL 2022** - Port 1433
   - Default user: `sa` (System Administrator)
-  - Default password: `YourPassword123`
-  - Default database: `TestDB`
+  - Default password: `TestPassword123!`
+  - Default database: `test_db`
 
 Each service includes:
 
@@ -275,13 +275,13 @@ Check connection strings match database configuration:
 
 ```bash
 # Verify MySQL is running
-mysql -h localhost -u root -ppassword -e "SELECT VERSION();"
+mysql -h localhost -u root -proot_password -e "SELECT VERSION();"
 
 # Verify PostgreSQL is running
-psql -h localhost -U postgres -c "SELECT VERSION();"
+psql -h localhost -U test_user -d test_db -c "SELECT VERSION();"
 
 # Verify MSSQL is running
-/opt/mssql-tools/bin/sqlcmd -S localhost -U sa -P YourPassword123 -Q "SELECT @@VERSION"
+/opt/mssql-tools18/bin/sqlcmd -S localhost -U sa -P 'TestPassword123!' -C -Q "SELECT @@VERSION"
 ```
 
 ## Performance Considerations

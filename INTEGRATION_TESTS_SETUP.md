@@ -1,4 +1,4 @@
-# DB-Connector Integration Testing - Complete Setup Summary
+# Vessel Integration Testing Setup
 
 ## Overview
 
@@ -11,7 +11,7 @@ automated setup, seeding, and teardown.
 
 ### Core Integration Tests
 
-- **[tests/integration_test.go](../tests/integration_test.go)** -
+- **[tests/integration_test.go](tests/integration_test.go)** -
   Comprehensive integration tests (10+ test functions)
   - SELECT queries with various conditions
   - JOINs (INNER and LEFT)
@@ -25,13 +25,13 @@ automated setup, seeding, and teardown.
 
 ### Database Seeding
 
-- **[dockerfiles/seed-mysql.sql](../dockerfiles/seed-mysql.sql)** -
+- **[dockerfiles/seed-mysql.sql](dockerfiles/seed-mysql.sql)** -
   MySQL test data
-- **[dockerfiles/seed-postgres.sql](../dockerfiles/seed-postgres.sql)**
+- **[dockerfiles/seed-postgres.sql](dockerfiles/seed-postgres.sql)**
   - PostgreSQL test data
-- **[dockerfiles/seed-sqlite.sql](../dockerfiles/seed-sqlite.sql)**
+- **[dockerfiles/seed-sqlite.sql](dockerfiles/seed-sqlite.sql)**
   - SQLite test data
-- **[dockerfiles/seed-mssql.sql](../dockerfiles/seed-mssql.sql)** - MSSQL test data
+- **[dockerfiles/seed-sqlserver.sql](dockerfiles/seed-sqlserver.sql)** - MSSQL test data
 
 All seed files include:
 
@@ -41,19 +41,19 @@ All seed files include:
 
 ### Docker and Containers
 
-- **[docker-compose.test.yml](../docker-compose.test.yml)** - Complete test environment
+- **[docker-compose.test.yml](docker-compose.test.yml)** - Complete test environment
   - MySQL 8.0 service
   - PostgreSQL 15 service
   - MSSQL 2022 service
   - Health checks and automatic initialization
   - Proper networking and port mapping
 
-- **[dockerfiles/Dockerfile.test](../dockerfiles/Dockerfile.test)**
+- **[dockerfiles/Dockerfile.test](dockerfiles/Dockerfile.test)**
   - Test runner image
 
 ### Testing Infrastructure and Scripts
 
-- **[scripts/run-integration-tests.sh](../scripts/run-integration-tests.sh)**
+- **[scripts/run-integration-tests.sh](scripts/run-integration-tests.sh)**
   - Test helper script with options:
   - Multi-database test running
   - Verbose output mode
@@ -61,7 +61,7 @@ All seed files include:
   - Configurable timeouts
   - Service health checking
 
-- **[Makefile](../Makefile)** - Enhanced with integration test targets:
+- **[Makefile](Makefile)** - Enhanced with integration test targets:
   - `make integration-test` - SQLite tests
   - `make integration-test-mysql` - MySQL tests
   - `make integration-test-postgres` - PostgreSQL tests
@@ -70,19 +70,17 @@ All seed files include:
 
 ### Documentation
 
-- **[tests/README.md](../tests/README.md)** - Comprehensive integration test guide
+- **[tests/README.md](tests/README.md)** - Comprehensive integration test guide
   - Complete test overview
   - Running instructions for each database
   - Environment variable reference
   - Troubleshooting guide
   - Docker Compose configuration details
 
-- **[docs/INTEGRATION_TESTING.md](../docs/INTEGRATION_TESTING.md)**
-  - Best practices guide
-  - Testing patterns and conventions
-  - Common pitfalls and solutions
-  - Performance testing guidelines
-  - Debugging strategies
+- **[docs/ENVIRONMENT_VARIABLES.md](docs/ENVIRONMENT_VARIABLES.md)**
+  - Test credential reference
+  - Strict integration test mode
+  - Docker Compose defaults
 
 ### CI/CD
 
@@ -93,8 +91,8 @@ For now, run tests locally:
 - `make test` - Unit tests
 - `make integration-test-all` - All database tests with Docker Compose
 
-See the comprehensive test setup in the [Makefile](../vessel/Makefile) and
-[docker-compose.test.yml](../vessel/dockerfiles/docker-compose.yml) for local validation before
+See the comprehensive test setup in the [Makefile](Makefile) and
+[docker-compose.test.yml](docker-compose.test.yml) for local validation before
 creating pull requests.
 
 ## Quick Start
@@ -222,18 +220,18 @@ The integration tests verify:
 - **Image**: mysql:8.0
 - **Port**: 3306
 - **User**: root
-- **Password**: password
+- **Password**: root_password
 - **Database**: test_db
-- **Connection**: `root:password@tcp(localhost:3306)/test_db?parseTime=true`
+- **Connection**: `root:root_password@tcp(localhost:3306)/test_db?parseTime=true`
 
 ### PostgreSQL
 
 - **Image**: postgres:15-alpine
 - **Port**: 5432
-- **User**: postgres
-- **Password**: password
+- **User**: test_user
+- **Password**: test_password
 - **Database**: test_db
-- **Connection**: `host=localhost user=postgres password=password dbname=test_db
+- **Connection**: `host=localhost user=test_user password=test_password dbname=test_db
 sslmode=disable`
 
 ### MSSQL
@@ -241,9 +239,9 @@ sslmode=disable`
 - **Image**: mcr.microsoft.com/mssql/server:2022-latest
 - **Port**: 1433
 - **User**: sa
-- **Password**: YourPassword123
-- **Database**: TestDB
-- **Connection**: `sqlserver://sa:YourPassword123@localhost:1433?database=TestDB`
+- **Password**: TestPassword123!
+- **Database**: test_db
+- **Connection**: `sqlserver://sa:TestPassword123%21@localhost:1433?database=test_db`
 
 ### SQLite
 
@@ -310,15 +308,15 @@ gh workflow run integration-tests.yml -f test_all_databases=true
 export DB_TYPE=sqlite  # sqlite, mysql, postgres, sqlserver
 
 # MySQL
-export MYSQL_DSN="root:password@tcp(localhost:3306)/\
+export MYSQL_DSN="root:root_password@tcp(localhost:3306)/\
   test_db?parseTime=true"
 
 # PostgreSQL
-export POSTGRES_DSN="host=localhost user=postgres\
-  password=password dbname=test_db sslmode=disable"
+export POSTGRES_DSN="host=localhost user=test_user\
+  password=test_password dbname=test_db sslmode=disable"
 
 # MSSQL
-export MSSQL_DSN="sqlserver://sa:YourPassword123@localhost:1433?database=TestDB"
+export MSSQL_DSN="sqlserver://sa:TestPassword123%21@localhost:1433?database=test_db"
 
 # Testing options
 export TIMEOUT=300              # Test timeout in seconds
@@ -443,18 +441,18 @@ func runNewFeatureTest(t *testing.T, tdb TestDB) {
 
 ## Resources
 
-- [Integration Testing Guide](../tests/README.md)
-- [Best Practices](../docs/INTEGRATION_TESTING.md)
-- [Vessel README](../README.md)
-- [Builder Documentation](../internal/pkg/builder/)
-- [Query Package](../pkg/query/)
+- [Integration Testing Guide](tests/README.md)
+- [Environment Variables](docs/ENVIRONMENT_VARIABLES.md)
+- [Vessel README](README.md)
+- [Builder Package](internal/pkg/builder/)
+- [Query Package](pkg/query/)
 
 ## Support
 
 For issues or questions:
 
-1. Check [Integration Testing Guide](../tests/README.md)
-2. Review [Best Practices](../docs/INTEGRATION_TESTING.md)
+1. Check [Integration Testing Guide](tests/README.md)
+2. Review [Environment Variables](docs/ENVIRONMENT_VARIABLES.md)
 3. Run tests with `--verbose` flag
 4. Check GitHub Actions workflow logs
 5. Inspect database logs: `docker logs test-<db>`

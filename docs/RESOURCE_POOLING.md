@@ -41,21 +41,22 @@ pool := v1.NewRowsAdapterPool()
 // In your query loop:
 adapter, err := pool.Acquire(rows)
 if err != nil {
+    _ = rows.Close()
     return err
 }
-defer pool.Release(adapter)
 
 // Use adapter normally
 for adapter.Next() {
     // ... scan rows
 }
+pool.Release(adapter)
 ```
 
 **Benefits:**
 
 - Eliminates allocation overhead by reusing adapters
 - Automatically resets adapter state on Release
-- No defer required for Close (already in Release)
+- `Release` closes the underlying rows before returning the adapter to the pool
 - Thread-safe via sync.Pool internals
 
 **When to Use:**
@@ -165,8 +166,10 @@ for i := 0; i < 10000; i++ {
     if err != nil { break }
 
     adapter, err := pool.Acquire(rows)
-    if err != nil { break }
-    defer pool.Release(adapter)
+    if err != nil {
+        _ = rows.Close()
+        break
+    }
 
     // Process rows...
     for adapter.Next() {
@@ -175,6 +178,7 @@ for i := 0; i < 10000; i++ {
         adapter.Scan(&id, &name)
         // ...
     }
+    pool.Release(adapter)
 }
 ```
 
@@ -480,4 +484,4 @@ A: Only for monitoring/debugging. Disable in production if not needed.
 
 - [RowsAdapter Documentation](../README.md#type-safe-row-scanning-with-scanrowsto)
 - [Database Abstraction Guide](./ARCHITECTURE.md)
-- [Code Review - Resource Management](../docs/CODE_REVIEW.md#28-resource-management)
+- [Architecture](./ARCHITECTURE.md)
