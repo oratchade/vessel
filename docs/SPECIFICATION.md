@@ -4,7 +4,7 @@
 
 ### Problem Statement
 
-Go services often need dynamic SQL and operational database behavior without
+Service code often needs dynamic SQL and operational database behavior without
 committing to a full ORM. Common tradeoffs are:
 
 - **Raw SQL Strings**: Flexible, but repetitive and easy to assemble
@@ -20,10 +20,10 @@ committing to a full ORM. Common tradeoffs are:
 
 ### Target Users
 
-- Go services that need dynamic query construction and explicit SQL behavior.
+- Services that need dynamic query construction and explicit SQL behavior.
 - Projects that need portable core CRUD/query flows across MySQL, PostgreSQL,
   SQLite, and MSSQL.
-- Teams that want tracing, retries, pool stats, transaction helpers, and
+- Codebases that want tracing, retries, pool stats, transaction helpers, and
   optional manager routing close to the data layer.
 - Applications that do not want ORM-managed relationships or generated query
   methods as the primary abstraction.

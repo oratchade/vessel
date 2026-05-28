@@ -558,14 +558,14 @@ Before releasing a new version:
 
 ## Summary
 
-Vessel is a well-engineered database abstraction library with:
+Vessel is a personal SQL toolkit with:
 
 - ✅ Multi-database support (MySQL, PostgreSQL, SQLite, MSSQL)
 - ✅ Type-safe fluent query builder
 - ✅ Comprehensive testing (100+ tests)
-- ✅ Professional documentation
+- ✅ Practical documentation
 - ✅ Zero linting issues
-- ✅ Production-ready code quality
+- ✅ Service-oriented code quality
 
 When working with Vessel, prioritize:
 
