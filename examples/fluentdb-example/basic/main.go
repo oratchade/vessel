@@ -25,7 +25,7 @@ func main() {
 		Database: "myapp",
 	}, nil)
 	if err != nil {
-		log.Fatal(err)
+		log.Fatal("failed to initialize database connection")
 	}
 	defer func() { _ = dbConn.Close() }()
 
