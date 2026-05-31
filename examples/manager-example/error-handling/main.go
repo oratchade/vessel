@@ -37,7 +37,8 @@ func main() {
 	adapter := dbv1.NewSlogAdapter(logger)
 	dm, err := v1.NewDBManager(ctx, configPath, adapter)
 	if err != nil {
-		log.Fatalf("Failed to create DBManager: %v", err)
+		log.Print("Failed to create DBManager")
+		os.Exit(1)
 	}
 
 	// Start workers and health checks
