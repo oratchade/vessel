@@ -579,6 +579,51 @@ func setPtrField(f reflect.Value, cv any) error {
 	return nil
 }
 
+// setSliceField populates a slice field from cv.
+//
+// Postgres array columns (uuid[], text[], int[], …) are delivered by pgx/v5 as a Go
+// []interface{} whose elements carry the driver's native per-element type — UUIDs, for
+// instance, arrive as [16]byte. The JSON fallback cannot map those element types onto the
+// destination's element type (it marshals a [16]byte to a numeric array, then fails to
+// unmarshal that into a string), so we convert element-by-element through setFieldFromValue.
+// This reuses every scalar/pointer/Scanner rule, including the [16]byte→UUID-string reformat
+// in setStringField.
+//
+// Two cases deliberately bypass element-wise conversion and fall back to JSON:
+//   - byte slices ([]byte), which round-trip as base64/raw bytes rather than element arrays;
+//   - a cv that is not itself a slice/array (e.g. a JSON-array string from a jsonb column),
+//     which the JSON decoder already handles correctly.
+func setSliceField(f reflect.Value, cv any) error {
+	if f.Type().Elem().Kind() == reflect.Uint8 {
+		return setFieldByJSON(f, cv)
+	}
+	rv := reflect.ValueOf(cv)
+	if rv.Kind() != reflect.Slice && rv.Kind() != reflect.Array {
+		return setFieldByJSON(f, cv)
+	}
+
+	out := reflect.MakeSlice(f.Type(), rv.Len(), rv.Len())
+	for i := 0; i < rv.Len(); i++ {
+		elem := rv.Index(i)
+		// Unwrap []interface{} elements to their concrete dynamic value so the recursive
+		// call sees the driver's element type (e.g. [16]byte) rather than interface{}.
+		if elem.Kind() == reflect.Interface {
+			if !elem.IsNil() {
+				elem = elem.Elem()
+			}
+		}
+		var ev any
+		if elem.IsValid() {
+			ev = elem.Interface()
+		}
+		if err := setFieldFromValue(out.Index(i), ev); err != nil {
+			return fmt.Errorf("setFieldFromValue: slice element %d for field of type %s: %w", i, f.Type(), err)
+		}
+	}
+	f.Set(out)
+	return nil
+}
+
 // setFieldByJSON JSON-unmarshals cv into f.
 // When cv is not a string (e.g. map[string]interface{} from pgx/v5's JSON codec),
 // it is marshaled to canonical JSON first; fmt.Sprint would produce invalid JSON.
@@ -619,6 +664,8 @@ func setFieldByKind(f reflect.Value, cv any) error {
 		return setBoolField(f, s)
 	case reflect.Pointer:
 		return setPtrField(f, cv)
+	case reflect.Slice:
+		return setSliceField(f, cv)
 	default:
 		return setFieldByJSON(f, cv)
 	}
