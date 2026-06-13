@@ -608,7 +608,9 @@ func setSliceField(f reflect.Value, cv any) error {
 		// Unwrap []interface{} elements to their concrete dynamic value so the recursive
 		// call sees the driver's element type (e.g. [16]byte) rather than interface{}.
 		if elem.Kind() == reflect.Interface {
-			elem = elem.Elem()
+			if !elem.IsNil() {
+				elem = elem.Elem()
+			}
 		}
 		var ev any
 		if elem.IsValid() {
