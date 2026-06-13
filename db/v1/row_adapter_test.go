@@ -667,6 +667,57 @@ func TestScanRowsTo_UUIDBytes16ToStringField(t *testing.T) {
 	assert.Equal(t, "550e8400-e29b-41d4-a716-446655440001", records[0].ID)
 }
 
+// TestScanRowsTo_UUIDArrayToStringSlice verifies that a Postgres uuid[] column —
+// delivered by pgx v5 as []interface{} of [16]byte — is scanned into a []string field,
+// with each element reformatted to canonical UUID text. This is the array analogue of
+// TestScanRowsTo_UUIDBytes16ToStringField: previously the slice fell through to the JSON
+// fallback, which marshalled each [16]byte to a numeric array and failed to unmarshal it
+// into a string element.
+func TestScanRowsTo_UUIDArrayToStringSlice(t *testing.T) {
+	// 550e8400-e29b-41d4-a716-446655440001 / ...440002
+	u1 := [16]byte{0x55, 0x0e, 0x84, 0x00, 0xe2, 0x9b, 0x41, 0xd4, 0xa7, 0x16, 0x44, 0x66, 0x55, 0x44, 0x00, 0x01}
+	u2 := [16]byte{0x55, 0x0e, 0x84, 0x00, 0xe2, 0x9b, 0x41, 0xd4, 0xa7, 0x16, 0x44, 0x66, 0x55, 0x44, 0x00, 0x02}
+
+	type Record struct {
+		Members []string `db:"members"`
+	}
+
+	tests := []struct {
+		name    string
+		dbValue any
+		want    []string
+	}{
+		{
+			name:    "uuid array as []interface{} of [16]byte",
+			dbValue: []any{u1, u2},
+			want:    []string{"550e8400-e29b-41d4-a716-446655440001", "550e8400-e29b-41d4-a716-446655440002"},
+		},
+		{
+			name:    "empty array",
+			dbValue: []any{},
+			want:    []string{},
+		},
+		{
+			name:    "text array as []interface{} of string",
+			dbValue: []any{"alpha", "beta"},
+			want:    []string{"alpha", "beta"},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			mockRows := NewMockRows([]string{"members"}, [][]any{{tt.dbValue}})
+			adapter := v1.NewRowsAdapterWithMockRows(mockRows)
+			defer adapter.Close() //nolint:errcheck
+
+			records, err := v1.ScanRowsTo[Record](context.Background(), adapter)
+			require.NoError(t, err)
+			require.Len(t, records, 1)
+			assert.Equal(t, tt.want, records[0].Members)
+		})
+	}
+}
+
 // TestScanRowsTo_ErrorHandling tests error propagation from scanning.
 func TestScanRowsTo_ErrorHandling(t *testing.T) {
 	type User struct {

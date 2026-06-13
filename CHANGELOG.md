@@ -5,6 +5,19 @@ All notable changes to Vessel are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.1.2] - 2026-06-13
+
+### Fixed
+
+- Scan SQL array columns (e.g. `uuid[]`, `text[]`, `int[]`) into Go slice fields.
+  pgx/v5 delivers arrays as `[]interface{}` carrying the driver's native per-element
+  type (UUIDs arrive as `[16]byte`); the previous JSON fallback could not map those
+  elements onto the destination's element type and failed with errors such as
+  `cannot unmarshal array into Go value of type string`. Slice fields are now
+  populated element-by-element, reusing the existing scalar/pointer/Scanner rules
+  (including the `[16]byte`→UUID-string reformat). Byte slices (`[]byte`) and
+  JSON-array strings continue to use the JSON path.
+
 ## [0.1.1] - 2026-05-27
 
 ### Changed
