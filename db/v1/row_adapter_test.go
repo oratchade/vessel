@@ -703,6 +703,13 @@ func TestScanRowsTo_UUIDArrayToStringSlice(t *testing.T) {
 			want:    []string{"alpha", "beta"},
 		},
 		{
+			// Postgres arrays can contain NULL elements; ensure nil interface
+			// elements do not panic during interface unwrapping and map to zero values.
+			name:    "array with nil element",
+			dbValue: []any{"alpha", nil, "beta"},
+			want:    []string{"alpha", "", "beta"},
+		},
+		{
 			// jsonb columns may arrive as a JSON-array string (text protocol);
 			// these must keep using the JSON decoder, not element-wise conversion.
 			name:    "json array delivered as string",
