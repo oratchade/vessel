@@ -702,6 +702,13 @@ func TestScanRowsTo_UUIDArrayToStringSlice(t *testing.T) {
 			dbValue: []any{"alpha", "beta"},
 			want:    []string{"alpha", "beta"},
 		},
+		{
+			// jsonb columns may arrive as a JSON-array string (text protocol);
+			// these must keep using the JSON decoder, not element-wise conversion.
+			name:    "json array delivered as string",
+			dbValue: `["alpha","beta"]`,
+			want:    []string{"alpha", "beta"},
+		},
 	}
 
 	for _, tt := range tests {
