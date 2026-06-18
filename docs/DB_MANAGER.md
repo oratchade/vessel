@@ -153,11 +153,32 @@ if err != nil {
 log.Printf("rows affected=%d", result.RowsAffected)
 ```
 
+```go
+result, err := dm.Upsert(
+    ctx,
+    "users",
+    map[string]any{
+        "email": email,
+        "name":  name,
+    },
+    &options.UpsertOptions{
+        ConflictColumns: []string{"email"},
+        Action:          options.UpsertDoUpdate,
+        UpdateColumns:   []string{"name"},
+    },
+    nil,
+)
+if err != nil {
+    return err
+}
+log.Printf("rows affected=%d", result.RowsAffected)
+```
+
 Supported synchronous methods:
 
 - `Get`, `GetRaw`, `GetByID`, `GetByIDRaw`
 - `Query`, `QueryRaw`
-- `Insert`, `Inserts`, `Update`, `Delete`
+- `Insert`, `Inserts`, `Upsert`, `Update`, `Delete`
 - `Exec`
 - `Ping`, `HealthStatus`
 
@@ -189,8 +210,11 @@ Supported async methods mirror the synchronous methods with an `Async` suffix:
 
 - `GetAsync`, `GetRawAsync`, `GetByIDAsync`, `GetByIDRawAsync`
 - `QueryAsync`, `QueryRawAsync`
-- `InsertAsync`, `InsertsAsync`, `UpdateAsync`, `DeleteAsync`
-- `ExecAsync`, `PingAsync`
+- `InsertAsync`, `InsertsAsync`, `UpsertAsync`, `UpdateAsync`, `DeleteAsync`
+- `ExecAsync`
+
+`PingAsync` is named for compatibility but checks the selected connection
+immediately and returns `error`, not a response channel.
 
 The response type is:
 
@@ -210,7 +234,8 @@ Always check `resp.Error` before reading `Data`, `RawData`, or `ExecData`.
 
 Automatic insert batching is disabled by default. When enabled, compatible
 `InsertAsync` requests may be flushed as one `Inserts` call by the same write
-worker.
+worker. `UpsertAsync` requests are not coalesced; they flush any pending insert
+batch first, then execute as individual upserts.
 
 Requests are compatible when they target the same worker, table, query options,
 and column set. A batch flushes when it reaches `write_batch_max_rows`, waits

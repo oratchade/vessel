@@ -86,6 +86,14 @@ func extractExecResultFromResponse(resp *QueryResponse) (*db.ExecResult, error) 
 	return resp.ExecData, nil
 }
 
+func waitForExecResult(ctx context.Context, responseCh <-chan *QueryResponse) (*db.ExecResult, error) {
+	resp, err := waitForResponse(ctx, responseCh)
+	if err != nil {
+		return nil, err
+	}
+	return extractExecResultFromResponse(resp)
+}
+
 // Get fetches data from the database synchronously based on the specified table, columns, and conditions.
 //
 // Parameters:
@@ -365,11 +373,7 @@ func (dm *DBManager) Insert(
 	if err != nil {
 		return nil, err
 	}
-	resp, err := waitForResponse(ctx, responseCh)
-	if err != nil {
-		return nil, err
-	}
-	return extractExecResultFromResponse(resp)
+	return waitForExecResult(ctx, responseCh)
 }
 
 // Inserts adds multiple new records to the database synchronously in bulk.
@@ -406,11 +410,35 @@ func (dm *DBManager) Inserts(
 	if err != nil {
 		return nil, err
 	}
-	resp, err := waitForResponse(ctx, responseCh)
+	return waitForExecResult(ctx, responseCh)
+}
+
+// Upsert inserts a record or applies conflict behavior synchronously.
+//
+// Parameters:
+//
+//	ctx: Context for cancellation and deadlines. If no deadline, 30s default is applied.
+//	table: Name of the table to insert into.
+//	data: Map of column names to values. Key should match column names.
+//	upsertOpts: Conflict behavior such as conflict columns and update action.
+//	opts: Optional query options.
+//
+// Returns:
+//
+//	*db.ExecResult: Execution result containing RowsAffected.
+//	error: Query error or context error.
+func (dm *DBManager) Upsert(
+	ctx context.Context,
+	table string,
+	data map[string]any,
+	upsertOpts *options.UpsertOptions,
+	opts *options.QueryOptions,
+) (*db.ExecResult, error) {
+	responseCh, err := dm.UpsertAsync(ctx, table, data, upsertOpts, opts)
 	if err != nil {
 		return nil, err
 	}
-	return extractExecResultFromResponse(resp)
+	return waitForExecResult(ctx, responseCh)
 }
 
 // Update updates one or more records in the database synchronously.
@@ -420,8 +448,8 @@ func (dm *DBManager) Inserts(
 //	ctx: Context for cancellation and deadlines. If no deadline, 30s default is applied.
 //	table: Name of the table to update.
 //	data: Map of column names to new values.
-//	cond: Condition specifying which records to update.
 //	joins: Optional join conditions.
+//	cond: Condition specifying which records to update.
 //	opts: Optional query options.
 //
 // Returns:
@@ -435,7 +463,7 @@ func (dm *DBManager) Inserts(
 //	result, err := dbManager.Update(ctx, "users", map[string]any{
 //	  "name": "Johnny",
 //	  "age": 31,
-//	}, cond, nil, nil)
+//	}, nil, cond, nil)
 //	if err != nil {
 //	  return err
 //	}
@@ -452,11 +480,7 @@ func (dm *DBManager) Update(
 	if err != nil {
 		return nil, err
 	}
-	resp, err := waitForResponse(ctx, responseCh)
-	if err != nil {
-		return nil, err
-	}
-	return extractExecResultFromResponse(resp)
+	return waitForExecResult(ctx, responseCh)
 }
 
 // Delete deletes one or more records from the database synchronously.
@@ -465,8 +489,8 @@ func (dm *DBManager) Update(
 //
 //	ctx: Context for cancellation and deadlines. If no deadline, 30s default is applied.
 //	table: Name of the table to delete from.
-//	cond: Condition specifying which records to delete.
 //	joins: Optional join conditions.
+//	cond: Condition specifying which records to delete.
 //	opts: Optional query options.
 //
 // Returns:
@@ -477,7 +501,7 @@ func (dm *DBManager) Update(
 // Example:
 //
 //	cond := condition.Equal("id", 123)
-//	result, err := dbManager.Delete(ctx, "users", cond, nil, nil)
+//	result, err := dbManager.Delete(ctx, "users", nil, cond, nil)
 //	if err != nil {
 //	  return err
 //	}
@@ -493,11 +517,7 @@ func (dm *DBManager) Delete(
 	if err != nil {
 		return nil, err
 	}
-	resp, err := waitForResponse(ctx, responseCh)
-	if err != nil {
-		return nil, err
-	}
-	return extractExecResultFromResponse(resp)
+	return waitForExecResult(ctx, responseCh)
 }
 
 // Exec executes a raw SQL statement synchronously without returning result rows.
@@ -530,11 +550,7 @@ func (dm *DBManager) Exec(
 	if err != nil {
 		return nil, err
 	}
-	resp, err := waitForResponse(ctx, responseCh)
-	if err != nil {
-		return nil, err
-	}
-	return extractExecResultFromResponse(resp)
+	return waitForExecResult(ctx, responseCh)
 }
 
 // PingAsync checks the database connection asynchronously and returns a channel.

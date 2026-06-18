@@ -12,6 +12,7 @@ import (
 	"github.com/stretchr/testify/assert"
 
 	v1 "tounilab.com/vessel/manager/v1"
+	"tounilab.com/vessel/pkg/query/options"
 )
 
 // TestQueryData tests the QueryData structure for different query types.
@@ -162,6 +163,7 @@ func TestQueryRequestTypeConstants(t *testing.T) {
 	assert.NotEmpty(t, v1.ReqGetByIDRaw)
 	assert.NotEmpty(t, v1.ReqInsert)
 	assert.NotEmpty(t, v1.ReqInserts)
+	assert.NotEmpty(t, v1.ReqUpsert)
 	assert.NotEmpty(t, v1.ReqUpdate)
 	assert.NotEmpty(t, v1.ReqDelete)
 	assert.NotEmpty(t, v1.ReqQuery)
@@ -399,6 +401,23 @@ func TestDBManagerInsertsNoDBs(t *testing.T) {
 	assert.Error(t, err)
 }
 
+// TestDBManagerUpsertNoDBs tests Upsert returns error when no write databases.
+func TestDBManagerUpsertNoDBs(t *testing.T) {
+	dm := &v1.DBManager{}
+	ctx := context.Background()
+	data := map[string]any{"email": "john@example.com", "name": "John"}
+	upsertOpts := &options.UpsertOptions{
+		ConflictColumns: []string{"email"},
+		Action:          options.UpsertDoUpdate,
+		UpdateColumns:   []string{"name"},
+	}
+
+	ch, err := dm.UpsertAsync(ctx, "users", data, upsertOpts, nil)
+
+	assert.Nil(t, ch)
+	assert.Error(t, err)
+}
+
 // TestDBManagerUpdateNoDBs tests Update returns error when no write databases.
 func TestDBManagerUpdateNoDBs(t *testing.T) {
 	dm := &v1.DBManager{}
@@ -491,21 +510,24 @@ func TestDBManagerMultipleOperations(t *testing.T) {
 	// With no DBs configured, all should return errors
 	ch1, err1 := dm.GetAsync(ctx, "users", []string{"id"}, nil, nil, nil)
 	ch2, err2 := dm.InsertAsync(ctx, "users", map[string]any{}, nil)
-	ch3, err3 := dm.UpdateAsync(ctx, "users", map[string]any{}, nil, nil, nil)
-	ch4, err4 := dm.DeleteAsync(ctx, "users", nil, nil, nil)
-	ch5, err5 := dm.QueryAsync(ctx, "SELECT * FROM users")
+	ch3, err3 := dm.UpsertAsync(ctx, "users", map[string]any{}, nil, nil)
+	ch4, err4 := dm.UpdateAsync(ctx, "users", map[string]any{}, nil, nil, nil)
+	ch5, err5 := dm.DeleteAsync(ctx, "users", nil, nil, nil)
+	ch6, err6 := dm.QueryAsync(ctx, "SELECT * FROM users")
 
 	assert.Nil(t, ch1)
 	assert.Nil(t, ch2)
 	assert.Nil(t, ch3)
 	assert.Nil(t, ch4)
 	assert.Nil(t, ch5)
+	assert.Nil(t, ch6)
 
 	assert.Error(t, err1)
 	assert.Error(t, err2)
 	assert.Error(t, err3)
 	assert.Error(t, err4)
 	assert.Error(t, err5)
+	assert.Error(t, err6)
 }
 
 // TestDBManagerReadOnlyVsReadWrite tests that read operations and write operations return proper errors when no DBs exist.
@@ -547,17 +569,21 @@ func TestDBManagerReadOnlyVsReadWrite(t *testing.T) {
 	assert.Nil(t, ch8)
 	assert.Error(t, err8)
 
-	ch9, err9 := dm.UpdateAsync(ctx, "users", map[string]any{}, nil, nil, nil)
+	ch9, err9 := dm.UpsertAsync(ctx, "users", map[string]any{}, nil, nil)
 	assert.Nil(t, ch9)
 	assert.Error(t, err9)
 
-	ch10, err10 := dm.DeleteAsync(ctx, "users", nil, nil, nil)
+	ch10, err10 := dm.UpdateAsync(ctx, "users", map[string]any{}, nil, nil, nil)
 	assert.Nil(t, ch10)
 	assert.Error(t, err10)
 
-	ch11, err11 := dm.ExecAsync(ctx, "INSERT INTO users VALUES (?, ?)", "test")
+	ch11, err11 := dm.DeleteAsync(ctx, "users", nil, nil, nil)
 	assert.Nil(t, ch11)
 	assert.Error(t, err11)
+
+	ch12, err12 := dm.ExecAsync(ctx, "INSERT INTO users VALUES (?, ?)", "test")
+	assert.Nil(t, ch12)
+	assert.Error(t, err12)
 }
 
 // TestDBManagerQueryParameters tests that query parameters are properly passed.
