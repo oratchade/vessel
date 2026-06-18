@@ -165,6 +165,8 @@ _, err := fdb.Insert().
 // MySQL, returns an explicit unsupported error on MSSQL.
 ```
 
+Use `ValuesBulk(...).Upserts(ctx)` for multi-row upsert.
+
 See [examples/](./examples) for more, including transactions, the manager
 package, and plugin authoring.
 

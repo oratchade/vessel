@@ -78,6 +78,14 @@ type QueryBuilder interface {
 		opts *options.QueryOptions,
 	) (string, []any, error)
 
+	// Upserts builds a bulk INSERT with conflict handling.
+	Upserts(
+		table string,
+		data []map[string]any,
+		upsertOpts *options.UpsertOptions,
+		opts *options.QueryOptions,
+	) (string, []any, error)
+
 	// Update builds an UPDATE query for the given table, data, joins, and conditions.
 	//
 	// Parameters:
@@ -361,6 +369,65 @@ func upsert(
 		return baseSQL + " ON CONFLICT " + conflict + " DO UPDATE SET " + fragment + ";", values, nil
 	default:
 		return "", nil, fmt.Errorf("builder.upsert: unsupported upsert action %q", upsertOpts.Action)
+	}
+}
+
+//nolint:cyclop
+func upserts(
+	dialect optionDialect,
+	table string,
+	data []map[string]any,
+	upsertOpts *options.UpsertOptions,
+	opts *options.QueryOptions,
+) (string, []any, error) {
+	if len(data) == 0 {
+		return "", nil, fmt.Errorf("builder.upserts: no data provided for insertion")
+	}
+	if upsertOpts == nil {
+		return "", nil, fmt.Errorf("builder.upserts: upsert options are required")
+	}
+	if upsertOpts.Action == "" {
+		return "", nil, fmt.Errorf("builder.upserts: upsert action is required")
+	}
+	if isMSSQLDialect(dialect) {
+		return "", nil, fmt.Errorf(
+			"builder.upserts: MSSQL upsert is not supported; use an explicit transaction or raw SQL",
+		)
+	}
+
+	baseSQL, values, err := inserts(dialect, table, data, opts)
+	if err != nil {
+		return "", nil, fmt.Errorf("builder.upserts: %w", err)
+	}
+	baseSQL = strings.TrimSuffix(baseSQL, ";")
+
+	switch upsertOpts.Action {
+	case options.UpsertDoNothing:
+		conflict, err := conflictTarget(dialect, upsertOpts)
+		if err != nil {
+			return "", nil, err
+		}
+		if isMySQLDialect(dialect) {
+			noOpColumn := dialect.QuoteIdentifier(upsertOpts.ConflictColumns[0])
+			return baseSQL + " ON DUPLICATE KEY UPDATE " + noOpColumn + " = " + noOpColumn + ";", values, nil
+		}
+		return baseSQL + " ON CONFLICT " + conflict + " DO NOTHING;", values, nil
+	case options.UpsertDoUpdate:
+		fragment, extraValues, err := upsertUpdateFragment(dialect, data[0], upsertOpts, len(values)+1)
+		if err != nil {
+			return "", nil, err
+		}
+		values = append(values, extraValues...)
+		if isMySQLDialect(dialect) {
+			return baseSQL + " ON DUPLICATE KEY UPDATE " + fragment + ";", values, nil
+		}
+		conflict, err := conflictTarget(dialect, upsertOpts)
+		if err != nil {
+			return "", nil, err
+		}
+		return baseSQL + " ON CONFLICT " + conflict + " DO UPDATE SET " + fragment + ";", values, nil
+	default:
+		return "", nil, fmt.Errorf("builder.upserts: unsupported upsert action %q", upsertOpts.Action)
 	}
 }
 

@@ -74,6 +74,20 @@ func (m *MSSQLQueryBuilder) Upsert(
 	return q, v, nil
 }
 
+// Upserts implements the QueryBuilder interface for MSSQL.
+func (m *MSSQLQueryBuilder) Upserts(
+	table string,
+	data []map[string]any,
+	upsertOpts *options.UpsertOptions,
+	opts *options.QueryOptions,
+) (string, []any, error) {
+	q, v, err := upserts(m.dialect, table, data, upsertOpts, opts)
+	if err != nil {
+		return "", nil, fmt.Errorf("upserts mssqlSQL Builder: error building upsert query: %w", err)
+	}
+	return q, v, nil
+}
+
 // Update implements the QueryBuilder interface for MSSQL.
 func (m *MSSQLQueryBuilder) Update(
 	table string,

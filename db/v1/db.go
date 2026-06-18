@@ -276,10 +276,27 @@ type upserter interface {
 		opts *options.QueryOptions,
 	) (*ExecResult, error)
 
+	// Upserts inserts multiple rows or applies conflict behavior when uniqueness conflicts occur.
+	Upserts(
+		ctx context.Context,
+		table string,
+		data []map[string]any,
+		upsertOpts *options.UpsertOptions,
+		opts *options.QueryOptions,
+	) (*ExecResult, error)
+
 	// UpsertQuery builds an UPSERT statement without executing it.
 	UpsertQuery(
 		table string,
 		data map[string]any,
+		upsertOpts *options.UpsertOptions,
+		opts *options.QueryOptions,
+	) (string, []any, error)
+
+	// UpsertsQuery builds a bulk UPSERT statement without executing it.
+	UpsertsQuery(
+		table string,
+		data []map[string]any,
 		upsertOpts *options.UpsertOptions,
 		opts *options.QueryOptions,
 	) (string, []any, error)

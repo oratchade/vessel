@@ -103,6 +103,30 @@ func TestPostgresUpsertDoUpdate(t *testing.T) {
 	assert.Equal(t, []any{"a@example.com", "Alice"}, args)
 }
 
+func TestPostgresUpsertsDoUpdate(t *testing.T) {
+	b := builder.NewPostgresQueryBuilder(sqldialect.PostgresDialect{})
+	query, args, err := b.Upserts(
+		"users",
+		[]map[string]any{
+			{"email": "a@example.com", "name": "Alice"},
+			{"email": "b@example.com", "name": "Bob"},
+		},
+		&options.UpsertOptions{
+			ConflictColumns: []string{"email"},
+			Action:          options.UpsertDoUpdate,
+		},
+		nil,
+	)
+
+	require.NoError(t, err)
+	assert.Equal(
+		t,
+		`INSERT INTO "users" ("email", "name") VALUES ($1, $2), ($3, $4) ON CONFLICT ("email") DO UPDATE SET "name" = excluded."name";`,
+		query,
+	)
+	assert.Equal(t, []any{"a@example.com", "Alice", "b@example.com", "Bob"}, args)
+}
+
 func TestSQLiteUpsertDoNothing(t *testing.T) {
 	b := builder.NewSQLiteQueryBuilder(sqldialect.SQLiteDialect{})
 	query, args, err := b.Upsert(
@@ -118,6 +142,30 @@ func TestSQLiteUpsertDoNothing(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, "INSERT INTO `users` (`email`, `name`) VALUES (?, ?) ON CONFLICT (`email`) DO NOTHING;", query)
 	assert.Equal(t, []any{"a@example.com", "Alice"}, args)
+}
+
+func TestSQLiteUpsertsDoNothing(t *testing.T) {
+	b := builder.NewSQLiteQueryBuilder(sqldialect.SQLiteDialect{})
+	query, args, err := b.Upserts(
+		"users",
+		[]map[string]any{
+			{"email": "a@example.com", "name": "Alice"},
+			{"email": "b@example.com", "name": "Bob"},
+		},
+		&options.UpsertOptions{
+			ConflictColumns: []string{"email"},
+			Action:          options.UpsertDoNothing,
+		},
+		nil,
+	)
+
+	require.NoError(t, err)
+	assert.Equal(
+		t,
+		"INSERT INTO `users` (`email`, `name`) VALUES (?, ?), (?, ?) ON CONFLICT (`email`) DO NOTHING;",
+		query,
+	)
+	assert.Equal(t, []any{"a@example.com", "Alice", "b@example.com", "Bob"}, args)
 }
 
 func TestMySQLUpsertDoUpdateWithExplicitValue(t *testing.T) {
@@ -138,11 +186,52 @@ func TestMySQLUpsertDoUpdateWithExplicitValue(t *testing.T) {
 	assert.Equal(t, []any{"a@example.com", "Alice", "Updated"}, args)
 }
 
+func TestMySQLUpsertsDoUpdateWithExplicitValue(t *testing.T) {
+	b := builder.NewMySQLQueryBuilder(sqldialect.MySQLDialect{})
+	query, args, err := b.Upserts(
+		"users",
+		[]map[string]any{
+			{"email": "a@example.com", "name": "Alice"},
+			{"email": "b@example.com", "name": "Bob"},
+		},
+		&options.UpsertOptions{
+			ConflictColumns: []string{"email"},
+			Action:          options.UpsertDoUpdate,
+			UpdateValues:    map[string]any{"name": "Updated"},
+		},
+		nil,
+	)
+
+	require.NoError(t, err)
+	assert.Equal(
+		t,
+		"INSERT INTO `users` (`email`, `name`) VALUES (?, ?), (?, ?) ON DUPLICATE KEY UPDATE `name` = ?;",
+		query,
+	)
+	assert.Equal(t, []any{"a@example.com", "Alice", "b@example.com", "Bob", "Updated"}, args)
+}
+
 func TestMSSQLUpsertUnsupported(t *testing.T) {
 	b := builder.NewMSSQLQueryBuilder(sqldialect.MSSQLDialect{})
 	_, _, err := b.Upsert(
 		"users",
 		map[string]any{"email": "a@example.com"},
+		&options.UpsertOptions{
+			ConflictColumns: []string{"email"},
+			Action:          options.UpsertDoUpdate,
+		},
+		nil,
+	)
+
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "MSSQL upsert is not supported")
+}
+
+func TestMSSQLUpsertsUnsupported(t *testing.T) {
+	b := builder.NewMSSQLQueryBuilder(sqldialect.MSSQLDialect{})
+	_, _, err := b.Upserts(
+		"users",
+		[]map[string]any{{"email": "a@example.com"}},
 		&options.UpsertOptions{
 			ConflictColumns: []string{"email"},
 			Action:          options.UpsertDoUpdate,

@@ -308,6 +308,32 @@ func upsert(
 	return execResult, nil
 }
 
+func upserts(
+	ctx context.Context,
+	table string,
+	data []map[string]any,
+	upsertOpts *options.UpsertOptions,
+	opts *options.QueryOptions,
+	dbOpts dbOpts,
+) (*ExecResult, error) {
+	if err := rejectExecutingReturning("Upserts", opts); err != nil {
+		return nil, err
+	}
+	query, args, err := upsertsQuery(table, data, upsertOpts, opts, dbOpts)
+	if err != nil {
+		return nil, fmt.Errorf("upserts: build query: %w", err)
+	}
+	result, err := dbOpts.querier.ExecContext(ctx, query, args...)
+	if err != nil {
+		return nil, fmt.Errorf("upserts: execute query: %w", dbOpts.mapError(err))
+	}
+	execResult, err := fromSQLResult(result)
+	if err != nil {
+		return nil, fmt.Errorf("upserts: %w", err)
+	}
+	return execResult, nil
+}
+
 func upsertQuery(
 	table string,
 	data map[string]any,
@@ -318,6 +344,20 @@ func upsertQuery(
 	query, args, err := dbOpts.builder.Upsert(table, data, upsertOpts, opts)
 	if err != nil {
 		return "", nil, fmt.Errorf("failed to build upsert query: %w", err)
+	}
+	return query, args, nil
+}
+
+func upsertsQuery(
+	table string,
+	data []map[string]any,
+	upsertOpts *options.UpsertOptions,
+	opts *options.QueryOptions,
+	dbOpts dbOpts,
+) (string, []any, error) {
+	query, args, err := dbOpts.builder.Upserts(table, data, upsertOpts, opts)
+	if err != nil {
+		return "", nil, fmt.Errorf("failed to build upserts query: %w", err)
 	}
 	return query, args, nil
 }

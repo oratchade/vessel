@@ -68,8 +68,16 @@ func (c *CompositeRecorder) Upsert(ctx, table, data, upsertOpts, opts any) *gomo
 	return c.upserterRecorder.Upsert(ctx, table, data, upsertOpts, opts)
 }
 
+func (c *CompositeRecorder) Upserts(ctx, table, data, upsertOpts, opts any) *gomock.Call {
+	return c.upserterRecorder.Upserts(ctx, table, data, upsertOpts, opts)
+}
+
 func (c *CompositeRecorder) UpsertQuery(table, data, upsertOpts, opts any) *gomock.Call {
 	return c.upserterRecorder.UpsertQuery(table, data, upsertOpts, opts)
+}
+
+func (c *CompositeRecorder) UpsertsQuery(table, data, upsertOpts, opts any) *gomock.Call {
+	return c.upserterRecorder.UpsertsQuery(table, data, upsertOpts, opts)
 }
 
 func (c *CompositeRecorder) Update(ctx, table, data, joins, conditions, opts any) *gomock.Call {

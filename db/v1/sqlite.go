@@ -517,6 +517,21 @@ func (m *SQLITE) UpsertQuery(
 	return upsertQuery(table, data, upsertOpts, opts, o)
 }
 
+// UpsertsQuery builds the bulk UPSERT query without executing it.
+func (m *SQLITE) UpsertsQuery(
+	table string,
+	data []map[string]any,
+	upsertOpts *options.UpsertOptions,
+	opts *options.QueryOptions,
+) (string, []any, error) {
+	o := dbOpts{
+		builder:     m.queryBuilder,
+		querier:     m.querier,
+		errorMapper: m.errorMapper,
+	}
+	return upsertsQuery(table, data, upsertOpts, opts, o)
+}
+
 // Upsert inserts one row or updates an existing row when a uniqueness conflict occurs.
 //
 //nolint:dupl
@@ -550,6 +565,47 @@ func (m *SQLITE) Upsert(
 		return result, err
 	}
 	span.SetStatus(codes.Ok, "upsert successful")
+	rowsReturned := 0
+	if result != nil {
+		rowsReturned = int(result.RowsAffected)
+	}
+	m.safeLogger.QuerySuccess(c, "sqlite", "upsert", table, duration, rowsReturned)
+	return result, nil
+}
+
+// Upserts inserts multiple rows or updates existing rows when uniqueness conflicts occur.
+//
+//nolint:dupl
+func (m *SQLITE) Upserts(
+	ctx context.Context,
+	table string,
+	data []map[string]any,
+	upsertOpts *options.UpsertOptions,
+	opts *options.QueryOptions,
+) (*ExecResult, error) {
+	startTime := time.Now()
+	c, span := oh.UseTracer(ctx, "sqlite.Upserts",
+		trace.WithSpanKind(trace.SpanKindClient),
+		trace.WithAttributes(
+			semconv.DBSystemNameSQLite,
+			semconv.DBOperationName("upsert"),
+			semconv.DBCollectionName(table),
+		))
+	defer span.End()
+	o := dbOpts{
+		builder:     m.queryBuilder,
+		querier:     m.querier,
+		errorMapper: m.errorMapper,
+	}
+	result, err := upserts(c, table, data, upsertOpts, opts, o)
+	duration := time.Since(startTime)
+	if err != nil {
+		span.RecordError(err)
+		span.SetStatus(codes.Error, err.Error())
+		m.safeLogger.QueryError(c, "sqlite", "upsert", table, duration, err)
+		return result, err
+	}
+	span.SetStatus(codes.Ok, "upserts successful")
 	rowsReturned := 0
 	if result != nil {
 		rowsReturned = int(result.RowsAffected)

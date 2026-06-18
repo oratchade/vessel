@@ -508,6 +508,21 @@ func (m *MSSQL) UpsertQuery(
 	return upsertQuery(table, data, upsertOpts, opts, o)
 }
 
+// UpsertsQuery returns a clear unsupported error for MSSQL.
+func (m *MSSQL) UpsertsQuery(
+	table string,
+	data []map[string]any,
+	upsertOpts *options.UpsertOptions,
+	opts *options.QueryOptions,
+) (string, []any, error) {
+	o := dbOpts{
+		builder:     m.queryBuilder,
+		querier:     m.querier,
+		errorMapper: m.errorMapper,
+	}
+	return upsertsQuery(table, data, upsertOpts, opts, o)
+}
+
 // Upsert returns a clear unsupported error for MSSQL.
 //
 //nolint:dupl
@@ -541,6 +556,47 @@ func (m *MSSQL) Upsert(
 		return result, err
 	}
 	span.SetStatus(codes.Ok, "upsert successful")
+	rowsAffected := int(0)
+	if result != nil {
+		rowsAffected = int(result.RowsAffected)
+	}
+	m.safeLogger.QuerySuccess(c, "mssql", "upsert", table, duration, rowsAffected)
+	return result, nil
+}
+
+// Upserts returns a clear unsupported error for MSSQL.
+//
+//nolint:dupl
+func (m *MSSQL) Upserts(
+	ctx context.Context,
+	table string,
+	data []map[string]any,
+	upsertOpts *options.UpsertOptions,
+	opts *options.QueryOptions,
+) (*ExecResult, error) {
+	startTime := time.Now()
+	c, span := oh.UseTracer(ctx, "mssql.Upserts",
+		trace.WithSpanKind(trace.SpanKindClient),
+		trace.WithAttributes(
+			semconv.DBSystemNameMicrosoftSQLServer,
+			semconv.DBOperationName("upsert"),
+			semconv.DBCollectionName(table),
+		))
+	defer span.End()
+	o := dbOpts{
+		builder:     m.queryBuilder,
+		querier:     m.querier,
+		errorMapper: m.errorMapper,
+	}
+	result, err := upserts(c, table, data, upsertOpts, opts, o)
+	duration := time.Since(startTime)
+	if err != nil {
+		span.RecordError(err)
+		span.SetStatus(codes.Error, err.Error())
+		m.safeLogger.QueryError(c, "mssql", "upsert", table, duration, err)
+		return result, err
+	}
+	span.SetStatus(codes.Ok, "upserts successful")
 	rowsAffected := int(0)
 	if result != nil {
 		rowsAffected = int(result.RowsAffected)
