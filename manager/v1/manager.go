@@ -82,6 +82,7 @@ const (
 	ReqInsert     QueryRequest = "insert"
 	ReqInserts    QueryRequest = "inserts"
 	ReqUpsert     QueryRequest = "upsert"
+	ReqUpserts    QueryRequest = "upserts"
 	ReqUpdate     QueryRequest = "update"
 	ReqDelete     QueryRequest = "delete"
 	ReqQuery      QueryRequest = "query"
@@ -958,6 +959,29 @@ func (dm *DBManager) UpsertAsync(
 		},
 	}
 	return dm.enqueueWrite(ctx, "UpsertAsync", q)
+}
+
+// UpsertsAsync inserts multiple records or applies conflict behavior asynchronously.
+// This method returns a channel that will receive the result and an error.
+// Returns an error immediately if no entries are available or if context is already canceled.
+// For synchronous access, use Upserts() instead.
+func (dm *DBManager) UpsertsAsync(
+	ctx context.Context,
+	table string,
+	data []map[string]any,
+	upsertOpts *options.UpsertOptions,
+	opts *options.QueryOptions,
+) (<-chan *QueryResponse, error) {
+	q := &Query{
+		Request: ReqUpserts,
+		Data: &QueryData{
+			Table:      table,
+			BulkData:   data,
+			UpsertOpts: upsertOpts,
+			Opts:       opts,
+		},
+	}
+	return dm.enqueueWrite(ctx, "UpsertsAsync", q)
 }
 
 // UpdateAsync updates an existing record in the database asynchronously.

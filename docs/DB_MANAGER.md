@@ -178,7 +178,7 @@ Supported synchronous methods:
 
 - `Get`, `GetRaw`, `GetByID`, `GetByIDRaw`
 - `Query`, `QueryRaw`
-- `Insert`, `Inserts`, `Upsert`, `Update`, `Delete`
+- `Insert`, `Inserts`, `Upsert`, `Upserts`, `Update`, `Delete`
 - `Exec`
 - `Ping`, `HealthStatus`
 
@@ -210,7 +210,8 @@ Supported async methods mirror the synchronous methods with an `Async` suffix:
 
 - `GetAsync`, `GetRawAsync`, `GetByIDAsync`, `GetByIDRawAsync`
 - `QueryAsync`, `QueryRawAsync`
-- `InsertAsync`, `InsertsAsync`, `UpsertAsync`, `UpdateAsync`, `DeleteAsync`
+- `InsertAsync`, `InsertsAsync`, `UpsertAsync`, `UpsertsAsync`, `UpdateAsync`,
+  `DeleteAsync`
 - `ExecAsync`
 
 `PingAsync` is named for compatibility but checks the selected connection
@@ -234,8 +235,8 @@ Always check `resp.Error` before reading `Data`, `RawData`, or `ExecData`.
 
 Automatic insert batching is disabled by default. When enabled, compatible
 `InsertAsync` requests may be flushed as one `Inserts` call by the same write
-worker. `UpsertAsync` requests are not coalesced; they flush any pending insert
-batch first, then execute as individual upserts.
+worker. `UpsertAsync` and `UpsertsAsync` requests are not coalesced; they flush
+any pending insert batch first, then execute directly.
 
 Requests are compatible when they target the same worker, table, query options,
 and column set. A batch flushes when it reaches `write_batch_max_rows`, waits

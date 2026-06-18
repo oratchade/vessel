@@ -441,6 +441,34 @@ func (dm *DBManager) Upsert(
 	return waitForExecResult(ctx, responseCh)
 }
 
+// Upserts inserts multiple records or applies conflict behavior synchronously.
+//
+// Parameters:
+//
+//	ctx: Context for cancellation and deadlines. If no deadline, 30s default is applied.
+//	table: Name of the table to insert into.
+//	data: Slice of maps, each representing a record with column names as keys.
+//	upsertOpts: Conflict behavior such as conflict columns and update action.
+//	opts: Optional query options.
+//
+// Returns:
+//
+//	*db.ExecResult: Execution result containing RowsAffected.
+//	error: Query error or context error.
+func (dm *DBManager) Upserts(
+	ctx context.Context,
+	table string,
+	data []map[string]any,
+	upsertOpts *options.UpsertOptions,
+	opts *options.QueryOptions,
+) (*db.ExecResult, error) {
+	responseCh, err := dm.UpsertsAsync(ctx, table, data, upsertOpts, opts)
+	if err != nil {
+		return nil, err
+	}
+	return waitForExecResult(ctx, responseCh)
+}
+
 // Update updates one or more records in the database synchronously.
 //
 // Parameters:

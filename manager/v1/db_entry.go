@@ -316,6 +316,15 @@ func (de *DBEntry) processWriteRequest(ctx context.Context, qd *Query) *QueryRes
 			qd.Data.Opts,
 		)
 		return &QueryResponse{ExecData: resp, Error: err}
+	case ReqUpserts:
+		resp, err := de.db.Upserts(
+			ctx,
+			qd.Data.Table,
+			qd.Data.BulkData,
+			qd.Data.UpsertOpts,
+			qd.Data.Opts,
+		)
+		return &QueryResponse{ExecData: resp, Error: err}
 	case ReqUpdate:
 		resp, err := de.db.Update(
 			ctx,

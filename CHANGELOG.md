@@ -11,6 +11,8 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 - Added manager-level `Upsert` and `UpsertAsync` APIs, including write-worker
   dispatch and coverage for direct execution and insert-batching interaction.
+- Added bulk upsert support through `Upserts`, `UpsertsQuery`, fluent
+  `InsertBuilder.Upserts`, and manager `Upserts`/`UpsertsAsync`.
 
 ### Changed
 
