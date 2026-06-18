@@ -1,4 +1,4 @@
-.PHONY: test coverage cobertura cover-html cover-func tools fmt fmt-check lint lint-markdown lint-docs check all mocks integration-test integration-test-sqlite integration-test-mysql integration-test-postgres integration-test-mssql integration-test-all wait-mssql deps-install deps-validate clean
+.PHONY: test coverage cobertura cover-html cover-func tools fmt fmt-check lint lint-markdown lint-docs check all mocks integration-test integration-test-sqlite integration-test-mysql integration-test-postgres integration-test-mssql integration-test-all wait-postgres wait-mssql deps-install deps-validate clean
 
 TEST_PKGS ?= ./...
 
@@ -95,7 +95,7 @@ test-integration:
 	@echo "Waiting for all services to be healthy..."
 	@sleep 10
 	@docker compose -f docker-compose.test.yml exec -T mysql mysqladmin --wait=60 --count=10 ping -h localhost -u root -proot_password || true
-	@docker compose -f docker-compose.test.yml exec -T postgres pg_isready -U test_user -d test_db -t 60 || true
+	@$(MAKE) wait-postgres
 	@$(MAKE) wait-mssql
 	@echo "Services are ready, running tests..."
 	CGO_ENABLED=$(CGO_ENABLED) gotestsum --format=short-verbose --junitfile $(JUNIT_FILE) -- -count=1 -timeout 300s $(GOFLAGS) $(TEST_PKGS)
@@ -148,8 +148,7 @@ integration-test-postgres:
 	@docker compose -f docker-compose.test.yml up -d postgres
 	@echo "Waiting for PostgreSQL to be healthy..."
 	@sleep 5
-	@docker compose -f docker-compose.test.yml exec -T postgres pg_isready -U test_user -d test_db -t 60 || true
-	@sleep 5
+	@$(MAKE) wait-postgres
 	@mkdir -p $(OUT_JUNIT_DIR)
 	@DB_TYPE=postgres \
 		DB_POSTGRES_USER=test_user \
@@ -179,7 +178,7 @@ integration-test-all:
 	@echo "Waiting for all services to be healthy..."
 	@sleep 10
 	@docker compose -f docker-compose.test.yml exec -T mysql mysqladmin --wait=60 --count=10 ping -h localhost -u root -proot_password || true
-	@docker compose -f docker-compose.test.yml exec -T postgres pg_isready -U test_user -d test_db -t 60 || true
+	@$(MAKE) wait-postgres
 	@$(MAKE) wait-mssql
 	@echo "Services are ready, running tests..."
 	@DB_TYPE=sqlite CGO_ENABLED=$(CGO_ENABLED) gotestsum --format=short-verbose --junitfile $(OUT_JUNIT_DIR)/integration-sqlite.xml -- -count=1 -timeout 300s -tags=integration ./tests -run "TestIntegration"
@@ -202,6 +201,19 @@ integration-test-all:
 		DB_MSSQL_DATABASE=test_db \
 		CGO_ENABLED=$(CGO_ENABLED) gotestsum --format=short-verbose --junitfile $(OUT_JUNIT_DIR)/integration-sqlserver.xml -- -count=1 -timeout 300s -tags=integration ./tests -run "TestIntegration"
 	@docker compose -f docker-compose.test.yml down -v
+
+wait-postgres:
+	@echo "Waiting for PostgreSQL to be ready..."
+	@for i in $$(seq 1 120); do \
+		if docker compose -f docker-compose.test.yml exec -T postgres pg_isready -U test_user -d test_db >/dev/null 2>&1; then \
+			echo "PostgreSQL is ready"; \
+			exit 0; \
+		fi; \
+		sleep 1; \
+	done; \
+	echo "PostgreSQL did not become ready in time. Container logs:"; \
+	docker compose -f docker-compose.test.yml logs postgres; \
+	exit 1
 
 wait-mssql:
 	@echo "Waiting for MSSQL to be ready (this can take several minutes)..."

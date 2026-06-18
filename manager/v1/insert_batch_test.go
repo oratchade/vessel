@@ -22,12 +22,20 @@ type batchDB struct {
 
 	insertCalls  int
 	insertsCalls int
+	upsertCalls  int
+	upsertsCalls int
 	execCalls    int
 
 	insertTables  []string
 	insertsTables []string
+	upsertTables  []string
+	upsertsTables []string
 	insertRows    []map[string]any
 	insertsRows   [][]map[string]any
+	upsertRows    []map[string]any
+	upsertsRows   [][]map[string]any
+	upsertOpts    []*options.UpsertOptions
+	upsertsOpts   []*options.UpsertOptions
 
 	insertsErr          error
 	insertsRowsAffected int64
@@ -82,6 +90,34 @@ func (b *batchDB) calls() (insertCalls int, insertsCalls int, execCalls int) {
 	b.mu.Lock()
 	defer b.mu.Unlock()
 	return b.insertCalls, b.insertsCalls, b.execCalls
+}
+
+func (b *batchDB) upsertRecords() (
+	upsertCalls int,
+	tables []string,
+	rows []map[string]any,
+	upsertOpts []*options.UpsertOptions,
+) {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	return b.upsertCalls,
+		append([]string(nil), b.upsertTables...),
+		append([]map[string]any(nil), b.upsertRows...),
+		append([]*options.UpsertOptions(nil), b.upsertOpts...)
+}
+
+func (b *batchDB) bulkUpsertRecords() (
+	upsertsCalls int,
+	tables []string,
+	rows [][]map[string]any,
+	upsertOpts []*options.UpsertOptions,
+) {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	return b.upsertsCalls,
+		append([]string(nil), b.upsertsTables...),
+		append([][]map[string]any(nil), b.upsertsRows...),
+		append([]*options.UpsertOptions(nil), b.upsertsOpts...)
 }
 
 func (b *batchDB) Get(
@@ -157,18 +193,51 @@ func (b *batchDB) InsertsQuery(string, []map[string]any, *options.QueryOptions) 
 }
 
 func (b *batchDB) Upsert(
-	context.Context,
-	string,
-	map[string]any,
-	*options.UpsertOptions,
-	*options.QueryOptions,
+	_ context.Context,
+	table string,
+	data map[string]any,
+	upsertOpts *options.UpsertOptions,
+	_ *options.QueryOptions,
 ) (*db.ExecResult, error) {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+
+	b.upsertCalls++
+	b.upsertTables = append(b.upsertTables, table)
+	b.upsertRows = append(b.upsertRows, data)
+	b.upsertOpts = append(b.upsertOpts, upsertOpts)
 	return &db.ExecResult{RowsAffected: 1}, nil
+}
+
+func (b *batchDB) Upserts(
+	_ context.Context,
+	table string,
+	data []map[string]any,
+	upsertOpts *options.UpsertOptions,
+	_ *options.QueryOptions,
+) (*db.ExecResult, error) {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+
+	b.upsertsCalls++
+	b.upsertsTables = append(b.upsertsTables, table)
+	b.upsertsRows = append(b.upsertsRows, append([]map[string]any(nil), data...))
+	b.upsertsOpts = append(b.upsertsOpts, upsertOpts)
+	return &db.ExecResult{RowsAffected: int64(len(data))}, nil
 }
 
 func (b *batchDB) UpsertQuery(
 	string,
 	map[string]any,
+	*options.UpsertOptions,
+	*options.QueryOptions,
+) (string, []any, error) {
+	return "", nil, nil
+}
+
+func (b *batchDB) UpsertsQuery(
+	string,
+	[]map[string]any,
 	*options.UpsertOptions,
 	*options.QueryOptions,
 ) (string, []any, error) {
@@ -253,6 +322,70 @@ func TestWriteWorkerBatchingDisabledUsesSingleInsert(t *testing.T) {
 	insertCalls, insertsCalls, _ := fake.calls()
 	assert.Equal(t, 1, insertCalls)
 	assert.Equal(t, 0, insertsCalls)
+}
+
+func TestWriteWorkerProcessesUpsert(t *testing.T) {
+	fake := &batchDB{}
+	de, worker, cancel := newBatchTestEntry(fake, false, 10, time.Hour)
+	defer cancel()
+
+	de.wg.Add(1)
+	go de.writeWorker(de.ctx, worker)
+
+	upsertOpts := &options.UpsertOptions{
+		ConflictColumns: []string{"email"},
+		Action:          options.UpsertDoUpdate,
+		UpdateColumns:   []string{"name"},
+	}
+	q := upsertQuery("users", map[string]any{"email": "a@example.com", "name": "A"}, upsertOpts)
+	worker.queue <- q
+	resp := readBatchResponse(t, q)
+	cancel()
+	de.wg.Wait()
+
+	require.NoError(t, resp.Error)
+	assert.Equal(t, int64(1), resp.ExecData.RowsAffected)
+	upsertCalls, tables, rows, opts := fake.upsertRecords()
+	assert.Equal(t, 1, upsertCalls)
+	assert.Equal(t, []string{"users"}, tables)
+	assert.Equal(t, "a@example.com", rows[0]["email"])
+	assert.Same(t, upsertOpts, opts[0])
+}
+
+func TestWriteWorkerProcessesUpserts(t *testing.T) {
+	fake := &batchDB{}
+	de, worker, cancel := newBatchTestEntry(fake, false, 10, time.Hour)
+	defer cancel()
+
+	de.wg.Add(1)
+	go de.writeWorker(de.ctx, worker)
+
+	upsertOpts := &options.UpsertOptions{
+		ConflictColumns: []string{"email"},
+		Action:          options.UpsertDoUpdate,
+		UpdateColumns:   []string{"name"},
+	}
+	q := upsertsQuery(
+		"users",
+		[]map[string]any{
+			{"email": "a@example.com", "name": "A"},
+			{"email": "b@example.com", "name": "B"},
+		},
+		upsertOpts,
+	)
+	worker.queue <- q
+	resp := readBatchResponse(t, q)
+	cancel()
+	de.wg.Wait()
+
+	require.NoError(t, resp.Error)
+	assert.Equal(t, int64(2), resp.ExecData.RowsAffected)
+	upsertsCalls, tables, rows, opts := fake.bulkUpsertRecords()
+	assert.Equal(t, 1, upsertsCalls)
+	assert.Equal(t, []string{"users"}, tables)
+	assert.Len(t, rows[0], 2)
+	assert.Equal(t, "a@example.com", rows[0][0]["email"])
+	assert.Same(t, upsertOpts, opts[0])
 }
 
 func TestWriteBatchingWorkerFlushesCompatibleInsertsAtMaxRows(t *testing.T) {
@@ -344,6 +477,72 @@ func TestWriteBatchingWorkerFlushesBeforeDirectWrite(t *testing.T) {
 	_, insertsCalls, execCalls := fake.calls()
 	assert.Equal(t, 1, insertsCalls)
 	assert.Equal(t, 1, execCalls)
+}
+
+func TestWriteBatchingWorkerFlushesBeforeUpsert(t *testing.T) {
+	fake := &batchDB{}
+	de, worker, cancel := newBatchTestEntry(fake, true, 10, time.Hour)
+	defer cancel()
+	go de.writeBatchingWorker(de.ctx, worker)
+
+	insert := insertQuery("users", map[string]any{"email": "a@example.com", "name": "A"})
+	upsertOpts := &options.UpsertOptions{
+		ConflictColumns: []string{"email"},
+		Action:          options.UpsertDoUpdate,
+		UpdateColumns:   []string{"name"},
+	}
+	upsert := upsertQuery(
+		"users",
+		map[string]any{"email": "a@example.com", "name": "B"},
+		upsertOpts,
+	)
+	worker.queue <- insert
+	worker.queue <- upsert
+
+	require.NoError(t, readBatchResponse(t, insert).Error)
+	require.NoError(t, readBatchResponse(t, upsert).Error)
+	insertCalls, insertsCalls, execCalls := fake.calls()
+	assert.Equal(t, 0, insertCalls)
+	assert.Equal(t, 1, insertsCalls)
+	assert.Equal(t, 0, execCalls)
+	upsertCalls, _, _, opts := fake.upsertRecords()
+	assert.Equal(t, 1, upsertCalls)
+	assert.Same(t, upsertOpts, opts[0])
+}
+
+func TestWriteBatchingWorkerFlushesBeforeUpserts(t *testing.T) {
+	fake := &batchDB{}
+	de, worker, cancel := newBatchTestEntry(fake, true, 10, time.Hour)
+	defer cancel()
+	go de.writeBatchingWorker(de.ctx, worker)
+
+	insert := insertQuery("users", map[string]any{"email": "a@example.com", "name": "A"})
+	upsertOpts := &options.UpsertOptions{
+		ConflictColumns: []string{"email"},
+		Action:          options.UpsertDoUpdate,
+		UpdateColumns:   []string{"name"},
+	}
+	upserts := upsertsQuery(
+		"users",
+		[]map[string]any{
+			{"email": "a@example.com", "name": "B"},
+			{"email": "b@example.com", "name": "C"},
+		},
+		upsertOpts,
+	)
+	worker.queue <- insert
+	worker.queue <- upserts
+
+	require.NoError(t, readBatchResponse(t, insert).Error)
+	require.NoError(t, readBatchResponse(t, upserts).Error)
+	insertCalls, insertsCalls, execCalls := fake.calls()
+	assert.Equal(t, 0, insertCalls)
+	assert.Equal(t, 1, insertsCalls)
+	assert.Equal(t, 0, execCalls)
+	upsertsCalls, _, rows, opts := fake.bulkUpsertRecords()
+	assert.Equal(t, 1, upsertsCalls)
+	assert.Len(t, rows[0], 2)
+	assert.Same(t, upsertOpts, opts[0])
 }
 
 func TestWriteBatchingWorkerFansOutBatchError(t *testing.T) {
@@ -467,6 +666,30 @@ func insertQuery(table string, data map[string]any) *Query {
 		Data: &QueryData{
 			Table: table,
 			Data:  data,
+		},
+		ResponseCh: make(chan *QueryResponse, 1),
+	}
+}
+
+func upsertQuery(table string, data map[string]any, upsertOpts *options.UpsertOptions) *Query {
+	return &Query{
+		Request: ReqUpsert,
+		Data: &QueryData{
+			Table:      table,
+			Data:       data,
+			UpsertOpts: upsertOpts,
+		},
+		ResponseCh: make(chan *QueryResponse, 1),
+	}
+}
+
+func upsertsQuery(table string, data []map[string]any, upsertOpts *options.UpsertOptions) *Query {
+	return &Query{
+		Request: ReqUpserts,
+		Data: &QueryData{
+			Table:      table,
+			BulkData:   data,
+			UpsertOpts: upsertOpts,
 		},
 		ResponseCh: make(chan *QueryResponse, 1),
 	}

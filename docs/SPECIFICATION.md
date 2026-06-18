@@ -63,7 +63,7 @@ The public `DB` interface includes:
 
 - Reads: `Get`, `GetRaw`, `GetByID`, `GetByIDRaw`, `Query`, `QueryRaw`.
 - Writes: `Insert`, `Inserts`, `Update`, `Delete`, `Exec`.
-- Upsert: `Upsert`, `UpsertQuery`.
+- Upsert: `Upsert`, `Upserts`, `UpsertQuery`, `UpsertsQuery`.
 - Preview/introspection: `GetQuery`, `InsertQuery`, `UpdateQuery`,
   `DeleteQuery`, `Explain`, and related helpers.
 - Transactions: `Begin`, `WithTransaction`.

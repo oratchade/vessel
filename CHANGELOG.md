@@ -5,6 +5,32 @@ All notable changes to Vessel are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+## [0.1.3] - 2026-06-18
+
+### Added
+
+- Added manager-level `Upsert` and `UpsertAsync` APIs, including write-worker
+  dispatch and coverage for direct execution and insert-batching interaction.
+- Added bulk upsert support through `Upserts`, `UpsertsQuery`, fluent
+  `InsertBuilder.Upserts`, and manager `Upserts`/`UpsertsAsync`.
+
+### Changed
+
+- Simplified repeated manager write enqueue and synchronous mutation response
+  handling while preserving existing public method signatures and behavior.
+- Documented manager upsert usage and clarified that `PingAsync` returns an
+  immediate error rather than a response channel.
+
+### Fixed
+
+- Removed a stale manager test double with outdated `db.DB` method signatures.
+- Corrected manager `Update` and `Delete` examples to match the current
+  argument order.
+- Preserved pgxpool defaults for omitted PostgreSQL pool settings and made the
+  PostgreSQL integration readiness check deterministic.
+
 ## [0.1.2] - 2026-06-13
 
 ### Fixed

@@ -131,10 +131,18 @@ func newPostgres(cfg PostgresConfig, logger Logger) (*Postgres, error) {
 		return nil, fmt.Errorf("failed to parse config: %w", err)
 	}
 
-	poolConfig.MaxConns = cfg.PoolMaxConns
-	poolConfig.MinConns = cfg.PoolMinConns
-	poolConfig.MaxConnIdleTime = cfg.PoolMaxConnIdle
-	poolConfig.MaxConnLifetime = cfg.PoolMaxConnLife
+	if cfg.PoolMaxConns > 0 {
+		poolConfig.MaxConns = cfg.PoolMaxConns
+	}
+	if cfg.PoolMinConns > 0 {
+		poolConfig.MinConns = cfg.PoolMinConns
+	}
+	if cfg.PoolMaxConnIdle > 0 {
+		poolConfig.MaxConnIdleTime = cfg.PoolMaxConnIdle
+	}
+	if cfg.PoolMaxConnLife > 0 {
+		poolConfig.MaxConnLifetime = cfg.PoolMaxConnLife
+	}
 
 	pool, err := pgxpool.NewWithConfig(ctx, poolConfig)
 	if err != nil {
@@ -674,6 +682,20 @@ func (pg *Postgres) UpsertQuery(
 	return query, args, nil
 }
 
+// UpsertsQuery builds the bulk UPSERT query without executing it.
+func (pg *Postgres) UpsertsQuery(
+	table string,
+	data []map[string]any,
+	upsertOpts *options.UpsertOptions,
+	opts *options.QueryOptions,
+) (string, []any, error) {
+	query, args, err := pg.queryBuilder.Upserts(table, data, upsertOpts, opts)
+	if err != nil {
+		return "", nil, fmt.Errorf("postgres.Upserts: failed to build upserts query: %w", err)
+	}
+	return query, args, nil
+}
+
 // Upsert inserts one row or updates an existing row when a uniqueness conflict occurs.
 func (pg *Postgres) Upsert(
 	ctx context.Context,
@@ -682,8 +704,34 @@ func (pg *Postgres) Upsert(
 	upsertOpts *options.UpsertOptions,
 	opts *options.QueryOptions,
 ) (*ExecResult, error) {
+	return pg.executeUpsert(ctx, "Upsert", "upsert", table, opts, func() (string, []any, error) {
+		return pg.queryBuilder.Upsert(table, data, upsertOpts, opts)
+	})
+}
+
+// Upserts inserts multiple rows or updates existing rows when uniqueness conflicts occur.
+func (pg *Postgres) Upserts(
+	ctx context.Context,
+	table string,
+	data []map[string]any,
+	upsertOpts *options.UpsertOptions,
+	opts *options.QueryOptions,
+) (*ExecResult, error) {
+	return pg.executeUpsert(ctx, "Upserts", "upserts", table, opts, func() (string, []any, error) {
+		return pg.queryBuilder.Upserts(table, data, upsertOpts, opts)
+	})
+}
+
+func (pg *Postgres) executeUpsert(
+	ctx context.Context,
+	operation string,
+	successStatus string,
+	table string,
+	opts *options.QueryOptions,
+	buildQuery func() (string, []any, error),
+) (*ExecResult, error) {
 	startTime := time.Now()
-	c, span := otel.UseTracer(ctx, "postgres.Upsert",
+	c, span := otel.UseTracer(ctx, "postgres."+operation,
 		trace.WithSpanKind(trace.SpanKindClient),
 		trace.WithAttributes(
 			semconv.DBSystemNamePostgreSQL,
@@ -691,15 +739,15 @@ func (pg *Postgres) Upsert(
 			semconv.DBCollectionName(table),
 		))
 	defer span.End()
-	if err := rejectExecutingReturning("Upsert", opts); err != nil {
+	if err := rejectExecutingReturning(operation, opts); err != nil {
 		span.RecordError(err)
 		span.SetStatus(codes.Error, err.Error())
 		pg.safeLogger.QueryError(c, "postgres", "upsert", table, 0, err)
 		return nil, err
 	}
-	query, args, err := pg.queryBuilder.Upsert(table, data, upsertOpts, opts)
+	query, args, err := buildQuery()
 	if err != nil {
-		err := fmt.Errorf("postgres.Upsert: failed to build upsert query: %w", err)
+		err := fmt.Errorf("postgres.%s: failed to build upsert query: %w", operation, err)
 		span.RecordError(err)
 		span.SetStatus(codes.Error, err.Error())
 		pg.safeLogger.QueryError(c, "postgres", "upsert", table, 0, err)
@@ -708,13 +756,13 @@ func (pg *Postgres) Upsert(
 	result, err := pg.querier.Exec(c, query, args...)
 	duration := time.Since(startTime)
 	if err != nil {
-		err := fmt.Errorf("postgres.Upsert: failed to execute upsert query: %w", pg.errorMapper.MapError(err))
+		err := fmt.Errorf("postgres.%s: failed to execute upsert query: %w", operation, pg.errorMapper.MapError(err))
 		span.RecordError(err)
 		span.SetStatus(codes.Error, err.Error())
 		pg.safeLogger.QueryError(c, "postgres", "upsert", table, duration, err)
 		return nil, err
 	}
-	span.SetStatus(codes.Ok, "upsert successful")
+	span.SetStatus(codes.Ok, successStatus+" successful")
 	execResult := fromCommandTag(result)
 	rowsReturned := 0
 	if execResult != nil {

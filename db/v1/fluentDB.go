@@ -870,9 +870,6 @@ func (i *InsertBuilder) UpsertQuery() (string, []any, error) {
 	if i.table == "" {
 		return "", nil, fmt.Errorf("InsertBuilder.UpsertQuery: table not specified")
 	}
-	if len(i.bulk) > 0 {
-		return "", nil, fmt.Errorf("InsertBuilder.UpsertQuery: bulk upserts are not supported")
-	}
 	if len(i.data) == 0 {
 		return "", nil, fmt.Errorf("InsertBuilder.UpsertQuery: no data provided")
 	}
@@ -889,10 +886,34 @@ func (i *InsertBuilder) UpsertQuery() (string, []any, error) {
 	return query, args, nil
 }
 
+// UpsertsQuery returns the generated bulk UPSERT SQL and arguments without executing it.
+func (i *InsertBuilder) UpsertsQuery() (string, []any, error) {
+	if i.table == "" {
+		return "", nil, fmt.Errorf("InsertBuilder.UpsertsQuery: table not specified")
+	}
+	if len(i.bulk) == 0 {
+		return "", nil, fmt.Errorf("InsertBuilder.UpsertsQuery: no bulk data provided")
+	}
+	if i.upsertOpts == nil {
+		return "", nil, fmt.Errorf("InsertBuilder.UpsertsQuery: upsert options not specified")
+	}
+	if err := validateQueryOptions(i.opts); err != nil {
+		return "", nil, fmt.Errorf("InsertBuilder.UpsertsQuery: invalid query options: %w", err)
+	}
+	query, args, err := i.db.UpsertsQuery(i.table, i.bulk, i.upsertOpts, i.opts)
+	if err != nil {
+		return "", nil, fmt.Errorf("InsertBuilder.UpsertsQuery: failed to build query: %w", err)
+	}
+	return query, args, nil
+}
+
 // Query returns the generated INSERT SQL and arguments without executing it.
 // It uses bulk insert SQL when ValuesBulk was called, otherwise single insert SQL.
 func (i *InsertBuilder) Query() (string, []any, error) {
 	if i.upsertOpts != nil {
+		if len(i.bulk) > 0 {
+			return i.UpsertsQuery()
+		}
 		return i.UpsertQuery()
 	}
 	if len(i.bulk) > 0 {
@@ -923,6 +944,13 @@ func (i *InsertBuilder) Exec(ctx context.Context) (*ExecResult, error) {
 	}
 
 	if i.upsertOpts != nil {
+		if len(i.bulk) > 0 {
+			result, err := i.Upserts(ctx)
+			if err != nil {
+				return nil, fmt.Errorf("InsertBuilder.Exec: failed to upsert bulk data: %w", err)
+			}
+			return result, nil
+		}
 		result, err := i.Upsert(ctx)
 		if err != nil {
 			return nil, fmt.Errorf("InsertBuilder.Exec: failed to upsert data: %w", err)
@@ -967,6 +995,24 @@ func (i *InsertBuilder) Upsert(ctx context.Context) (*ExecResult, error) {
 	result, err := i.db.Upsert(ctx, i.table, i.data, i.upsertOpts, i.opts)
 	if err != nil {
 		return nil, fmt.Errorf("InsertBuilder.Upsert: failed to execute upsert: %w", err)
+	}
+	return result, nil
+}
+
+// Upserts executes the configured bulk upsert.
+func (i *InsertBuilder) Upserts(ctx context.Context) (*ExecResult, error) {
+	if i.table == "" {
+		return nil, fmt.Errorf("InsertBuilder.Upserts: table not specified")
+	}
+	if len(i.bulk) == 0 {
+		return nil, fmt.Errorf("InsertBuilder.Upserts: no bulk data provided")
+	}
+	if i.upsertOpts == nil {
+		return nil, fmt.Errorf("InsertBuilder.Upserts: upsert options not specified")
+	}
+	result, err := i.db.Upserts(ctx, i.table, i.bulk, i.upsertOpts, i.opts)
+	if err != nil {
+		return nil, fmt.Errorf("InsertBuilder.Upserts: failed to execute upserts: %w", err)
 	}
 	return result, nil
 }

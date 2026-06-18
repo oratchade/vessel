@@ -41,15 +41,17 @@ func setupIntegration(t *testing.T) *IntegrationTest {
 	ctx := context.Background()
 
 	cfg := &v1.PostgresConfig{
-		User:           "test_user",
-		Password:       "test_password",
-		Host:           "localhost",
-		Port:           5432,
-		Database:       "test_db",
-		SSLMode:        "disable",
-		ConnectTimeout: 10 * time.Second,
-		PoolMaxConns:   10,
-		PoolMinConns:   2,
+		User:            "test_user",
+		Password:        "test_password",
+		Host:            "localhost",
+		Port:            5432,
+		Database:        "test_db",
+		SSLMode:         "disable",
+		ConnectTimeout:  10 * time.Second,
+		PoolMaxConns:    10,
+		PoolMinConns:    2,
+		PoolMaxConnIdle: 30 * time.Minute,
+		PoolMaxConnLife: 1 * time.Hour,
 	}
 
 	db, err := v1.NewDB(cfg, nil)

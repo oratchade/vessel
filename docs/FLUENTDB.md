@@ -244,7 +244,8 @@ result, err := fdb.
 ## UPSERT
 
 Upsert is configured on `InsertBuilder` with `OnConflict` and either
-`DoUpdate`, `DoUpdateSet`, or `DoNothing`.
+`DoUpdate`, `DoUpdateSet`, or `DoNothing`. Use `ValuesBulk` with the same
+conflict methods for bulk upsert.
 
 ```go
 result, err := fdb.
@@ -257,20 +258,32 @@ result, err := fdb.
     Upsert(ctx)
 ```
 
+```go
+result, err := fdb.
+    Insert().
+    Into("users").
+    ValuesBulk([]map[string]any{
+        {"id": id1, "email": "a@example.com"},
+        {"id": id2, "email": "b@example.com"},
+    }).
+    OnConflict("id").
+    DoUpdate("email").
+    Upserts(ctx)
+```
+
 Dialect behavior:
 
 - PostgreSQL and SQLite render `ON CONFLICT`.
 - MySQL renders `ON DUPLICATE KEY UPDATE`.
 - MSSQL returns an explicit unsupported error.
 
-Bulk upsert is not supported.
-
 ## RETURNING / OUTPUT Preview
 
 `Returning` is for query preview only. `InsertQuery`, `UpdateQuery`,
-`DeleteQuery`, and `UpsertQuery` can include PostgreSQL `RETURNING` or MSSQL
-`OUTPUT` where supported by the builder. Mutation execution methods reject
-`Returning` because they return `ExecResult`, not rows.
+`DeleteQuery`, `UpsertQuery`, and `UpsertsQuery` can include PostgreSQL
+`RETURNING` or MSSQL `OUTPUT` where supported by the builder. Mutation
+execution methods reject `Returning` because they return `ExecResult`, not
+rows.
 
 ```go
 sql, args, err := fdb.

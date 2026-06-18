@@ -227,3 +227,19 @@ func (mr *MockQueryBuilderMockRecorder) Upsert(table, data, upsertOpts, opts int
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Upsert", reflect.TypeOf((*MockQueryBuilder)(nil).Upsert), table, data, upsertOpts, opts)
 }
+
+// Upserts mocks base method.
+func (m *MockQueryBuilder) Upserts(table string, data []map[string]any, upsertOpts *options.UpsertOptions, opts *options.QueryOptions) (string, []any, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "Upserts", table, data, upsertOpts, opts)
+	ret0, _ := ret[0].(string)
+	ret1, _ := ret[1].([]any)
+	ret2, _ := ret[2].(error)
+	return ret0, ret1, ret2
+}
+
+// Upserts indicates an expected call of Upserts.
+func (mr *MockQueryBuilderMockRecorder) Upserts(table, data, upsertOpts, opts interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Upserts", reflect.TypeOf((*MockQueryBuilder)(nil).Upserts), table, data, upsertOpts, opts)
+}
