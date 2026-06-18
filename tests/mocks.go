@@ -6,7 +6,6 @@ import (
 	"tounilab.com/vessel/pkg/query/options"
 )
 
-// Mock SQLDialect for testing
 type MockDialect struct{}
 
 func (m MockDialect) Placeholder(_ int) string {

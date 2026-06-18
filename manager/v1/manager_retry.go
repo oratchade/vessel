@@ -118,6 +118,8 @@ func (dm *DBManager) ExecWithRetry(
 	return result, fmt.Errorf("exec with retry failed: %w", err)
 }
 
+type MultiEntryQueryFunc func(context.Context, int) ([]map[string]any, error)
+
 // MultiEntryQuery executes a query across multiple entries with retry logic
 //
 // This advanced pattern is useful when you want to:
@@ -141,9 +143,6 @@ func (dm *DBManager) ExecWithRetry(
 //	    // Each attempt is a new entry selection
 //	    return dm.Query(ctx, "SELECT * FROM events")
 //	})
-type MultiEntryQueryFunc func(context.Context, int) ([]map[string]any, error)
-
-// MultiEntryQuery executes a query function with entry-based retry semantics
 func (dm *DBManager) MultiEntryQuery(
 	ctx context.Context,
 	cfg *QueryWithRetryConfig,
@@ -253,9 +252,6 @@ func (dm *DBManager) HealthCheckWithRetry(
 	return nil
 }
 
-// BatchQueryWithRetry executes multiple queries with shared retry strategy
-//
-// Useful when you have several dependent queries and want coordinated retry.
 type BatchQueryJob struct {
 	Name  string
 	Query func(ctx context.Context) ([]map[string]any, error)
