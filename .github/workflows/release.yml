@@ -167,9 +167,9 @@ jobs:
 
       - name: Create and push release branch
         run: |
+          set -euo pipefail
           git config user.name "touni-release-bot"
           git config user.email "294938989+touni-bot@users.noreply.github.com"
-          set -euo pipefail
           TAG="${{ needs.validate-release.outputs.tag }}"
           BRANCH="release/${TAG}"
           if git ls-remote --exit-code --heads origin "$BRANCH" >/dev/null 2>&1; then
