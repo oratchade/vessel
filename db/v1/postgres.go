@@ -131,10 +131,18 @@ func newPostgres(cfg PostgresConfig, logger Logger) (*Postgres, error) {
 		return nil, fmt.Errorf("failed to parse config: %w", err)
 	}
 
-	poolConfig.MaxConns = cfg.PoolMaxConns
-	poolConfig.MinConns = cfg.PoolMinConns
-	poolConfig.MaxConnIdleTime = cfg.PoolMaxConnIdle
-	poolConfig.MaxConnLifetime = cfg.PoolMaxConnLife
+	if cfg.PoolMaxConns > 0 {
+		poolConfig.MaxConns = cfg.PoolMaxConns
+	}
+	if cfg.PoolMinConns > 0 {
+		poolConfig.MinConns = cfg.PoolMinConns
+	}
+	if cfg.PoolMaxConnIdle > 0 {
+		poolConfig.MaxConnIdleTime = cfg.PoolMaxConnIdle
+	}
+	if cfg.PoolMaxConnLife > 0 {
+		poolConfig.MaxConnLifetime = cfg.PoolMaxConnLife
+	}
 
 	pool, err := pgxpool.NewWithConfig(ctx, poolConfig)
 	if err != nil {
