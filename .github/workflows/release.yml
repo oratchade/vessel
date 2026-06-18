@@ -161,11 +161,14 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
+          token: ${{ secrets.RELEASE_BOT_TOKEN }}
           fetch-depth: 0
           ref: ${{ needs.validate-release.outputs.tag }}
 
       - name: Create and push release branch
         run: |
+          git config user.name "touni-release-bot"
+          git config user.email "294938989+touni-bot@users.noreply.github.com"
           set -euo pipefail
           TAG="${{ needs.validate-release.outputs.tag }}"
           BRANCH="release/${TAG}"
