@@ -58,6 +58,67 @@ func TestFluentDBDialectMatrix(t *testing.T) {
 				Exec(ctx)
 			require.NoError(t, err)
 
+			singleUpsert, err := fluent.Insert().
+				Into(fluentMatrixUsersTable).
+				Set("name", "Alice Updated").
+				Set("email", "alice.matrix@example.com").
+				Set("age", 32).
+				Set("status", "inactive").
+				OnConflict("email").
+				DoUpdate("name", "age", "status").
+				Upsert(ctx)
+			if testDB.driver == "sqlserver" {
+				require.Error(t, err)
+				assert.Contains(t, err.Error(), "MSSQL upsert is not supported")
+			} else {
+				require.NoError(t, err)
+				require.NotNil(t, singleUpsert)
+				assert.Positive(t, singleUpsert.RowsAffected)
+				aliceRows, err := fluent.Select(fluentMatrixUsersTable, "name", "status").
+					Where(cdt.NewExpr().Column("email").Op("=").Value("alice.matrix@example.com")).
+					Get(ctx)
+				require.NoError(t, err)
+				require.Len(t, aliceRows, 1)
+				assert.Equal(t, "Alice Updated", aliceRows[0]["name"])
+				assert.Equal(t, "inactive", aliceRows[0]["status"])
+			}
+
+			bulkUpsert, err := fluent.Insert().
+				Into(fluentMatrixUsersTable).
+				ValuesBulk([]map[string]any{
+					{
+						"name":   "Bob Updated",
+						"email":  "bob.matrix@example.com",
+						"age":    43,
+						"status": "active",
+					},
+					{
+						"name":   "Bulk Matrix",
+						"email":  "bulk.matrix@example.com",
+						"age":    35,
+						"status": "active",
+					},
+				}).
+				OnConflict("email").
+				DoUpdate("name", "age", "status").
+				Upserts(ctx)
+			if testDB.driver == "sqlserver" {
+				require.Error(t, err)
+				assert.Contains(t, err.Error(), "MSSQL upsert is not supported")
+			} else {
+				require.NoError(t, err)
+				require.NotNil(t, bulkUpsert)
+				assert.Positive(t, bulkUpsert.RowsAffected)
+				upsertedRows, err := fluent.Select(fluentMatrixUsersTable, "name", "email").
+					Where(cdt.In("email", "bob.matrix@example.com", "bulk.matrix@example.com")).
+					OrderByAsc("email").
+					Get(ctx)
+				require.NoError(t, err)
+				require.Len(t, upsertedRows, 2)
+				assert.Equal(t, "Bob Updated", upsertedRows[0]["name"])
+				assert.Equal(t, "Bulk Matrix", upsertedRows[1]["name"])
+			}
+
 			countRows, err := fluent.Select(fluentMatrixUsersTable).
 				Where(cdt.In("status", "active", "inactive")).
 				CountRaw(ctx)
@@ -66,7 +127,11 @@ func TestFluentDBDialectMatrix(t *testing.T) {
 			var count int64
 			require.NoError(t, countRows.Scan(&count))
 			require.NoError(t, countRows.Close())
-			assert.Equal(t, int64(2), count)
+			expectedCount := int64(3)
+			if testDB.driver == "sqlserver" {
+				expectedCount = 2
+			}
+			assert.Equal(t, expectedCount, count)
 
 			fetched, err := fluent.Insert().
 				Into(fluentMatrixUsersTable).

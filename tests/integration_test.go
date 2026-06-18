@@ -23,6 +23,7 @@ import (
 	v1 "tounilab.com/vessel/db/v1"
 	"tounilab.com/vessel/db/v1/dberror"
 	"tounilab.com/vessel/pkg/query/condition"
+	"tounilab.com/vessel/pkg/query/options"
 )
 
 // getEnv retrieves environment variable with fallback default
@@ -562,6 +563,143 @@ func TestIntegration_BulkInsert(t *testing.T) {
 
 			if result.RowsAffected != 2 {
 				t.Errorf("Expected 2 rows affected, got %d", result.RowsAffected)
+			}
+		})
+	}
+}
+
+// TestIntegration_Upsert tests single-row UPSERT operations.
+//
+//nolint:errcheck
+func TestIntegration_Upsert(t *testing.T) {
+	if testing.Short() {
+		t.Skip("Skipping integration tests in short mode")
+	}
+
+	for _, testDB := range getFilteredDatabases() {
+		t.Run(testDB.name, func(t *testing.T) {
+			database := connectIntegrationDB(t, testDB)
+			defer database.Close()
+
+			testDB.setupFn(t, database)
+
+			ctx := context.Background()
+			upsertOpts := &options.UpsertOptions{
+				ConflictColumns: []string{"email"},
+				Action:          options.UpsertDoUpdate,
+				UpdateColumns:   []string{"name", "age", "status"},
+			}
+			data := map[string]any{
+				"name":   "Alice Updated",
+				"email":  "alice@example.com",
+				"age":    39,
+				"status": inactiveStatus,
+			}
+
+			result, err := database.Upsert(ctx, "users", data, upsertOpts, nil)
+			if testDB.driver == "sqlserver" {
+				if err == nil || !strings.Contains(err.Error(), "MSSQL upsert is not supported") {
+					t.Fatalf("expected MSSQL unsupported upsert error, got result=%v err=%v", result, err)
+				}
+				return
+			}
+			if err != nil {
+				t.Fatalf("Upsert failed: %v", err)
+			}
+			if result == nil || result.RowsAffected <= 0 {
+				t.Fatalf("expected rows affected from Upsert, got %#v", result)
+			}
+
+			rows, err := database.Get(
+				ctx,
+				"users",
+				[]string{"name", "age", "status"},
+				nil,
+				condition.NewExpr().Column("email").Op("=").Value("alice@example.com"),
+				nil,
+			)
+			if err != nil {
+				t.Fatalf("Get after Upsert failed: %v", err)
+			}
+			if len(rows) != 1 {
+				t.Fatalf("expected 1 upserted user, got %d", len(rows))
+			}
+			if rows[0]["name"] != "Alice Updated" || rows[0]["status"] != inactiveStatus {
+				t.Fatalf("upsert did not update row: %#v", rows[0])
+			}
+		})
+	}
+}
+
+// TestIntegration_BulkUpsert tests multi-row UPSERT operations.
+//
+//nolint:errcheck
+func TestIntegration_BulkUpsert(t *testing.T) {
+	if testing.Short() {
+		t.Skip("Skipping integration tests in short mode")
+	}
+
+	for _, testDB := range getFilteredDatabases() {
+		t.Run(testDB.name, func(t *testing.T) {
+			database := connectIntegrationDB(t, testDB)
+			defer database.Close()
+
+			testDB.setupFn(t, database)
+
+			ctx := context.Background()
+			upsertOpts := &options.UpsertOptions{
+				ConflictColumns: []string{"email"},
+				Action:          options.UpsertDoUpdate,
+				UpdateColumns:   []string{"name", "age", "status"},
+			}
+			data := []map[string]any{
+				{
+					"name":   "Bob Updated",
+					"email":  "bob@example.com",
+					"age":    41,
+					"status": inactiveStatus,
+				},
+				{
+					"name":   "Bulk Upsert New",
+					"email":  "bulk-upsert@example.com",
+					"age":    26,
+					"status": activeStatus,
+				},
+			}
+
+			result, err := database.Upserts(ctx, "users", data, upsertOpts, nil)
+			if testDB.driver == "sqlserver" {
+				if err == nil || !strings.Contains(err.Error(), "MSSQL upsert is not supported") {
+					t.Fatalf("expected MSSQL unsupported upserts error, got result=%v err=%v", result, err)
+				}
+				return
+			}
+			if err != nil {
+				t.Fatalf("Upserts failed: %v", err)
+			}
+			if result == nil || result.RowsAffected <= 0 {
+				t.Fatalf("expected rows affected from Upserts, got %#v", result)
+			}
+
+			rows, err := database.Get(
+				ctx,
+				"users",
+				[]string{"name", "email", "status"},
+				nil,
+				condition.In("email", "bob@example.com", "bulk-upsert@example.com"),
+				&options.QueryOptions{OrderBy: []options.OrderBy{{Column: "email", Direction: "ASC"}}},
+			)
+			if err != nil {
+				t.Fatalf("Get after Upserts failed: %v", err)
+			}
+			if len(rows) != 2 {
+				t.Fatalf("expected 2 bulk-upserted users, got %d", len(rows))
+			}
+			if rows[0]["name"] != "Bob Updated" || rows[0]["status"] != inactiveStatus {
+				t.Fatalf("bulk upsert did not update existing row: %#v", rows[0])
+			}
+			if rows[1]["name"] != "Bulk Upsert New" || rows[1]["status"] != activeStatus {
+				t.Fatalf("bulk upsert did not insert new row: %#v", rows[1])
 			}
 		})
 	}
