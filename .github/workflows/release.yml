@@ -237,7 +237,7 @@ jobs:
           prerelease: ${{ needs.validate-release.outputs.prerelease }}
           fail_on_unmatched_files: true
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_TOKEN: ${{ secrets.RELEASE_BOT_TOKEN }}
 
   publish-module-metadata:
     name: Publish Module Metadata
