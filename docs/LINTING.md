@@ -121,6 +121,7 @@ MD013:
   heading_line_length: 100
 MD024:
   allow_different_nesting: true # Allow repeated headings in different nesting levels
+  siblings_only: true # Allow repeated changelog categories under different releases
 MD033: false # Allow inline HTML
 ```
 
