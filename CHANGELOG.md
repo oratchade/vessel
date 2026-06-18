@@ -7,6 +7,8 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+## [0.1.3] - 2026-06-18
+
 ### Added
 
 - Added manager-level `Upsert` and `UpsertAsync` APIs, including write-worker
@@ -26,6 +28,8 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 - Removed a stale manager test double with outdated `db.DB` method signatures.
 - Corrected manager `Update` and `Delete` examples to match the current
   argument order.
+- Preserved pgxpool defaults for omitted PostgreSQL pool settings and made the
+  PostgreSQL integration readiness check deterministic.
 
 ## [0.1.2] - 2026-06-13
 
