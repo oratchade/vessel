@@ -13,6 +13,11 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
   success: the success path wrapped a nil error with `%w`, so every
   successful call reported `query with retry failed: %!w(<nil>)`. Both
   helpers now return a nil error when the operation succeeds.
+- Fixed typed scanning (`ScanRowsTo`, `ScanAll`, `ScanOne`) silently
+  corrupting numeric columns scanned into `string` struct fields: the
+  reflect conversion fast path turned integers into their Unicode code
+  point (`int64(65)` became `"A"`). Numeric values are now formatted as
+  decimal text (`"65"`).
 
 ## [0.1.3] - 2026-06-18
 

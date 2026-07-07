@@ -695,7 +695,12 @@ func setFieldFromValue(f reflect.Value, cv any) error {
 			f.Set(rv)
 			return nil
 		}
-		if rv.Type().ConvertibleTo(f.Type()) {
+		// Skip the Convert shortcut for non-string → string: Go's conversion
+		// rules turn an integer into its Unicode code point (int64(65) → "A"),
+		// not decimal text. Fall through to setFieldByKind, which formats the
+		// value as a string instead.
+		if rv.Type().ConvertibleTo(f.Type()) &&
+			(f.Kind() != reflect.String || rv.Kind() == reflect.String) {
 			f.Set(rv.Convert(f.Type()))
 			return nil
 		}
