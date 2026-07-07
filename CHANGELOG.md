@@ -18,6 +18,12 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
   reflect conversion fast path turned integers into their Unicode code
   point (`int64(65)` became `"A"`). Numeric values are now formatted as
   decimal text (`"65"`).
+- Fixed embedded-struct column mapping so a field declared on the outer
+  struct shadows a same-named field promoted from an embedded struct,
+  matching `encoding/json` depth semantics. Previously the embedded field
+  silently won, scanning the column into the wrong field. Same-depth
+  collisions between embedded structs are now dropped as ambiguous
+  instead of resolving by declaration order.
 
 ## [0.1.3] - 2026-06-18
 
