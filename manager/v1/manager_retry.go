@@ -72,13 +72,16 @@ func (dm *DBManager) QueryWithRetry(
 		return fn(ctx)
 	})
 
-	if err != nil && cfg.Logger != nil {
-		cfg.Logger.Error("Query failed after retries",
-			"error", err.Error(),
-		)
+	if err != nil {
+		if cfg.Logger != nil {
+			cfg.Logger.Error("Query failed after retries",
+				"error", err.Error(),
+			)
+		}
+		return result, fmt.Errorf("query with retry failed: %w", err)
 	}
 
-	return result, fmt.Errorf("query with retry failed: %w", err)
+	return result, nil
 }
 
 // ExecWithRetry wraps an exec function with automatic retry logic across entries
@@ -109,13 +112,16 @@ func (dm *DBManager) ExecWithRetry(
 		return fn(ctx)
 	})
 
-	if err != nil && cfg.Logger != nil {
-		cfg.Logger.Error("Exec failed after retries",
-			"error", err.Error(),
-		)
+	if err != nil {
+		if cfg.Logger != nil {
+			cfg.Logger.Error("Exec failed after retries",
+				"error", err.Error(),
+			)
+		}
+		return result, fmt.Errorf("exec with retry failed: %w", err)
 	}
 
-	return result, fmt.Errorf("exec with retry failed: %w", err)
+	return result, nil
 }
 
 type MultiEntryQueryFunc func(context.Context, int) ([]map[string]any, error)

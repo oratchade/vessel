@@ -7,6 +7,13 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+### Fixed
+
+- Fixed `QueryWithRetry` and `ExecWithRetry` returning a non-nil error on
+  success: the success path wrapped a nil error with `%w`, so every
+  successful call reported `query with retry failed: %!w(<nil>)`. Both
+  helpers now return a nil error when the operation succeeds.
+
 ## [0.1.3] - 2026-06-18
 
 ### Added
