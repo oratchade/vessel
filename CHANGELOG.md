@@ -24,6 +24,11 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
   silently won, scanning the column into the wrong field. Same-depth
   collisions between embedded structs are now dropped as ambiguous
   instead of resolving by declaration order.
+- Fixed the database manager silencing all driver-level logging: each
+  `DBEntry` constructed its `db.DB` with a `nil` logger, so slow-query
+  warnings, query errors, and transaction lifecycle events were dropped
+  for databases accessed through the manager. The manager's logger is now
+  passed through to the driver.
 
 ## [0.1.3] - 2026-06-18
 

@@ -92,7 +92,7 @@ func newDBEntry(
 	)
 
 	//nolint:contextcheck
-	dbInstance, err := db.NewDB(cfg.Config(), nil)
+	dbInstance, err := db.NewDB(cfg.Config(), logger)
 	if err != nil {
 		logger.Error("Failed to create database instance",
 			"name", cfg.Name,
