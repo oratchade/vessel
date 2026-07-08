@@ -27,7 +27,7 @@ func TestQueryWithRetrySuccess(t *testing.T) {
 	dm := &v1.DBManager{}
 
 	rows, err := dm.QueryWithRetry(context.Background(), retryTestConfig(),
-		func(_ context.Context) ([]map[string]any, error) {
+		func(_ context.Context, _ int) ([]map[string]any, error) {
 			return []map[string]any{{"id": 1}}, nil
 		})
 
@@ -36,13 +36,14 @@ func TestQueryWithRetrySuccess(t *testing.T) {
 	assert.Equal(t, 1, rows[0]["id"])
 }
 
-// TestQueryWithRetryFailure ensures an exhausted retry returns the wrapped error.
+// TestQueryWithRetryFailure ensures an exhausted retry returns the wrapped error
+// even when no logger is configured.
 func TestQueryWithRetryFailure(t *testing.T) {
 	dm := &v1.DBManager{}
 	sentinel := errors.New("boom")
 
 	_, err := dm.QueryWithRetry(context.Background(), retryTestConfig(),
-		func(_ context.Context) ([]map[string]any, error) {
+		func(_ context.Context, _ int) ([]map[string]any, error) {
 			return nil, sentinel
 		})
 
@@ -57,7 +58,7 @@ func TestQueryWithRetryRecovers(t *testing.T) {
 	calls := 0
 
 	rows, err := dm.QueryWithRetry(context.Background(), retryTestConfig(),
-		func(_ context.Context) ([]map[string]any, error) {
+		func(_ context.Context, _ int) ([]map[string]any, error) {
 			calls++
 			if calls == 1 {
 				return nil, errors.New("transient")
@@ -68,6 +69,22 @@ func TestQueryWithRetryRecovers(t *testing.T) {
 	require.NoError(t, err)
 	require.Len(t, rows, 1)
 	assert.Equal(t, 2, calls)
+}
+
+// TestQueryWithRetryPassesAttemptNumbers ensures the callback receives the
+// 1-indexed attempt number on every invocation.
+func TestQueryWithRetryPassesAttemptNumbers(t *testing.T) {
+	dm := &v1.DBManager{}
+	var attempts []int
+
+	_, err := dm.QueryWithRetry(context.Background(), retryTestConfig(),
+		func(_ context.Context, attempt int) ([]map[string]any, error) {
+			attempts = append(attempts, attempt)
+			return nil, errors.New("always fails")
+		})
+
+	require.Error(t, err)
+	assert.Equal(t, []int{1, 2, 3}, attempts)
 }
 
 // TestExecWithRetrySuccess ensures a successful exec returns a nil error.

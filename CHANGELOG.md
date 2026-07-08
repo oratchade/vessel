@@ -12,6 +12,14 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 - Removed the unused `RetryMetricsCollector` and `QueryRetryMetrics` types
   from `manager/v1`. They were never wired into any retry path
   (`RecordAttempt` was never called) and had no callers, tests, or docs.
+- **Breaking:** removed `DBManager.MultiEntryQuery`,
+  `DBManager.QueryWithCustomRetry`, and the `MultiEntryQueryFunc` type.
+  Both were near-duplicates of `QueryWithRetry`, which now covers their
+  use cases: its callback receives the 1-indexed attempt number
+  (`RetryableQueryFunc`), and a custom strategy is passed via
+  `QueryWithRetryConfig{Strategy: ...}`. This also removes a bug where
+  `MultiEntryQuery` returned a nil error on failure when no logger was
+  configured.
 
 ### Changed
 
@@ -19,6 +27,11 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
   projection alias pattern in the query builder was compiled once per
   column per query, and the table-name pattern in `SanitizeTableName`
   once per logged query. Both are now compiled once at package init.
+- **Breaking:** `DBManager.QueryWithRetry` callbacks now receive the
+  1-indexed attempt number: the parameter type changed from
+  `func(context.Context) ([]map[string]any, error)` to
+  `RetryableQueryFunc`. Existing callbacks compile after adding an
+  ignored `_ int` parameter.
 - `NewFluentDB` now declares its parameter as the named `dbActions`
   interface instead of an equivalent anonymous interface literal, removing
   a type assertion that could never fail. Call sites are unaffected.

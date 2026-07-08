@@ -38,7 +38,7 @@ func exampleBasicRetry(ctx context.Context, dm *v1.DBManager) {
 	{
 		fmt.Println("  • Query with default exponential backoff (100ms → 5s, 3 attempts)")
 		cfg := v1.DefaultQueryRetryConfig()
-		_, _ = dm.QueryWithRetry(ctx, cfg, func(ctx context.Context) ([]map[string]any, error) {
+		_, _ = dm.QueryWithRetry(ctx, cfg, func(ctx context.Context, _ int) ([]map[string]any, error) {
 			return dm.Query(ctx, "SELECT * FROM users WHERE age > ?", 18)
 		})
 		fmt.Println("    Result: Query executed with automatic retry")
@@ -53,7 +53,7 @@ func exampleBasicRetry(ctx context.Context, dm *v1.DBManager) {
 			MaxEntryAttempts: 3,
 			Logger:           nil,
 		}
-		_, _ = dm.QueryWithRetry(ctx, cfg, func(ctx context.Context) ([]map[string]any, error) {
+		_, _ = dm.QueryWithRetry(ctx, cfg, func(ctx context.Context, _ int) ([]map[string]any, error) {
 			return dm.Query(ctx, "SELECT * FROM products WHERE stock > ?", 0)
 		})
 		fmt.Println("    Result: Predictable retry intervals")
@@ -100,7 +100,7 @@ func exampleContextTimeout(ctx context.Context, dm *v1.DBManager) {
 		defer cancel()
 
 		cfg := v1.DefaultQueryRetryConfig()
-		_, err := dm.QueryWithRetry(ctxWithTimeout, cfg, func(ctx context.Context) ([]map[string]any, error) {
+		_, err := dm.QueryWithRetry(ctxWithTimeout, cfg, func(ctx context.Context, _ int) ([]map[string]any, error) {
 			return dm.Query(ctx, "SELECT * FROM large_table")
 		})
 
@@ -175,7 +175,7 @@ func exampleRetryPatterns(ctx context.Context, dm *v1.DBManager) {
 			MaxEntryAttempts: 2,
 			Logger:           nil,
 		}
-		rows, _ := dm.QueryWithRetry(ctx, cfg, func(ctx context.Context) ([]map[string]any, error) {
+		rows, _ := dm.QueryWithRetry(ctx, cfg, func(ctx context.Context, _ int) ([]map[string]any, error) {
 			return dm.Query(ctx, "SELECT * FROM users")
 		})
 		fmt.Printf("  Result: Retrieved %d rows with automatic fallback\n\n", len(rows))

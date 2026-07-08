@@ -33,6 +33,10 @@ func DefaultQueryRetryConfig() *QueryWithRetryConfig {
 	}
 }
 
+// RetryableQueryFunc is the function signature for queries that can be retried.
+// The attempt parameter (1-indexed) indicates which attempt this is.
+type RetryableQueryFunc func(context.Context, int) ([]map[string]any, error)
+
 // QueryWithRetry wraps a query function with automatic retry logic across entries
 //
 // This function integrates the retry package with DBManager's entry selection.
@@ -41,10 +45,12 @@ func DefaultQueryRetryConfig() *QueryWithRetryConfig {
 // 2. Next call selects the next available entry (by health + priority + round-robin)
 // 3. Query is retried according to the strategy
 //
+// The callback receives the 1-indexed attempt number.
+//
 // Example:
 //
 //	cfg := DefaultQueryRetryConfig() // Uses exponential backoff
-//	rows, err := dm.QueryWithRetry(ctx, cfg, func(ctx context.Context) ([]map[string]any, error) {
+//	rows, err := dm.QueryWithRetry(ctx, cfg, func(ctx context.Context, attempt int) ([]map[string]any, error) {
 //	    return dm.Query(ctx, "SELECT * FROM users WHERE age > ?", 18)
 //	})
 //
@@ -56,25 +62,27 @@ func DefaultQueryRetryConfig() *QueryWithRetryConfig {
 func (dm *DBManager) QueryWithRetry(
 	ctx context.Context,
 	cfg *QueryWithRetryConfig,
-	fn func(context.Context) ([]map[string]any, error),
+	fn RetryableQueryFunc,
 ) ([]map[string]any, error) {
 	if cfg == nil {
 		cfg = DefaultQueryRetryConfig()
 	}
 
+	attemptCounter := 0
 	result, err := retry.DoWithResult(ctx, cfg.Strategy, func() ([]map[string]any, error) {
+		attemptCounter++
 		if cfg.Logger != nil {
 			cfg.Logger.Debug("Query retry attempt",
-				"attempt", 1, // Simplified for logging
+				"attempt", attemptCounter,
 			)
 		}
 
-		return fn(ctx)
+		return fn(ctx, attemptCounter)
 	})
-
 	if err != nil {
 		if cfg.Logger != nil {
 			cfg.Logger.Error("Query failed after retries",
+				"attempts", attemptCounter,
 				"error", err.Error(),
 			)
 		}
@@ -121,103 +129,6 @@ func (dm *DBManager) ExecWithRetry(
 		return result, fmt.Errorf("exec with retry failed: %w", err)
 	}
 
-	return result, nil
-}
-
-type MultiEntryQueryFunc func(context.Context, int) ([]map[string]any, error)
-
-// MultiEntryQuery executes a query across multiple entries with retry logic
-//
-// This advanced pattern is useful when you want to:
-// - Distribute read load across multiple replicas
-// - Fallback to different entries on failure
-// - Aggregate results from multiple sources
-//
-// Example: Query with explicit entry preference
-//
-//	cfg := &QueryWithRetryConfig{
-//	    Strategy: retry.NewLinearBackoff(
-//	        100*time.Millisecond,
-//	        1*time.Second,
-//	        100*time.Millisecond,
-//	        3,  // Try 3 entries
-//	        0.1,
-//	    ),
-//	}
-//
-//	rows, err := dm.MultiEntryQuery(ctx, cfg, func(ctx context.Context, attempt int) ([]map[string]any, error) {
-//	    // Each attempt is a new entry selection
-//	    return dm.Query(ctx, "SELECT * FROM events")
-//	})
-func (dm *DBManager) MultiEntryQuery(
-	ctx context.Context,
-	cfg *QueryWithRetryConfig,
-	fn MultiEntryQueryFunc,
-) ([]map[string]any, error) {
-	if cfg == nil {
-		cfg = DefaultQueryRetryConfig()
-	}
-
-	attemptCounter := 0
-	result, err := retry.DoWithResult(ctx, cfg.Strategy, func() ([]map[string]any, error) {
-		attemptCounter++
-		if cfg.Logger != nil {
-			cfg.Logger.Debug("Multi-entry query attempt",
-				"attempt_number", attemptCounter,
-			)
-		}
-
-		return fn(ctx, attemptCounter)
-	})
-
-	if err != nil && cfg.Logger != nil {
-		cfg.Logger.Error("Multi-entry query failed",
-			"attempts", attemptCounter,
-			"error", err.Error(),
-		)
-		return result, fmt.Errorf("multi-entry query failed: %w", err)
-	}
-
-	return result, nil
-}
-
-// RetryableQueryFunc is the function signature for queries that can be retried
-// The attempt parameter (1-indexed) indicates which attempt this is
-type RetryableQueryFunc func(context.Context, int) ([]map[string]any, error)
-
-// QueryWithCustomRetry provides fine-grained control over retry behavior
-//
-// This is useful when you need custom logic beyond simple entry failover.
-//
-// Example: Retry with custom backoff and logging
-//
-//	strategy := retry.NewExponentialBackoff(
-//	    100*time.Millisecond,  // Start with 100ms
-//	    10*time.Second,        // Cap at 10s
-//	    2.0,                   // Double each time
-//	    5,                     // Max 5 attempts
-//	    0.1,                   // 10% jitter
-//	)
-//
-//		rows, err := dm.QueryWithCustomRetry(
-//			ctx, strategy,
-//			func(ctx context.Context, attempt int) ([]map[string]any, error) {
-//	    fmt.Printf("Attempting query (attempt %d)\n", attempt)
-//	    return dm.Query(ctx, "SELECT * FROM users")
-//	})
-func (dm *DBManager) QueryWithCustomRetry(
-	ctx context.Context,
-	strategy retry.Strategy,
-	fn RetryableQueryFunc,
-) ([]map[string]any, error) {
-	attemptCounter := 0
-	result, err := retry.DoWithResult(ctx, strategy, func() ([]map[string]any, error) {
-		attemptCounter++
-		return fn(ctx, attemptCounter)
-	})
-	if err != nil {
-		return result, fmt.Errorf("custom retry failed: %w", err)
-	}
 	return result, nil
 }
 
