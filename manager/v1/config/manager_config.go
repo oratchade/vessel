@@ -1,6 +1,9 @@
 package config
 
-import "time"
+import (
+	"fmt"
+	"time"
+)
 
 const (
 	DefaultWriteQueueSize  = 1000
@@ -38,12 +41,20 @@ func (mc *ManagerConfig) GetByName(name string) *ConfigEntry {
 	return nil
 }
 
-// Validate ensures all configuration entries are valid.
+// Validate ensures all configuration entries are valid and uniquely named.
+// Entries are stored in maps keyed by name, so a duplicate name would
+// silently overwrite an earlier entry.
 func (mc *ManagerConfig) Validate() error {
+	seen := make(map[string]struct{}, len(mc.Entries))
 	for i := range mc.Entries {
 		if err := mc.Entries[i].Validate(); err != nil {
 			return err
 		}
+		name := mc.Entries[i].Name
+		if _, dup := seen[name]; dup {
+			return fmt.Errorf("ManagerConfig: duplicate entry name %q", name)
+		}
+		seen[name] = struct{}{}
 	}
 	return nil
 }

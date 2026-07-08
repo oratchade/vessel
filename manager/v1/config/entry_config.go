@@ -56,8 +56,20 @@ func (ce *ConfigEntry) Config() db.DBConfig {
 	}
 }
 
-// Validate ensures exactly one database configuration is set.
+// Validate ensures the entry is named, has a known type, and has exactly one
+// database configuration set. Type is checked here so a misspelled or missing
+// type fails at config load instead of the entry being silently dropped when
+// the manager routes entries by type.
 func (ce *ConfigEntry) Validate() error {
+	if ce.Name == "" {
+		return fmt.Errorf("ConfigEntry: name is required")
+	}
+	if ce.Type != ReadOnly && ce.Type != ReadWrite {
+		return fmt.Errorf(
+			"ConfigEntry %q: type must be %q or %q, got %q",
+			ce.Name, ReadOnly, ReadWrite, ce.Type,
+		)
+	}
 	count := 0
 	if ce.MySQL != nil {
 		count++

@@ -35,6 +35,11 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
   raw into the generated SQL. Previously only the fluent API validated
   directions; direct `DB`/manager calls with hand-built query options
   bypassed the check.
+- Manager configuration is now validated fail-fast: entries must have a
+  name, a `type` of `readonly` or `readwrite`, and names must be unique.
+  Previously an entry with a missing or misspelled type was silently
+  dropped at startup, and duplicate names silently overwrote earlier
+  entries. Configs that omitted `type` must now set it explicitly.
 
 ## [0.1.3] - 2026-06-18
 
