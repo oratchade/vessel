@@ -9,6 +9,10 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ### Removed
 
+- Removed the scratch working documents `CODE_QUALITY_IMPROVEMENTS.md` and
+  `INTEGRATION_TESTS_SETUP.md` from the repository root. Integration test
+  setup is covered by `CONTRIBUTING.md` and
+  `docs/ENVIRONMENT_VARIABLES.md`.
 - Removed the unused `RetryMetricsCollector` and `QueryRetryMetrics` types
   from `manager/v1`. They were never wired into any retry path
   (`RecordAttempt` was never called) and had no callers, tests, or docs.
