@@ -24,6 +24,13 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
   a type assertion that could never fail. Call sites are unaffected.
 - The MySQL DSN builder formats `parseTime` with `strconv.FormatBool`
   instead of `fmt.Sprintf("%t", ...)`. Identical output, idiomatic form.
+- Dialect detection in the SQL builder now uses type identity (type
+  switches on the concrete dialect types) instead of matching the printed
+  type name with `strings.Contains(fmt.Sprintf("%T", d), "MySQL")`. The
+  duplicated name-sniffing capability fallback in `CapabilitiesFor` was
+  deleted; all built-in dialects implement `CapabilityProvider`, and
+  custom dialects that don't now report no capabilities instead of
+  capabilities guessed from their type name.
 - Simplified `SafeLogger.Debug` from `Debug(msg ...string)` to
   `Debug(msg string)`. It no longer logs a fixed `"database debug"`
   message with the caller's text buried in a field; the caller's message

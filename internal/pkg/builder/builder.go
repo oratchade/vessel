@@ -944,19 +944,39 @@ func dialectTypeName(dialect cdt.SQLDialect) string {
 }
 
 func isMySQLDialect(dialect cdt.SQLDialect) bool {
-	return strings.Contains(dialectTypeName(dialect), "MySQL")
+	switch dialect.(type) {
+	case sqldialect.MySQLDialect, *sqldialect.MySQLDialect:
+		return true
+	default:
+		return false
+	}
 }
 
 func isPostgresDialect(dialect cdt.SQLDialect) bool {
-	return strings.Contains(dialectTypeName(dialect), "Postgres")
+	switch dialect.(type) {
+	case sqldialect.PostgresDialect, *sqldialect.PostgresDialect:
+		return true
+	default:
+		return false
+	}
 }
 
 func isSQLiteDialect(dialect cdt.SQLDialect) bool {
-	return strings.Contains(dialectTypeName(dialect), "SQLite")
+	switch dialect.(type) {
+	case sqldialect.SQLiteDialect, *sqldialect.SQLiteDialect:
+		return true
+	default:
+		return false
+	}
 }
 
 func isMSSQLDialect(dialect cdt.SQLDialect) bool {
-	return strings.Contains(dialectTypeName(dialect), "MSSQL")
+	switch dialect.(type) {
+	case sqldialect.MSSQLDialect, *sqldialect.MSSQLDialect:
+		return true
+	default:
+		return false
+	}
 }
 
 func joinTableRefs(dialect cdt.SQLDialect, joins []cdt.Join) []string {
