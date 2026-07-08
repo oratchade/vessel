@@ -326,68 +326,6 @@ func (dm *DBManager) BatchQueryWithRetry(
 	return results
 }
 
-// QueryRetryMetrics tracks retry statistics for monitoring
-type QueryRetryMetrics struct {
-	TotalAttempts           int64
-	SuccessfulQueries       int64
-	FailedQueries           int64
-	TotalRetries            int64
-	AverageAttemptsPerQuery float64
-}
-
-// RetryMetricsCollector collects metrics from query retries
-type RetryMetricsCollector struct {
-	enabled bool
-	metrics *QueryRetryMetrics
-	mu      sync.RWMutex
-}
-
-// NewRetryMetricsCollector creates a new metrics collector
-func NewRetryMetricsCollector() *RetryMetricsCollector {
-	return &RetryMetricsCollector{
-		enabled: true,
-		metrics: &QueryRetryMetrics{},
-	}
-}
-
-// RecordAttempt records a query attempt
-func (rmc *RetryMetricsCollector) RecordAttempt(success bool, attemptCount int) {
-	if !rmc.enabled {
-		return
-	}
-
-	rmc.mu.Lock()
-	defer rmc.mu.Unlock()
-
-	rmc.metrics.TotalAttempts++
-	if success {
-		rmc.metrics.SuccessfulQueries++
-	} else {
-		rmc.metrics.FailedQueries++
-	}
-	rmc.metrics.TotalRetries += int64(attemptCount - 1)
-}
-
-// GetMetrics returns current metrics
-func (rmc *RetryMetricsCollector) GetMetrics() *QueryRetryMetrics {
-	rmc.mu.RLock()
-	defer rmc.mu.RUnlock()
-
-	// Calculate averages
-	var avgAttempts float64
-	if rmc.metrics.TotalAttempts > 0 {
-		avgAttempts = float64(rmc.metrics.TotalAttempts+rmc.metrics.TotalRetries) / float64(rmc.metrics.TotalAttempts)
-	}
-
-	return &QueryRetryMetrics{
-		TotalAttempts:           rmc.metrics.TotalAttempts,
-		SuccessfulQueries:       rmc.metrics.SuccessfulQueries,
-		FailedQueries:           rmc.metrics.FailedQueries,
-		TotalRetries:            rmc.metrics.TotalRetries,
-		AverageAttemptsPerQuery: avgAttempts,
-	}
-}
-
 // Logger interface for retry logging (to avoid circular imports)
 // This mirrors the db.Logger interface for consistency
 type Logger interface {

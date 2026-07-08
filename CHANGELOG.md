@@ -7,6 +7,12 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+### Removed
+
+- Removed the unused `RetryMetricsCollector` and `QueryRetryMetrics` types
+  from `manager/v1`. They were never wired into any retry path
+  (`RecordAttempt` was never called) and had no callers, tests, or docs.
+
 ### Changed
 
 - Hoisted per-call regular-expression compilation out of hot paths: the
