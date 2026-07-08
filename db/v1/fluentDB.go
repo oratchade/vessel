@@ -610,19 +610,13 @@ func (s *SelectBuilder) Count(ctx context.Context) (int64, error) {
 		return 0, fmt.Errorf("SelectBuilder.Count: count query did not return a count value")
 	}
 
-	// Handle different database driver return types for COUNT (int64, int, etc.)
-	switch v := countVal.(type) {
-	case int64:
-		return v, nil
-	case int:
-		return int64(v), nil
-	case int32:
-		return int64(v), nil
-	case float64:
-		return int64(v), nil
-	default:
-		return 0, fmt.Errorf("SelectBuilder.Count: unexpected count type: %T", countVal)
+	// Drivers deliver COUNT(*) as int64, int, uint, float, or (text protocols)
+	// as string/[]byte. cvToInt64 coerces all of them.
+	count, err := cvToInt64(countVal)
+	if err != nil {
+		return 0, fmt.Errorf("SelectBuilder.Count: unexpected count value: %w", err)
 	}
+	return count, nil
 }
 
 // CountRaw executes a COUNT(*) query and returns a RowsAdapter.

@@ -54,6 +54,11 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
   no longer classifies as a validation error, MySQL's `SQL syntax`
   message is now recognized, and a duplicated `connection refused`
   needle was removed.
+- `SelectBuilder.Count` now accepts every `COUNT(*)` return type drivers
+  produce — including `string`/`[]byte` from text protocols and unsigned
+  integers — by reusing the shared numeric coercion helper. Previously
+  only `int64`/`int`/`int32`/`float64` were handled and other types
+  errored.
 
 ## [0.1.3] - 2026-06-18
 
