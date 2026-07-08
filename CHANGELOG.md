@@ -22,6 +22,8 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 - `NewFluentDB` now declares its parameter as the named `dbActions`
   interface instead of an equivalent anonymous interface literal, removing
   a type assertion that could never fail. Call sites are unaffected.
+- The MySQL DSN builder formats `parseTime` with `strconv.FormatBool`
+  instead of `fmt.Sprintf("%t", ...)`. Identical output, idiomatic form.
 - Simplified `SafeLogger.Debug` from `Debug(msg ...string)` to
   `Debug(msg string)`. It no longer logs a fixed `"database debug"`
   message with the caller's text buried in a field; the caller's message
