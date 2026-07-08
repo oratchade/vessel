@@ -119,7 +119,6 @@ func (dm *DBManager) ExecWithRetry(
 
 		return fn(ctx)
 	})
-
 	if err != nil {
 		if cfg.Logger != nil {
 			cfg.Logger.Error("Exec failed after retries",
