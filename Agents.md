@@ -72,7 +72,7 @@ make test                        # unit tests (adds -tags=test)
 go test -tags test -race ./...   # equivalent, explicit
 make coverage                    # unit tests + coverage report
 make lint                        # golangci-lint (40+ linters)
-make fmt-check                   # gofmt/goimports verification
+make fmt-check                   # gofumpt verification (stricter than gofmt)
 
 # Integration tests (build tag: integration; SQLite needs no containers)
 make integration-test-sqlite
