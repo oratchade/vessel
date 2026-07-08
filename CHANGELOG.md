@@ -13,6 +13,9 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
   `INTEGRATION_TESTS_SETUP.md` from the repository root. Integration test
   setup is covered by `CONTRIBUTING.md` and
   `docs/ENVIRONMENT_VARIABLES.md`.
+- Removed the stale developer document `RELEASES.md` (a parallel release
+  record that stopped at 0.1.1; release contents live in `CHANGELOG.md`,
+  the process in `CONTRIBUTING.md` and the release workflow).
 - Removed the unused `RetryMetricsCollector` and `QueryRetryMetrics` types
   from `manager/v1`. They were never wired into any retry path
   (`RecordAttempt` was never called) and had no callers, tests, or docs.
