@@ -57,9 +57,9 @@ func ensureQueryOptions(opts **options.QueryOptions) {
 	}
 }
 
-// dbActions defines the interface required by FluentDB to execute all types of database operations.
+// DBActions defines the interface required by FluentDB to execute all types of database operations.
 // It combines read, write, and query building capabilities.
-type dbActions interface {
+type DBActions interface {
 	reader
 	writer
 	upserter
@@ -70,7 +70,7 @@ type dbActions interface {
 // It acts as an entry point for building SELECT, INSERT, UPDATE, and DELETE operations
 // with a chainable, ergonomic API while reusing the database operation interfaces.
 type FluentDB struct {
-	db dbActions
+	db DBActions
 }
 
 // NewFluentDB creates a new FluentDB instance that wraps the provided DB interface.
@@ -89,14 +89,8 @@ type FluentDB struct {
 //	    Select("users", "id", "name", "email").
 //	    Where(cdt.NewExpr().Column("age").Op(">").Value(18)).
 //	    Get()
-func NewFluentDB(db interface {
-	reader
-	writer
-	upserter
-	introspector
-},
-) *FluentDB {
-	return &FluentDB{db: db.(dbActions)}
+func NewFluentDB(db DBActions) *FluentDB {
+	return &FluentDB{db: db}
 }
 
 // Select begins a SELECT query by specifying the table and columns.
@@ -135,7 +129,7 @@ func (f *FluentDB) Select(table string, columns ...string) *SelectBuilder {
 //
 // Example:
 //
-//	NewFluentDB(db, ctx).
+//	NewFluentDB(db).
 //	    Insert().
 //	    Into("users").
 //	    Values(map[string]any{"name": "John", "age": 30}).
@@ -158,7 +152,7 @@ func (f *FluentDB) Insert() *InsertBuilder {
 //
 // Example:
 //
-//	NewFluentDB(db, ctx).
+//	NewFluentDB(db).
 //	    Update("users").
 //	    Set("age", 31).
 //	    Where(cdt.NewExpr().Column("id").Op("=").Value(1)).
@@ -179,7 +173,7 @@ func (f *FluentDB) Update(table string) *UpdateBuilder {
 //
 // Example:
 //
-//	NewFluentDB(db, ctx).
+//	NewFluentDB(db).
 //	    Delete().
 //	    From("users").
 //	    Where(cdt.NewExpr().Column("id").Op("=").Value(1)).
@@ -194,7 +188,7 @@ func (f *FluentDB) Delete() *DeleteBuilder {
 // It allows chainable method calls to construct complex queries with
 // joins, conditions, ordering, and pagination.
 type SelectBuilder struct {
-	db         dbActions
+	db         DBActions
 	table      string
 	columns    []string
 	joins      []cdt.Join
@@ -472,7 +466,7 @@ func (s *SelectBuilder) Having(cond cdt.Condition) *SelectBuilder {
 //
 // Example:
 //
-//	rows, err := NewFluentDB(db, ctx).
+//	rows, err := NewFluentDB(db).
 //	    Select("users", "id", "name").
 //	    Where(cdt.NewExpr().Column("age").Op(">").Value(18)).
 //	    Get()
@@ -541,7 +535,7 @@ func (s *SelectBuilder) Query() (string, []any, error) {
 //
 // Example:
 //
-//	user, err := NewFluentDB(db, ctx).
+//	user, err := NewFluentDB(db).
 //	    Select("users", "id", "name", "email").
 //	    Where(cdt.NewExpr().Column("id").Op("=").Value(42)).
 //	    One(ctx)
@@ -586,7 +580,7 @@ func (s *SelectBuilder) One(ctx context.Context) (map[string]any, error) {
 //
 // Example:
 //
-//	count, err := NewFluentDB(db, ctx).
+//	count, err := NewFluentDB(db).
 //	    Select("users").
 //	    Where(cdt.NewExpr().Column("active").Op("=").Value(true)).
 //	    Count(ctx)
@@ -610,19 +604,13 @@ func (s *SelectBuilder) Count(ctx context.Context) (int64, error) {
 		return 0, fmt.Errorf("SelectBuilder.Count: count query did not return a count value")
 	}
 
-	// Handle different database driver return types for COUNT (int64, int, etc.)
-	switch v := countVal.(type) {
-	case int64:
-		return v, nil
-	case int:
-		return int64(v), nil
-	case int32:
-		return int64(v), nil
-	case float64:
-		return int64(v), nil
-	default:
-		return 0, fmt.Errorf("SelectBuilder.Count: unexpected count type: %T", countVal)
+	// Drivers deliver COUNT(*) as int64, int, uint, float, or (text protocols)
+	// as string/[]byte. cvToInt64 coerces all of them.
+	count, err := cvToInt64(countVal)
+	if err != nil {
+		return 0, fmt.Errorf("SelectBuilder.Count: unexpected count value: %w", err)
 	}
+	return count, nil
 }
 
 // CountRaw executes a COUNT(*) query and returns a RowsAdapter.
@@ -661,7 +649,7 @@ func countProjection(alias ...string) string {
 // It allows specification of the table and values to insert, either as
 // single or bulk operations.
 type InsertBuilder struct {
-	db         dbActions
+	db         DBActions
 	table      string
 	data       map[string]any
 	bulk       []map[string]any
@@ -932,7 +920,7 @@ func (i *InsertBuilder) Query() (string, []any, error) {
 //
 // Example:
 //
-//	result, err := NewFluentDB(db, ctx).
+//	result, err := NewFluentDB(db).
 //	    Insert().
 //	    Into("users").
 //	    Set("name", "John").
@@ -1077,7 +1065,7 @@ func (i *InsertBuilder) validateInsertAndFetch(keyColumn string) (any, error) {
 // It allows specification of the table, values to update, conditions to filter rows,
 // and optional joins for complex updates.
 type UpdateBuilder struct {
-	db         dbActions
+	db         DBActions
 	table      string
 	data       map[string]any
 	joins      []cdt.Join
@@ -1306,7 +1294,7 @@ func (u *UpdateBuilder) Query() (string, []any, error) {
 //
 // Example:
 //
-//	result, err := NewFluentDB(db, ctx).
+//	result, err := NewFluentDB(db).
 //	    Update("users").
 //	    Set("age", 31).
 //	    Set("updated_at", time.Now()).
@@ -1345,7 +1333,7 @@ func (u *UpdateBuilder) Exec(ctx context.Context) (*ExecResult, error) {
 // Example:
 //
 //	// Update all users' status field
-//	result, err := NewFluentDB(db, ctx).
+//	result, err := NewFluentDB(db).
 //	    Update("users").
 //	    Set("status", "inactive").
 //	    UpdateAll(ctx)  // No WHERE clause
@@ -1370,7 +1358,7 @@ func (u *UpdateBuilder) UpdateAll(ctx context.Context) (*ExecResult, error) {
 // It allows specification of the table, conditions to filter rows,
 // and optional joins for complex deletes.
 type DeleteBuilder struct {
-	db         dbActions
+	db         DBActions
 	table      string
 	joins      []cdt.Join
 	conditions cdt.Condition
@@ -1570,7 +1558,7 @@ func (d *DeleteBuilder) Query() (string, []any, error) {
 //
 // Example:
 //
-//	result, err := NewFluentDB(db, ctx).
+//	result, err := NewFluentDB(db).
 //	    Delete().
 //	    From("users").
 //	    Where(cdt.NewExpr().Column("id").Op("=").Value(42)).
@@ -1605,13 +1593,13 @@ func (d *DeleteBuilder) Exec(ctx context.Context) (*ExecResult, error) {
 // Example:
 //
 //	// Delete all inactive users
-//	result, err := NewFluentDB(db, ctx).
+//	result, err := NewFluentDB(db).
 //	    Delete().
 //	    From("users").
 //	    Where(cdt.NewExpr().Column("status").Op("=").Value("inactive")).
 //	    Exec(ctx)
 //	// For truly unfiltered delete:
-//	result, err := NewFluentDB(db, ctx).
+//	result, err := NewFluentDB(db).
 //	    Delete().
 //	    From("users").
 //	    DeleteAll(ctx)  // No WHERE clause

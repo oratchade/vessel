@@ -120,12 +120,16 @@ make test
 go test -v -tags=integration -run TestIntegration ./tests
 
 # Run unit tests for specific package
-go test -v ./db/v1/...
+go test -tags test -v ./db/v1/...
 
 # Run with coverage
 make coverage
 make cover-html  # Opens coverage report in browser
 ```
+
+> **Note:** unit tests are gated behind the `test` build tag, so a plain
+> `go test ./...` reports "no test files". Use `make test` or pass
+> `-tags test` explicitly.
 
 ### Writing Tests
 

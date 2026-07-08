@@ -51,6 +51,10 @@ entries:
 Entry `type` values are `readonly` and `readwrite`. Each entry must configure
 exactly one database config: `mysql`, `postgres`, `sqlite`, or `mssql`.
 
+Since v0.2.0, configuration is validated fail-fast at load: every entry must
+have a `name`, `type` is required (a missing or misspelled value is an error,
+not a silently dropped entry), and entry names must be unique.
+
 Per-entry queue, worker, health, priority, and batch settings override global
 settings.
 

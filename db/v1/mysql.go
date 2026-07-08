@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
+	"strconv"
 	"time"
 
 	// Import the MySQL driver and provide config builder
@@ -74,7 +75,7 @@ func (cfg MysqlConfig) Driver() string {
 func (cfg MysqlConfig) DSN() string {
 	cfgMap := map[string]string{
 		"charset":      cfg.Charset,
-		"parseTime":    fmt.Sprintf("%t", cfg.ParseTime),
+		"parseTime":    strconv.FormatBool(cfg.ParseTime),
 		"loc":          cfg.Loc,
 		"timeout":      cfg.Timeout.String(),
 		"readTimeout":  cfg.ReadTimeout.String(),

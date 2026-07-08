@@ -6,7 +6,7 @@ import (
 	"github.com/golang/mock/gomock"
 )
 
-// MockDBActions is a composite mock that implements the dbActions interface.
+// MockDBActions is a composite mock that implements the DBActions interface.
 // It embeds the three component mocks (Mockreader, Mockwriter, Mockintrospector).
 type MockDBActions struct {
 	*Mockreader

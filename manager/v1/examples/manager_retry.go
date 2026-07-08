@@ -24,7 +24,7 @@ func ExampleQueryWithRetry() {
 
 		cfg := v1.DefaultQueryRetryConfig()
 
-		rows, err := dm.QueryWithRetry(ctx, cfg, func(ctx context.Context) ([]map[string]any, error) {
+		rows, err := dm.QueryWithRetry(ctx, cfg, func(ctx context.Context, _ int) ([]map[string]any, error) {
 			return dm.Query(ctx, "SELECT * FROM users WHERE age > ?", 18)
 		})
 		if err != nil {
@@ -51,7 +51,7 @@ func ExampleQueryWithRetry() {
 			Logger:           nil,
 		}
 
-		rows, err := dm.QueryWithRetry(ctx, cfg, func(ctx context.Context) ([]map[string]any, error) {
+		rows, err := dm.QueryWithRetry(ctx, cfg, func(ctx context.Context, _ int) ([]map[string]any, error) {
 			return dm.Query(ctx, "SELECT * FROM orders WHERE status = ?", "pending")
 		})
 		if err != nil {
@@ -79,22 +79,22 @@ func ExampleQueryWithRetry() {
 		log.Printf("Exec succeeded: %v\n", result)
 	}
 
-	// Example 4: Multi-entry query with fine-grained attempt tracking
+	// Example 4: Query with fine-grained attempt tracking
 	{
-		log.Println("Example 4: Multi-entry query with custom attempt function")
+		log.Println("Example 4: Query with per-attempt logging")
 
 		cfg := v1.DefaultQueryRetryConfig()
 
-		rows, err := dm.MultiEntryQuery(ctx, cfg, func(ctx context.Context, attempt int) ([]map[string]any, error) {
+		rows, err := dm.QueryWithRetry(ctx, cfg, func(ctx context.Context, attempt int) ([]map[string]any, error) {
 			log.Printf("  Attempt #%d\n", attempt)
 			return dm.Query(ctx, "SELECT * FROM users")
 		})
 		if err != nil {
-			log.Printf("Multi-entry query failed: %v\n", err)
+			log.Printf("Query failed: %v\n", err)
 			return
 		}
 
-		log.Printf("Multi-entry query succeeded: %d rows\n", len(rows))
+		log.Printf("Query succeeded: %d rows\n", len(rows))
 	}
 
 	// Example 5: Health check with retry
@@ -153,20 +153,22 @@ func ExampleQueryWithRetry() {
 		}
 	}
 
-	// Example 7: Custom retry with attempt counter
+	// Example 7: Custom strategy with attempt counter
 	{
-		log.Println("Example 7: Custom retry with per-attempt logging")
+		log.Println("Example 7: Custom strategy with per-attempt logging")
 
-		strategy := retry.NewExponentialBackoff(
-			100*time.Millisecond,
-			5*time.Second,
-			2.0,
-			3,
-			0.1,
-		)
+		cfg := &v1.QueryWithRetryConfig{
+			Strategy: retry.NewExponentialBackoff(
+				100*time.Millisecond,
+				5*time.Second,
+				2.0,
+				3,
+				0.1,
+			),
+		}
 
-		rows, err := dm.QueryWithCustomRetry(
-			ctx, strategy,
+		rows, err := dm.QueryWithRetry(
+			ctx, cfg,
 			func(ctx context.Context, attempt int) ([]map[string]any, error) {
 				log.Printf("  Query attempt #%d\n", attempt)
 				return dm.Query(ctx, "SELECT * FROM critical_data")
@@ -189,7 +191,7 @@ func ExampleContextTimeout() {
 
 	cfg := v1.DefaultQueryRetryConfig()
 
-	rows, err := dm.QueryWithRetry(ctx, cfg, func(ctx context.Context) ([]map[string]any, error) {
+	rows, err := dm.QueryWithRetry(ctx, cfg, func(ctx context.Context, _ int) ([]map[string]any, error) {
 		// Simulated slow query
 		select {
 		case <-time.After(3 * time.Second):
@@ -268,7 +270,7 @@ func ExampleQueryWithLogging(logger v1.Logger) {
 		Logger:           logger,
 	}
 
-	rows, err := dm.QueryWithRetry(ctx, cfg, func(ctx context.Context) ([]map[string]any, error) {
+	rows, err := dm.QueryWithRetry(ctx, cfg, func(ctx context.Context, _ int) ([]map[string]any, error) {
 		return dm.Query(ctx, "SELECT * FROM users")
 	})
 	if err != nil {
@@ -298,7 +300,7 @@ func ExampleRetryPatterns() {
 			Logger:           nil,
 		}
 
-		rows, err := dm.QueryWithRetry(ctx, cfg, func(ctx context.Context) ([]map[string]any, error) {
+		rows, err := dm.QueryWithRetry(ctx, cfg, func(ctx context.Context, _ int) ([]map[string]any, error) {
 			return dm.Query(ctx, "SELECT * FROM users")
 		})
 		if err != nil {

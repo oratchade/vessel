@@ -222,7 +222,7 @@ if err != nil {
     log.Fatal(err)
 }
 
-fdb := db.NewFluentDB(tx, ctx)
+fdb := db.NewFluentDB(tx)
 
 // Use FluentDB normally, all operations are in transaction
 result, err := fdb.Insert().Into("users").
@@ -301,7 +301,7 @@ Contexts are propagated through the entire builder chain:
 ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 defer cancel()
 
-fdb := db.NewFluentDB(dbConn, ctx)
+fdb := db.NewFluentDB(dbConn)
 // All queries use the same context with 5-second timeout
 rows, err := fdb.Select("users", "id").Get()
 ```
@@ -312,12 +312,12 @@ Switch from normal operations to transaction context:
 
 ```go
 // Normal operations
-fdb := db.NewFluentDB(dbConn, ctx)
+fdb := db.NewFluentDB(dbConn)
 rows, err := fdb.Select("users", "id").Get()
 
 // Start transaction
 tx, _ := dbConn.Begin(ctx)
-txFdb := db.NewFluentDB(tx, ctx)
+txFdb := db.NewFluentDB(tx)
 
 // Use transaction
 _, _ = txFdb.Insert().Into("users").Set("name", "John").Exec()

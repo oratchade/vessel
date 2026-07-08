@@ -60,6 +60,10 @@ func setupDBs(
 				return nil, nil, fmt.Errorf("failed to create read-write DB entry: %w", err)
 			}
 			readWrite[entry.Name] = dbEntry
+		default:
+			// Unreachable when the config was validated, but never drop an
+			// entry silently if setupDBs is reached with an unknown type.
+			return nil, nil, fmt.Errorf("setupDBs: entry %q has unknown type %q", entry.Name, entry.Type)
 		}
 	}
 

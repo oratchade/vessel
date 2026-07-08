@@ -214,3 +214,35 @@ func TestConfigEntryNilOverrides(t *testing.T) {
 	assert.Nil(t, entry.ReadQueueSize)
 	assert.Nil(t, entry.WriteWorkers)
 }
+
+// TestConfigEntryValidateType ensures Validate rejects missing or unknown
+// entry types: setupDBs routes entries by type, so an invalid type would
+// otherwise be silently dropped instead of failing at config load.
+func TestConfigEntryValidateType(t *testing.T) {
+	testCases := []struct {
+		name        string
+		entryType   config.DBType
+		expectedErr bool
+	}{
+		{name: "readonly valid", entryType: config.ReadOnly},
+		{name: "readwrite valid", entryType: config.ReadWrite},
+		{name: "empty type rejected", entryType: "", expectedErr: true},
+		{name: "unknown type rejected", entryType: "read-only", expectedErr: true},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			entry := &config.ConfigEntry{
+				Name:   "db1",
+				Type:   tc.entryType,
+				SQLite: &db.SQLiteConfig{},
+			}
+			err := entry.Validate()
+			if tc.expectedErr {
+				assert.Error(t, err)
+			} else {
+				assert.NoError(t, err)
+			}
+		})
+	}
+}

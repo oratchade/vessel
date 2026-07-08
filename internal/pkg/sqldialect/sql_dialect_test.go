@@ -412,3 +412,39 @@ func TestMSSQLLimitWithoutOffsetAddsZeroOffset(t *testing.T) {
 	assert.Equal(t, "ORDER BY [id] ASC OFFSET 0 ROWS FETCH NEXT @p1 ROWS ONLY", frag)
 	assert.Equal(t, []any{5}, args)
 }
+
+// TestSupportedOptions_OrderByDirectionValidation ensures ORDER BY directions
+// are validated and normalized at the builder layer, so an invalid direction
+// (e.g. from a caller that bypasses the fluent API) cannot be concatenated raw
+// into the generated SQL.
+func TestSupportedOptions_OrderByDirectionValidation(t *testing.T) {
+	cases := []struct {
+		name      string
+		direction string
+		wantFrag  string
+		wantErr   bool
+	}{
+		{name: "empty defaults to ASC", direction: "", wantFrag: "ORDER BY \"id\" ASC"},
+		{name: "uppercase ASC", direction: "ASC", wantFrag: "ORDER BY \"id\" ASC"},
+		{name: "uppercase DESC", direction: "DESC", wantFrag: "ORDER BY \"id\" DESC"},
+		{name: "lowercase normalized", direction: "desc", wantFrag: "ORDER BY \"id\" DESC"},
+		{name: "mixed case with spaces", direction: "  Asc  ", wantFrag: "ORDER BY \"id\" ASC"},
+		{name: "injection rejected", direction: "ASC; DROP TABLE users; --", wantErr: true},
+		{name: "garbage rejected", direction: "SIDEWAYS", wantErr: true},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			opts := &options.QueryOptions{
+				OrderBy: []options.OrderBy{{Column: "id", Direction: tc.direction}},
+			}
+			frag, _, err := sd.PostgresDialect{}.SupportedOptions(definition.QueryTypeSelect, opts, 1)
+			if tc.wantErr {
+				assert.Error(t, err)
+				return
+			}
+			assert.NoError(t, err)
+			assert.Equal(t, tc.wantFrag, frag)
+		})
+	}
+}

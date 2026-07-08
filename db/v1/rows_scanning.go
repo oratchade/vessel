@@ -51,12 +51,44 @@ func (fmc *fieldMapCache) get(tType reflect.Type) map[string][]int {
 	return fieldMap
 }
 
+// fieldCandidate tracks the best field seen so far for a column name during
+// field collection: its index path and whether it collided with another field
+// at the same depth (ambiguous, dropped like encoding/json does).
+type fieldCandidate struct {
+	path      []int
+	ambiguous bool
+}
+
+// addFieldCandidate records path for name following encoding/json depth
+// semantics: the shallowest field wins; a collision at the same depth marks
+// the name ambiguous so it is dropped from the final map.
+func addFieldCandidate(fields map[string]fieldCandidate, name string, path []int) {
+	existing, ok := fields[name]
+	switch {
+	case !ok, len(path) < len(existing.path):
+		fields[name] = fieldCandidate{path: path}
+	case len(path) == len(existing.path):
+		existing.ambiguous = true
+		fields[name] = existing
+	}
+}
+
 // buildFieldMap builds a mapping from lower-cased column name to struct field index path.
 // Anonymous (embedded) structs are recursed into so their fields appear at the top level,
-// mirroring how encoding/json handles embedded structs.
+// mirroring how encoding/json handles embedded structs: a shallower field shadows a
+// deeper one with the same name, and same-depth collisions are dropped as ambiguous.
+// (Unlike encoding/json, an explicit db/json tag does not break same-depth ties.)
 func buildFieldMap(tType reflect.Type) map[string][]int {
-	fieldMap := map[string][]int{}
-	collectFields(tType, nil, fieldMap)
+	fields := map[string]fieldCandidate{}
+	collectFields(tType, nil, fields)
+
+	fieldMap := make(map[string][]int, len(fields))
+	for name, candidate := range fields {
+		if candidate.ambiguous {
+			continue
+		}
+		fieldMap[name] = candidate.path
+	}
 	return fieldMap
 }
 
@@ -81,7 +113,7 @@ func fieldName(f reflect.StructField) string {
 // If the field is an embedded struct without an explicit db tag, it recurses into
 // the embedded type and returns true (handled). Returns false to signal that the
 // field should be treated as a normal named column.
-func tryEmbedded(f reflect.StructField, path []int, fieldMap map[string][]int) bool {
+func tryEmbedded(f reflect.StructField, path []int, fields map[string]fieldCandidate) bool {
 	if !f.Anonymous {
 		return false
 	}
@@ -97,16 +129,16 @@ func tryEmbedded(f reflect.StructField, path []int, fieldMap map[string][]int) b
 		return true // skip entirely
 	}
 	if dbTag == "" {
-		collectFields(ft, path, fieldMap)
+		collectFields(ft, path, fields)
 		return true
 	}
 	// Explicit non-empty db tag on an embedded struct: treat it as a named column.
 	return false
 }
 
-// collectFields walks tType recursively, accumulating index paths into fieldMap.
+// collectFields walks tType recursively, accumulating field candidates.
 // prefix is the index path from the outermost struct to the current level.
-func collectFields(tType reflect.Type, prefix []int, fieldMap map[string][]int) {
+func collectFields(tType reflect.Type, prefix []int, fields map[string]fieldCandidate) {
 	for i := 0; i < tType.NumField(); i++ {
 		f := tType.Field(i)
 
@@ -117,7 +149,7 @@ func collectFields(tType reflect.Type, prefix []int, fieldMap map[string][]int) 
 
 		// Anonymous (embedded) struct without an explicit db tag: recurse into it
 		// so its columns appear as top-level keys, same as encoding/json behavior.
-		if tryEmbedded(f, path, fieldMap) {
+		if tryEmbedded(f, path, fields) {
 			continue
 		}
 
@@ -126,7 +158,7 @@ func collectFields(tType reflect.Type, prefix []int, fieldMap map[string][]int) 
 		if name == "-" {
 			continue
 		}
-		fieldMap[strings.ToLower(name)] = path
+		addFieldCandidate(fields, strings.ToLower(name), path)
 	}
 }
 
@@ -695,7 +727,12 @@ func setFieldFromValue(f reflect.Value, cv any) error {
 			f.Set(rv)
 			return nil
 		}
-		if rv.Type().ConvertibleTo(f.Type()) {
+		// Skip the Convert shortcut for non-string → string: Go's conversion
+		// rules turn an integer into its Unicode code point (int64(65) → "A"),
+		// not decimal text. Fall through to setFieldByKind, which formats the
+		// value as a string instead.
+		if rv.Type().ConvertibleTo(f.Type()) &&
+			(f.Kind() != reflect.String || rv.Kind() == reflect.String) {
 			f.Set(rv.Convert(f.Type()))
 			return nil
 		}

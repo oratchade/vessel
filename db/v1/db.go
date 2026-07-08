@@ -135,8 +135,8 @@ type reader interface {
 	//   opts: Optional query parameters (limit, offset, order, etc.).
 	//
 	// Returns:
-	//   map[string]any: Row as a map of column names to values.
-	//   error: Error if the query fails or no row is found.
+	//   []map[string]any: Slice of matching rows, each as a map of column names to values.
+	//   error: Error if the query fails.
 	GetByID(
 		ctx context.Context,
 		table string,
@@ -161,7 +161,7 @@ type reader interface {
 	//   args: Arguments for parameterized query.
 	//
 	// Returns:
-	//   *sql.Rows: Result rows from the query.
+	//   []map[string]any: Slice of rows, each as a map of column names to values.
 	//   error: Error if the query fails.
 	Query(ctx context.Context, query string, args ...any) ([]map[string]any, error)
 

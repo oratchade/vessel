@@ -56,8 +56,8 @@ func TestManagerConfigValidate(t *testing.T) {
 			name: "all entries valid",
 			config: &config.ManagerConfig{
 				Entries: []config.ConfigEntry{
-					{Name: "db1", MySQL: &db.MysqlConfig{}},
-					{Name: "db2", Postgres: &db.PostgresConfig{}},
+					{Name: "db1", Type: config.ReadWrite, MySQL: &db.MysqlConfig{}},
+					{Name: "db2", Type: config.ReadOnly, Postgres: &db.PostgresConfig{}},
 				},
 			},
 			expectedErr: false,
@@ -66,8 +66,8 @@ func TestManagerConfigValidate(t *testing.T) {
 			name: "one entry invalid (no DB config)",
 			config: &config.ManagerConfig{
 				Entries: []config.ConfigEntry{
-					{Name: "db1", MySQL: &db.MysqlConfig{}},
-					{Name: "db2"}, // Invalid - no DB config
+					{Name: "db1", Type: config.ReadWrite, MySQL: &db.MysqlConfig{}},
+					{Name: "db2", Type: config.ReadOnly}, // Invalid - no DB config
 				},
 			},
 			expectedErr: true,
@@ -413,4 +413,27 @@ func TestManagerConfigMultipleFallbacks(t *testing.T) {
 	// Reads should use hardcoded defaults (not set in global or entry)
 	assert.Equal(t, config.DefaultReadWorkers, mc.EntryReadWorkers(entry))
 	assert.Equal(t, config.DefaultReadQueueSize, mc.EntryReadQueueSize(entry))
+}
+
+// TestManagerConfigValidateDuplicateNames ensures duplicate entry names are
+// rejected: entries are stored in maps keyed by name, so a duplicate would
+// silently overwrite an earlier entry.
+func TestManagerConfigValidateDuplicateNames(t *testing.T) {
+	cfg := &config.ManagerConfig{
+		Entries: []config.ConfigEntry{
+			{Name: "db1", Type: config.ReadOnly, MySQL: &db.MysqlConfig{}},
+			{Name: "db1", Type: config.ReadOnly, Postgres: &db.PostgresConfig{}},
+		},
+	}
+	assert.Error(t, cfg.Validate())
+}
+
+// TestManagerConfigValidateEmptyName ensures entries must be named.
+func TestManagerConfigValidateEmptyName(t *testing.T) {
+	cfg := &config.ManagerConfig{
+		Entries: []config.ConfigEntry{
+			{Name: "", Type: config.ReadOnly, MySQL: &db.MysqlConfig{}},
+		},
+	}
+	assert.Error(t, cfg.Validate())
 }
