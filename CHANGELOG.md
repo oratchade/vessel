@@ -7,6 +7,13 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+### Changed
+
+- Hoisted per-call regular-expression compilation out of hot paths: the
+  projection alias pattern in the query builder was compiled once per
+  column per query, and the table-name pattern in `SanitizeTableName`
+  once per logged query. Both are now compiled once at package init.
+
 ### Fixed
 
 - Fixed `QueryWithRetry` and `ExecWithRetry` returning a non-nil error on

@@ -463,12 +463,15 @@ func GenerateTransactionID() string {
 	return fmt.Sprintf("tx_%d_%s", time.Now().UnixNano(), hex.EncodeToString(b))
 }
 
+// safeTableNamePattern matches table names safe to log verbatim.
+// Compiled once; SanitizeTableName runs on every logged query.
+var safeTableNamePattern = regexp.MustCompile(`^[a-zA-Z0-9_.]+$`)
+
 // SanitizeTableName ensures table name is safe for logging.
 // Removes any suspicious patterns that might indicate injection attempts.
 func SanitizeTableName(tableName string) string {
 	// Basic validation - should only contain alphanumeric, underscore, and dot
-	re := regexp.MustCompile(`^[a-zA-Z0-9_.]+$`)
-	if re.MatchString(tableName) {
+	if safeTableNamePattern.MatchString(tableName) {
 		return tableName
 	}
 	return "[INVALID_TABLE_NAME]"

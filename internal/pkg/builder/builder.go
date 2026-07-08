@@ -15,6 +15,11 @@ import (
 
 var sqlFunctionPattern = regexp.MustCompile(`(?i)^([a-z_][a-z0-9_]*)\s*\(.*\)$`)
 
+// aliasPattern matches the " AS " separator in projection aliases. Every
+// built-in dialect maps the alias operator to "AS", so the pattern is
+// compiled once instead of per column per query.
+var aliasPattern = regexp.MustCompile(`(?i)\s+AS\s+`)
+
 type optionDialect interface {
 	cdt.SQLDialect
 	SupportedOptions(definition.QueryType, *options.QueryOptions, int) (string, []any, error)
@@ -216,7 +221,7 @@ func sanitizeColumn(dialect cdt.SQLDialect, column string) string {
 	c, alias := column, ""
 	if raw, ok := helpers.IsRawProjection(column); ok {
 		c = raw
-		if loc := rawAliasIndex(dialect, c); loc != nil {
+		if loc := rawAliasIndex(c); loc != nil {
 			c, alias = c[:loc[0]], c[loc[1]:]
 		}
 		if alias != "" {
@@ -228,8 +233,7 @@ func sanitizeColumn(dialect cdt.SQLDialect, column string) string {
 		return "*"
 	}
 
-	asPattern := regexp.MustCompile(`(?i)\s+` + regexp.QuoteMeta(dialect.Operator("AS")) + `\s+`)
-	if loc := asPattern.FindStringIndex(column); loc != nil {
+	if loc := aliasPattern.FindStringIndex(column); loc != nil {
 		c, alias = column[:loc[0]], column[loc[1]:]
 	}
 	if alias != "" {
@@ -256,9 +260,8 @@ func sanitizeColumn(dialect cdt.SQLDialect, column string) string {
 	return fmt.Sprintf("%s%s", dialect.QuoteIdentifier(strings.TrimSpace(c)), alias)
 }
 
-func rawAliasIndex(dialect cdt.SQLDialect, column string) []int {
-	asPattern := regexp.MustCompile(`(?i)\s+` + regexp.QuoteMeta(dialect.Operator("AS")) + `\s+`)
-	return asPattern.FindStringIndex(column)
+func rawAliasIndex(column string) []int {
+	return aliasPattern.FindStringIndex(column)
 }
 
 // insert builds an INSERT query for the given table and data.
