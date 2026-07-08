@@ -5,7 +5,7 @@ All notable changes to Vessel are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [0.2.0] - 2026-07-08
 
 ### Removed
 
@@ -23,6 +23,7 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ### Changed
 
+- Updated indirect dependencies (`golang.org/x/*`, `modernc.org/libc`).
 - Hoisted per-call regular-expression compilation out of hot paths: the
   projection alias pattern in the query builder was compiled once per
   column per query, and the table-name pattern in `SanitizeTableName`
