@@ -89,14 +89,8 @@ type FluentDB struct {
 //	    Select("users", "id", "name", "email").
 //	    Where(cdt.NewExpr().Column("age").Op(">").Value(18)).
 //	    Get()
-func NewFluentDB(db interface {
-	reader
-	writer
-	upserter
-	introspector
-},
-) *FluentDB {
-	return &FluentDB{db: db.(dbActions)}
+func NewFluentDB(db dbActions) *FluentDB {
+	return &FluentDB{db: db}
 }
 
 // Select begins a SELECT query by specifying the table and columns.
