@@ -50,9 +50,11 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
   `func(context.Context) ([]map[string]any, error)` to
   `RetryableQueryFunc`. Existing callbacks compile after adding an
   ignored `_ int` parameter.
-- `NewFluentDB` now declares its parameter as the named `dbActions`
-  interface instead of an equivalent anonymous interface literal, removing
-  a type assertion that could never fail. Call sites are unaffected.
+- `NewFluentDB` now declares its parameter as the exported `DBActions`
+  interface (the query-capable subset shared by `DB` and `Tx`) instead of
+  an equivalent anonymous interface literal, removing a type assertion
+  that could never fail and giving the public API a documented named
+  type. Call sites are unaffected.
 - The MySQL DSN builder formats `parseTime` with `strconv.FormatBool`
   instead of `fmt.Sprintf("%t", ...)`. Identical output, idiomatic form.
 - Dialect detection in the SQL builder now uses type identity (type

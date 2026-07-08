@@ -57,9 +57,9 @@ func ensureQueryOptions(opts **options.QueryOptions) {
 	}
 }
 
-// dbActions defines the interface required by FluentDB to execute all types of database operations.
+// DBActions defines the interface required by FluentDB to execute all types of database operations.
 // It combines read, write, and query building capabilities.
-type dbActions interface {
+type DBActions interface {
 	reader
 	writer
 	upserter
@@ -70,7 +70,7 @@ type dbActions interface {
 // It acts as an entry point for building SELECT, INSERT, UPDATE, and DELETE operations
 // with a chainable, ergonomic API while reusing the database operation interfaces.
 type FluentDB struct {
-	db dbActions
+	db DBActions
 }
 
 // NewFluentDB creates a new FluentDB instance that wraps the provided DB interface.
@@ -89,7 +89,7 @@ type FluentDB struct {
 //	    Select("users", "id", "name", "email").
 //	    Where(cdt.NewExpr().Column("age").Op(">").Value(18)).
 //	    Get()
-func NewFluentDB(db dbActions) *FluentDB {
+func NewFluentDB(db DBActions) *FluentDB {
 	return &FluentDB{db: db}
 }
 
@@ -188,7 +188,7 @@ func (f *FluentDB) Delete() *DeleteBuilder {
 // It allows chainable method calls to construct complex queries with
 // joins, conditions, ordering, and pagination.
 type SelectBuilder struct {
-	db         dbActions
+	db         DBActions
 	table      string
 	columns    []string
 	joins      []cdt.Join
@@ -649,7 +649,7 @@ func countProjection(alias ...string) string {
 // It allows specification of the table and values to insert, either as
 // single or bulk operations.
 type InsertBuilder struct {
-	db         dbActions
+	db         DBActions
 	table      string
 	data       map[string]any
 	bulk       []map[string]any
@@ -1065,7 +1065,7 @@ func (i *InsertBuilder) validateInsertAndFetch(keyColumn string) (any, error) {
 // It allows specification of the table, values to update, conditions to filter rows,
 // and optional joins for complex updates.
 type UpdateBuilder struct {
-	db         dbActions
+	db         DBActions
 	table      string
 	data       map[string]any
 	joins      []cdt.Join
@@ -1358,7 +1358,7 @@ func (u *UpdateBuilder) UpdateAll(ctx context.Context) (*ExecResult, error) {
 // It allows specification of the table, conditions to filter rows,
 // and optional joins for complex deletes.
 type DeleteBuilder struct {
-	db         dbActions
+	db         DBActions
 	table      string
 	joins      []cdt.Join
 	conditions cdt.Condition
