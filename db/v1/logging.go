@@ -459,7 +459,9 @@ func ExtractCorrelationID(ctx context.Context) string {
 // This is used to correlate all operations within a transaction in logs.
 func GenerateTransactionID() string {
 	b := make([]byte, 8)
-	rand.Read(b)
+	// crypto/rand.Read never returns an error (guaranteed since Go 1.24);
+	// discard it explicitly so errcheck sees intent, not an oversight.
+	_, _ = rand.Read(b)
 	return fmt.Sprintf("tx_%d_%s", time.Now().UnixNano(), hex.EncodeToString(b))
 }
 

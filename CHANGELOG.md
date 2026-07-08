@@ -31,6 +31,9 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
   deleted; all built-in dialects implement `CapabilityProvider`, and
   custom dialects that don't now report no capabilities instead of
   capabilities guessed from their type name.
+- `GenerateTransactionID` now discards the `crypto/rand.Read` error
+  explicitly (`_, _ =`). The call cannot fail on supported Go versions;
+  the explicit discard documents that and satisfies errcheck.
 - Simplified `SafeLogger.Debug` from `Debug(msg ...string)` to
   `Debug(msg string)`. It no longer logs a fixed `"database debug"`
   message with the caller's text buried in a field; the caller's message
