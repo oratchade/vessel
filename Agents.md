@@ -1,48 +1,32 @@
-# Agents.md - Vessel Database Library
+# Agents.md — Vessel Database Library
 
-**Project:** Vessel - Multi-Database SQL Abstraction Library  
-**Language:** Go 1.26.0+  
-**Last Updated:** March 15, 2026
+**Project:** Vessel — multi-database SQL toolkit for Go services
+**Language:** Go 1.26+
+**Current version:** v0.2.0
+**Last updated:** 2026-07-08
 
----
-
-## Overview
-
-This file documents agent instructions and workflows for working with the
-Vessel database abstraction library. Use this guide to understand how to
-approach common tasks, maintain code quality, and contribute to the project.
+Instructions for AI agents and automation working on this repository.
+Human contributors should read [CONTRIBUTING.md](CONTRIBUTING.md); this file
+condenses the facts an agent needs to work correctly without re-deriving them.
 
 ---
 
-## Agent Purpose
+## What Vessel Is
 
-**Role:** Database Library Developer  
-**Responsibility:** Build and maintain a clean, maintainable database
-abstraction layer that handles SQL generation and query building without
-overcomplicating. Keep the API fluent and intuitive, support multiple
-database dialects, and ensure all code is well-tested.
+A layered SQL toolkit that sits between raw `database/sql` and a full ORM:
+fluent query builders, dialect-aware SQL generation, typed row scanning,
+transactions with savepoints, OpenTelemetry tracing, retry helpers, and an
+optional manager for read/write routing across multiple databases.
 
-**Key Focus Areas:**
+Layering (dependencies flow left to right, never back):
 
-- Implementing fluent query builders (SELECT, INSERT, UPDATE, DELETE)
-- Supporting multiple SQL dialects (MySQL, PostgreSQL, SQLite, MSSQL)
-- Generating correct SQL for each database type
-- Writing comprehensive unit and integration tests
-- Maintaining clean interfaces and extensible architecture
-- Optimizing performance in hot paths
-- Optimizing for maintainability and readability
-- Keeping lint output clean before merging changes
-- Documenting all features and changes clearly
-- Handling errors gracefully and consistently
-- Providing a seamless developer experience with type safety and clear APIs
-- Ensuring plugin architecture is robust and easy to extend
+```text
+condition DSL → query builder → SQL dialect → driver (MySQL/Postgres/SQLite/MSSQL)
+```
 
-**What You Don't Need to Handle:**
-
-- Frontend or backend business logic
-- Application-level API design
-- Server infrastructure
-- Driver installation or system setup
+Supported dialects: MySQL, PostgreSQL (pgx), SQLite (modernc, pure Go), MSSQL.
+New features must work on all four or return an explicit "unsupported" error —
+never emit silently broken SQL.
 
 ---
 
@@ -50,524 +34,186 @@ database dialects, and ensure all code is well-tested.
 
 ```text
 vessel/
-├── db/v1/                           # Public API (version 1)
-│   ├── db.go                        # Core DB/DBActions/Tx interfaces
-│   ├── fluentDB.go                  # Fluent query builder
-│   │                                 # (SelectBuilder, UpdateBuilder, etc.)
-│   ├── config_*.go                  # Database configs
-│   │                                 # (MySQL, PostgreSQL, SQLite, MSSQL)
-│   ├── row_adapter.go               # Row scanning abstraction
-│   ├── logger.go                    # Logging interface
-│   └── *_test.go                    # Unit tests (80+ tests)
-│
-├── internal/pkg/                    # Internal implementation packages
-│   ├── builder/                     # SQL query builder (internal)
-│   │   ├── builder.go               # Builder interface
-│   │   ├── mysql.go, postgres.go    # Dialect implementations
-│   │   └── *_builder_test.go        # Builder tests (per-dialect)
-│   │
-│   ├── sqldialect/                  # SQL dialect abstractions
-│   │   ├── sql_dialect.go           # Shared dialect logic
-│   │   ├── mysql.go, postgres.go    # Dialect-specific implementations
-│   │   └── sql_dialect_test.go      # Dialect tests (per-dialect)
-│   │
-│   ├── operator/                    # Operator definitions
-│   ├── helpers/                     # Utility functions
-│   └── otel/                        # OpenTelemetry integration
-│
-├── pkg/query/                       # Public query DSL packages
-│   ├── condition/                   # Condition DSL (Expr, And, Or, In)
-│   ├── options/                     # QueryOptions (OrderBy, Limit)
-│   └── definition/                  # Constants
-│
-├── manager/v1/                      # Query manager (higher-level API)
-├── tests/                           # Integration tests
-├── examples/                        # Usage examples
-└── docs/                            # Documentation
+├── db/v1/                  # Public driver API
+│   ├── db.go               # DB/Tx interfaces, NewDB factory
+│   ├── mysql.go, postgres.go, sqlite.go, mssql.go   # Configs + driver impls
+│   ├── fluentDB.go         # Fluent builders (Select/Insert/Update/Delete)
+│   ├── rows_scanning.go    # Typed scanning (ScanRowsTo, ScanAll, ScanOne)
+│   ├── row_adapter.go      # Streaming row access; rows_pool.go = pooling
+│   ├── logging.go          # SafeLogger, error classification, sanitizers
+│   ├── logger.go           # db.Logger interface; logger_adapters.go
+│   ├── transaction.go      # WithTransaction, panic-safe rollback
+│   └── dberror/            # Sentinel errors + per-driver error mappers
+├── internal/pkg/
+│   ├── builder/            # SQL query builder (per-dialect files)
+│   ├── sqldialect/         # Dialect quoting/placeholders/capabilities
+│   ├── operator/, helpers/, otel/
+├── pkg/
+│   ├── query/condition/    # Condition DSL (Expr, And, Or, In, Between)
+│   ├── query/options/      # QueryOptions (OrderBy, Limit, Returning…)
+│   ├── query/definition/   # Driver-name constants
+│   └── retry/              # Backoff strategies (fixed/linear/exponential…)
+├── manager/v1/             # DBManager: routing, workers, health, batching
+│   └── config/             # Manager YAML/JSON/TOML config + validation
+├── tests/                  # Integration tests (build tag: integration)
+├── examples/               # Runnable examples
+└── docs/                   # Guides (see table at the bottom)
 ```
 
 ---
 
-## Agent Guidelines by Task
+## Build, Test, Lint
 
-### 1. **Adding New Database Support**
-
-**Scope:** MySQL, PostgreSQL, SQLite, MSSQL only (established pattern)
-
-**Steps:**
-
-1. Create driver config in `db/v1/{dialect}.go`
-2. Implement `SQLDialect` interface in
-   `internal/pkg/sqldialect/{dialect}.go`
-3. Implement `QueryBuilder` interface in
-   `internal/pkg/builder/{dialect}.go`
-4. Add unit tests: `{dialect}_test.go`,
-   `{dialect}_builder_test.go`
-5. Add integration tests in `tests/integration_test.go`
-6. Update docs in `README.md` and
-   `OPERATORS_COMPATIBILITY.md`
-
-**Key Files to Modify:**
-
-- `db/v1/{dialect}.go` - Driver configuration
-- `internal/pkg/sqldialect/{dialect}.go` - SQL generation
-- `internal/pkg/builder/{dialect}.go` - Query building
-
-**Testing Requirements:**
-
-- ✅ Unit tests must pass (use `-tags=test` flag)
-- ✅ Integration tests required for real database
-- ✅ All tests pass in CI/CD
-
----
-
-### 2. **Bug Fixes**
-
-**Process:**
-
-1. Identify the affected module (db/v1, builder, sqldialect, etc.)
-2. Write a failing test first (TDD approach)
-3. Fix the bug in the implementation
-4. Ensure all related tests pass
-5. Run full test suite: `go test -tags=test ./...`
-6. Update relevant documentation if behavior changed
-
-**Key Test Files:**
-
-- `db/v1/fluentDB_test.go` - Builder API tests
-- `internal/pkg/builder/builder_test.go` - Builder tests
-- `internal/pkg/sqldialect/sql_dialect_test.go` - SQL
-  generation tests
-
-**Important:** Never commit without running full test suite
-and linter
-
----
-
-### 3. **Adding New Query Features**
-
-#### Example: Adding LIMIT/OFFSET support
-
-**Process:**
-
-1. **Define:** Add feature to `QueryOptions` struct in
-   `pkg/query/options/options.go`
-2. **Builder:** Add builder method to `SelectBuilder`,
-   `UpdateBuilder`, `DeleteBuilder` in `db/v1/fluentDB.go`
-3. **SQL Generation:** Update SQL generation in
-   `internal/pkg/sqldialect/sql_dialect.go`
-4. **Per-Dialect:** Update each dialect if special handling is
-   needed (e.g., MSSQL OFFSET/FETCH syntax)
-5. **Test:** Add comprehensive tests to `fluentDB_test.go` and `sql_dialect_test.go`
-6. **Document:** Update `README.md` and migration guide
-
-**Key Pattern:**
-
-```go
-// 1. Add to options
-type QueryOptions struct {
-    NewFeature  TypeHere
-}
-
-// 2. Add builder method
-func (sb *SelectBuilder) NewFeature(value TypeHere) *SelectBuilder {
-    sb.opts.NewFeature = value
-    return sb
-}
-
-// 3. Update SQL generation
-// In sql_dialect.go supportedOptions()
-if opts.NewFeature != nil {
-    // Generate SQL fragment
-}
-
-// 4. Test across dialects
-// In sql_dialect_test.go
-```
-
----
-
-### 4. **Fixing SQL Generation Issues**
-
-**Location:** `internal/pkg/sqldialect/sql_dialect.go`
-
-**Process:**
-
-1. Understand the `supportedOptions()` function (handles LIMIT,
-   OFFSET, ORDER BY, etc.)
-2. Check dialect-specific implementations in `{dialect}.go`
-3. Verify `QuoteIdentifier()` is used for all column/table names
-4. Test with all 4 dialects (MySQL, PostgreSQL, SQLite, MSSQL)
-5. Pay special attention to:
-   - Identifier quoting (backticks vs quotes vs brackets)
-   - OFFSET/FETCH syntax (MSSQL-specific)
-   - NULL handling in HAVING clauses
-
-**Common Issues:**
-
-- ✗ Not quoting identifiers → SQL injection risks
-- ✗ Wrong operator syntax → Database errors
-- ✗ Dialect-specific syntax → MSSQL OFFSET/FETCH instead of LIMIT/OFFSET
-
-**Test Pattern:**
-
-```go
-testCases := []struct {
-    name       string
-    opts       *options.QueryOptions
-    expectSQL  string
-}{
-    {
-        name: "description",
-        opts: &options.QueryOptions{...},
-        expectSQL: "SELECT ... expected SQL",
-    },
-}
-```
-
----
-
-### 5. **Performance Improvements**
-
-**Profile Before:** Use `go test -bench=.` if benchmarks exist
-
-**Areas to Focus:**
-
-1. **Row Scanning** (`db/v1/row_adapter.go`) - Hot path for data retrieval
-2. **SQL Building** (`internal/pkg/builder/`) - Path for every query
-3. **Connection Pooling** - Database pooling configuration
-
-**Important Constraints:**
-
-- No breaking changes to public API
-- All tests must pass
-- Benchmarks must show improvement or equal performance
-
----
-
-### 6. **Documentation Updates**
-
-**Documentation Files:**
-
-| File                              | Purpose                    |
-| --------------------------------- | -------------------------- |
-| `README.md`                       | Feature overview and quick |
-| `CHANGELOG.md`                    | Version history            |
-| `docs/ARCHITECTURE.md`            | Current architecture docs  |
-| `docs/ERROR_HANDLING.md`          | Error handling             |
-| `docs/OPERATORS_COMPATIBILITY.md` | Operator support           |
-| `docs/SQL_NULL_TYPES.md`          | Null type handling         |
-| `CONTRIBUTING.md`                 | Contributing guide         |
-
-**When to Update Documentation:**
-
-- ✅ New features added
-- ✅ API changes made
-- ✅ Bug fixes that change behavior
-- ✅ Example code updated
-- ✅ Performance improvements documented
-
-**Format Requirements:**
-
-- Use GitHub-flavored markdown
-- Code examples must be correct and tested
-- Cross-reference related documentation
-- Keep examples up-to-date with code
-
----
-
-### 7. **Testing Requirements**
-
-**Test Execution:**
+**Unit tests are gated behind the `test` build tag.** A plain `go test ./...`
+reports "no test files" — this is the single most common agent mistake here.
 
 ```bash
-# Unit tests only
-go test -tags=test ./db/v1 ./internal/pkg/builder ./internal/pkg/sqldialect
+make test                        # unit tests (adds -tags=test)
+go test -tags test -race ./...   # equivalent, explicit
+make coverage                    # unit tests + coverage report
+make lint                        # golangci-lint (40+ linters)
+make fmt-check                   # gofmt/goimports verification
 
-# With coverage
-go test -tags=test -cover ./...
-
-# Integration tests (requires Docker/databases)
-go test -tags=test ./tests
-
-# Linting
-make lint
-
-# All quality checks
-make test
+# Integration tests (build tag: integration; SQLite needs no containers)
+make integration-test-sqlite
+make integration-test-all        # requires Docker (MySQL/Postgres/MSSQL)
+DB_TYPE=mysql go test -tags=integration ./tests -run TestIntegration
 ```
 
-**Test Coverage Expectations:**
-
-- ✅ New code: Minimum 80% coverage
-- ✅ Bug fixes: New tests for the bug
-- ✅ Features: Integration tests for real databases
-- ✅ All dialects tested (MySQL, PostgreSQL, SQLite, MSSQL)
-
-**Test Naming Convention:**
-
-```go
-func Test{Feature}_{Scenario}(t *testing.T) {
-    // Example: TestSelectBuilderOrderBy
-}
-
-func TestSelectBuilderOrderBy_SingleColumn(t *testing.T) {
-    // Specific scenario
-}
-```
+A pre-commit hook runs golangci-lint; commits with lint findings are rejected.
+Fix findings rather than suppressing them — staticcheck suggestions
+(De Morgan simplifications, `strconv` over `fmt.Sprintf`, etc.) are enforced.
 
 ---
 
-### 8. **Code Quality Standards**
+## Conventions
 
-**Linting (40+ enabled linters):**
+**Commits** — `<type>: <Capitalized description>` with types
+`feat fix refactor docs test chore perf ci`. Body explains *why*.
+One logical change per commit; refactors separate from behavior changes.
+Breaking changes use `refactor!:`/`feat!:` and a `BREAKING CHANGE:` footer.
 
-```bash
-make lint  # Run golangci-lint
-```
+**Changelog** — every user-visible change adds an entry under `## [Unreleased]`
+in [CHANGELOG.md](CHANGELOG.md) (Keep a Changelog format) in the same commit.
 
-**Code Style:**
+**TDD** — for bug fixes, write the failing regression test first (RED), then
+fix (GREEN). New code targets 80% coverage. Table-driven tests with `t.Run`
+subtests; mocks are generated with gomock (`make mocks`).
 
-- ✅ Document exported APIs and behavior changes clearly
-- ✅ Use interfaces for abstraction
-- ✅ Proper error handling with context
-- ✅ No global state (except for registry in plugin system)
-- ✅ Immutable where possible
-
-**Error Handling:**
-
-- Use sentinel errors from `db/v1/dberror/errors.go`
-- Wrap errors with context using `fmt.Errorf`
-- Map database-specific errors to Vessel errors
-- Never ignore errors silently
-
-**Example:**
-
-```go
-if err != nil {
-    return fmt.Errorf("failed to scan row: %w", err)
-}
-```
+**API stability** — exported API changes are breaking. Prefer additive
+changes; when something must break, migrate all examples/tests in the same
+commit and document the migration in the changelog.
 
 ---
 
-### 9. **Working with Builders**
+## Current API Facts (v0.2.0)
 
-**Fluent API Pattern** (in `db/v1/fluentDB.go`):
+Post-0.2.0 signatures agents get wrong when trained on older code:
 
-```go
-// SelectBuilder example
-func (sb *SelectBuilder) OrderBy(column, direction string) *SelectBuilder {
-    // Implementation
-    return sb  // Return for chaining
-}
-
-// Usage
-rows, err := fdb.Select("users", "id", "name").
-    OrderBy("name", "ASC").
-    Limit(10).
-    Get()
-```
-
-**Builder Characteristics:**
-
-- ✅ Methods return `*Builder` for chaining
-- ✅ Order of method calls doesn't matter
-- ✅ Each method modifies builder state
-- ✅ Terminal methods (Get, Exec) execute the query
-
-**Key Builders:**
-
-- `SelectBuilder` - For SELECT queries
-- `UpdateBuilder` - For UPDATE queries
-- `DeleteBuilder` - For DELETE queries
-- `InsertBuilder` - For INSERT queries
+- `db.NewFluentDB(db)` takes **one** argument (the old `(db, ctx)` form is
+  gone; `ctx` goes to terminal calls like `Get(ctx)`).
+- `DBManager.QueryWithRetry(ctx, cfg, fn)` — `fn` is
+  `func(ctx context.Context, attempt int) ([]map[string]any, error)`.
+  `MultiEntryQuery` and `QueryWithCustomRetry` **no longer exist**; pass a
+  custom strategy via `QueryWithRetryConfig{Strategy: …}`.
+- `SafeLogger.Debug(msg string)` — single message, no variadic strings.
+- Manager config is validated fail-fast: every entry needs a unique `name`
+  and a `type` of `readonly`/`readwrite`; violations error at load.
+- Dialect capabilities come from the `sqldialect.CapabilityProvider`
+  interface (`Capabilities()`); dialect identity is checked by **type**,
+  never by inspecting `fmt.Sprintf("%T", …)` strings.
+- `ORDER BY` directions are validated at the SQL-generation layer:
+  only `ASC`/`DESC` (case-insensitive, empty = `ASC`).
 
 ---
 
-### 10. **Database Configuration**
+## Task Recipes
 
-**Config Types** (in `db/v1/config_*.go`):
+### Bug fix
+1. Reproduce with a failing test in the affected package (RED).
+2. Fix; run `make test && make lint`.
+3. Changelog entry + one commit. Update docs if behavior changed.
 
-- `MysqlConfig` - MySQL connection config
-- `PostgresConfig` - PostgreSQL connection config
-- `SQLiteConfig` - SQLite connection config
-- `MSSQLConfig` - MSSQL connection config
+### New query feature (e.g., a new option)
+1. Add the field to `pkg/query/options/`.
+2. Add fluent methods in `db/v1/fluentDB.go` (return the builder for chaining).
+3. Generate SQL in `internal/pkg/sqldialect/sql_dialect.go`
+   (`supportedOptions`); handle per-dialect syntax (MSSQL OFFSET/FETCH…).
+4. If a dialect can't support it, return an explicit error — check via
+   `Capabilities()`, and extend the `Capabilities` struct if needed.
+5. Test across all four dialects; update `docs/PORTABILITY_MATRIX.md`.
 
-**Creation Pattern:**
+### New operator
+1. Define in `internal/pkg/operator/`; map per dialect in
+   `internal/pkg/sqldialect/`.
+2. Expose in `pkg/query/condition/`; test; update
+   `docs/OPERATORS_COMPATIBILITY.md`.
 
-```go
-db, err := db.NewDB(db.MysqlConfig{
-    User:     "user",
-    Password: "password",
-    Host:     "localhost",
-    Port:     3306,
-    Database: "mydb",
-}, logger)
-```
-
-**Important:**
-
-- Each config type validates settings
-- Connection pooling configured per database
-- OpenTelemetry can be disabled via `OTEL_ENABLED` env var
-
----
-
-## Common Workflows
-
-### Workflow: Adding a New Operator
-
-1. Define operator in `internal/pkg/operator/operator.go`
-2. Map operator to SQL syntax in `internal/pkg/sqldialect/{dialect}.go`
-3. Add to condition DSL in `pkg/query/condition/`
-4. Test in `condition_test.go`
-5. Update `OPERATORS_COMPATIBILITY.md`
-
-### Workflow: Fixing a Dialect Bug
-
-1. Find the test case in `internal/pkg/sqldialect/sql_dialect_test.go`
-2. Add test for specific dialect
-3. Fix implementation in `internal/pkg/sqldialect/{dialect}.go`
-4. Verify with integration tests
-5. Update docs if behavior changed
-
-### Workflow: Adding Transaction Feature
-
-1. Add method to `Tx` interface in `db/v1/db.go`
-2. Implement in each dialect's transaction handler
-3. Add tests in `db/v1/db_test.go`
-4. Add integration tests in `tests/integration_test.go`
-5. Document in `README.md` transactions section
+### New dialect (rare)
+Follow the four existing pairs: config+driver in `db/v1/`, dialect in
+`internal/pkg/sqldialect/` (must implement `CapabilityProvider`), builder
+support in `internal/pkg/builder/`, error mapper in `db/v1/dberror/`,
+integration tests in `tests/`.
 
 ---
 
-## Testing Best Practices
+## Pitfalls (learned the hard way — do not reintroduce)
 
-### Unit Tests
-
-- Test single feature in isolation
-- Use table-driven tests for multiple cases
-- Mock external dependencies
-
-### Integration Tests
-
-- Use real database instances
-- Clean up data after tests
-- Test multi-dialect compatibility
-
-### Test Helpers
-
-Located in `internal/pkg/builder/test_helpers.go`:
-
-- `intPtr()` - Helper for int pointers
-- Other utilities for test setup
-
----
-
-## Performance Considerations
-
-**Critical Paths:**
-
-1. **Row Scanning** - Optimize in `db/v1/row_adapter.go`
-2. **Query Building** - Optimize in builder implementations
-3. **Connection Pooling** - Monitor with `PoolStats()`
-
-**OpenTelemetry Impact:**
-
-- Minimal when enabled (built-in instrumentation)
-- Zero overhead when disabled (`OTEL_ENABLED=false`)
+- **Never `fmt.Errorf("…: %w", err)` outside an `if err != nil` branch.**
+  Wrapping nil produces a *non-nil* error (`%!w(<nil>)`). This shipped as a
+  real bug in the retry helpers.
+- **Never use `reflect.Value.Convert` to turn integers into strings.**
+  `int64(65) → "A"` (rune conversion), not `"65"`. Numeric→string scanning
+  formats decimal text explicitly (`rows_scanning.go`).
+- **Field-map precedence follows `encoding/json`:** shallower (outer) struct
+  fields shadow embedded ones; same-depth collisions are dropped as ambiguous.
+- **Error classification is typed-first:** check `dberror` sentinels with
+  `errors.Is`/`errors.As` before any message-substring matching, and keep
+  substring needles narrow (a bare `"invalid"` or `"near"` misclassifies).
+- **Identifiers vs values:** values are always parameterized through dialect
+  placeholders; identifiers go through `QuoteIdentifier`. Raw helpers
+  (`ColumnRaw`, `HavingRaw`, raw queries) are caller-owned escape hatches —
+  never route user input into them.
+- **Compile regexes at package init**, not per call, in hot paths.
+- **Don't detect types by their printed names** (`%T` + `strings.Contains`);
+  use type switches or an interface method.
 
 ---
 
-## Release Checklist
+## Release Process
 
-Before releasing a new version:
+Releases are tag-driven via `.github/workflows/release.yml`:
 
-- [ ] All tests passing: `go test -tags=test ./...`
-- [ ] Linting clean: `make lint`
-- [ ] Coverage acceptable: `go test -cover ./...`
-- [ ] Documentation updated
-- [ ] Changelog updated in `CHANGELOG.md`
-- [ ] Example code tested and working
-- [ ] Integration tests pass
-- [ ] No breaking changes (or documented migration)
+1. Retitle `## [Unreleased]` to `## [X.Y.Z] - YYYY-MM-DD` in CHANGELOG.md
+   (the workflow fails without a matching section).
+2. Merge to `main`, then tag: `git tag -a vX.Y.Z && git push origin vX.Y.Z`.
+3. The workflow validates (lint, coverage, SQLite integration), packages a
+   source archive, creates the GitHub Release from the changelog section,
+   and warms the module proxy.
 
----
-
-## Key Design Patterns
-
-1. **Strategy Pattern** - SQLDialect for per-database implementations
-2. **Builder Pattern** - FluentDB for readable query construction
-3. **Composite Pattern** - Conditions (And, Or, Not, etc.)
-4. **Adapter Pattern** - Row scanning abstraction
-5. **Factory Pattern** - Plugin driver registry
-6. **Bridge Pattern** - Abstraction from implementation
+Breaking changes require at least a minor bump while on v0.x.
 
 ---
 
-## Important Notes
+## Documentation Map
 
-### ⚠️ Breaking Changes
+| File | Purpose |
+| --- | --- |
+| `README.md` | Overview, quick start |
+| `CONTRIBUTING.md` | Human contributor guide, test/lint workflow |
+| `CHANGELOG.md` | Version history (Keep a Changelog) |
+| `docs/ARCHITECTURE.md` | Layering and design notes |
+| `docs/FLUENTDB.md` | Fluent builder guide |
+| `docs/DB_MANAGER.md` | Manager routing, workers, config |
+| `docs/CONFIGURATION.md` / `docs/ENVIRONMENT_VARIABLES.md` | Config reference |
+| `docs/ERROR_HANDLING.md` | Sentinel errors, classification |
+| `docs/LOGGING.md` / `docs/OBSERVABILITY.md` | Logger adapters, OTel |
+| `docs/OPERATORS_COMPATIBILITY.md` / `docs/PORTABILITY_MATRIX.md` | Dialect support tables |
+| `docs/RESOURCE_POOLING.md` | RowsAdapter pooling (public feature) |
+| `docs/SQL_NULL_TYPES.md` | Null handling in typed scanning |
+| `docs/PLUGINS.md` | Custom driver registry |
+| `docs/LINTING.md` | Markdown/doc linting tooling |
 
-- Require documentation, migration guide, and changelog entry
-- Should be bundled into major version release
-- Example: OrderBy struct redesign → v1.1.0
-
-### ⚠️ Code Style
-
-- Keep exported API documentation accurate and useful
-- No global state except plugin registry
-- Prefer composition over inheritance
-
-### ⚠️ Error Handling
-
-- Always wrap errors with context
-- Use sentinel errors from dberror package
-- Log errors with proper context
-
-### ⚠️ Database Support
-
-- All new features must work on all 4 dialects
-- Test on real database instances
-- Handle dialect-specific syntax carefully
-
----
-
-## Resources
-
-- **README.md** - Feature overview and quick start
-- **docs/ARCHITECTURE.md** - Current architecture notes
-- **CONTRIBUTING.md** - Contribution guidelines
-- **CHANGELOG.md** - Version history
-
----
-
-## Version Info
-
-- **Go Version:** 1.26.0+
-- **License:** MIT
-- **Status:** v0.x, used by the author, not broadly battle hardened
-- **Test Coverage:** Unit and integration coverage across supported dialects
-- **Last Updated:** March 15, 2026
-
----
-
-## Summary
-
-Vessel is a personal SQL toolkit with:
-
-- ✅ Multi-database support (MySQL, PostgreSQL, SQLite, MSSQL)
-- ✅ Type-safe fluent query builder
-- ✅ Unit and integration tests
-- ✅ Practical documentation
-- ✅ Linting in the normal quality gate
-- ✅ Production-style service APIs
-
-When working with Vessel, prioritize:
-
-1. Avoiding unnecessary breaking changes
-2. Testing across all dialects
-3. Clear documentation
-4. Type safety and error handling
-5. Performance without breaking API
+Update the relevant doc in the same commit as a behavior change — stale
+examples in doc comments count as documentation too (`go vet` won't catch
+them; reviewers must).

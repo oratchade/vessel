@@ -31,6 +31,11 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 ### Changed
 
 - Updated indirect dependencies (`golang.org/x/*`, `modernc.org/libc`).
+- Rewrote `Agents.md` from scratch: accurate project structure and test
+  commands (including the `test` build-tag gotcha), current v0.2.0 API
+  facts, task recipes, the release process, and a pitfalls section
+  distilled from the bugs fixed in this release. The previous version was
+  last updated 2026-03-15 and had drifted from the code.
 - Corrected stale documentation: `NewFluentDB` doc examples showed a
   removed two-argument form, `GetByID`/`Query` doc comments described
   wrong return types, `CONTRIBUTING.md` now notes that unit tests require
