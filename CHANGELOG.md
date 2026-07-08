@@ -40,6 +40,13 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
   Previously an entry with a missing or misspelled type was silently
   dropped at startup, and duplicate names silently overwrote earlier
   entries. Configs that omitted `type` must now set it explicitly.
+- `ClassifyError` now prefers typed detection (the `dberror` sentinels
+  attached by the drivers' error mappers, and `context.Canceled`) over
+  message substring matching, and the string fallbacks were narrowed:
+  a bare `near` no longer classifies as a syntax error, a bare `invalid`
+  no longer classifies as a validation error, MySQL's `SQL syntax`
+  message is now recognized, and a duplicated `connection refused`
+  needle was removed.
 
 ## [0.1.3] - 2026-06-18
 

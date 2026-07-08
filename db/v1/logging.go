@@ -4,12 +4,14 @@ import (
 	"context"
 	"crypto/rand"
 	"encoding/hex"
+	"errors"
 	"fmt"
 	"regexp"
 	"strings"
 	"time"
 
 	"go.opentelemetry.io/otel/trace"
+	"tounilab.com/vessel/db/v1/dberror"
 )
 
 // contextKey is a type for context keys to avoid collisions.
@@ -192,11 +194,17 @@ func (sl *SafeLogger) TransactionSuccess(ctx context.Context, dbDriver, operatio
 
 // ClassifyError analyzes an error and returns its classification type and log level.
 // This helps determine how to log different types of database errors appropriately.
+// Typed detection (dberror sentinels attached by the drivers' error mappers,
+// context cancellation) takes precedence over message substring matching.
 //
 //nolint:cyclop
 func ClassifyError(err error) (errorType string, level LogLevel) {
 	if err == nil {
 		return ErrorTypeUnknown, LogLevelInfo
+	}
+
+	if errType, errLevel, ok := classifyTypedError(err); ok {
+		return errType, errLevel
 	}
 
 	errMsg := err.Error()
@@ -261,6 +269,29 @@ func ClassifyError(err error) (errorType string, level LogLevel) {
 	return ErrorTypeUnknown, LogLevelError
 }
 
+// classifyTypedError classifies errors carrying a dberror sentinel or a
+// context cancellation, without relying on message text.
+func classifyTypedError(err error) (errorType string, level LogLevel, ok bool) {
+	switch {
+	case errors.Is(err, dberror.ErrDuplicateKey):
+		return ErrorTypeDuplicateKey, LogLevelWarn, true
+	case errors.Is(err, dberror.ErrForeignKeyViolation):
+		return ErrorTypeForeignKeyViolation, LogLevelWarn, true
+	case errors.Is(err, dberror.ErrConstraintViolation):
+		return ErrorTypeConstraintViolation, LogLevelWarn, true
+	case errors.Is(err, dberror.ErrSyntaxError):
+		return ErrorTypeSyntax, LogLevelWarn, true
+	case errors.Is(err, dberror.ErrQueryTimeout):
+		return ErrorTypeTimeout, LogLevelError, true
+	case errors.Is(err, dberror.ErrConnectionFailed):
+		return ErrorTypeConnection, LogLevelError, true
+	case errors.Is(err, context.Canceled):
+		return ErrorTypeContextCanceled, LogLevelInfo, true
+	default:
+		return "", LogLevelInfo, false
+	}
+}
+
 func getConstraintErrors(errMsg string) (errorType string, level LogLevel) {
 	if strings.Contains(errMsg, "unique constraint") ||
 		strings.Contains(errMsg, "constraint failed") ||
@@ -283,8 +314,11 @@ func getDataTypeErrors(errMsg string) (errorType string, level LogLevel) {
 }
 
 func getValidationErrors(errMsg string) (errorType string, level LogLevel) {
+	// A bare "invalid" needle is too greedy (e.g. "invalid memory address");
+	// require an explicit validation phrase or an input/value qualifier.
 	if strings.Contains(errMsg, "validation") ||
-		strings.Contains(errMsg, "invalid") {
+		strings.Contains(errMsg, "invalid input") ||
+		strings.Contains(errMsg, "invalid value") {
 		return ErrorTypeValidationError, LogLevelWarn
 	}
 
@@ -296,7 +330,6 @@ func getConnectionErrors(errMsg string) (errorType string, level LogLevel) {
 	if strings.Contains(errMsg, "connection refused") ||
 		strings.Contains(errMsg, "connection reset") ||
 		strings.Contains(errMsg, "broken pipe") ||
-		strings.Contains(errMsg, "connection refused") ||
 		strings.Contains(errMsg, "no such host") ||
 		strings.Contains(errMsg, "nodename nor servname provided") {
 		return ErrorTypeConnection, LogLevelError
@@ -358,10 +391,14 @@ func getPermissionErrors(errMsg string) (errorType string, level LogLevel) {
 }
 
 func getSyntaxErrors(errMsg string) (errorType string, level LogLevel) {
+	// "sql syntax" covers MySQL 1064 ("You have an error in your SQL syntax"),
+	// which does not contain "syntax error" verbatim. A bare "near" needle was
+	// dropped: it matched far too many unrelated messages, and SQLite's
+	// `near "X": syntax error` already contains "syntax error".
 	if strings.Contains(errMsg, "syntax error") ||
+		strings.Contains(errMsg, "sql syntax") ||
 		strings.Contains(errMsg, "parse error") ||
-		strings.Contains(errMsg, "unexpected token") ||
-		strings.Contains(errMsg, "near") {
+		strings.Contains(errMsg, "unexpected token") {
 		return ErrorTypeSyntax, LogLevelWarn
 	}
 
