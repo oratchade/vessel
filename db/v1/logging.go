@@ -126,12 +126,12 @@ func (sl *SafeLogger) Error(err error) {
 	sl.logger.Error("database error", errLogKey, err)
 }
 
-func (sl *SafeLogger) Debug(msg ...string) {
+func (sl *SafeLogger) Debug(msg string) {
 	if sl.logger == nil {
 		return
 	}
 
-	sl.logger.Debug("database debug", "message", strings.Join(msg, " "))
+	sl.logger.Debug(msg)
 }
 
 // QuerySuccess logs a successful query with automatic context extraction from ctx.

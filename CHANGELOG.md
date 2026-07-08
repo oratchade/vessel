@@ -19,6 +19,10 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
   projection alias pattern in the query builder was compiled once per
   column per query, and the table-name pattern in `SanitizeTableName`
   once per logged query. Both are now compiled once at package init.
+- Simplified `SafeLogger.Debug` from `Debug(msg ...string)` to
+  `Debug(msg string)`. It no longer logs a fixed `"database debug"`
+  message with the caller's text buried in a field; the caller's message
+  is now the log message. All callers already passed a single string.
 
 ### Fixed
 
