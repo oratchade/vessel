@@ -29,6 +29,12 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
   warnings, query errors, and transaction lifecycle events were dropped
   for databases accessed through the manager. The manager's logger is now
   passed through to the driver.
+- `ORDER BY` directions are now validated at the SQL-generation layer for
+  every entry point: anything other than `ASC`/`DESC` (case-insensitive,
+  empty defaults to `ASC`) returns an error instead of being concatenated
+  raw into the generated SQL. Previously only the fluent API validated
+  directions; direct `DB`/manager calls with hand-built query options
+  bypassed the check.
 
 ## [0.1.3] - 2026-06-18
 

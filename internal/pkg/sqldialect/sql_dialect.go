@@ -62,7 +62,10 @@ func supportedOptions(
 		}
 
 		if len(opts.OrderBy) > 0 {
-			orderByFragments := getOrderByFragment(dialect, opts.OrderBy)
+			orderByFragments, err := getOrderByFragment(dialect, opts.OrderBy)
+			if err != nil {
+				return "", nil, err
+			}
 			parts = append(parts, fmt.Sprintf(
 				"%s %s",
 				dialect.Operator(operator.OrderBy),
@@ -117,7 +120,10 @@ func supportedOptions(
 		}
 		if queryType == definition.QueryTypeUpdate || queryType == definition.QueryTypeDelete {
 			if len(opts.OrderBy) > 0 {
-				orderByFragments := getOrderByFragment(dialect, opts.OrderBy)
+				orderByFragments, err := getOrderByFragment(dialect, opts.OrderBy)
+				if err != nil {
+					return "", nil, err
+				}
 				parts = append(parts, fmt.Sprintf(
 					"%s %s",
 					dialect.Operator(operator.OrderBy),
@@ -134,18 +140,34 @@ func supportedOptions(
 	return strings.Join(parts, " "), args, nil
 }
 
-func getOrderByFragment(dialect condition.SQLDialect, orderBy []options.OrderBy) []string {
+func getOrderByFragment(dialect condition.SQLDialect, orderBy []options.OrderBy) ([]string, error) {
 	orderByFragments := make([]string, 0, len(orderBy))
 	for _, order := range orderBy {
-		direction := order.Direction
-		if direction == "" {
-			direction = "ASC"
+		direction, err := normalizeOrderDirection(order.Direction)
+		if err != nil {
+			return nil, err
 		}
 		orderByFragments = append(orderByFragments,
 			fmt.Sprintf("%s %s", quoteOptionIdentifier(dialect, order.Column), direction),
 		)
 	}
-	return orderByFragments
+	return orderByFragments, nil
+}
+
+// normalizeOrderDirection validates an ORDER BY direction and returns its
+// canonical uppercase form. An empty direction defaults to ASC. Any value
+// other than ASC or DESC is rejected so it cannot be concatenated raw into
+// the generated SQL. This holds for every entry point (fluent API, direct DB
+// calls, and manager queries), not just callers that pre-validate options.
+func normalizeOrderDirection(direction string) (string, error) {
+	switch strings.ToUpper(strings.TrimSpace(direction)) {
+	case "", "ASC":
+		return "ASC", nil
+	case "DESC":
+		return "DESC", nil
+	default:
+		return "", fmt.Errorf("invalid ORDER BY direction %q, must be ASC or DESC", direction)
+	}
 }
 
 func quoteOptionIdentifier(dialect condition.SQLDialect, value string) string {
