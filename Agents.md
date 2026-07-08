@@ -1,8 +1,8 @@
 # Agents.md — Vessel Database Library
 
-**Project:** Vessel — multi-database SQL toolkit for Go services
-**Language:** Go 1.26+
-**Current version:** v0.2.0
+**Project:** Vessel — multi-database SQL toolkit for Go services  
+**Language:** Go 1.26+  
+**Current version:** v0.2.0  
 **Last updated:** 2026-07-08
 
 Instructions for AI agents and automation working on this repository.
@@ -130,11 +130,13 @@ Post-0.2.0 signatures agents get wrong when trained on older code:
 ## Task Recipes
 
 ### Bug fix
+
 1. Reproduce with a failing test in the affected package (RED).
 2. Fix; run `make test && make lint`.
 3. Changelog entry + one commit. Update docs if behavior changed.
 
 ### New query feature (e.g., a new option)
+
 1. Add the field to `pkg/query/options/`.
 2. Add fluent methods in `db/v1/fluentDB.go` (return the builder for chaining).
 3. Generate SQL in `internal/pkg/sqldialect/sql_dialect.go`
@@ -144,12 +146,14 @@ Post-0.2.0 signatures agents get wrong when trained on older code:
 5. Test across all four dialects; update `docs/PORTABILITY_MATRIX.md`.
 
 ### New operator
+
 1. Define in `internal/pkg/operator/`; map per dialect in
    `internal/pkg/sqldialect/`.
 2. Expose in `pkg/query/condition/`; test; update
    `docs/OPERATORS_COMPATIBILITY.md`.
 
 ### New dialect (rare)
+
 Follow the four existing pairs: config+driver in `db/v1/`, dialect in
 `internal/pkg/sqldialect/` (must implement `CapabilityProvider`), builder
 support in `internal/pkg/builder/`, error mapper in `db/v1/dberror/`,
