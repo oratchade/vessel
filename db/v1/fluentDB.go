@@ -129,7 +129,7 @@ func (f *FluentDB) Select(table string, columns ...string) *SelectBuilder {
 //
 // Example:
 //
-//	NewFluentDB(db, ctx).
+//	NewFluentDB(db).
 //	    Insert().
 //	    Into("users").
 //	    Values(map[string]any{"name": "John", "age": 30}).
@@ -152,7 +152,7 @@ func (f *FluentDB) Insert() *InsertBuilder {
 //
 // Example:
 //
-//	NewFluentDB(db, ctx).
+//	NewFluentDB(db).
 //	    Update("users").
 //	    Set("age", 31).
 //	    Where(cdt.NewExpr().Column("id").Op("=").Value(1)).
@@ -173,7 +173,7 @@ func (f *FluentDB) Update(table string) *UpdateBuilder {
 //
 // Example:
 //
-//	NewFluentDB(db, ctx).
+//	NewFluentDB(db).
 //	    Delete().
 //	    From("users").
 //	    Where(cdt.NewExpr().Column("id").Op("=").Value(1)).
@@ -466,7 +466,7 @@ func (s *SelectBuilder) Having(cond cdt.Condition) *SelectBuilder {
 //
 // Example:
 //
-//	rows, err := NewFluentDB(db, ctx).
+//	rows, err := NewFluentDB(db).
 //	    Select("users", "id", "name").
 //	    Where(cdt.NewExpr().Column("age").Op(">").Value(18)).
 //	    Get()
@@ -535,7 +535,7 @@ func (s *SelectBuilder) Query() (string, []any, error) {
 //
 // Example:
 //
-//	user, err := NewFluentDB(db, ctx).
+//	user, err := NewFluentDB(db).
 //	    Select("users", "id", "name", "email").
 //	    Where(cdt.NewExpr().Column("id").Op("=").Value(42)).
 //	    One(ctx)
@@ -580,7 +580,7 @@ func (s *SelectBuilder) One(ctx context.Context) (map[string]any, error) {
 //
 // Example:
 //
-//	count, err := NewFluentDB(db, ctx).
+//	count, err := NewFluentDB(db).
 //	    Select("users").
 //	    Where(cdt.NewExpr().Column("active").Op("=").Value(true)).
 //	    Count(ctx)
@@ -920,7 +920,7 @@ func (i *InsertBuilder) Query() (string, []any, error) {
 //
 // Example:
 //
-//	result, err := NewFluentDB(db, ctx).
+//	result, err := NewFluentDB(db).
 //	    Insert().
 //	    Into("users").
 //	    Set("name", "John").
@@ -1294,7 +1294,7 @@ func (u *UpdateBuilder) Query() (string, []any, error) {
 //
 // Example:
 //
-//	result, err := NewFluentDB(db, ctx).
+//	result, err := NewFluentDB(db).
 //	    Update("users").
 //	    Set("age", 31).
 //	    Set("updated_at", time.Now()).
@@ -1333,7 +1333,7 @@ func (u *UpdateBuilder) Exec(ctx context.Context) (*ExecResult, error) {
 // Example:
 //
 //	// Update all users' status field
-//	result, err := NewFluentDB(db, ctx).
+//	result, err := NewFluentDB(db).
 //	    Update("users").
 //	    Set("status", "inactive").
 //	    UpdateAll(ctx)  // No WHERE clause
@@ -1558,7 +1558,7 @@ func (d *DeleteBuilder) Query() (string, []any, error) {
 //
 // Example:
 //
-//	result, err := NewFluentDB(db, ctx).
+//	result, err := NewFluentDB(db).
 //	    Delete().
 //	    From("users").
 //	    Where(cdt.NewExpr().Column("id").Op("=").Value(42)).
@@ -1593,13 +1593,13 @@ func (d *DeleteBuilder) Exec(ctx context.Context) (*ExecResult, error) {
 // Example:
 //
 //	// Delete all inactive users
-//	result, err := NewFluentDB(db, ctx).
+//	result, err := NewFluentDB(db).
 //	    Delete().
 //	    From("users").
 //	    Where(cdt.NewExpr().Column("status").Op("=").Value("inactive")).
 //	    Exec(ctx)
 //	// For truly unfiltered delete:
-//	result, err := NewFluentDB(db, ctx).
+//	result, err := NewFluentDB(db).
 //	    Delete().
 //	    From("users").
 //	    DeleteAll(ctx)  // No WHERE clause

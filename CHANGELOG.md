@@ -24,6 +24,11 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 ### Changed
 
 - Updated indirect dependencies (`golang.org/x/*`, `modernc.org/libc`).
+- Corrected stale documentation: `NewFluentDB` doc examples showed a
+  removed two-argument form, `GetByID`/`Query` doc comments described
+  wrong return types, `CONTRIBUTING.md` now notes that unit tests require
+  the `test` build tag, and the manager guide documents the fail-fast
+  config validation.
 - Hoisted per-call regular-expression compilation out of hot paths: the
   projection alias pattern in the query builder was compiled once per
   column per query, and the table-name pattern in `SanitizeTableName`
