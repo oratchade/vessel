@@ -41,6 +41,11 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ### Fixed
 
+- `Postgres.Commit` and `Postgres.Rollback` now pass the span-derived
+  context to the pgx commit/rollback call and to the safe logger, matching
+  every other traced method on the driver. Previously they discarded the
+  context returned by the tracer, so those operations and their log events
+  were not correlated with the span.
 - Fixed `QueryWithRetry` and `ExecWithRetry` returning a non-nil error on
   success: the success path wrapped a nil error with `%w`, so every
   successful call reported `query with retry failed: %!w(<nil>)`. Both

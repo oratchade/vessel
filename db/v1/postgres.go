@@ -1089,7 +1089,7 @@ func (pg *Postgres) Close() error {
 //nolint:dupl
 func (pg *Postgres) Commit(ctx context.Context) error {
 	startTime := time.Now()
-	_, span := otel.UseTracer(ctx, "postgres.Commit",
+	c, span := otel.UseTracer(ctx, "postgres.Commit",
 		trace.WithSpanKind(trace.SpanKindClient),
 		trace.WithAttributes(
 			semconv.DBSystemNamePostgreSQL,
@@ -1101,27 +1101,27 @@ func (pg *Postgres) Commit(ctx context.Context) error {
 		err := fmt.Errorf("postgres.Commit: invalid querier type, expected pgx.Tx")
 		span.RecordError(err)
 		span.SetStatus(codes.Error, err.Error())
-		pg.safeLogger.QueryError(ctx, "postgres", "commit", "", 0, err)
+		pg.safeLogger.QueryError(c, "postgres", "commit", "", 0, err)
 		return err
 	}
-	if err := pgxTx.Commit(ctx); err != nil {
+	if err := pgxTx.Commit(c); err != nil {
 		duration := time.Since(startTime)
 		err := fmt.Errorf("postgres.Commit: failed to commit transaction: %w", err)
 		span.RecordError(err)
 		span.SetStatus(codes.Error, err.Error())
-		pg.safeLogger.QueryError(ctx, "postgres", "commit", "", duration, err)
+		pg.safeLogger.QueryError(c, "postgres", "commit", "", duration, err)
 		return err
 	}
 
 	span.SetStatus(codes.Ok, "transaction committed")
-	pg.safeLogger.TransactionSuccess(ctx, "postgres", "commit")
+	pg.safeLogger.TransactionSuccess(c, "postgres", "commit")
 	return nil
 }
 
 //nolint:dupl
 func (pg *Postgres) Rollback(ctx context.Context) error {
 	startTime := time.Now()
-	_, span := otel.UseTracer(ctx, "postgres.Rollback",
+	c, span := otel.UseTracer(ctx, "postgres.Rollback",
 		trace.WithSpanKind(trace.SpanKindClient),
 		trace.WithAttributes(
 			semconv.DBSystemNamePostgreSQL,
@@ -1134,20 +1134,20 @@ func (pg *Postgres) Rollback(ctx context.Context) error {
 		span.RecordError(err)
 		span.SetStatus(codes.Error, err.Error())
 
-		pg.safeLogger.QueryError(ctx, "postgres", "rollback", "", 0, err)
+		pg.safeLogger.QueryError(c, "postgres", "rollback", "", 0, err)
 		return err
 	}
-	if err := pgxTx.Rollback(ctx); err != nil {
+	if err := pgxTx.Rollback(c); err != nil {
 		duration := time.Since(startTime)
 		err := fmt.Errorf("postgres.Rollback: failed to rollback transaction: %w", err)
 		span.RecordError(err)
 		span.SetStatus(codes.Error, err.Error())
-		pg.safeLogger.QueryError(ctx, "postgres", "rollback", "", duration, err)
+		pg.safeLogger.QueryError(c, "postgres", "rollback", "", duration, err)
 		return err
 	}
 
 	span.SetStatus(codes.Ok, "transaction rolled back")
-	pg.safeLogger.TransactionSuccess(ctx, "postgres", "rollback")
+	pg.safeLogger.TransactionSuccess(c, "postgres", "rollback")
 	return nil
 }
 
