@@ -64,9 +64,9 @@ MARKDOWNLINT_INSTALL = markdownlint-cli2@$(MARKDOWNLINT_VERSION)
 endif
 
 ifeq ($(VALE_VERSION),)
-VALE_INSTALL = github.com/errata-ai/vale/v3/cmd/vale@latest
+VALE_INSTALL = github.com/vale-cli/vale/v3/cmd/vale@latest
 else
-VALE_INSTALL = github.com/errata-ai/vale/v3/cmd/vale@$(VALE_VERSION)
+VALE_INSTALL = github.com/vale-cli/vale/v3/cmd/vale@$(VALE_VERSION)
 endif
 GOFLAGS ?= -tags=test
 CGO_ENABLED ?= 0
@@ -260,7 +260,7 @@ lint-docs:
 	@if command -v vale >/dev/null 2>&1; then \
 		vale --config .vale.yaml ./docs ./README.md *.md 2>/dev/null || true; \
 	else \
-		echo "Vale not found. Install with: go install github.com/errata-ai/vale/v3@latest"; exit 1; \
+		echo "Vale not found. Install with: go install github.com/vale-cli/vale/v3/cmd/vale@latest"; exit 1; \
 	fi
 
 # Mock generation

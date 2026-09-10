@@ -57,7 +57,7 @@ markdownlint-cli2 "**/*.md"
 **Installation:**
 
 ```bash
-go install github.com/errata-ai/vale/v3@latest
+go install github.com/vale-cli/vale/v3/cmd/vale@latest
 ```
 
 **Usage:**
@@ -163,7 +163,7 @@ npx markdownlint-cli2 "**/*.md"
 ### "Vale not found"
 
 ```bash
-go install github.com/errata-ai/vale/v3@latest
+go install github.com/vale-cli/vale/v3/cmd/vale@latest
 ```
 
 ### Too many warnings in check target
