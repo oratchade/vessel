@@ -5,6 +5,36 @@ All notable changes to Vessel are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+
+- `ExecReturning(ctx)` on `InsertBuilder`, `UpdateBuilder`, and
+  `DeleteBuilder` executes a mutation configured with `Returning` as a single
+  statement and returns the rows as `*RowsAdapter` (PostgreSQL `RETURNING`,
+  MSSQL `OUTPUT`). It covers upserts and honors `WithTx`, removing the
+  insert-then-select race of fetching by key. MySQL and SQLite return an
+  explicit unsupported error without executing the statement. `Exec` still
+  rejects `Returning`. Errors reported while reading the returned rows, such
+  as a duplicate key, map to `dberror` sentinels like the rest of the driver
+  API. (#26)
+- `ReturningExecutor`, an optional extension of `DBActions` implemented by the
+  built-in drivers and by `DBManager`. Custom `DBActions` implementations opt in
+  by adding `ExecReturning(ctx, query, args...)`; the builders return a clear
+  error when it is missing. Existing interfaces are unchanged.
+- `DBManager.ExecReturning` and `DBManager.ExecReturningAsync` run a
+  row-returning mutation on a read-write entry (never a read-only replica) and
+  return `*db.RowsAdapter`, via the new `ReqExecReturning` request type. These
+  requests are never coalesced by insert batching. If a synchronous
+  `ExecReturning` caller cancels or times out, rows that arrive afterwards are
+  closed so their connection returns to the pool.
+
+### Fixed
+
+- PostgreSQL `UpsertQuery`/`UpsertsQuery` with `Returning` rendered
+  `RETURNING` before `ON CONFLICT`, which is invalid SQL. `RETURNING` is now
+  rendered after the conflict clause.
+
 ## [0.2.0] - 2026-07-08
 
 ### Removed
