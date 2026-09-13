@@ -5,6 +5,19 @@ All notable changes to Vessel are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+
+- `DBManager.WithTransaction(ctx, entryName, fn, opts...)` runs a callback
+  inside a transaction on a named `readwrite` entry. Every statement issued
+  through the callback's `db.Tx`, including `SELECT ... FOR UPDATE`, runs on
+  the transaction's connection and bypasses worker queues and read/write
+  routing, so multi-statement atomicity and row-lock serialisation are
+  available to DBManager users. New sentinel errors `ErrEntryNotFound`,
+  `ErrEntryReadOnly`, and `ErrEntryUnhealthy` report entries that cannot host
+  a transaction.
+
 ## [0.2.0] - 2026-07-08
 
 ### Removed
