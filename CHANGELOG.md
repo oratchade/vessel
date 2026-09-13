@@ -25,7 +25,9 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 - `DBManager.ExecReturning` and `DBManager.ExecReturningAsync` run a
   row-returning mutation on a read-write entry (never a read-only replica) and
   return `*db.RowsAdapter`, via the new `ReqExecReturning` request type. These
-  requests are never coalesced by insert batching.
+  requests are never coalesced by insert batching. If a synchronous
+  `ExecReturning` caller cancels or times out, rows that arrive afterwards are
+  closed so their connection returns to the pool.
 
 ### Fixed
 

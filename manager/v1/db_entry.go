@@ -550,6 +550,10 @@ func (de *DBEntry) sendResponseWithTimeout(
 	qd *Query,
 	response *QueryResponse,
 ) {
+	if qd.handoff != nil {
+		qd.handoff.deliver(qd.ResponseCh, response)
+		return
+	}
 	const responseSendTimeout = 5 * time.Second
 	select {
 	case qd.ResponseCh <- response:

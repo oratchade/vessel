@@ -102,6 +102,8 @@ type Query struct {
 	Request    QueryRequest
 	Data       *QueryData
 	ResponseCh chan *QueryResponse
+
+	handoff *responseHandoff
 }
 
 type QueryData struct {

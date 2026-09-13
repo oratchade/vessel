@@ -196,6 +196,12 @@ read-only replica. Pass SQL from a FluentDB mutation builder's
 `Returning(...).Query()`, or trusted raw SQL. MySQL and SQLite entries return an
 unsupported error without executing the statement.
 
+If the caller's context is cancelled, or the default timeout expires, before the
+rows arrive, `ExecReturning` returns the context error and the manager closes the
+rows when they do arrive, so their connection goes back to the pool.
+`ExecReturningAsync` callers own the response and must close `RawData`
+themselves.
+
 ```go
 rows, err := dm.ExecReturning(ctx, query, args...)
 if err != nil {

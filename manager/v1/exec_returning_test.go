@@ -12,6 +12,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	db "tounilab.com/vessel/db/v1"
+	"tounilab.com/vessel/manager/v1/config"
 )
 
 type returningBatchDB struct {
@@ -143,4 +144,94 @@ func TestDBManagerExecReturningWithoutEntries(t *testing.T) {
 	rows, err := dm.ExecReturning(ctx, `DELETE FROM "users" RETURNING "id"`)
 	assert.Nil(t, rows)
 	require.Error(t, err)
+}
+
+// delayedReturningDB returns live rows from a one-connection SQLite pool only once
+// released, so the response reaches the worker after the synchronous caller gave up.
+type delayedReturningDB struct {
+	db.DB
+
+	started  chan struct{}
+	release  chan struct{}
+	returned chan struct{}
+}
+
+func (d *delayedReturningDB) ExecReturning(ctx context.Context, _ string, _ ...any) (*db.RowsAdapter, error) {
+	close(d.started)
+	<-d.release
+	defer close(d.returned)
+	return d.QueryRaw(ctx, "SELECT 1")
+}
+
+func TestDBManagerExecReturningClosesRowsAfterCallerStopsWaiting(t *testing.T) {
+	tests := []struct {
+		name    string
+		timeout time.Duration
+		cancel  bool
+	}{
+		{name: "caller cancels", timeout: defaultTimeout, cancel: true},
+		{name: "default timeout", timeout: 50 * time.Millisecond},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			previous := defaultTimeout
+			defaultTimeout = tt.timeout
+			t.Cleanup(func() { defaultTimeout = previous })
+
+			sqliteEntry, err := newDBEntry(context.Background(), &config.ManagerConfig{}, &config.ConfigEntry{
+				Name:   "sqlite-one-conn",
+				Type:   config.ReadWrite,
+				SQLite: &db.SQLiteConfig{FilePath: ":memory:", MaxOpenConns: 1, MaxIdleConns: 1},
+			}, &noOpLogger{})
+			require.NoError(t, err)
+			sqlite := sqliteEntry.db
+			t.Cleanup(func() {
+				sqliteEntry.cancel()
+				_ = sqlite.Close()
+			})
+
+			delayed := &delayedReturningDB{
+				DB:       sqlite,
+				started:  make(chan struct{}),
+				release:  make(chan struct{}),
+				returned: make(chan struct{}),
+			}
+			de, worker, stopEntry := newReturningTestEntry(delayed, false)
+			de.writeQueue = []*dbEntryWorker{worker}
+			de.writeWorkerIdx, err = NewAtomicWrapCounter(int64(len(de.writeQueue)))
+			require.NoError(t, err)
+			de.lifecycle.store(lifecycleStarted)
+			de.wg.Add(1)
+			go de.writeWorker(de.ctx, worker)
+			t.Cleanup(func() {
+				stopEntry()
+				de.wg.Wait()
+			})
+
+			dm := &DBManager{readWriteEntries: map[string]*DBEntry{de.name: de}}
+			dm.lifecycle.store(lifecycleStarted)
+
+			ctx, cancel := context.WithCancel(context.Background())
+			defer cancel()
+			if tt.cancel {
+				go func() {
+					<-delayed.started
+					cancel()
+				}()
+			}
+
+			rows, err := dm.ExecReturning(ctx, `INSERT INTO "jobs" DEFAULT VALUES RETURNING "id"`)
+			require.Error(t, err)
+			assert.Nil(t, rows)
+
+			close(delayed.release)
+			<-delayed.returned
+
+			execCtx, cancelExec := context.WithTimeout(context.Background(), 2*time.Second)
+			defer cancelExec()
+			_, err = sqlite.Exec(execCtx, "SELECT 1")
+			require.NoError(t, err, "rows delivered after the caller stopped waiting must be closed")
+		})
+	}
 }
