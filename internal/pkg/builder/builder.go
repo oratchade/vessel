@@ -286,9 +286,13 @@ func insert(
 	placeholders, values := make([]string, 0), make([]any, 0)
 
 	for _, col := range columns {
-		placeholders = append(placeholders, dialect.Placeholder(index))
-		values = append(values, data[col])
-		index++
+		placeholder, args, err := bindValue(dialect, data[col], index)
+		if err != nil {
+			return "", nil, fmt.Errorf("builder.insert: column %q: %w", col, err)
+		}
+		placeholders = append(placeholders, placeholder)
+		values = append(values, args...)
+		index += len(args)
 	}
 
 	// Quote column names
@@ -555,13 +559,13 @@ func upsertUpdateFragment(
 		}
 		sort.Strings(valueColumns)
 		for _, col := range valueColumns {
-			setParts = append(setParts, fmt.Sprintf(
-				"%s = %s",
-				dialect.QuoteIdentifier(col),
-				dialect.Placeholder(index),
-			))
-			values = append(values, upsertOpts.UpdateValues[col])
-			index++
+			placeholder, args, err := bindValue(dialect, upsertOpts.UpdateValues[col], index)
+			if err != nil {
+				return "", nil, fmt.Errorf("builder.upsert: update column %q: %w", col, err)
+			}
+			setParts = append(setParts, fmt.Sprintf("%s = %s", dialect.QuoteIdentifier(col), placeholder))
+			values = append(values, args...)
+			index += len(args)
 		}
 	}
 
@@ -621,7 +625,10 @@ func inserts(
 	var values []any
 
 	for _, row := range data {
-		i, rowValues, rowVals := rowValues(dialect, row, columns, index)
+		i, rowValues, rowVals, err := rowValues(dialect, row, columns, index)
+		if err != nil {
+			return "", nil, fmt.Errorf("builder.inserts: %w", err)
+		}
 		rowPlaceholders = append(rowPlaceholders, fmt.Sprintf("(%s)", strings.Join(rowValues, ", ")))
 		values = append(values, rowVals...)
 		index = i
@@ -655,26 +662,36 @@ func inserts(
 	), values, nil
 }
 
-func rowValues(dialect cdt.SQLDialect, row map[string]any, columns []string, index int) (int, []string, []any) {
+func rowValues(
+	dialect cdt.SQLDialect,
+	row map[string]any,
+	columns []string,
+	index int,
+) (int, []string, []any, error) {
 	var rowValues []string
 	var values []any
 	for _, col := range columns {
-		if val, ok := row[col]; ok {
-			rowValues = append(rowValues, dialect.Placeholder(index))
-			values = append(values, val)
-			index++
-		} else {
+		val, ok := row[col]
+		if !ok {
 			rowValues = append(rowValues, "NULL")
+			continue
 		}
+		placeholder, args, err := bindValue(dialect, val, index)
+		if err != nil {
+			return 0, nil, nil, fmt.Errorf("column %q: %w", col, err)
+		}
+		rowValues = append(rowValues, placeholder)
+		values = append(values, args...)
+		index += len(args)
 	}
 
-	return index, rowValues, values
+	return index, rowValues, values, nil
 }
 
 // update builds an UPDATE query for the given table, data, joins, and conditions.
 // The joins parameter is optional and may be nil or empty.
 //
-//nolint:prealloc,cyclop,gocognit
+//nolint:cyclop,gocognit
 func update(
 	dialect optionDialect,
 	table string,
@@ -684,20 +701,9 @@ func update(
 	opts *options.QueryOptions,
 	joinFn func(table string, join *cdt.Join, paramBase int) (string, []any, error),
 ) (string, []any, error) {
-	// Extract and sort column names for deterministic ordering
-	columns := make([]string, 0, len(data))
-	for col := range data {
-		columns = append(columns, col)
-	}
-	sort.Strings(columns)
-
-	index := 1
-	sets, values := make([]string, 0), make([]any, 0)
-
-	for _, col := range columns {
-		sets = append(sets, fmt.Sprintf("%s = %s", dialect.QuoteIdentifier(col), dialect.Placeholder(index)))
-		values = append(values, data[col])
-		index++
+	sets, values, index, err := setClauses(dialect, data)
+	if err != nil {
+		return "", nil, fmt.Errorf("builder.update: %w", err)
 	}
 
 	sql := fmt.Sprintf("UPDATE %s", dialect.QuoteIdentifier(table))

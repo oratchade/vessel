@@ -12,6 +12,7 @@ caller-owned inputs and should be trusted or allowlisted.
 | Raw HAVING | Yes, trusted SQL | Yes, trusted SQL | Yes, trusted SQL | Yes, trusted SQL |
 | Projection aliases | Yes | Yes | Yes | Yes |
 | Raw projections | Yes, trusted SQL | Yes, trusted SQL | Yes, trusted SQL | Yes, trusted SQL |
+| Raw value expressions (`RawExpr`) | Yes, trusted SQL | Yes, trusted SQL | Yes, trusted SQL | Yes, trusted SQL |
 | Joins | Yes | Yes | Yes | Yes |
 | Joined UPDATE | `UPDATE ... JOIN` | `UPDATE ... FROM` | `UPDATE ... FROM` | `UPDATE ... FROM` |
 | Joined DELETE | `DELETE t FROM ... JOIN` | `DELETE ... USING` | Unsupported | `DELETE ... FROM` |
@@ -20,7 +21,7 @@ caller-owned inputs and should be trusted or allowlisted.
 | INSERT returning preview | Ignored | `RETURNING` | Ignored | `OUTPUT inserted...` |
 | UPDATE returning preview | Ignored | `RETURNING` | Ignored | `OUTPUT inserted...` |
 | DELETE returning preview | Ignored | `RETURNING` | Ignored | `OUTPUT deleted...` |
-| Returning execution | Unsupported, clear error | Unsupported, clear error | Unsupported, clear error | Unsupported, clear error |
+| Returning execution (`ExecReturning`) | Unsupported, clear error | `RETURNING` | Unsupported, clear error | `OUTPUT inserted/deleted...`; upsert unsupported |
 | Upsert do update | `ON DUPLICATE KEY UPDATE` | `ON CONFLICT DO UPDATE` | `ON CONFLICT DO UPDATE` | Unsupported, clear error |
 | Upsert do nothing | no-op duplicate-key update | `ON CONFLICT DO NOTHING` | `ON CONFLICT DO NOTHING` | Unsupported, clear error |
 | Upsert conflict target predicate (`TargetWhere`) | Unsupported, clear error | `ON CONFLICT (cols) WHERE ...` | `ON CONFLICT (cols) WHERE ...` without bound values; bound values return a clear error | Unsupported, clear error |
@@ -37,8 +38,8 @@ caller-owned inputs and should be trusted or allowlisted.
 - Prefer condition helpers such as `Equal`, `In`, `IsNull`, `IsNotNull`, and
   `ILike` for dynamic values.
 - Prefer `Column` and `ColumnAs` for identifiers.
-- Use `ColumnRaw`, `ColumnRawAs`, `HavingRaw`, `QueryRaw`, and `Exec` only for
-  trusted SQL fragments.
+- Use `ColumnRaw`, `ColumnRawAs`, `HavingRaw`, `RawExpr`, `QueryRaw`, and
+  `Exec` only for trusted SQL fragments.
 - Use app-generated IDs plus `InsertAndFetch` for portable create-and-fetch
   flows.
 - Pass `TransactionOptions` to `Begin` or `WithTransaction` when isolation
@@ -49,5 +50,6 @@ caller-owned inputs and should be trusted or allowlisted.
 - PostgreSQL arrays and `ANY`.
 - PostgreSQL/Timescale `DISTINCT ON`.
 - Database-specific casts such as `ip_address::text`.
-- Row-returning mutation execution via `RETURNING` or `OUTPUT`.
+- Row-returning mutation execution (`ExecReturning`): PostgreSQL `RETURNING`
+  and MSSQL `OUTPUT` only.
 - MSSQL upsert via `MERGE`.

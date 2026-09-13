@@ -1246,6 +1246,13 @@ func TestInsertBuilderInsertAndFetchValidation(t *testing.T) {
 			build: func() *v1.InsertBuilder { return fluentDB.Insert().Into("users").Set("id", 1).Returning("id") },
 			key:   "id",
 		},
+		{
+			name: "raw expression key",
+			build: func() *v1.InsertBuilder {
+				return fluentDB.Insert().Into("users").Set("id", v1.RawExpr("gen_random_uuid()"))
+			},
+			key: "id",
+		},
 	}
 
 	for _, tt := range tests {

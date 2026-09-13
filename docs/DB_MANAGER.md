@@ -130,6 +130,52 @@ if _, err := dm.Ping(ctx); err != nil {
 }
 ```
 
+## Transactions
+
+`WithTransaction(ctx, entryName, fn, opts...)` runs `fn` inside a database
+transaction on the named `readwrite` entry:
+
+```go
+import (
+    "database/sql"
+
+    db "tounilab.com/vessel/db/v1"
+)
+
+err := dm.WithTransaction(ctx, "primary", func(tx db.Tx) error {
+    // Lock the owning row before reading the set it guards.
+    if _, err := tx.Query(ctx, "SELECT id FROM routes WHERE id = $1 FOR UPDATE", routeID); err != nil {
+        return err
+    }
+    if _, err := tx.Exec(ctx, "DELETE FROM route_stops WHERE route_id = $1", routeID); err != nil {
+        return err
+    }
+    _, err := db.NewFluentDB(tx).Insert().Into("route_stops").ValuesBulk(stops).Exec(ctx)
+    return err
+}, db.TransactionOptions{Isolation: sql.LevelReadCommitted})
+```
+
+- The transaction commits when `fn` returns nil and rolls back when `fn`
+  returns an error or panics. A panic is returned as an error.
+- Every statement issued through `tx`, including a plain
+  `SELECT ... FOR UPDATE`, runs on the transaction's connection. Read/write
+  routing does not apply inside the callback, so a lock is never taken on a
+  replica. Do not call `dm.Get`, `dm.Insert`, and similar methods inside `fn`:
+  they are routed and queued as independent statements outside the
+  transaction.
+- Transactions bypass the worker queues and hold a pool connection for the
+  whole callback. Keep them short.
+- Before touching the database, `WithTransaction` returns
+  `ErrManagerNotStarted` or `ErrManagerClosed`, `ErrEntryNotFound` for an
+  unknown name, `ErrEntryReadOnly` for a `readonly` entry (a transaction on a
+  replica protects nothing), and `ErrEntryUnhealthy` for an entry failing
+  health checks.
+- `WithTransaction` never retries. To retry, for example on a serialization
+  failure, wrap the whole `WithTransaction` call in your retry loop or a
+  `QueryWithRetry` callback. Never retry individual statements inside `fn`.
+- `Stop` closes connections without waiting for in-flight transactions. Finish
+  them before shutdown.
+
 ## Synchronous API
 
 The synchronous methods block until the queued operation returns or the context
@@ -183,11 +229,32 @@ Supported synchronous methods:
 - `Get`, `GetRaw`, `GetByID`, `GetByIDRaw`
 - `Query`, `QueryRaw`
 - `Insert`, `Inserts`, `Upsert`, `Upserts`, `Update`, `Delete`
-- `Exec`
+- `Exec`, `ExecReturning`
 - `Ping`, `HealthStatus`
 
-`GetRaw`, `GetByIDRaw`, and `QueryRaw` return `*db.RowsAdapter`. Use
-`ScanRowsTo`, `ScanAll`, `ScanOne`, or close the rows manually.
+`GetRaw`, `GetByIDRaw`, `QueryRaw`, and `ExecReturning` return
+`*db.RowsAdapter`. Use `ScanRowsTo`, `ScanAll`, `ScanOne`, or close the rows
+manually.
+
+`ExecReturning` runs an `INSERT`, `UPDATE`, or `DELETE` that returns rows
+(PostgreSQL `RETURNING`, MSSQL `OUTPUT`) on a read-write entry, never on a
+read-only replica. Pass SQL from a FluentDB mutation builder's
+`Returning(...).Query()`, or trusted raw SQL. MySQL and SQLite entries return an
+unsupported error without executing the statement.
+
+If the caller's context is cancelled, or the default timeout expires, before the
+rows arrive, `ExecReturning` returns the context error and the manager closes the
+rows when they do arrive, so their connection goes back to the pool.
+`ExecReturningAsync` callers own the response and must close `RawData`
+themselves.
+
+```go
+rows, err := dm.ExecReturning(ctx, query, args...)
+if err != nil {
+    return err
+}
+routes, err := db.ScanAll[Route](ctx, rows)
+```
 
 ## Async API
 
@@ -216,7 +283,7 @@ Supported async methods mirror the synchronous methods with an `Async` suffix:
 - `QueryAsync`, `QueryRawAsync`
 - `InsertAsync`, `InsertsAsync`, `UpsertAsync`, `UpsertsAsync`, `UpdateAsync`,
   `DeleteAsync`
-- `ExecAsync`
+- `ExecAsync`, `ExecReturningAsync`
 
 `PingAsync` is named for compatibility but checks the selected connection
 immediately and returns `error`, not a response channel.
@@ -239,8 +306,8 @@ Always check `resp.Error` before reading `Data`, `RawData`, or `ExecData`.
 
 Automatic insert batching is disabled by default. When enabled, compatible
 `InsertAsync` requests may be flushed as one `Inserts` call by the same write
-worker. `UpsertAsync` and `UpsertsAsync` requests are not coalesced; they flush
-any pending insert batch first, then execute directly.
+worker. `UpsertAsync`, `UpsertsAsync`, and `ExecReturningAsync` requests are not
+coalesced; they flush any pending insert batch first, then execute directly.
 
 Requests are compatible when they target the same worker, table, query options,
 and column set. A batch flushes when it reaches `write_batch_max_rows`, waits

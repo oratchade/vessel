@@ -6,9 +6,59 @@ import (
 
 	"tounilab.com/vessel/db/v1/dberror"
 	builder "tounilab.com/vessel/internal/pkg/builder"
+	"tounilab.com/vessel/internal/pkg/sqldialect"
 	cdt "tounilab.com/vessel/pkg/query/condition"
 	"tounilab.com/vessel/pkg/query/options"
 )
+
+func rejectUnsupportedReturningExecution(driver string, dialect sqldialect.CapabilityProvider) error {
+	if dialect.Capabilities().MutationReturning {
+		return nil
+	}
+	return fmt.Errorf(
+		"%s.ExecReturning: mutation RETURNING/OUTPUT execution is not supported by this dialect",
+		driver,
+	)
+}
+
+// errMappingRowsProvider maps driver errors reported while reading rows. A
+// mutation's own failure (e.g. a duplicate key) can surface only through
+// Rows.Err, after the query call itself succeeded.
+type errMappingRowsProvider struct {
+	RowsProvider
+
+	mapper dberror.ErrorMapper
+}
+
+func (p errMappingRowsProvider) columns() ([]string, error) {
+	cols, err := p.RowsProvider.columns()
+	return cols, p.mapErr("errMappingRowsProvider.columns", err)
+}
+
+func (p errMappingRowsProvider) scan(dest ...any) error {
+	return p.mapErr("errMappingRowsProvider.scan", p.RowsProvider.scan(dest...))
+}
+
+func (p errMappingRowsProvider) close() error {
+	return p.mapErr("errMappingRowsProvider.close", p.RowsProvider.close())
+}
+
+func (p errMappingRowsProvider) err() error {
+	return p.mapErr("errMappingRowsProvider.err", p.RowsProvider.err())
+}
+
+func (p errMappingRowsProvider) mapErr(operation string, err error) error {
+	if err == nil {
+		return nil
+	}
+	return fmt.Errorf("%s: %w", operation, p.mapper.MapError(err))
+}
+
+// mapRowErrors routes the rows' iteration, scan, and close errors through mapper.
+func mapRowErrors(rows *RowsAdapter, mapper dberror.ErrorMapper) *RowsAdapter {
+	rows.provider = errMappingRowsProvider{RowsProvider: rows.provider, mapper: mapper}
+	return rows
+}
 
 // dbOpts holds common database operation dependencies used by helper functions.
 type dbOpts struct {

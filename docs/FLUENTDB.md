@@ -224,9 +224,26 @@ result, err := fdb.
     Exec(ctx)
 ```
 
-The right-hand side of `Set` is parameterized. There is no public `db.Raw`
-assignment helper. If you need expressions such as `seen_count = seen_count +
-1`, use `DB.Exec` or `DB.QueryRaw`/`Exec` with a reviewed raw SQL statement.
+Values passed to `Set` are parameterized. To have the database evaluate an
+expression instead, wrap trusted SQL in `v1.RawExpr`. It renders inline in
+`Set`, `SetMap`, `Values`, `ValuesBulk`, `DoUpdateSet`, and condition `Expr`
+values:
+
+```go
+result, err := fdb.
+    Update("idempotency_records").
+    Set("completed_at", v1.RawExpr("NOW()")).
+    Set("seen_count", v1.RawExpr("seen_count + 1")).
+    Where(cdt.NewExpr().Column("expires_at").Op(">").Value(v1.RawExpr("NOW()"))).
+    Exec(ctx)
+```
+
+`RawExpr` is caller-owned SQL that is neither quoted nor parameterized: pass
+only trusted, allowlisted syntax, never user input. It keeps time comparisons
+on the database clock (`NOW()` rather than an app-side `time.Now()`) and makes
+counters atomic. In `DoUpdateSet` on PostgreSQL, qualify existing-row columns
+with the table name (`counters.n + 1`), because `excluded` makes bare names
+ambiguous.
 
 ## DELETE
 
@@ -331,13 +348,12 @@ result, err := fdb.
 - MySQL returns an explicit error for either predicate, because
   `ON DUPLICATE KEY UPDATE` supports neither.
 
-## RETURNING / OUTPUT Preview
+## RETURNING / OUTPUT
 
-`Returning` is for query preview only. `InsertQuery`, `UpdateQuery`,
-`DeleteQuery`, `UpsertQuery`, and `UpsertsQuery` can include PostgreSQL
-`RETURNING` or MSSQL `OUTPUT` where supported by the builder. Mutation
-execution methods reject `Returning` because they return `ExecResult`, not
-rows.
+`Returning` adds PostgreSQL `RETURNING` or MSSQL `OUTPUT` columns to a
+mutation. `Query`, `InsertQuery`, `UpdateQuery`, `DeleteQuery`, `UpsertQuery`,
+and `UpsertsQuery` preview the SQL; MySQL and SQLite leave the clause out of
+the preview.
 
 ```go
 sql, args, err := fdb.
@@ -348,8 +364,33 @@ sql, args, err := fdb.
     Query()
 ```
 
-If production code needs returned rows from a mutation, use a dialect-specific
-raw query that your tests cover.
+To execute the mutation and read the returned rows in one statement, call
+`ExecReturning` on the insert, update, or delete builder. It works for upserts
+and with `WithTx`, and returns `*RowsAdapter`. `ScanAll`, `ScanOne`, and
+`ScanRowsTo` close the rows; otherwise close them yourself.
+
+```go
+rows, err := fdb.
+    Insert().
+    Into("routes").
+    Values(data).
+    Returning("id", "created_at").
+    ExecReturning(ctx)
+if err != nil {
+    return err
+}
+created, err := db.ScanOne[Route](ctx, rows)
+```
+
+- `ExecReturning` requires `Returning` columns. `Exec`, `Upsert`, and the other
+  `ExecResult` methods still reject `Returning`.
+- As with `Exec`, update and delete require `Where`.
+- MySQL and SQLite return an unsupported error without executing the
+  statement. MSSQL upserts remain unsupported.
+- The builder's `DBActions` must implement `ReturningExecutor`. The built-in
+  drivers, their transactions, and `DBManager` do. A custom adapter adds
+  `ExecReturning(ctx, query, args...)` and must run the statement on a writable
+  connection.
 
 ## Transactions
 
