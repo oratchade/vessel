@@ -62,6 +62,9 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 - PostgreSQL `UpsertQuery`/`UpsertsQuery` with `Returning` rendered
   `RETURNING` before `ON CONFLICT`, which is invalid SQL. `RETURNING` is now
   rendered after the conflict clause.
+- `DBManager.GetRaw`, `GetByIDRaw`, and `QueryRaw` now close rows that arrive
+  after a synchronous caller cancels or times out, so their connection returns
+  to the pool. Previously each such call left a connection checked out.
 
 ## [0.2.0] - 2026-07-08
 
