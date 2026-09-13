@@ -820,7 +820,8 @@ func (i *InsertBuilder) DoUpdateSet(data map[string]any) *InsertBuilder {
 // TargetWhere adds a predicate to the conflict target, rendered as
 // ON CONFLICT (cols) WHERE <cond>. PostgreSQL and SQLite need it to infer a
 // partial unique index (e.g. uniqueness among rows where deleted_at IS NULL).
-// MySQL returns an error.
+// SQLite can't match bound values against the index predicate, so a predicate
+// that binds values returns an error there. MySQL returns an error.
 func (i *InsertBuilder) TargetWhere(cond cdt.Condition) *InsertBuilder {
 	if i.upsertOpts == nil {
 		i.upsertOpts = &options.UpsertOptions{}

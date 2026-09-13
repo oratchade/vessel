@@ -23,7 +23,7 @@ caller-owned inputs and should be trusted or allowlisted.
 | Returning execution | Unsupported, clear error | Unsupported, clear error | Unsupported, clear error | Unsupported, clear error |
 | Upsert do update | `ON DUPLICATE KEY UPDATE` | `ON CONFLICT DO UPDATE` | `ON CONFLICT DO UPDATE` | Unsupported, clear error |
 | Upsert do nothing | no-op duplicate-key update | `ON CONFLICT DO NOTHING` | `ON CONFLICT DO NOTHING` | Unsupported, clear error |
-| Upsert conflict target predicate (`TargetWhere`) | Unsupported, clear error | `ON CONFLICT (cols) WHERE ...` | `ON CONFLICT (cols) WHERE ...` | Unsupported, clear error |
+| Upsert conflict target predicate (`TargetWhere`) | Unsupported, clear error | `ON CONFLICT (cols) WHERE ...` | `ON CONFLICT (cols) WHERE ...` without bound values; bound values return a clear error | Unsupported, clear error |
 | Upsert conditional update (`UpdateWhere`) | Unsupported, clear error | `DO UPDATE SET ... WHERE ...` | `DO UPDATE SET ... WHERE ...` | Unsupported, clear error |
 | Case-insensitive search | `LOWER(col) LIKE LOWER(?)` | `LOWER(col) LIKE LOWER(?)` | `LOWER(col) LIKE LOWER(?)` | `LOWER(col) LIKE LOWER(?)` |
 | Array membership | Expand values with `IN` | Expand values with `IN`; use raw SQL for `ANY` | Expand values with `IN` | Expand values with `IN` |

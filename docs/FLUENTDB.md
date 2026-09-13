@@ -323,6 +323,11 @@ result, err := fdb.
   order: insert values, target predicate, update values, update predicate.
 - `UpdateWhere` requires `DoUpdate` or `DoUpdateSet`. `TargetWhere` also
   works with `DoNothing`.
+- On SQLite, `TargetWhere` can't bind values. SQLite can't match a bound
+  value against a partial index's predicate, so `active = ?` never matches an
+  index declared `WHERE active = 1`, and the builder returns an error instead.
+  Use a predicate without bound values, such as `IS NULL`. PostgreSQL accepts
+  bound values here.
 - MySQL returns an explicit error for either predicate, because
   `ON DUPLICATE KEY UPDATE` supports neither.
 

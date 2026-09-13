@@ -15,6 +15,7 @@ import (
 const (
 	upsertWhereRelationships = "upsert_where_relationships"
 	upsertWhereClaims        = "upsert_where_claims"
+	upsertWhereActiveClaims  = "upsert_where_active_claims"
 )
 
 func upsertWhereSchema(driver string) []string {
@@ -33,6 +34,11 @@ func upsertWhereSchema(driver string) []string {
 				" (source_id, target_id) WHERE deleted_at IS NULL",
 			"CREATE TABLE " + upsertWhereClaims + " (scope_key " + textType + " PRIMARY KEY, owner " + textType +
 				" NOT NULL, expires_at BIGINT NOT NULL)",
+			"DROP TABLE IF EXISTS " + upsertWhereActiveClaims,
+			"CREATE TABLE " + upsertWhereActiveClaims + " (id " + idType + ", scope_key " + textType +
+				" NOT NULL, active INTEGER NOT NULL, owner " + textType + " NOT NULL)",
+			"CREATE UNIQUE INDEX " + upsertWhereActiveClaims + "_active ON " + upsertWhereActiveClaims +
+				" (scope_key) WHERE active = 1",
 		}
 	default:
 		return nil
@@ -73,7 +79,51 @@ func TestIntegration_UpsertConflictPredicates(t *testing.T) {
 			t.Run("conditional do update", func(t *testing.T) {
 				testUpsertUpdateWhere(ctx, t, database)
 			})
+			t.Run("equality partial index target", func(t *testing.T) {
+				testUpsertTargetWhereEquality(ctx, t, database, testDB.driver)
+			})
 		})
+	}
+}
+
+// testUpsertTargetWhereEquality targets a partial index whose predicate compares a
+// column with a constant. PostgreSQL matches a bound value against it; SQLite
+// cannot, so the builder must reject the bound form before executing.
+func testUpsertTargetWhereEquality(ctx context.Context, t *testing.T, database v1.DB, driver string) {
+	t.Helper()
+	fluent := v1.NewFluentDB(database)
+	_, err := fluent.Insert().Into(upsertWhereActiveClaims).
+		Set("scope_key", "k1").Set("active", 1).Set("owner", "first").
+		Exec(ctx)
+	if err != nil {
+		t.Fatalf("seed failed: %v", err)
+	}
+
+	_, err = fluent.Insert().Into(upsertWhereActiveClaims).
+		Set("scope_key", "k1").Set("active", 1).Set("owner", "second").
+		OnConflict("scope_key").
+		TargetWhere(condition.NewExpr().Column("active").Op("=").Value(1)).
+		DoUpdate("owner").
+		Upsert(ctx)
+
+	wantOwner := "second"
+	if driver == "sqlite" {
+		if err == nil || !strings.Contains(err.Error(), "SQLite cannot match a bound TargetWhere value") {
+			t.Fatalf("expected SQLite to reject a bound TargetWhere value, got %v", err)
+		}
+		wantOwner = "first"
+	} else if err != nil {
+		t.Fatalf("upsert with equality TargetWhere failed: %v", err)
+	}
+
+	rows, err := fluent.Select(upsertWhereActiveClaims, "owner").
+		Where(condition.NewExpr().Column("scope_key").Op("=").Value("k1")).
+		Get(ctx)
+	if err != nil {
+		t.Fatalf("select failed: %v", err)
+	}
+	if len(rows) != 1 || rows[0]["owner"] != wantOwner {
+		t.Fatalf("unexpected rows: %#v", rows)
 	}
 }
 

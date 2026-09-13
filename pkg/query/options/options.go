@@ -32,7 +32,9 @@ type UpsertOptions struct {
 
 	// TargetWhere is an optional predicate on the conflict target, rendered as
 	// ON CONFLICT (cols) WHERE <predicate>. PostgreSQL and SQLite require it to
-	// infer a partial unique index. MySQL rejects it with an error.
+	// infer a partial unique index. SQLite rejects a predicate that binds values,
+	// because it can't match them against the index predicate. MySQL rejects it
+	// with an error.
 	TargetWhere condition.Condition
 
 	// UpdateWhere is an optional predicate that makes DO UPDATE conditional,

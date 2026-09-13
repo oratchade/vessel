@@ -492,6 +492,12 @@ func conflictTarget(dialect optionDialect, upsertOpts *options.UpsertOptions, pa
 	if err != nil {
 		return "", nil, err
 	}
+	if len(args) > 0 && isSQLiteDialect(dialect) {
+		return "", nil, fmt.Errorf(
+			"builder.upsert: SQLite cannot match a bound TargetWhere value against a partial index predicate; " +
+				"use a predicate without bound values, such as IS NULL",
+		)
+	}
 	return "(" + strings.Join(quoted, ", ") + ")" + where, args, nil
 }
 

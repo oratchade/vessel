@@ -17,8 +17,10 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
   `options.UpsertOptions.TargetWhere` and `UpdateWhere` fields, work for
   single and bulk upserts on PostgreSQL and SQLite, and return an explicit
   error on MySQL (`ON DUPLICATE KEY UPDATE` supports neither) and when
-  `UpdateWhere` is combined with `DoNothing`. Upserts without predicates
-  render unchanged SQL.
+  `UpdateWhere` is combined with `DoNothing`. On SQLite, a `TargetWhere`
+  that binds values returns an error, because SQLite can't match a bound
+  value against a partial index predicate. Upserts without predicates render
+  unchanged SQL.
 
 ## [0.2.0] - 2026-07-08
 
