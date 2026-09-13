@@ -351,6 +351,15 @@ func (de *DBEntry) processWriteRequest(ctx context.Context, qd *Query) *QueryRes
 			qd.Data.Params...,
 		)
 		return &QueryResponse{ExecData: resp, Error: err}
+	case ReqExecReturning:
+		executor, ok := de.db.(db.ReturningExecutor)
+		if !ok {
+			return &QueryResponse{
+				Error: fmt.Errorf("ExecReturning: database entry %q does not support RETURNING execution", de.name),
+			}
+		}
+		rows, err := executor.ExecReturning(ctx, qd.Data.Query, qd.Data.Params...)
+		return &QueryResponse{RawData: rows, Error: err}
 	}
 	return &QueryResponse{}
 }
@@ -541,6 +550,10 @@ func (de *DBEntry) sendResponseWithTimeout(
 	qd *Query,
 	response *QueryResponse,
 ) {
+	if qd.handoff != nil {
+		qd.handoff.deliver(qd.ResponseCh, response)
+		return
+	}
 	const responseSendTimeout = 5 * time.Second
 	select {
 	case qd.ResponseCh <- response:
