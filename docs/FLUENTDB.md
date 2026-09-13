@@ -224,9 +224,26 @@ result, err := fdb.
     Exec(ctx)
 ```
 
-The right-hand side of `Set` is parameterized. There is no public `db.Raw`
-assignment helper. If you need expressions such as `seen_count = seen_count +
-1`, use `DB.Exec` or `DB.QueryRaw`/`Exec` with a reviewed raw SQL statement.
+Values passed to `Set` are parameterized. To have the database evaluate an
+expression instead, wrap trusted SQL in `v1.RawExpr`. It renders inline in
+`Set`, `SetMap`, `Values`, `ValuesBulk`, `DoUpdateSet`, and condition `Expr`
+values:
+
+```go
+result, err := fdb.
+    Update("idempotency_records").
+    Set("completed_at", v1.RawExpr("NOW()")).
+    Set("seen_count", v1.RawExpr("seen_count + 1")).
+    Where(cdt.NewExpr().Column("expires_at").Op(">").Value(v1.RawExpr("NOW()"))).
+    Exec(ctx)
+```
+
+`RawExpr` is caller-owned SQL that is neither quoted nor parameterized: pass
+only trusted, allowlisted syntax, never user input. It keeps time comparisons
+on the database clock (`NOW()` rather than an app-side `time.Now()`) and makes
+counters atomic. In `DoUpdateSet` on PostgreSQL, qualify existing-row columns
+with the table name (`counters.n + 1`), because `excluded` makes bare names
+ambiguous.
 
 ## DELETE
 

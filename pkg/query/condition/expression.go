@@ -90,6 +90,14 @@ func (e *Expr) ToSQL(dialect SQLDialect, paramBase int) (string, []any, error) {
 		return sql, nil, nil
 	}
 
+	if raw, ok := e.value.(RawExpr); ok {
+		sql := strings.TrimSpace(string(raw))
+		if sql == "" {
+			return "", nil, fmt.Errorf("invalid expression: raw expression cannot be empty")
+		}
+		return fmt.Sprintf("%s %s %s", column, op, sql), nil, nil
+	}
+
 	if e.value == nil {
 		return "", nil, fmt.Errorf("invalid expression")
 	}

@@ -1092,6 +1092,11 @@ func (i *InsertBuilder) validateInsertAndFetch(keyColumn string) (any, error) {
 	if !ok {
 		return nil, fmt.Errorf("InsertBuilder.InsertAndFetch: key column %q missing from insert data", keyColumn)
 	}
+	if _, raw := keyValue.(cdt.RawExpr); raw {
+		return nil, fmt.Errorf(
+			"InsertBuilder.InsertAndFetch: key column %q must be a bound value, not a RawExpr", keyColumn,
+		)
+	}
 	return keyValue, nil
 }
 

@@ -36,6 +36,14 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
   available to DBManager users. New sentinel errors `ErrEntryNotFound`,
   `ErrEntryReadOnly`, and `ErrEntryUnhealthy` report entries that cannot host
   a transaction.
+- `RawExpr` (`db/v1.RawExpr`, an alias of `pkg/query/condition.RawExpr`)
+  marks a trusted SQL expression such as `NOW()` or `counter + 1` in a value
+  position. It renders inline instead of binding a parameter in `Set`,
+  `SetMap`, `Values`, `ValuesBulk`, `DoUpdateSet`, and `condition.Expr`
+  values, with placeholder numbering kept contiguous around it. Same trust
+  contract as `ColumnRaw`: trusted or allowlisted SQL only, never user input.
+  Empty raw expressions return an error, and `InsertAndFetch` rejects a
+  `RawExpr` key value because it cannot fetch the row back by it (#29).
 
 ### Fixed
 

@@ -12,6 +12,7 @@ caller-owned inputs and should be trusted or allowlisted.
 | Raw HAVING | Yes, trusted SQL | Yes, trusted SQL | Yes, trusted SQL | Yes, trusted SQL |
 | Projection aliases | Yes | Yes | Yes | Yes |
 | Raw projections | Yes, trusted SQL | Yes, trusted SQL | Yes, trusted SQL | Yes, trusted SQL |
+| Raw value expressions (`RawExpr`) | Yes, trusted SQL | Yes, trusted SQL | Yes, trusted SQL | Yes, trusted SQL |
 | Joins | Yes | Yes | Yes | Yes |
 | Joined UPDATE | `UPDATE ... JOIN` | `UPDATE ... FROM` | `UPDATE ... FROM` | `UPDATE ... FROM` |
 | Joined DELETE | `DELETE t FROM ... JOIN` | `DELETE ... USING` | Unsupported | `DELETE ... FROM` |
@@ -35,8 +36,8 @@ caller-owned inputs and should be trusted or allowlisted.
 - Prefer condition helpers such as `Equal`, `In`, `IsNull`, `IsNotNull`, and
   `ILike` for dynamic values.
 - Prefer `Column` and `ColumnAs` for identifiers.
-- Use `ColumnRaw`, `ColumnRawAs`, `HavingRaw`, `QueryRaw`, and `Exec` only for
-  trusted SQL fragments.
+- Use `ColumnRaw`, `ColumnRawAs`, `HavingRaw`, `RawExpr`, `QueryRaw`, and
+  `Exec` only for trusted SQL fragments.
 - Use app-generated IDs plus `InsertAndFetch` for portable create-and-fetch
   flows.
 - Pass `TransactionOptions` to `Begin` or `WithTransaction` when isolation
