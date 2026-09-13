@@ -130,6 +130,52 @@ if _, err := dm.Ping(ctx); err != nil {
 }
 ```
 
+## Transactions
+
+`WithTransaction(ctx, entryName, fn, opts...)` runs `fn` inside a database
+transaction on the named `readwrite` entry:
+
+```go
+import (
+    "database/sql"
+
+    db "tounilab.com/vessel/db/v1"
+)
+
+err := dm.WithTransaction(ctx, "primary", func(tx db.Tx) error {
+    // Lock the owning row before reading the set it guards.
+    if _, err := tx.Query(ctx, "SELECT id FROM routes WHERE id = $1 FOR UPDATE", routeID); err != nil {
+        return err
+    }
+    if _, err := tx.Exec(ctx, "DELETE FROM route_stops WHERE route_id = $1", routeID); err != nil {
+        return err
+    }
+    _, err := db.NewFluentDB(tx).Insert().Into("route_stops").ValuesBulk(stops).Exec(ctx)
+    return err
+}, db.TransactionOptions{Isolation: sql.LevelReadCommitted})
+```
+
+- The transaction commits when `fn` returns nil and rolls back when `fn`
+  returns an error or panics. A panic is returned as an error.
+- Every statement issued through `tx`, including a plain
+  `SELECT ... FOR UPDATE`, runs on the transaction's connection. Read/write
+  routing does not apply inside the callback, so a lock is never taken on a
+  replica. Do not call `dm.Get`, `dm.Insert`, and similar methods inside `fn`:
+  they are routed and queued as independent statements outside the
+  transaction.
+- Transactions bypass the worker queues and hold a pool connection for the
+  whole callback. Keep them short.
+- Before touching the database, `WithTransaction` returns
+  `ErrManagerNotStarted` or `ErrManagerClosed`, `ErrEntryNotFound` for an
+  unknown name, `ErrEntryReadOnly` for a `readonly` entry (a transaction on a
+  replica protects nothing), and `ErrEntryUnhealthy` for an entry failing
+  health checks.
+- `WithTransaction` never retries. To retry, for example on a serialization
+  failure, wrap the whole `WithTransaction` call in your retry loop or a
+  `QueryWithRetry` callback. Never retry individual statements inside `fn`.
+- `Stop` closes connections without waiting for in-flight transactions. Finish
+  them before shutdown.
+
 ## Synchronous API
 
 The synchronous methods block until the queued operation returns or the context
