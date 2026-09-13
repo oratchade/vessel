@@ -294,6 +294,60 @@ Dialect behavior:
 - MySQL renders `ON DUPLICATE KEY UPDATE`.
 - MSSQL returns an explicit unsupported error.
 
+### Conflict predicates
+
+`TargetWhere` adds a predicate to the conflict target. PostgreSQL and SQLite
+need it to pick a partial unique index, such as uniqueness among rows that
+aren't soft-deleted:
+
+```go
+result, err := fdb.
+    Insert().
+    Into("relationships").
+    Set("source_id", sourceID).
+    Set("target_id", targetID).
+    Set("label", label).
+    OnConflict("source_id", "target_id").
+    TargetWhere(cdt.IsNull("deleted_at")).
+    DoUpdate("label").
+    Upsert(ctx)
+// ON CONFLICT ("source_id", "target_id") WHERE "deleted_at" IS NULL DO UPDATE ...
+```
+
+`UpdateWhere` makes `DO UPDATE` conditional. When the predicate is false the
+conflicting row is left unchanged and `RowsAffected` is `0`. The next example
+inserts a new claim, takes over an expired one, and otherwise does nothing:
+
+```go
+result, err := fdb.
+    Insert().
+    Into("idempotency_records").
+    Set("scope_key", key).
+    Set("owner", owner).
+    Set("expires_at", expiresAt).
+    OnConflict("scope_key").
+    DoUpdateSet(map[string]any{"owner": owner, "expires_at": expiresAt}).
+    UpdateWhere(cdt.NewExpr().Column("idempotency_records.expires_at").Op("<=").Value(now)).
+    Upsert(ctx)
+// ... DO UPDATE SET ... WHERE "idempotency_records"."expires_at" <= $6
+```
+
+- Qualify columns in `UpdateWhere` with the table name. PostgreSQL treats
+  unqualified names as ambiguous there, because both the existing row and
+  `excluded` are in scope.
+- Both predicates are optional and independent, the call order doesn't
+  matter, and they apply to `Upserts` too. Bind values follow statement
+  order: insert values, target predicate, update values, update predicate.
+- `UpdateWhere` requires `DoUpdate` or `DoUpdateSet`. `TargetWhere` also
+  works with `DoNothing`.
+- On SQLite, `TargetWhere` can't bind values. SQLite can't match a bound
+  value against a partial index's predicate, so `active = ?` never matches an
+  index declared `WHERE active = 1`, and the builder returns an error instead.
+  Use a predicate without bound values, such as `IS NULL`. PostgreSQL accepts
+  bound values here.
+- MySQL returns an explicit error for either predicate, because
+  `ON DUPLICATE KEY UPDATE` supports neither.
+
 ## RETURNING / OUTPUT
 
 `Returning` adds PostgreSQL `RETURNING` or MSSQL `OUTPUT` columns to a

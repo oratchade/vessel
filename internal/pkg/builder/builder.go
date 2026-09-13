@@ -342,6 +342,9 @@ func upsert(
 			"builder.upsert: MSSQL upsert is not supported; use an explicit transaction or raw SQL",
 		)
 	}
+	if err := validateUpsertPredicates(dialect, upsertOpts); err != nil {
+		return "", nil, fmt.Errorf("builder.upsert: %w", err)
+	}
 
 	baseSQL, values, err := insert(dialect, table, data, opts)
 	if err != nil {
@@ -351,7 +354,7 @@ func upsert(
 
 	switch upsertOpts.Action {
 	case options.UpsertDoNothing:
-		conflict, err := conflictTarget(dialect, upsertOpts)
+		conflict, conflictValues, err := conflictTarget(dialect, upsertOpts, len(values)+1)
 		if err != nil {
 			return "", nil, err
 		}
@@ -359,8 +362,17 @@ func upsert(
 			noOpColumn := dialect.QuoteIdentifier(upsertOpts.ConflictColumns[0])
 			return baseSQL + " ON DUPLICATE KEY UPDATE " + noOpColumn + " = " + noOpColumn + ";", values, nil
 		}
-		return baseSQL + " ON CONFLICT " + conflict + " DO NOTHING;", values, nil
+		return baseSQL + " ON CONFLICT " + conflict + " DO NOTHING;", append(values, conflictValues...), nil
 	case options.UpsertDoUpdate:
+		var conflict string
+		if !isMySQLDialect(dialect) {
+			var conflictValues []any
+			conflict, conflictValues, err = conflictTarget(dialect, upsertOpts, len(values)+1)
+			if err != nil {
+				return "", nil, err
+			}
+			values = append(values, conflictValues...)
+		}
 		fragment, extraValues, err := upsertUpdateFragment(dialect, data, upsertOpts, len(values)+1)
 		if err != nil {
 			return "", nil, err
@@ -369,11 +381,12 @@ func upsert(
 		if isMySQLDialect(dialect) {
 			return baseSQL + " ON DUPLICATE KEY UPDATE " + fragment + ";", values, nil
 		}
-		conflict, err := conflictTarget(dialect, upsertOpts)
+		updateWhere, whereValues, err := conflictPredicate(dialect, upsertOpts.UpdateWhere, len(values)+1)
 		if err != nil {
 			return "", nil, err
 		}
-		return baseSQL + " ON CONFLICT " + conflict + " DO UPDATE SET " + fragment + ";", values, nil
+		return baseSQL + " ON CONFLICT " + conflict + " DO UPDATE SET " + fragment + updateWhere + ";",
+			append(values, whereValues...), nil
 	default:
 		return "", nil, fmt.Errorf("builder.upsert: unsupported upsert action %q", upsertOpts.Action)
 	}
@@ -401,6 +414,9 @@ func upserts(
 			"builder.upserts: MSSQL upsert is not supported; use an explicit transaction or raw SQL",
 		)
 	}
+	if err := validateUpsertPredicates(dialect, upsertOpts); err != nil {
+		return "", nil, fmt.Errorf("builder.upserts: %w", err)
+	}
 
 	baseSQL, values, err := inserts(dialect, table, data, opts)
 	if err != nil {
@@ -410,7 +426,7 @@ func upserts(
 
 	switch upsertOpts.Action {
 	case options.UpsertDoNothing:
-		conflict, err := conflictTarget(dialect, upsertOpts)
+		conflict, conflictValues, err := conflictTarget(dialect, upsertOpts, len(values)+1)
 		if err != nil {
 			return "", nil, err
 		}
@@ -418,8 +434,17 @@ func upserts(
 			noOpColumn := dialect.QuoteIdentifier(upsertOpts.ConflictColumns[0])
 			return baseSQL + " ON DUPLICATE KEY UPDATE " + noOpColumn + " = " + noOpColumn + ";", values, nil
 		}
-		return baseSQL + " ON CONFLICT " + conflict + " DO NOTHING;", values, nil
+		return baseSQL + " ON CONFLICT " + conflict + " DO NOTHING;", append(values, conflictValues...), nil
 	case options.UpsertDoUpdate:
+		var conflict string
+		if !isMySQLDialect(dialect) {
+			var conflictValues []any
+			conflict, conflictValues, err = conflictTarget(dialect, upsertOpts, len(values)+1)
+			if err != nil {
+				return "", nil, err
+			}
+			values = append(values, conflictValues...)
+		}
 		fragment, extraValues, err := upsertUpdateFragment(dialect, data[0], upsertOpts, len(values)+1)
 		if err != nil {
 			return "", nil, err
@@ -428,28 +453,68 @@ func upserts(
 		if isMySQLDialect(dialect) {
 			return baseSQL + " ON DUPLICATE KEY UPDATE " + fragment + ";", values, nil
 		}
-		conflict, err := conflictTarget(dialect, upsertOpts)
+		updateWhere, whereValues, err := conflictPredicate(dialect, upsertOpts.UpdateWhere, len(values)+1)
 		if err != nil {
 			return "", nil, err
 		}
-		return baseSQL + " ON CONFLICT " + conflict + " DO UPDATE SET " + fragment + ";", values, nil
+		return baseSQL + " ON CONFLICT " + conflict + " DO UPDATE SET " + fragment + updateWhere + ";",
+			append(values, whereValues...), nil
 	default:
 		return "", nil, fmt.Errorf("builder.upserts: unsupported upsert action %q", upsertOpts.Action)
 	}
 }
 
-func conflictTarget(dialect optionDialect, upsertOpts *options.UpsertOptions) (string, error) {
+// validateUpsertPredicates rejects conflict predicates the action or dialect cannot render.
+func validateUpsertPredicates(dialect optionDialect, upsertOpts *options.UpsertOptions) error {
+	if upsertOpts.TargetWhere == nil && upsertOpts.UpdateWhere == nil {
+		return nil
+	}
+	if upsertOpts.UpdateWhere != nil && upsertOpts.Action != options.UpsertDoUpdate {
+		return fmt.Errorf("UpdateWhere requires DO UPDATE")
+	}
+	if isMySQLDialect(dialect) {
+		return fmt.Errorf(
+			"MySQL does not support conflict predicates (TargetWhere/UpdateWhere) with ON DUPLICATE KEY UPDATE",
+		)
+	}
+	return nil
+}
+
+// conflictTarget renders "(cols)" plus the optional TargetWhere predicate starting at paramBase.
+func conflictTarget(dialect optionDialect, upsertOpts *options.UpsertOptions, paramBase int) (string, []any, error) {
 	if len(upsertOpts.ConflictColumns) == 0 {
-		return "", fmt.Errorf("builder.upsert: conflict columns are required")
+		return "", nil, fmt.Errorf("builder.upsert: conflict columns are required")
 	}
 	quoted := make([]string, 0, len(upsertOpts.ConflictColumns))
 	for _, col := range upsertOpts.ConflictColumns {
 		if col == "" {
-			return "", fmt.Errorf("builder.upsert: conflict column cannot be empty")
+			return "", nil, fmt.Errorf("builder.upsert: conflict column cannot be empty")
 		}
 		quoted = append(quoted, dialect.QuoteIdentifier(col))
 	}
-	return "(" + strings.Join(quoted, ", ") + ")", nil
+	where, args, err := conflictPredicate(dialect, upsertOpts.TargetWhere, paramBase)
+	if err != nil {
+		return "", nil, err
+	}
+	if len(args) > 0 && isSQLiteDialect(dialect) {
+		return "", nil, fmt.Errorf(
+			"builder.upsert: SQLite cannot match a bound TargetWhere value against a partial index predicate; " +
+				"use a predicate without bound values, such as IS NULL",
+		)
+	}
+	return "(" + strings.Join(quoted, ", ") + ")" + where, args, nil
+}
+
+// conflictPredicate renders an optional " WHERE <cond>" fragment for an ON CONFLICT clause.
+func conflictPredicate(dialect optionDialect, cond cdt.Condition, paramBase int) (string, []any, error) {
+	if cond == nil {
+		return "", nil, nil
+	}
+	sql, args, err := cond.ToSQL(dialect, paramBase)
+	if err != nil {
+		return "", nil, fmt.Errorf("builder.upsert: conflict predicate: %w", err)
+	}
+	return " WHERE " + sql, args, nil
 }
 
 //nolint:cyclop

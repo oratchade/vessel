@@ -44,6 +44,18 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
   contract as `ColumnRaw`: trusted or allowlisted SQL only, never user input.
   Empty raw expressions return an error, and `InsertAndFetch` rejects a
   `RawExpr` key value because it cannot fetch the row back by it (#29).
+- Upsert conflict predicates: `InsertBuilder.TargetWhere(cond)` renders
+  `ON CONFLICT (cols) WHERE <cond>` so upserts can target partial unique
+  indexes (the soft-delete uniqueness pattern), and
+  `InsertBuilder.UpdateWhere(cond)` renders `DO UPDATE SET ... WHERE <cond>`
+  for conditional updates such as expired-claim takeover. Both map to the new
+  `options.UpsertOptions.TargetWhere` and `UpdateWhere` fields, work for
+  single and bulk upserts on PostgreSQL and SQLite, and return an explicit
+  error on MySQL (`ON DUPLICATE KEY UPDATE` supports neither) and when
+  `UpdateWhere` is combined with `DoNothing`. On SQLite, a `TargetWhere`
+  that binds values returns an error, because SQLite can't match a bound
+  value against a partial index predicate. Upserts without predicates render
+  unchanged SQL.
 
 ### Fixed
 
