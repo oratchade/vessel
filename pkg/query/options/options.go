@@ -26,8 +26,21 @@ type UpsertOptions struct {
 	UpdateColumns []string
 
 	// UpdateValues contains explicit values to set on conflict.
-	// These values are parameterized. If provided, they are appended after insert values.
+	// These values are parameterized. If provided, they are appended after insert
+	// values and any TargetWhere values.
 	UpdateValues map[string]any
+
+	// TargetWhere is an optional predicate on the conflict target, rendered as
+	// ON CONFLICT (cols) WHERE <predicate>. PostgreSQL and SQLite require it to
+	// infer a partial unique index. MySQL rejects it with an error.
+	TargetWhere condition.Condition
+
+	// UpdateWhere is an optional predicate that makes DO UPDATE conditional,
+	// rendered as DO UPDATE SET ... WHERE <predicate>. Conflicting rows that do
+	// not match are left unchanged. Requires Action UpsertDoUpdate. Qualify
+	// columns with the table name: PostgreSQL treats unqualified names as
+	// ambiguous with the excluded row. MySQL rejects it with an error.
+	UpdateWhere condition.Condition
 }
 
 // OrderBy specifies a column and its sort direction for result ordering.

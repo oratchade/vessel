@@ -817,6 +817,30 @@ func (i *InsertBuilder) DoUpdateSet(data map[string]any) *InsertBuilder {
 	return i
 }
 
+// TargetWhere adds a predicate to the conflict target, rendered as
+// ON CONFLICT (cols) WHERE <cond>. PostgreSQL and SQLite need it to infer a
+// partial unique index (e.g. uniqueness among rows where deleted_at IS NULL).
+// MySQL returns an error.
+func (i *InsertBuilder) TargetWhere(cond cdt.Condition) *InsertBuilder {
+	if i.upsertOpts == nil {
+		i.upsertOpts = &options.UpsertOptions{}
+	}
+	i.upsertOpts.TargetWhere = cond
+	return i
+}
+
+// UpdateWhere makes the conflict update conditional, rendered as
+// DO UPDATE SET ... WHERE <cond>. Conflicting rows that don't match are left
+// unchanged. Qualify columns with the table name. Requires DoUpdate or
+// DoUpdateSet; MySQL returns an error.
+func (i *InsertBuilder) UpdateWhere(cond cdt.Condition) *InsertBuilder {
+	if i.upsertOpts == nil {
+		i.upsertOpts = &options.UpsertOptions{}
+	}
+	i.upsertOpts.UpdateWhere = cond
+	return i
+}
+
 // InsertQuery returns the generated single-row INSERT SQL and arguments without executing it.
 func (i *InsertBuilder) InsertQuery() (string, []any, error) {
 	if i.table == "" {

@@ -5,6 +5,21 @@ All notable changes to Vessel are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+
+- Upsert conflict predicates: `InsertBuilder.TargetWhere(cond)` renders
+  `ON CONFLICT (cols) WHERE <cond>` so upserts can target partial unique
+  indexes (the soft-delete uniqueness pattern), and
+  `InsertBuilder.UpdateWhere(cond)` renders `DO UPDATE SET ... WHERE <cond>`
+  for conditional updates such as expired-claim takeover. Both map to the new
+  `options.UpsertOptions.TargetWhere` and `UpdateWhere` fields, work for
+  single and bulk upserts on PostgreSQL and SQLite, and return an explicit
+  error on MySQL (`ON DUPLICATE KEY UPDATE` supports neither) and when
+  `UpdateWhere` is combined with `DoNothing`. Upserts without predicates
+  render unchanged SQL.
+
 ## [0.2.0] - 2026-07-08
 
 ### Removed
