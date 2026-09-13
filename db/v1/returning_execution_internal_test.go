@@ -9,6 +9,7 @@ import (
 	"testing"
 
 	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -17,6 +18,30 @@ import (
 )
 
 var errReturningQuery = errors.New("returning query failed")
+
+type failingRowsProvider struct{ failure error }
+
+func (f failingRowsProvider) columns() ([]string, error) { return nil, f.failure }
+func (f failingRowsProvider) next() bool                 { return false }
+func (f failingRowsProvider) scan(...any) error          { return f.failure }
+func (f failingRowsProvider) close() error               { return f.failure }
+func (f failingRowsProvider) err() error                 { return f.failure }
+
+func TestMapRowErrorsMapsIterationErrors(t *testing.T) {
+	duplicate := &pgconn.PgError{Code: "23505"}
+	rows := mapRowErrors(&RowsAdapter{provider: failingRowsProvider{failure: duplicate}}, dberror.PostgresErrorMapper{})
+
+	assert.False(t, rows.Next())
+	require.ErrorIs(t, rows.Err(), dberror.ErrDuplicateKey)
+	require.ErrorIs(t, rows.Scan(), dberror.ErrDuplicateKey)
+	require.ErrorIs(t, rows.Close(), dberror.ErrDuplicateKey)
+	_, err := rows.Columns()
+	require.ErrorIs(t, err, dberror.ErrDuplicateKey)
+
+	clean := mapRowErrors(&RowsAdapter{provider: failingRowsProvider{}}, dberror.PostgresErrorMapper{})
+	require.NoError(t, clean.Err())
+	require.NoError(t, clean.Close())
+}
 
 type recordingSQLQuerier struct {
 	fakeSQLQuerier

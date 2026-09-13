@@ -15,7 +15,9 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
   MSSQL `OUTPUT`). It covers upserts and honors `WithTx`, removing the
   insert-then-select race of fetching by key. MySQL and SQLite return an
   explicit unsupported error without executing the statement. `Exec` still
-  rejects `Returning`. (#26)
+  rejects `Returning`. Errors reported while reading the returned rows, such
+  as a duplicate key, map to `dberror` sentinels like the rest of the driver
+  API. (#26)
 - `ReturningExecutor`, an optional extension of `DBActions` implemented by the
   built-in drivers and by `DBManager`. Custom `DBActions` implementations opt in
   by adding `ExecReturning(ctx, query, args...)`; the builders return a clear

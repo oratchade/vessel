@@ -11,6 +11,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	v1 "tounilab.com/vessel/db/v1"
+	"tounilab.com/vessel/db/v1/dberror"
 	cdt "tounilab.com/vessel/pkg/query/condition"
 )
 
@@ -80,6 +81,29 @@ func TestFluentDBExecReturningMatrix(t *testing.T) {
 			require.Len(t, updated, 1)
 			assert.Equal(t, inserted[0].ID, updated[0].ID)
 			assert.Equal(t, "inactive", updated[0].Status)
+
+			duplicate := func() *v1.InsertBuilder {
+				return fluent.Insert().
+					Into(fluentMatrixUsersTable).
+					Set("name", "Returning Duplicate").
+					Set("email", "returning.matrix@example.com").
+					Set("age", 30).
+					Set("status", "active").
+					Returning("id")
+			}
+			rows, err = duplicate().ExecReturning(ctx)
+			if err == nil {
+				_, err = v1.ScanAll[returningMatrixUser](ctx, rows)
+			}
+			require.ErrorIs(t, err, dberror.ErrDuplicateKey, "ScanAll must surface the mapped duplicate-key error")
+
+			rows, err = duplicate().ExecReturning(ctx)
+			if err == nil {
+				assert.False(t, rows.Next())
+				err = rows.Err()
+				_ = rows.Close()
+			}
+			require.ErrorIs(t, err, dberror.ErrDuplicateKey, "RowsAdapter.Err must surface the mapped duplicate-key error")
 
 			if testDB.driver == "postgres" {
 				rows, err = fluent.Insert().
