@@ -66,6 +66,40 @@ type DBActions interface {
 	introspector
 }
 
+// ReturningExecutor is an optional extension of DBActions that executes a
+// mutation returning rows: INSERT, UPDATE, or DELETE with PostgreSQL RETURNING
+// or MSSQL OUTPUT. The built-in drivers and their transactions implement it,
+// and the mutation builders' ExecReturning requires it. Implementations must
+// run the statement on a writable connection, never a read replica.
+type ReturningExecutor interface {
+	ExecReturning(ctx context.Context, query string, args ...any) (*RowsAdapter, error)
+}
+
+func requireReturningColumns(operation string, opts *options.QueryOptions) error {
+	if opts == nil || len(opts.Returning) == 0 {
+		return fmt.Errorf("%s: Returning columns not specified", operation)
+	}
+	return nil
+}
+
+func execReturning(
+	ctx context.Context,
+	actions DBActions,
+	operation string,
+	query string,
+	args []any,
+) (*RowsAdapter, error) {
+	executor, ok := actions.(ReturningExecutor)
+	if !ok {
+		return nil, fmt.Errorf("%s: %T does not implement ReturningExecutor", operation, actions)
+	}
+	rows, err := executor.ExecReturning(ctx, query, args...)
+	if err != nil {
+		return nil, fmt.Errorf("%s: failed to execute mutation: %w", operation, err)
+	}
+	return rows, nil
+}
+
 // FluentDB provides a fluent/builder interface for constructing and executing database queries.
 // It acts as an entry point for building SELECT, INSERT, UPDATE, and DELETE operations
 // with a chainable, ergonomic API while reusing the database operation interfaces.
@@ -760,11 +794,11 @@ func (i *InsertBuilder) SetMap(data map[string]any) *InsertBuilder {
 	return i
 }
 
-// Returning requests mutation RETURNING/OUTPUT columns in query preview.
+// Returning requests mutation RETURNING/OUTPUT columns.
 //
-// Returning is supported for query preview on PostgreSQL and MSSQL. Mutation
-// execution methods reject Returning because they return ExecResult, not rows.
-// MySQL and SQLite ignore Returning in generated preview SQL.
+// Returning is rendered on PostgreSQL and MSSQL. ExecReturning executes the
+// mutation and returns these columns as rows; methods that return ExecResult
+// reject Returning. MySQL and SQLite ignore Returning in generated preview SQL.
 func (i *InsertBuilder) Returning(columns ...string) *InsertBuilder {
 	if len(columns) == 0 {
 		return i
@@ -1066,6 +1100,35 @@ func (i *InsertBuilder) validateInsertAndFetch(keyColumn string) (any, error) {
 	return keyValue, nil
 }
 
+// ExecReturning executes the INSERT, or the upsert when OnConflict is configured,
+// as one statement and returns the rows selected by Returning. Uses bulk insert
+// SQL when ValuesBulk was called.
+//
+// It requires Returning columns and a dialect that executes mutation RETURNING
+// (PostgreSQL) or OUTPUT (MSSQL); MySQL and SQLite return an error without
+// executing the statement. ScanAll, ScanOne, and ScanRowsTo close the returned
+// rows; otherwise the caller must close them.
+//
+// Example:
+//
+//	rows, err := NewFluentDB(db).
+//	    Insert().
+//	    Into("users").
+//	    Set("email", "john@example.com").
+//	    Returning("id", "created_at").
+//	    ExecReturning(ctx)
+func (i *InsertBuilder) ExecReturning(ctx context.Context) (*RowsAdapter, error) {
+	const operation = "InsertBuilder.ExecReturning"
+	if err := requireReturningColumns(operation, i.opts); err != nil {
+		return nil, err
+	}
+	query, args, err := i.Query()
+	if err != nil {
+		return nil, fmt.Errorf("%s: %w", operation, err)
+	}
+	return execReturning(ctx, i.db, operation, query, args)
+}
+
 // UpdateBuilder is a fluent builder for UPDATE queries.
 // It allows specification of the table, values to update, conditions to filter rows,
 // and optional joins for complex updates.
@@ -1253,11 +1316,11 @@ func (u *UpdateBuilder) Limit(limit int) *UpdateBuilder {
 	return u
 }
 
-// Returning requests mutation RETURNING/OUTPUT columns in query preview.
+// Returning requests mutation RETURNING/OUTPUT columns.
 //
-// Returning is supported for query preview on PostgreSQL and MSSQL. Mutation
-// execution methods reject Returning because they return ExecResult, not rows.
-// MySQL and SQLite ignore Returning in generated preview SQL.
+// Returning is rendered on PostgreSQL and MSSQL. ExecReturning executes the
+// mutation and returns these columns as rows; methods that return ExecResult
+// reject Returning. MySQL and SQLite ignore Returning in generated preview SQL.
 func (u *UpdateBuilder) Returning(columns ...string) *UpdateBuilder {
 	if len(columns) == 0 {
 		return u
@@ -1357,6 +1420,37 @@ func (u *UpdateBuilder) UpdateAll(ctx context.Context) (*ExecResult, error) {
 		return nil, fmt.Errorf("UpdateBuilder.UpdateAll: failed to update rows: %w", err)
 	}
 	return result, nil
+}
+
+// ExecReturning executes the UPDATE as one statement and returns the rows
+// selected by Returning. Like Exec, it requires a WHERE condition.
+//
+// It requires Returning columns and a dialect that executes mutation RETURNING
+// (PostgreSQL) or OUTPUT (MSSQL); MySQL and SQLite return an error without
+// executing the statement. ScanAll, ScanOne, and ScanRowsTo close the returned
+// rows; otherwise the caller must close them.
+//
+// Example:
+//
+//	rows, err := NewFluentDB(db).
+//	    Update("jobs").
+//	    Set("status", "leased").
+//	    Where(cdt.NewExpr().Column("status").Op("=").Value("queued")).
+//	    Returning("id", "payload").
+//	    ExecReturning(ctx)
+func (u *UpdateBuilder) ExecReturning(ctx context.Context) (*RowsAdapter, error) {
+	const operation = "UpdateBuilder.ExecReturning"
+	if err := requireReturningColumns(operation, u.opts); err != nil {
+		return nil, err
+	}
+	if u.conditions == nil {
+		return nil, fmt.Errorf("%s: WHERE condition required", operation)
+	}
+	query, args, err := u.UpdateQuery()
+	if err != nil {
+		return nil, fmt.Errorf("%s: %w", operation, err)
+	}
+	return execReturning(ctx, u.db, operation, query, args)
 }
 
 // DeleteBuilder is a fluent builder for DELETE queries.
@@ -1520,11 +1614,11 @@ func (d *DeleteBuilder) Limit(limit int) *DeleteBuilder {
 	return d
 }
 
-// Returning requests mutation RETURNING/OUTPUT columns in query preview.
+// Returning requests mutation RETURNING/OUTPUT columns.
 //
-// Returning is supported for query preview on PostgreSQL and MSSQL. Mutation
-// execution methods reject Returning because they return ExecResult, not rows.
-// MySQL and SQLite ignore Returning in generated preview SQL.
+// Returning is rendered on PostgreSQL and MSSQL. ExecReturning executes the
+// mutation and returns these columns as rows; methods that return ExecResult
+// reject Returning. MySQL and SQLite ignore Returning in generated preview SQL.
 func (d *DeleteBuilder) Returning(columns ...string) *DeleteBuilder {
 	if len(columns) == 0 {
 		return d
@@ -1620,4 +1714,35 @@ func (d *DeleteBuilder) DeleteAll(ctx context.Context) (*ExecResult, error) {
 		return nil, fmt.Errorf("DeleteBuilder.DeleteAll: failed to delete rows: %w", err)
 	}
 	return result, nil
+}
+
+// ExecReturning executes the DELETE as one statement and returns the rows
+// selected by Returning. Like Exec, it requires a WHERE condition.
+//
+// It requires Returning columns and a dialect that executes mutation RETURNING
+// (PostgreSQL) or OUTPUT (MSSQL); MySQL and SQLite return an error without
+// executing the statement. ScanAll, ScanOne, and ScanRowsTo close the returned
+// rows; otherwise the caller must close them.
+//
+// Example:
+//
+//	rows, err := NewFluentDB(db).
+//	    Delete().
+//	    From("sessions").
+//	    Where(cdt.NewExpr().Column("expires_at").Op("<").Value(now)).
+//	    Returning("id").
+//	    ExecReturning(ctx)
+func (d *DeleteBuilder) ExecReturning(ctx context.Context) (*RowsAdapter, error) {
+	const operation = "DeleteBuilder.ExecReturning"
+	if err := requireReturningColumns(operation, d.opts); err != nil {
+		return nil, err
+	}
+	if d.conditions == nil {
+		return nil, fmt.Errorf("%s: WHERE condition required", operation)
+	}
+	query, args, err := d.DeleteQuery()
+	if err != nil {
+		return nil, fmt.Errorf("%s: %w", operation, err)
+	}
+	return execReturning(ctx, d.db, operation, query, args)
 }

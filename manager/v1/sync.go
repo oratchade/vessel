@@ -3,6 +3,7 @@ package v1
 import (
 	"context"
 	"fmt"
+	"sync"
 	"time"
 
 	db "tounilab.com/vessel/db/v1"
@@ -10,9 +11,10 @@ import (
 	"tounilab.com/vessel/pkg/query/options"
 )
 
-const (
-	defaultTimeout = 30 * time.Second
-)
+// defaultTimeout is a variable only so tests can shorten it.
+//
+//nolint:gochecknoglobals
+var defaultTimeout = 30 * time.Second
 
 // waitForResponse waits for a query response from a channel with timeout handling.
 //
@@ -467,6 +469,76 @@ func (dm *DBManager) Upserts(
 		return nil, err
 	}
 	return waitForExecResult(ctx, responseCh)
+}
+
+// ExecReturning executes a mutation that returns rows synchronously on a read-write entry.
+//
+// Parameters:
+//
+//	ctx: Context for cancellation and deadlines. If no deadline, 30s default is applied.
+//	query: INSERT, UPDATE, or DELETE with RETURNING (PostgreSQL) or OUTPUT (MSSQL),
+//	  typically from a FluentDB mutation builder's Returning(...).Query().
+//	args: Arguments for the parameterized statement.
+//
+// Returns:
+//
+//	*db.RowsAdapter: Returned rows. ScanAll, ScanOne, and ScanRowsTo close them; otherwise close them manually.
+//	error: Query error, unsupported-dialect error, or context error.
+func (dm *DBManager) ExecReturning(ctx context.Context, query string, args ...any) (*db.RowsAdapter, error) {
+	q := &Query{
+		Request: ReqExecReturning,
+		Data:    &QueryData{Query: query, Params: args},
+		handoff: &responseHandoff{},
+	}
+	responseCh, err := dm.enqueueWrite(ctx, "ExecReturning", q)
+	if err != nil {
+		return nil, err
+	}
+	resp, err := waitForResponse(ctx, responseCh)
+	if err != nil {
+		q.handoff.abandon(responseCh)
+		return nil, err
+	}
+	return extractRawDataFromResponse(resp)
+}
+
+// responseHandoff closes returned rows that reach a synchronous caller after it stopped
+// waiting; the buffered response channel would otherwise hold them and their connection.
+type responseHandoff struct {
+	mu        sync.Mutex
+	abandoned bool
+}
+
+// deliver sends resp to the waiting caller, or closes its rows if the caller is gone.
+func (h *responseHandoff) deliver(responseCh chan<- *QueryResponse, resp *QueryResponse) {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	if !h.abandoned {
+		select {
+		case responseCh <- resp:
+			return
+		default:
+		}
+	}
+	closeResponseRows(resp)
+}
+
+// abandon marks the caller gone and closes rows delivered before it stopped waiting.
+func (h *responseHandoff) abandon(responseCh <-chan *QueryResponse) {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	h.abandoned = true
+	select {
+	case resp := <-responseCh:
+		closeResponseRows(resp)
+	default:
+	}
+}
+
+func closeResponseRows(resp *QueryResponse) {
+	if resp != nil && resp.RawData != nil {
+		_ = resp.RawData.Close()
+	}
 }
 
 // Update updates one or more records in the database synchronously.

@@ -2,8 +2,10 @@ package builder
 
 import (
 	"fmt"
+	"strings"
 
 	cdt "tounilab.com/vessel/pkg/query/condition"
+	"tounilab.com/vessel/pkg/query/definition"
 	"tounilab.com/vessel/pkg/query/options"
 )
 
@@ -67,9 +69,13 @@ func (m *MSSQLQueryBuilder) Upsert(
 	upsertOpts *options.UpsertOptions,
 	opts *options.QueryOptions,
 ) (string, []any, error) {
-	q, v, err := upsert(m.dialect, table, data, upsertOpts, opts)
+	q, v, err := upsert(m.dialect, table, data, upsertOpts, withoutReturning(opts))
 	if err != nil {
 		return "", nil, fmt.Errorf("upsert mssqlSQL Builder: error building upsert query: %w", err)
+	}
+	q, err = appendInsertReturning(m.dialect, q, opts)
+	if err != nil {
+		return "", nil, fmt.Errorf("upsert mssqlSQL Builder: error building returning clause: %w", err)
 	}
 	return q, v, nil
 }
@@ -81,11 +87,37 @@ func (m *MSSQLQueryBuilder) Upserts(
 	upsertOpts *options.UpsertOptions,
 	opts *options.QueryOptions,
 ) (string, []any, error) {
-	q, v, err := upserts(m.dialect, table, data, upsertOpts, opts)
+	q, v, err := upserts(m.dialect, table, data, upsertOpts, withoutReturning(opts))
 	if err != nil {
 		return "", nil, fmt.Errorf("upserts mssqlSQL Builder: error building upsert query: %w", err)
 	}
+	q, err = appendInsertReturning(m.dialect, q, opts)
+	if err != nil {
+		return "", nil, fmt.Errorf("upserts mssqlSQL Builder: error building returning clause: %w", err)
+	}
 	return q, v, nil
+}
+
+// withoutReturning drops Returning so it can be rendered after the conflict
+// clause; the INSERT renderer would emit the invalid RETURNING ... ON CONFLICT.
+func withoutReturning(opts *options.QueryOptions) *options.QueryOptions {
+	if opts == nil || len(opts.Returning) == 0 {
+		return opts
+	}
+	stripped := *opts
+	stripped.Returning = nil
+	return &stripped
+}
+
+func appendInsertReturning(dialect optionDialect, query string, opts *options.QueryOptions) (string, error) {
+	fragment, _, err := dialect.SupportedOptions(definition.QueryTypeInsert, returningOptions(opts), 0)
+	if err != nil {
+		return "", fmt.Errorf("render RETURNING: %w", err)
+	}
+	if fragment == "" {
+		return query, nil
+	}
+	return strings.TrimSuffix(query, ";") + " " + fragment + ";", nil
 }
 
 // Update implements the QueryBuilder interface for MSSQL.

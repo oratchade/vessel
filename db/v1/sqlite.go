@@ -855,6 +855,15 @@ func (m *SQLITE) Exec(
 	return execResult, nil
 }
 
+// ExecReturning implements ReturningExecutor. Mutation RETURNING is not enabled
+// for SQLite, so it returns an unsupported error without executing the statement.
+func (m *SQLITE) ExecReturning(ctx context.Context, query string, args ...any) (*RowsAdapter, error) {
+	if err := rejectUnsupportedReturningExecution("sqlite", sqldialect.SQLiteDialect{}); err != nil {
+		return nil, err
+	}
+	return m.QueryRaw(ctx, query, args...)
+}
+
 func (m *SQLITE) Explain(
 	ctx context.Context,
 	query string,
