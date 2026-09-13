@@ -183,11 +183,26 @@ Supported synchronous methods:
 - `Get`, `GetRaw`, `GetByID`, `GetByIDRaw`
 - `Query`, `QueryRaw`
 - `Insert`, `Inserts`, `Upsert`, `Upserts`, `Update`, `Delete`
-- `Exec`
+- `Exec`, `ExecReturning`
 - `Ping`, `HealthStatus`
 
-`GetRaw`, `GetByIDRaw`, and `QueryRaw` return `*db.RowsAdapter`. Use
-`ScanRowsTo`, `ScanAll`, `ScanOne`, or close the rows manually.
+`GetRaw`, `GetByIDRaw`, `QueryRaw`, and `ExecReturning` return
+`*db.RowsAdapter`. Use `ScanRowsTo`, `ScanAll`, `ScanOne`, or close the rows
+manually.
+
+`ExecReturning` runs an `INSERT`, `UPDATE`, or `DELETE` that returns rows
+(PostgreSQL `RETURNING`, MSSQL `OUTPUT`) on a read-write entry, never on a
+read-only replica. Pass SQL from a FluentDB mutation builder's
+`Returning(...).Query()`, or trusted raw SQL. MySQL and SQLite entries return an
+unsupported error without executing the statement.
+
+```go
+rows, err := dm.ExecReturning(ctx, query, args...)
+if err != nil {
+    return err
+}
+routes, err := db.ScanAll[Route](ctx, rows)
+```
 
 ## Async API
 
@@ -216,7 +231,7 @@ Supported async methods mirror the synchronous methods with an `Async` suffix:
 - `QueryAsync`, `QueryRawAsync`
 - `InsertAsync`, `InsertsAsync`, `UpsertAsync`, `UpsertsAsync`, `UpdateAsync`,
   `DeleteAsync`
-- `ExecAsync`
+- `ExecAsync`, `ExecReturningAsync`
 
 `PingAsync` is named for compatibility but checks the selected connection
 immediately and returns `error`, not a response channel.
@@ -239,8 +254,8 @@ Always check `resp.Error` before reading `Data`, `RawData`, or `ExecData`.
 
 Automatic insert batching is disabled by default. When enabled, compatible
 `InsertAsync` requests may be flushed as one `Inserts` call by the same write
-worker. `UpsertAsync` and `UpsertsAsync` requests are not coalesced; they flush
-any pending insert batch first, then execute directly.
+worker. `UpsertAsync`, `UpsertsAsync`, and `ExecReturningAsync` requests are not
+coalesced; they flush any pending insert batch first, then execute directly.
 
 Requests are compatible when they target the same worker, table, query options,
 and column set. A batch flushes when it reaches `write_batch_max_rows`, waits

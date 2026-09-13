@@ -983,6 +983,15 @@ func (pg *Postgres) QueryRaw(ctx context.Context, query string, args ...any) (*R
 	return ra, nil
 }
 
+// ExecReturning implements ReturningExecutor for mutations with a RETURNING
+// clause and streams the returned rows.
+func (pg *Postgres) ExecReturning(ctx context.Context, query string, args ...any) (*RowsAdapter, error) {
+	if err := rejectUnsupportedReturningExecution("postgres", sqldialect.PostgresDialect{}); err != nil {
+		return nil, err
+	}
+	return pg.QueryRaw(ctx, query, args...)
+}
+
 func (pg *Postgres) Exec(
 	ctx context.Context,
 	query string,

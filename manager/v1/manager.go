@@ -94,6 +94,9 @@ const (
 	ReqExec       QueryRequest = "exec"
 )
 
+// ReqExecReturning executes a mutation that returns rows on a read-write entry.
+const ReqExecReturning QueryRequest = "execReturning"
+
 // Query represents a database query request with its parameters and a channel for the response.
 type Query struct {
 	Request    QueryRequest
@@ -986,6 +989,22 @@ func (dm *DBManager) UpsertsAsync(
 		},
 	}
 	return dm.enqueueWrite(ctx, "UpsertsAsync", q)
+}
+
+// ExecReturningAsync executes a mutation that returns rows (INSERT, UPDATE, or DELETE
+// with RETURNING or OUTPUT) asynchronously on a read-write entry, never a read-only replica.
+// The response's RawData holds the returned rows; the caller must close them.
+// Returns an error immediately if no entries are available or if context is already canceled.
+// For synchronous access, use ExecReturning() instead.
+func (dm *DBManager) ExecReturningAsync(ctx context.Context, query string, args ...any) (<-chan *QueryResponse, error) {
+	q := &Query{
+		Request: ReqExecReturning,
+		Data: &QueryData{
+			Query:  query,
+			Params: args,
+		},
+	}
+	return dm.enqueueWrite(ctx, "ExecReturningAsync", q)
 }
 
 // UpdateAsync updates an existing record in the database asynchronously.

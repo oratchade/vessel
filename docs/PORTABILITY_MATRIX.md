@@ -20,7 +20,7 @@ caller-owned inputs and should be trusted or allowlisted.
 | INSERT returning preview | Ignored | `RETURNING` | Ignored | `OUTPUT inserted...` |
 | UPDATE returning preview | Ignored | `RETURNING` | Ignored | `OUTPUT inserted...` |
 | DELETE returning preview | Ignored | `RETURNING` | Ignored | `OUTPUT deleted...` |
-| Returning execution | Unsupported, clear error | Unsupported, clear error | Unsupported, clear error | Unsupported, clear error |
+| Returning execution (`ExecReturning`) | Unsupported, clear error | `RETURNING` | Unsupported, clear error | `OUTPUT inserted/deleted...`; upsert unsupported |
 | Upsert do update | `ON DUPLICATE KEY UPDATE` | `ON CONFLICT DO UPDATE` | `ON CONFLICT DO UPDATE` | Unsupported, clear error |
 | Upsert do nothing | no-op duplicate-key update | `ON CONFLICT DO NOTHING` | `ON CONFLICT DO NOTHING` | Unsupported, clear error |
 | Case-insensitive search | `LOWER(col) LIKE LOWER(?)` | `LOWER(col) LIKE LOWER(?)` | `LOWER(col) LIKE LOWER(?)` | `LOWER(col) LIKE LOWER(?)` |
@@ -47,5 +47,6 @@ caller-owned inputs and should be trusted or allowlisted.
 - PostgreSQL arrays and `ANY`.
 - PostgreSQL/Timescale `DISTINCT ON`.
 - Database-specific casts such as `ip_address::text`.
-- Row-returning mutation execution via `RETURNING` or `OUTPUT`.
+- Row-returning mutation execution (`ExecReturning`): PostgreSQL `RETURNING`
+  and MSSQL `OUTPUT` only.
 - MSSQL upsert via `MERGE`.

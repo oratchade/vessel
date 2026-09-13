@@ -844,6 +844,15 @@ func (m *MSSQL) Exec(
 	return execResult, nil
 }
 
+// ExecReturning implements ReturningExecutor for mutations with an OUTPUT
+// clause and streams the returned rows.
+func (m *MSSQL) ExecReturning(ctx context.Context, query string, args ...any) (*RowsAdapter, error) {
+	if err := rejectUnsupportedReturningExecution("mssql", sqldialect.MSSQLDialect{}); err != nil {
+		return nil, err
+	}
+	return m.QueryRaw(ctx, query, args...)
+}
+
 func (m *MSSQL) Explain(
 	ctx context.Context,
 	query string,

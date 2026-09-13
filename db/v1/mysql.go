@@ -893,6 +893,15 @@ func (m *MySQL) Exec(
 	return execResult, nil
 }
 
+// ExecReturning implements ReturningExecutor. MySQL has no mutation RETURNING,
+// so it returns an unsupported error without executing the statement.
+func (m *MySQL) ExecReturning(ctx context.Context, query string, args ...any) (*RowsAdapter, error) {
+	if err := rejectUnsupportedReturningExecution("mysql", sqldialect.MySQLDialect{}); err != nil {
+		return nil, err
+	}
+	return m.QueryRaw(ctx, query, args...)
+}
+
 func (m *MySQL) Explain(
 	ctx context.Context,
 	query string,

@@ -277,13 +277,12 @@ Dialect behavior:
 - MySQL renders `ON DUPLICATE KEY UPDATE`.
 - MSSQL returns an explicit unsupported error.
 
-## RETURNING / OUTPUT Preview
+## RETURNING / OUTPUT
 
-`Returning` is for query preview only. `InsertQuery`, `UpdateQuery`,
-`DeleteQuery`, `UpsertQuery`, and `UpsertsQuery` can include PostgreSQL
-`RETURNING` or MSSQL `OUTPUT` where supported by the builder. Mutation
-execution methods reject `Returning` because they return `ExecResult`, not
-rows.
+`Returning` adds PostgreSQL `RETURNING` or MSSQL `OUTPUT` columns to a
+mutation. `Query`, `InsertQuery`, `UpdateQuery`, `DeleteQuery`, `UpsertQuery`,
+and `UpsertsQuery` preview the SQL; MySQL and SQLite leave the clause out of
+the preview.
 
 ```go
 sql, args, err := fdb.
@@ -294,8 +293,33 @@ sql, args, err := fdb.
     Query()
 ```
 
-If production code needs returned rows from a mutation, use a dialect-specific
-raw query that your tests cover.
+To execute the mutation and read the returned rows in one statement, call
+`ExecReturning` on the insert, update, or delete builder. It works for upserts
+and with `WithTx`, and returns `*RowsAdapter`. `ScanAll`, `ScanOne`, and
+`ScanRowsTo` close the rows; otherwise close them yourself.
+
+```go
+rows, err := fdb.
+    Insert().
+    Into("routes").
+    Values(data).
+    Returning("id", "created_at").
+    ExecReturning(ctx)
+if err != nil {
+    return err
+}
+created, err := db.ScanOne[Route](ctx, rows)
+```
+
+- `ExecReturning` requires `Returning` columns. `Exec`, `Upsert`, and the other
+  `ExecResult` methods still reject `Returning`.
+- As with `Exec`, update and delete require `Where`.
+- MySQL and SQLite return an unsupported error without executing the
+  statement. MSSQL upserts remain unsupported.
+- The builder's `DBActions` must implement `ReturningExecutor`. The built-in
+  drivers, their transactions, and `DBManager` do. A custom adapter adds
+  `ExecReturning(ctx, query, args...)` and must run the statement on a writable
+  connection.
 
 ## Transactions
 

@@ -7,6 +7,24 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+### Added
+
+- `ExecReturning(ctx)` on `InsertBuilder`, `UpdateBuilder`, and
+  `DeleteBuilder` executes a mutation configured with `Returning` as a single
+  statement and returns the rows as `*RowsAdapter` (PostgreSQL `RETURNING`,
+  MSSQL `OUTPUT`). It covers upserts and honors `WithTx`, removing the
+  insert-then-select race of fetching by key. MySQL and SQLite return an
+  explicit unsupported error without executing the statement. `Exec` still
+  rejects `Returning`. (#26)
+- `ReturningExecutor`, an optional extension of `DBActions` implemented by the
+  built-in drivers and by `DBManager`. Custom `DBActions` implementations opt in
+  by adding `ExecReturning(ctx, query, args...)`; the builders return a clear
+  error when it is missing. Existing interfaces are unchanged.
+- `DBManager.ExecReturning` and `DBManager.ExecReturningAsync` run a
+  row-returning mutation on a read-write entry (never a read-only replica) and
+  return `*db.RowsAdapter`, via the new `ReqExecReturning` request type. These
+  requests are never coalesced by insert batching.
+
 ### Fixed
 
 - PostgreSQL `UpsertQuery`/`UpsertsQuery` with `Returning` rendered

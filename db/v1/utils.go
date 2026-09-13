@@ -6,9 +6,20 @@ import (
 
 	"tounilab.com/vessel/db/v1/dberror"
 	builder "tounilab.com/vessel/internal/pkg/builder"
+	"tounilab.com/vessel/internal/pkg/sqldialect"
 	cdt "tounilab.com/vessel/pkg/query/condition"
 	"tounilab.com/vessel/pkg/query/options"
 )
+
+func rejectUnsupportedReturningExecution(driver string, dialect sqldialect.CapabilityProvider) error {
+	if dialect.Capabilities().MutationReturning {
+		return nil
+	}
+	return fmt.Errorf(
+		"%s.ExecReturning: mutation RETURNING/OUTPUT execution is not supported by this dialect",
+		driver,
+	)
+}
 
 // dbOpts holds common database operation dependencies used by helper functions.
 type dbOpts struct {

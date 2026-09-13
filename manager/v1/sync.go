@@ -469,6 +469,31 @@ func (dm *DBManager) Upserts(
 	return waitForExecResult(ctx, responseCh)
 }
 
+// ExecReturning executes a mutation that returns rows synchronously on a read-write entry.
+//
+// Parameters:
+//
+//	ctx: Context for cancellation and deadlines. If no deadline, 30s default is applied.
+//	query: INSERT, UPDATE, or DELETE with RETURNING (PostgreSQL) or OUTPUT (MSSQL),
+//	  typically from a FluentDB mutation builder's Returning(...).Query().
+//	args: Arguments for the parameterized statement.
+//
+// Returns:
+//
+//	*db.RowsAdapter: Returned rows. ScanAll, ScanOne, and ScanRowsTo close them; otherwise close them manually.
+//	error: Query error, unsupported-dialect error, or context error.
+func (dm *DBManager) ExecReturning(ctx context.Context, query string, args ...any) (*db.RowsAdapter, error) {
+	responseCh, err := dm.ExecReturningAsync(ctx, query, args...)
+	if err != nil {
+		return nil, err
+	}
+	resp, err := waitForResponse(ctx, responseCh)
+	if err != nil {
+		return nil, err
+	}
+	return extractRawDataFromResponse(resp)
+}
+
 // Update updates one or more records in the database synchronously.
 //
 // Parameters:
