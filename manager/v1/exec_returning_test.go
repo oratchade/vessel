@@ -13,6 +13,8 @@ import (
 
 	db "tounilab.com/vessel/db/v1"
 	"tounilab.com/vessel/manager/v1/config"
+	"tounilab.com/vessel/pkg/query/condition"
+	"tounilab.com/vessel/pkg/query/options"
 )
 
 type returningBatchDB struct {
@@ -146,9 +148,9 @@ func TestDBManagerExecReturningWithoutEntries(t *testing.T) {
 	require.Error(t, err)
 }
 
-// delayedReturningDB returns live rows from a one-connection SQLite pool only once
+// delayedRowsDB returns live rows from a one-connection SQLite pool only once
 // released, so the response reaches the worker after the synchronous caller gave up.
-type delayedReturningDB struct {
+type delayedRowsDB struct {
 	db.DB
 
 	started  chan struct{}
@@ -156,15 +158,53 @@ type delayedReturningDB struct {
 	returned chan struct{}
 }
 
-func (d *delayedReturningDB) ExecReturning(ctx context.Context, _ string, _ ...any) (*db.RowsAdapter, error) {
+func (d *delayedRowsDB) lateRows(ctx context.Context) (*db.RowsAdapter, error) {
 	close(d.started)
 	<-d.release
 	defer close(d.returned)
-	return d.QueryRaw(ctx, "SELECT 1")
+	return d.DB.QueryRaw(ctx, "SELECT 1")
 }
 
-func TestDBManagerExecReturningClosesRowsAfterCallerStopsWaiting(t *testing.T) {
-	tests := []struct {
+func (d *delayedRowsDB) ExecReturning(ctx context.Context, _ string, _ ...any) (*db.RowsAdapter, error) {
+	return d.lateRows(ctx)
+}
+
+func (d *delayedRowsDB) GetRaw(
+	ctx context.Context, _ string, _ []string, _ []condition.Join, _ condition.Condition, _ *options.QueryOptions,
+) (*db.RowsAdapter, error) {
+	return d.lateRows(ctx)
+}
+
+func (d *delayedRowsDB) GetByIDRaw(
+	ctx context.Context, _ string, _ any, _ []condition.Join, _ *options.QueryOptions,
+) (*db.RowsAdapter, error) {
+	return d.lateRows(ctx)
+}
+
+func (d *delayedRowsDB) QueryRaw(ctx context.Context, _ string, _ ...any) (*db.RowsAdapter, error) {
+	return d.lateRows(ctx)
+}
+
+func TestDBManagerRawRowsClosedAfterCallerStopsWaiting(t *testing.T) {
+	calls := []struct {
+		name  string
+		write bool
+		call  func(context.Context, *DBManager) (*db.RowsAdapter, error)
+	}{
+		{name: "ExecReturning", write: true, call: func(ctx context.Context, dm *DBManager) (*db.RowsAdapter, error) {
+			return dm.ExecReturning(ctx, `INSERT INTO "jobs" DEFAULT VALUES RETURNING "id"`)
+		}},
+		{name: "GetRaw", call: func(ctx context.Context, dm *DBManager) (*db.RowsAdapter, error) {
+			return dm.GetRaw(ctx, "jobs", []string{"id"}, nil, nil, nil)
+		}},
+		{name: "GetByIDRaw", call: func(ctx context.Context, dm *DBManager) (*db.RowsAdapter, error) {
+			return dm.GetByIDRaw(ctx, "jobs", 1, nil, nil)
+		}},
+		{name: "QueryRaw", call: func(ctx context.Context, dm *DBManager) (*db.RowsAdapter, error) {
+			return dm.QueryRaw(ctx, `SELECT "id" FROM "jobs"`)
+		}},
+	}
+	waits := []struct {
 		name    string
 		timeout time.Duration
 		cancel  bool
@@ -173,65 +213,87 @@ func TestDBManagerExecReturningClosesRowsAfterCallerStopsWaiting(t *testing.T) {
 		{name: "default timeout", timeout: 50 * time.Millisecond},
 	}
 
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			previous := defaultTimeout
-			defaultTimeout = tt.timeout
-			t.Cleanup(func() { defaultTimeout = previous })
-
-			sqliteEntry, err := newDBEntry(context.Background(), &config.ManagerConfig{}, &config.ConfigEntry{
-				Name:   "sqlite-one-conn",
-				Type:   config.ReadWrite,
-				SQLite: &db.SQLiteConfig{FilePath: ":memory:", MaxOpenConns: 1, MaxIdleConns: 1},
-			}, &noOpLogger{})
-			require.NoError(t, err)
-			sqlite := sqliteEntry.db
-			t.Cleanup(func() {
-				sqliteEntry.cancel()
-				_ = sqlite.Close()
+	for _, tc := range calls {
+		for _, tt := range waits {
+			t.Run(tc.name+"/"+tt.name, func(t *testing.T) {
+				testRowsClosedAfterCallerStopsWaiting(t, tc.write, tc.call, tt.timeout, tt.cancel)
 			})
-
-			delayed := &delayedReturningDB{
-				DB:       sqlite,
-				started:  make(chan struct{}),
-				release:  make(chan struct{}),
-				returned: make(chan struct{}),
-			}
-			de, worker, stopEntry := newReturningTestEntry(delayed, false)
-			de.writeQueue = []*dbEntryWorker{worker}
-			de.writeWorkerIdx, err = NewAtomicWrapCounter(int64(len(de.writeQueue)))
-			require.NoError(t, err)
-			de.lifecycle.store(lifecycleStarted)
-			de.wg.Add(1)
-			go de.writeWorker(de.ctx, worker)
-			t.Cleanup(func() {
-				stopEntry()
-				de.wg.Wait()
-			})
-
-			dm := &DBManager{readWriteEntries: map[string]*DBEntry{de.name: de}}
-			dm.lifecycle.store(lifecycleStarted)
-
-			ctx, cancel := context.WithCancel(context.Background())
-			defer cancel()
-			if tt.cancel {
-				go func() {
-					<-delayed.started
-					cancel()
-				}()
-			}
-
-			rows, err := dm.ExecReturning(ctx, `INSERT INTO "jobs" DEFAULT VALUES RETURNING "id"`)
-			require.Error(t, err)
-			assert.Nil(t, rows)
-
-			close(delayed.release)
-			<-delayed.returned
-
-			execCtx, cancelExec := context.WithTimeout(context.Background(), 2*time.Second)
-			defer cancelExec()
-			_, err = sqlite.Exec(execCtx, "SELECT 1")
-			require.NoError(t, err, "rows delivered after the caller stopped waiting must be closed")
-		})
+		}
 	}
+}
+
+func testRowsClosedAfterCallerStopsWaiting(
+	t *testing.T,
+	write bool,
+	call func(context.Context, *DBManager) (*db.RowsAdapter, error),
+	timeout time.Duration,
+	cancelCaller bool,
+) {
+	t.Helper()
+	previous := defaultTimeout
+	defaultTimeout = timeout
+	t.Cleanup(func() { defaultTimeout = previous })
+
+	sqliteEntry, err := newDBEntry(context.Background(), &config.ManagerConfig{}, &config.ConfigEntry{
+		Name:   "sqlite-one-conn",
+		Type:   config.ReadWrite,
+		SQLite: &db.SQLiteConfig{FilePath: ":memory:", MaxOpenConns: 1, MaxIdleConns: 1},
+	}, &noOpLogger{})
+	require.NoError(t, err)
+	sqlite := sqliteEntry.db
+	t.Cleanup(func() {
+		sqliteEntry.cancel()
+		_ = sqlite.Close()
+	})
+
+	delayed := &delayedRowsDB{
+		DB:       sqlite,
+		started:  make(chan struct{}),
+		release:  make(chan struct{}),
+		returned: make(chan struct{}),
+	}
+	de, worker, stopEntry := newReturningTestEntry(delayed, false)
+	counter, err := NewAtomicWrapCounter(1)
+	require.NoError(t, err)
+	dm := &DBManager{}
+	if write {
+		de.writeQueue, de.writeWorkerIdx = []*dbEntryWorker{worker}, counter
+		dm.readWriteEntries = map[string]*DBEntry{de.name: de}
+	} else {
+		de.readQueue, de.readWorkerIdx = []*dbEntryWorker{worker}, counter
+		dm.readOnlyEntries = map[string]*DBEntry{de.name: de}
+	}
+	de.lifecycle.store(lifecycleStarted)
+	dm.lifecycle.store(lifecycleStarted)
+	de.wg.Add(1)
+	if write {
+		go de.writeWorker(de.ctx, worker)
+	} else {
+		go de.readWorker(de.ctx, worker)
+	}
+	t.Cleanup(func() {
+		stopEntry()
+		de.wg.Wait()
+	})
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	if cancelCaller {
+		go func() {
+			<-delayed.started
+			cancel()
+		}()
+	}
+
+	rows, err := call(ctx, dm)
+	require.Error(t, err)
+	assert.Nil(t, rows)
+
+	close(delayed.release)
+	<-delayed.returned
+
+	execCtx, cancelExec := context.WithTimeout(context.Background(), 2*time.Second)
+	defer cancelExec()
+	_, err = sqlite.Exec(execCtx, "SELECT 1")
+	require.NoError(t, err, "rows delivered after the caller stopped waiting must be closed")
 }

@@ -174,15 +174,16 @@ func (dm *DBManager) GetRaw(
 	cond condition.Condition,
 	opts *options.QueryOptions,
 ) (*db.RowsAdapter, error) {
-	responseCh, err := dm.GetRawAsync(ctx, table, columns, joins, cond, opts)
-	if err != nil {
-		return nil, err
-	}
-	resp, err := waitForResponse(ctx, responseCh)
-	if err != nil {
-		return nil, err
-	}
-	return extractRawDataFromResponse(resp)
+	return dm.awaitRawRows(ctx, "GetRaw", &Query{
+		Request: ReqGetRaw,
+		Data: &QueryData{
+			Table:      table,
+			Columns:    columns,
+			Joins:      joins,
+			Conditions: cond,
+			Opts:       opts,
+		},
+	})
 }
 
 // GetByID fetches a single record from the database synchronously by ID.
@@ -257,15 +258,15 @@ func (dm *DBManager) GetByIDRaw(
 	joins []condition.Join,
 	opts *options.QueryOptions,
 ) (*db.RowsAdapter, error) {
-	responseCh, err := dm.GetByIDRawAsync(ctx, table, id, joins, opts)
-	if err != nil {
-		return nil, err
-	}
-	resp, err := waitForResponse(ctx, responseCh)
-	if err != nil {
-		return nil, err
-	}
-	return extractRawDataFromResponse(resp)
+	return dm.awaitRawRows(ctx, "GetByIDRaw", &Query{
+		Request: ReqGetByIDRaw,
+		Data: &QueryData{
+			Table: table,
+			ID:    id,
+			Joins: joins,
+			Opts:  opts,
+		},
+	})
 }
 
 // Query executes a raw SQL query synchronously and returns structured data.
@@ -330,15 +331,10 @@ func (dm *DBManager) QueryRaw(
 	query string,
 	args ...any,
 ) (*db.RowsAdapter, error) {
-	responseCh, err := dm.QueryRawAsync(ctx, query, args...)
-	if err != nil {
-		return nil, err
-	}
-	resp, err := waitForResponse(ctx, responseCh)
-	if err != nil {
-		return nil, err
-	}
-	return extractRawDataFromResponse(resp)
+	return dm.awaitRawRows(ctx, "QueryRaw", &Query{
+		Request: ReqQueryRaw,
+		Data:    &QueryData{Query: query, Params: args},
+	})
 }
 
 // Insert adds a single new record to the database synchronously.

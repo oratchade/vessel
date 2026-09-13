@@ -156,6 +156,44 @@ func (dm *DBManager) enqueueWrite(
 	return q.ResponseCh, nil
 }
 
+func (dm *DBManager) enqueueRead(
+	ctx context.Context,
+	operation string,
+	q *Query,
+) (<-chan *QueryResponse, error) {
+	if err := dm.ensureRunning(); err != nil {
+		return nil, fmt.Errorf("%s: %w", operation, err)
+	}
+
+	dbEntry := dm.readEntry()
+	if dbEntry == nil {
+		return nil, fmt.Errorf("no read-only database entries available")
+	}
+
+	q.ResponseCh = newQueryResponseChannel()
+	if err := dbEntry.roundRobinQueueRead(ctx, q); err != nil {
+		return nil, fmt.Errorf("%s: failed to enqueue query: %w", operation, err)
+	}
+
+	return q.ResponseCh, nil
+}
+
+// awaitRawRows runs a row-returning read and closes rows that arrive after the caller
+// stopped waiting, so their connection returns to the pool.
+func (dm *DBManager) awaitRawRows(ctx context.Context, operation string, q *Query) (*db.RowsAdapter, error) {
+	q.handoff = &responseHandoff{}
+	responseCh, err := dm.enqueueRead(ctx, operation, q)
+	if err != nil {
+		return nil, err
+	}
+	resp, err := waitForResponse(ctx, responseCh)
+	if err != nil {
+		q.handoff.abandon(responseCh)
+		return nil, err
+	}
+	return extractRawDataFromResponse(resp)
+}
+
 // HealthStatus represents the current health status of all database entries.
 type HealthStatus struct {
 	ReadOnlyHealthy  int // Number of healthy readonly entries
