@@ -407,6 +407,28 @@ func TestWriteBatchingWorkerFlushesCompatibleInsertsAtMaxRows(t *testing.T) {
 	assert.Len(t, fake.insertsRows[0], 2)
 }
 
+func TestWriteBatchingWorkerPreservesRawExprValues(t *testing.T) {
+	fake := &batchDB{}
+	de, worker, cancel := newBatchTestEntry(fake, true, 2, time.Hour)
+	defer cancel()
+	go de.writeBatchingWorker(de.ctx, worker)
+
+	now := cdt.RawExpr("NOW()")
+	q1 := insertQuery("jobs", map[string]any{"id": 1, "created_at": now})
+	q2 := insertQuery("jobs", map[string]any{"id": 2, "created_at": now})
+	worker.queue <- q1
+	worker.queue <- q2
+
+	require.NoError(t, readBatchResponse(t, q1).Error)
+	require.NoError(t, readBatchResponse(t, q2).Error)
+	_, insertsCalls, _ := fake.calls()
+	require.Equal(t, 1, insertsCalls)
+	require.Len(t, fake.insertsRows[0], 2)
+	for _, row := range fake.insertsRows[0] {
+		assert.Equal(t, now, row["created_at"], "batched rows must keep RawExpr values for inline rendering")
+	}
+}
+
 func TestWriteBatchingWorkerFlushesOnDelay(t *testing.T) {
 	fake := &batchDB{}
 	de, worker, cancel := newBatchTestEntry(fake, true, 10, time.Millisecond)
