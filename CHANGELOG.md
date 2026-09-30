@@ -14,7 +14,7 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
   opens a short-lived connection pool of its own, released by `Close`; no `*sql.DB`
   is exposed. `Up`, `Status` and `Version` return Vessel's own `Result` and `Status`
   types, so goose stays out of the public API. `WithVersionTable` renames the
-  version table; `WithLogger` sends progress to a `db.Logger` with goose's structured
+  version table; `WithSlog` sends progress to a `*slog.Logger` with goose's structured
   fields, executed statements at Debug. Only the supplied file system runs:
   goose's process-wide registry of Go migrations is disabled, so a migration another
   component registers for a different database is never applied. Concurrent runs against one database are serialized on PostgreSQL

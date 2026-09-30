@@ -2,9 +2,8 @@ package v1
 
 import (
 	"context"
+	"fmt"
 	"log/slog"
-
-	db "tounilab.com/vessel/db/v1"
 )
 
 // statementMessage is the message goose logs before each SQL statement. Those go to
@@ -12,49 +11,38 @@ import (
 // goose renames it, statements land at Info, which is noisy but not wrong.
 const statementMessage = "executing statement"
 
-// WithLogger sends the Migrator's progress to logger, with goose's structured fields
-// (source, version, duration): one Info line per applied migration and per run, and
-// each executed statement at Debug. Without it the Migrator logs nothing; Up and
-// Status return what happened either way.
-func WithLogger(logger db.Logger) Option {
+// WithSlog sends the Migrator's progress to logger, with goose's structured fields
+// (source, version, duration_seconds, current_version): one Info line per applied
+// migration and per run, and each executed statement at Debug. Without it the
+// Migrator logs nothing; Up and Status return what happened either way.
+func WithSlog(logger *slog.Logger) Option {
 	return func(o *options) { o.logger = logger }
 }
 
-// loggerHandler is a slog.Handler writing to a Vessel db.Logger, so goose's structured
-// logging reaches whatever logger the application gave Vessel.
-type loggerHandler struct {
-	logger db.Logger
+// statementsAtDebug passes goose's records to the application's handler, lowering the
+// per-statement ones to Debug.
+type statementsAtDebug struct {
+	slog.Handler
 }
 
-func (h *loggerHandler) Enabled(context.Context, slog.Level) bool { return true }
-
-func (h *loggerHandler) Handle(_ context.Context, r slog.Record) error {
-	args := make([]any, 0, 2*r.NumAttrs())
-	r.Attrs(func(a slog.Attr) bool {
-		args = append(args, a.Key, a.Value.Any())
-		return true
-	})
-	switch {
-	case r.Message == statementMessage || r.Level < slog.LevelInfo:
-		h.logger.Debug(r.Message, args...)
-	case r.Level >= slog.LevelError:
-		h.logger.Error(r.Message, args...)
-	case r.Level >= slog.LevelWarn:
-		h.logger.Warn(r.Message, args...)
-	default:
-		h.logger.Info(r.Message, args...)
+func (h statementsAtDebug) Handle(ctx context.Context, r slog.Record) error {
+	if r.Message == statementMessage && r.Level > slog.LevelDebug {
+		r.Level = slog.LevelDebug
+		// slog.Logger asked Enabled at the original level; ask again at the new one.
+		if !h.Enabled(ctx, r.Level) {
+			return nil
+		}
+	}
+	if err := h.Handler.Handle(ctx, r); err != nil {
+		return fmt.Errorf("migrate: log: %w", err)
 	}
 	return nil
 }
 
-func (h *loggerHandler) WithAttrs(attrs []slog.Attr) slog.Handler {
-	fields := make([]any, 0, 2*len(attrs))
-	for _, a := range attrs {
-		fields = append(fields, a.Key, a.Value.Any())
-	}
-	return &loggerHandler{logger: h.logger.With(fields...)}
+func (h statementsAtDebug) WithAttrs(attrs []slog.Attr) slog.Handler {
+	return statementsAtDebug{h.Handler.WithAttrs(attrs)}
 }
 
-// WithGroup keeps the handler as is. ponytail: goose logs no groups; flatten them with
-// a key prefix if it ever does.
-func (h *loggerHandler) WithGroup(string) slog.Handler { return h }
+func (h statementsAtDebug) WithGroup(name string) slog.Handler {
+	return statementsAtDebug{h.Handler.WithGroup(name)}
+}

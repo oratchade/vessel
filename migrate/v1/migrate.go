@@ -61,7 +61,7 @@ type Option func(*options)
 
 type options struct {
 	versionTable string
-	logger       db.Logger
+	logger       *slog.Logger
 }
 
 // WithVersionTable sets the table that records applied migrations. The default
@@ -141,7 +141,7 @@ func providerOptions(dialect goose.Dialect, o options) ([]goose.ProviderOption, 
 	}
 	if o.logger != nil {
 		// goose logs only when verbose.
-		opts = append(opts, goose.WithVerbose(true), goose.WithSlog(slog.New(&loggerHandler{logger: o.logger})))
+		opts = append(opts, goose.WithVerbose(true), goose.WithSlog(slog.New(statementsAtDebug{o.logger.Handler()})))
 	}
 	locker, err := lockerFor(dialect)
 	if err != nil {
