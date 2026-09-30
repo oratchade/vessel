@@ -133,7 +133,9 @@ func checkDSN(dialect goose.Dialect, dsn string) error {
 }
 
 func providerOptions(dialect goose.Dialect, o options) ([]goose.ProviderOption, error) {
-	var opts []goose.ProviderOption
+	// Only the supplied file system: by default goose also runs Go migrations registered
+	// anywhere in the process, which may belong to another database.
+	opts := []goose.ProviderOption{goose.WithDisableGlobalRegistry(true)}
 	if o.versionTable != "" {
 		opts = append(opts, goose.WithTableName(o.versionTable))
 	}

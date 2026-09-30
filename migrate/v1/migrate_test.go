@@ -4,12 +4,14 @@ package v1_test
 
 import (
 	"context"
+	"database/sql"
 	"errors"
 	"path/filepath"
 	"strings"
 	"testing"
 	"testing/fstest"
 
+	"github.com/pressly/goose/v3"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -157,6 +159,28 @@ func TestWithVersionTable(t *testing.T) {
 	var applied int
 	require.NoError(t, rows.Scan(&applied))
 	assert.Equal(t, 2, applied)
+}
+
+// goose providers include Go migrations registered anywhere in the process by default.
+// One registered for another database must never run against this one.
+func TestUpIgnoresGloballyRegisteredGoMigrations(t *testing.T) {
+	ran := false
+	goose.AddNamedMigrationContext("00003_other_database.go",
+		func(context.Context, *sql.Tx) error { ran = true; return nil }, nil)
+	t.Cleanup(goose.ResetGlobalMigrations)
+
+	m, err := migrate.New(sqliteConfig(t), baseMigrations())
+	require.NoError(t, err)
+	t.Cleanup(func() { assert.NoError(t, m.Close()) })
+
+	results, err := m.Up(context.Background())
+	require.NoError(t, err)
+	assert.Len(t, results, 2, "only the supplied SQL migrations run")
+	assert.False(t, ran, "the globally registered Go migration must not run")
+
+	version, err := m.Version(context.Background())
+	require.NoError(t, err)
+	assert.Equal(t, int64(2), version)
 }
 
 func TestErrorsAreDistinct(t *testing.T) {
