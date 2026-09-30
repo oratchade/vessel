@@ -9,8 +9,11 @@ dialect keeps its own migration files.
 
 ```go
 import (
+    "context"
     "embed"
     "io/fs"
+    "log"
+    "log/slog"
 
     db "tounilab.com/vessel/db/v1"
     migrate "tounilab.com/vessel/migrate/v1"
@@ -24,7 +27,7 @@ func migrateUp(ctx context.Context, cfg db.PostgresConfig) error {
     if err != nil {
         return err
     }
-    m, err := migrate.New(cfg, migrations)
+    m, err := migrate.New(cfg, migrations, migrate.WithLogger(db.NewSlogAdapter(slog.Default())))
     if err != nil {
         return err
     }
@@ -49,6 +52,11 @@ func migrateUp(ctx context.Context, cfg db.PostgresConfig) error {
   highest applied version, 0 when none is.
 - `WithVersionTable(name)` changes the table that records applied migrations
   (default `goose_db_version`).
+- `WithLogger(logger)` sends progress to the same `db.Logger` the rest of Vessel uses,
+  with goose's structured fields (`source`, `version`, `duration_seconds`,
+  `current_version`): one Info line per applied migration and per run, and each executed
+  statement at Debug, so a baseline migration does not put a whole schema in the Info
+  log. Without it the Migrator logs nothing.
 
 There is no `Down`. Add it when a consumer needs it.
 

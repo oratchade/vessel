@@ -14,7 +14,8 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
   opens a short-lived connection pool of its own, released by `Close`; no `*sql.DB`
   is exposed. `Up`, `Status` and `Version` return Vessel's own `Result` and `Status`
   types, so goose stays out of the public API. `WithVersionTable` renames the
-  version table. Concurrent runs against one database are serialized on PostgreSQL
+  version table; `WithLogger` sends progress to a `db.Logger` with goose's structured
+  fields, executed statements at Debug. Concurrent runs against one database are serialized on PostgreSQL
   (advisory lock) and MySQL (lock table); SQLite and MSSQL leave that to the
   caller. A MySQL configuration without `ParseTime` is refused with
   `ErrMySQLParseTime`, a plugin driver with `ErrUnsupportedDriver`. See
