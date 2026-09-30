@@ -17,9 +17,12 @@ Vessel provides:
 - Structured logging adapters and OpenTelemetry tracing hooks.
 - An optional `manager/v1` package for multi-connection services.
 - A plugin registry for custom drivers that implement the `db.DB` contract.
+- A `migrate/v1` package that applies versioned SQL migration files with goose
+  ([MIGRATIONS.md](MIGRATIONS.md)).
 
-Vessel does not provide schema migrations, model relationships, hooks,
-compile-time SQL validation, or ORM lifecycle behavior.
+Vessel does not generate schema or migrations from models, and does not provide
+model relationships, hooks, compile-time SQL validation, or ORM lifecycle
+behavior.
 
 ## Supported Dialects
 

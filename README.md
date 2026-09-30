@@ -36,6 +36,8 @@ It provides:
   vessel
 - **An optional manager package** (`manager/v1`) for services that need
   connection routing, backpressure, and async write coalescing
+- **Versioned SQL migrations** (`migrate/v1`), applied with goose from files
+  you write, one directory per dialect
 
 The query builder and typed scanning live in `db/v1`. The manager is opt-in
 through a separate package, so services that don't need it don't pay for it.
@@ -45,8 +47,9 @@ through a separate package, so services that don't need it don't pay for it.
 Vessel is intentionally smaller than an ORM and intentionally larger than
 `database/sql`. It does not provide:
 
-- **No model lifecycle, associations, hooks, or migrations.** Use GORM, Bun,
-  or ent if you need those.
+- **No model lifecycle, associations, hooks, or schema generated from
+  models.** Use GORM, Bun, or ent if you need those. `migrate/v1` runs the SQL
+  migration files you write; it does not write them for you.
 - **No compile-time SQL validation.** Use sqlc if compile-time query safety
   matters more than runtime composition.
 - **No magic.** Raw SQL stays raw SQL through `QueryRaw` and the trusted-raw
@@ -204,6 +207,7 @@ Detailed reference material lives in `/docs`:
   drivers
 - [Environment variables](./docs/ENVIRONMENT_VARIABLES.md) — configuration
   for tests and runtime
+- [Migrations](./docs/MIGRATIONS.md) — versioned SQL migrations with goose
 
 ## Contributing
 

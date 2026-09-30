@@ -55,6 +55,7 @@ vessel/
 │   └── retry/              # Backoff strategies (fixed/linear/exponential…)
 ├── manager/v1/             # DBManager: routing, workers, health, batching
 │   └── config/             # Manager YAML/JSON/TOML config + validation
+├── migrate/v1/             # Versioned SQL migrations through goose
 ├── tests/                  # Integration tests (build tag: integration)
 ├── examples/               # Runnable examples
 └── docs/                   # Guides (see table at the bottom)
@@ -216,6 +217,7 @@ Breaking changes require at least a minor bump while on v0.x.
 | `docs/RESOURCE_POOLING.md` | RowsAdapter pooling (public feature) |
 | `docs/SQL_NULL_TYPES.md` | Null handling in typed scanning |
 | `docs/PLUGINS.md` | Custom driver registry |
+| `docs/MIGRATIONS.md` | Versioned SQL migrations (`migrate/v1`, goose) |
 | `docs/LINTING.md` | Markdown/doc linting tooling |
 
 Update the relevant doc in the same commit as a behavior change — stale

@@ -5,6 +5,32 @@ All notable changes to Vessel are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+
+- `migrate/v1` applies versioned SQL migrations with goose (`github.com/pressly/goose/v3`
+  v3.28.0). `New(cfg, fsys, opts...)` takes the same `DBConfig` as `db.NewDB` and
+  opens a short-lived connection pool of its own, released by `Close`; no `*sql.DB`
+  is exposed. `Up`, `Status` and `Version` return Vessel's own `Result` and `Status`
+  types, so goose stays out of the public API. `WithVersionTable` renames the
+  version table; `WithSlog` sends progress to a `*slog.Logger` with goose's structured
+  fields, executed statements at Debug. Only the supplied file system runs:
+  goose's process-wide registry of Go migrations is disabled, so a migration another
+  component registers for a different database is never applied. Concurrent runs against one database are serialized on PostgreSQL
+  (advisory lock) and MySQL (lock table); SQLite and MSSQL leave that to the
+  caller. A MySQL configuration without `ParseTime` is refused with
+  `ErrMySQLParseTime`, a plugin driver with `ErrUnsupportedDriver`. See
+  `docs/MIGRATIONS.md`. (#72)
+
+### Changed
+
+- The README and the specification no longer list schema migrations among what
+  Vessel does not do: `migrate/v1` runs migration files the caller writes. Schema
+  generated from models remains out of scope.
+- `golang.org/x/crypto` and `golang.org/x/text` are raised to the minimum
+  versions goose requires.
+
 ## [0.2.1] - 2026-09-13
 
 ### Added
