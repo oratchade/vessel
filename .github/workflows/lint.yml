@@ -1,8 +1,19 @@
 name: Lint
 
+# Pushes run the checks on main only, after a merge: on any other branch, a push run
+# checked the same code as the pull_request run beside it. workflow_dispatch runs a
+# branch that has no pull request.
 on:
-  push: {}
+  push:
+    branches: [main]
   pull_request: {}
+  workflow_dispatch: {}
+
+# A newer push to a pull request cancels its run still in progress. Every other run
+# (main, manual) is its own group, so none is cancelled or queued.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.run_id }}
+  cancel-in-progress: true
 
 permissions:
   contents: read
@@ -17,7 +28,7 @@ jobs:
       - uses: actions/checkout@v4
 
       - name: Set up Go
-        uses: actions/setup-go@v4
+        uses: actions/setup-go@v5
         with:
           go-version: "1.26.x"
           cache: true
@@ -48,7 +59,7 @@ jobs:
       - uses: actions/checkout@v4
 
       - name: Set up Go
-        uses: actions/setup-go@v4
+        uses: actions/setup-go@v5
         with:
           go-version: "1.26.x"
           cache: true
@@ -74,7 +85,7 @@ jobs:
       - uses: actions/checkout@v4
 
       - name: Set up Go
-        uses: actions/setup-go@v4
+        uses: actions/setup-go@v5
         with:
           go-version: "1.26.x"
           cache: true
@@ -99,7 +110,7 @@ jobs:
       - uses: actions/checkout@v4
 
       - name: Set up Go
-        uses: actions/setup-go@v4
+        uses: actions/setup-go@v5
         with:
           go-version: "1.26.x"
           cache: true
@@ -119,7 +130,7 @@ jobs:
       - uses: actions/checkout@v4
 
       - name: Set up Go
-        uses: actions/setup-go@v4
+        uses: actions/setup-go@v5
         with:
           go-version: "1.26.x"
           cache: true
@@ -172,7 +183,7 @@ jobs:
       - uses: actions/checkout@v4
 
       - name: Set up Go
-        uses: actions/setup-go@v4
+        uses: actions/setup-go@v5
         with:
           go-version: "1.26.x"
           cache: true
