@@ -34,6 +34,9 @@ import (
 //	}
 type RowsAdapter struct {
 	provider RowsProvider
+	// onClose runs once, after the rows are closed: whatever must outlive them,
+	// such as the context the query ran in, is released then.
+	onClose func()
 }
 
 // initRowsAdapterSource initializes the adapter with the provided rows.
@@ -58,6 +61,7 @@ func (ra *RowsAdapter) initRowsAdapterSource(rows any) error {
 // Centralizes reset logic to ensure consistency between Release and other cleanup paths.
 func (ra *RowsAdapter) reset() {
 	ra.provider = nil
+	ra.onClose = nil
 }
 
 // newRowsAdapter creates a RowsAdapter from either *sql.Rows or pgx.Rows.
@@ -128,10 +132,21 @@ func (r *RowsAdapter) Err() error {
 // close releases the underlying database resources and prevents connection leaks.
 // Must be called before the adapter goes out of scope to return connections to the pool.
 func (r *RowsAdapter) close() error {
+	if f := r.onClose; f != nil {
+		r.onClose = nil
+		defer f()
+	}
 	if r.provider == nil {
 		return nil
 	}
 	return r.provider.close()
+}
+
+// OnClose registers f to run once, after the rows are closed. A query's context
+// must outlive the call that returned its rows, because the driver reads them
+// under it; the manager releases that context here.
+func (r *RowsAdapter) OnClose(f func()) {
+	r.onClose = f
 }
 
 // Close releases the underlying database resources and prevents connection leaks.

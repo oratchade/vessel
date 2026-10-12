@@ -60,6 +60,18 @@ func waitForResponse(ctx context.Context, responseCh <-chan *QueryResponse) (*Qu
 
 // extractDataFromResponse extracts structured data from a query response.
 // Returns the Data field if available, or an error if response had an error.
+// withDefaultTimeout gives a caller without a deadline the default one, before the
+// query is enqueued: the same deadline then bounds both the wait and the query's
+// execution (#82), so a caller who gives up stops the query too. Only for results
+// read in full before the call returns; raw rows outlive the call, and a caller who
+// stops waiting for them cancels the query through its handoff instead.
+func withDefaultTimeout(ctx context.Context) (context.Context, context.CancelFunc) {
+	if _, ok := ctx.Deadline(); ok {
+		return ctx, func() {}
+	}
+	return context.WithTimeout(ctx, defaultTimeout)
+}
+
 func extractDataFromResponse(resp *QueryResponse) ([]map[string]any, error) {
 	if resp.Error != nil {
 		return nil, resp.Error
@@ -129,6 +141,8 @@ func (dm *DBManager) Get(
 	cond condition.Condition,
 	opts *options.QueryOptions,
 ) ([]map[string]any, error) {
+	ctx, cancel := withDefaultTimeout(ctx)
+	defer cancel()
 	responseCh, err := dm.GetAsync(ctx, table, columns, joins, cond, opts)
 	if err != nil {
 		return nil, err
@@ -218,6 +232,8 @@ func (dm *DBManager) GetByID(
 	joins []condition.Join,
 	opts *options.QueryOptions,
 ) ([]map[string]any, error) {
+	ctx, cancel := withDefaultTimeout(ctx)
+	defer cancel()
 	responseCh, err := dm.GetByIDAsync(ctx, table, id, joins, opts)
 	if err != nil {
 		return nil, err
@@ -293,6 +309,8 @@ func (dm *DBManager) Query(
 	query string,
 	args ...any,
 ) ([]map[string]any, error) {
+	ctx, cancel := withDefaultTimeout(ctx)
+	defer cancel()
 	responseCh, err := dm.QueryAsync(ctx, query, args...)
 	if err != nil {
 		return nil, err
@@ -367,6 +385,8 @@ func (dm *DBManager) Insert(
 	data map[string]any,
 	opts *options.QueryOptions,
 ) (*db.ExecResult, error) {
+	ctx, cancel := withDefaultTimeout(ctx)
+	defer cancel()
 	responseCh, err := dm.InsertAsync(ctx, table, data, opts)
 	if err != nil {
 		return nil, err
@@ -404,6 +424,8 @@ func (dm *DBManager) Inserts(
 	data []map[string]any,
 	opts *options.QueryOptions,
 ) (*db.ExecResult, error) {
+	ctx, cancel := withDefaultTimeout(ctx)
+	defer cancel()
 	responseCh, err := dm.InsertsAsync(ctx, table, data, opts)
 	if err != nil {
 		return nil, err
@@ -432,6 +454,8 @@ func (dm *DBManager) Upsert(
 	upsertOpts *options.UpsertOptions,
 	opts *options.QueryOptions,
 ) (*db.ExecResult, error) {
+	ctx, cancel := withDefaultTimeout(ctx)
+	defer cancel()
 	responseCh, err := dm.UpsertAsync(ctx, table, data, upsertOpts, opts)
 	if err != nil {
 		return nil, err
@@ -460,6 +484,8 @@ func (dm *DBManager) Upserts(
 	upsertOpts *options.UpsertOptions,
 	opts *options.QueryOptions,
 ) (*db.ExecResult, error) {
+	ctx, cancel := withDefaultTimeout(ctx)
+	defer cancel()
 	responseCh, err := dm.UpsertsAsync(ctx, table, data, upsertOpts, opts)
 	if err != nil {
 		return nil, err
@@ -503,15 +529,32 @@ func (dm *DBManager) ExecReturning(ctx context.Context, query string, args ...an
 type responseHandoff struct {
 	mu        sync.Mutex
 	abandoned bool
+	// cancel cancels the query's execution while it runs, so a caller who stops
+	// waiting stops the query too (#82).
+	cancel context.CancelFunc
+}
+
+// start registers the cancel function of the query's execution. It reports false
+// when the caller has already gone, and the query must not run.
+func (h *responseHandoff) start(cancel context.CancelFunc) bool {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	if h.abandoned {
+		return false
+	}
+	h.cancel = cancel
+	return true
 }
 
 // deliver sends resp to the waiting caller, or closes its rows if the caller is gone.
+// Once delivered, the result is the caller's: abandon no longer cancels it.
 func (h *responseHandoff) deliver(responseCh chan<- *QueryResponse, resp *QueryResponse) {
 	h.mu.Lock()
 	defer h.mu.Unlock()
 	if !h.abandoned {
 		select {
 		case responseCh <- resp:
+			h.cancel = nil
 			return
 		default:
 		}
@@ -519,11 +562,16 @@ func (h *responseHandoff) deliver(responseCh chan<- *QueryResponse, resp *QueryR
 	closeResponseRows(resp)
 }
 
-// abandon marks the caller gone and closes rows delivered before it stopped waiting.
+// abandon marks the caller gone, cancels a query still running, and closes rows
+// delivered before the caller stopped waiting.
 func (h *responseHandoff) abandon(responseCh <-chan *QueryResponse) {
 	h.mu.Lock()
 	defer h.mu.Unlock()
 	h.abandoned = true
+	if h.cancel != nil {
+		h.cancel()
+		h.cancel = nil
+	}
 	select {
 	case resp := <-responseCh:
 		closeResponseRows(resp)
@@ -572,6 +620,8 @@ func (dm *DBManager) Update(
 	cond condition.Condition,
 	opts *options.QueryOptions,
 ) (*db.ExecResult, error) {
+	ctx, cancel := withDefaultTimeout(ctx)
+	defer cancel()
 	responseCh, err := dm.UpdateAsync(ctx, table, data, joins, cond, opts)
 	if err != nil {
 		return nil, err
@@ -609,6 +659,8 @@ func (dm *DBManager) Delete(
 	cond condition.Condition,
 	opts *options.QueryOptions,
 ) (*db.ExecResult, error) {
+	ctx, cancel := withDefaultTimeout(ctx)
+	defer cancel()
 	responseCh, err := dm.DeleteAsync(ctx, table, joins, cond, opts)
 	if err != nil {
 		return nil, err
@@ -642,6 +694,8 @@ func (dm *DBManager) Exec(
 	query string,
 	args ...any,
 ) (*db.ExecResult, error) {
+	ctx, cancel := withDefaultTimeout(ctx)
+	defer cancel()
 	responseCh, err := dm.ExecAsync(ctx, query, args...)
 	if err != nil {
 		return nil, err

@@ -7,6 +7,26 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+### Changed
+
+- **Behaviour change: a caller's context now governs the query, not only the wait (#82).**
+  Queued queries ran with the worker's own context, so a cancelled or expired caller only
+  stopped waiting: the statement ran on, a write the caller gave up on could still commit,
+  and against a stalled database every abandoned query held a worker until the TCP
+  connection died. A query now runs in a context that ends when its caller's ends, when a
+  synchronous caller stops waiting (the 30 s default included), or when the manager shuts
+  down; a query whose caller gave up while it was queued is answered with an error and not
+  run. Raw rows (`GetRaw`, `GetByIDRaw`, `QueryRaw`, `ExecReturning`) keep that context
+  alive until they are closed, through the new `db.RowsAdapter.OnClose`. Batched inserts
+  keep the worker's context, since one batch carries several callers' rows.
+  Transactions already used the caller's context and are unchanged. **To keep work running
+  after its caller's context ends, detach it with `context.WithoutCancel`.** Async callers'
+  contexts now bound execution too.
+
+### Added
+
+- `db.RowsAdapter.OnClose(f)` registers a function to run once, after the rows are closed.
+
 ### Fixed
 
 - A database that stops answering without closing its connection now turns its entry

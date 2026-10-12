@@ -383,9 +383,7 @@ func (de *DBEntry) writeWorker(ctx context.Context, w *dbEntryWorker) {
 			if !ok {
 				return
 			}
-			response := de.processWriteRequest(ctx, qd)
-			// Send response with timeout to prevent worker from blocking indefinitely
-			de.sendResponseWithTimeout(ctx, qd, response)
+			de.execute(ctx, qd, de.processWriteRequest)
 		case <-ctx.Done():
 			return
 		}
@@ -443,10 +441,11 @@ func (de *DBEntry) handleBatchingWrite(
 ) {
 	if qd.Request != ReqInsert {
 		flush(ctx)
-		response := de.processWriteRequest(ctx, qd)
-		de.sendResponseWithTimeout(ctx, qd, response)
+		de.execute(ctx, qd, de.processWriteRequest)
 		return
 	}
+	// A batched insert keeps the worker's context: one batch carries several
+	// callers' rows, so no single caller may cancel it.
 	if !batch.compatible(qd) {
 		flush(ctx)
 	}
@@ -540,13 +539,64 @@ func (de *DBEntry) readWorker(ctx context.Context, w *dbEntryWorker) {
 			if !ok {
 				return
 			}
-			response := de.processReadRequest(ctx, qd)
-			// Send response with timeout to prevent worker from blocking indefinitely
-			de.sendResponseWithTimeout(ctx, qd, response)
+			de.execute(ctx, qd, de.processReadRequest)
 		case <-ctx.Done():
 			return
 		}
 	}
+}
+
+// errCallerGone answers a query that was not run because its caller had gone.
+var errCallerGone = errors.New("query not run: its caller stopped waiting")
+
+// execute runs one query in its execution context and sends the response. A query
+// whose caller has already gone is not run.
+func (de *DBEntry) execute(
+	worker context.Context,
+	qd *Query,
+	process func(context.Context, *Query) *QueryResponse,
+) {
+	ctx, release, ok := executionContext(worker, qd)
+	if !ok {
+		// Still answered: an async caller may be reading the channel without a
+		// deadline of its own. A synchronous caller who gave up never sees it.
+		de.sendResponseWithTimeout(worker, qd, &QueryResponse{Error: errCallerGone})
+		return
+	}
+	response := process(ctx, qd)
+	if response.RawData != nil && response.Error == nil {
+		// The driver reads the rows under ctx after this returns: they release it.
+		response.RawData.OnClose(release)
+	} else {
+		release()
+	}
+	// Send response with timeout to prevent worker from blocking indefinitely
+	de.sendResponseWithTimeout(worker, qd, response)
+}
+
+// executionContext is the context a query runs in (#82). It ends when the caller's
+// context ends, when a synchronous caller stops waiting, or when the worker shuts
+// down. release frees it. ok is false when the caller has already gone, in which
+// case the query must not run.
+func executionContext(worker context.Context, qd *Query) (ctx context.Context, release func(), ok bool) {
+	if qd.ctx == nil {
+		// Enqueued without a caller's context (internal and test paths).
+		return worker, func() {}, true
+	}
+	if qd.ctx.Err() != nil {
+		return nil, nil, false
+	}
+	ctx, cancel := context.WithCancel(qd.ctx)
+	stop := context.AfterFunc(worker, cancel)
+	release = func() {
+		stop()
+		cancel()
+	}
+	if qd.handoff != nil && !qd.handoff.start(cancel) {
+		release()
+		return nil, nil, false
+	}
+	return ctx, release, true
 }
 
 func (de *DBEntry) sendResponseWithTimeout(
@@ -586,6 +636,7 @@ func (de *DBEntry) roundRobinQueueWrite(ctx context.Context, qd *Query) error {
 	idx := de.nextWriteWorkerIndex(qd)
 	w := de.writeQueue[idx]
 
+	qd.ctx = ctx
 	select {
 	case w.queue <- qd:
 		return nil
@@ -622,6 +673,7 @@ func (de *DBEntry) roundRobinQueueRead(ctx context.Context, qd *Query) error {
 	idx := de.readWorkerIdx.Next()
 	w := de.readQueue[idx]
 
+	qd.ctx = ctx
 	select {
 	case w.queue <- qd:
 		return nil
