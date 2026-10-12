@@ -34,9 +34,9 @@ import (
 //	}
 type RowsAdapter struct {
 	provider RowsProvider
-	// onClose runs once, after the rows are closed: whatever must outlive them,
-	// such as the context the query ran in, is released then.
-	onClose func()
+	// onClose run once, last registered first, after the rows are closed: whatever
+	// must outlive them, such as the context the query ran in, is released then.
+	onClose []func()
 }
 
 // initRowsAdapterSource initializes the adapter with the provided rows.
@@ -132,21 +132,25 @@ func (r *RowsAdapter) Err() error {
 // close releases the underlying database resources and prevents connection leaks.
 // Must be called before the adapter goes out of scope to return connections to the pool.
 func (r *RowsAdapter) close() error {
-	if f := r.onClose; f != nil {
-		r.onClose = nil
-		defer f()
-	}
+	hooks := r.onClose
+	r.onClose = nil
+	defer func() {
+		for i := len(hooks) - 1; i >= 0; i-- {
+			hooks[i]()
+		}
+	}()
 	if r.provider == nil {
 		return nil
 	}
 	return r.provider.close()
 }
 
-// OnClose registers f to run once, after the rows are closed. A query's context
-// must outlive the call that returned its rows, because the driver reads them
-// under it; the manager releases that context here.
+// OnClose registers f to run once, after the rows are closed. Every function
+// registered runs, last registered first, so a caller's hook never replaces the
+// manager's: the manager releases the query's context here, which must outlive
+// the call that returned the rows because the driver reads them under it.
 func (r *RowsAdapter) OnClose(f func()) {
-	r.onClose = f
+	r.onClose = append(r.onClose, f)
 }
 
 // Close releases the underlying database resources and prevents connection leaks.

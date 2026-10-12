@@ -26,6 +26,8 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 ### Added
 
 - `db.RowsAdapter.OnClose(f)` registers a function to run once, after the rows are closed.
+  Every function registered runs, last registered first, so a caller's hook never replaces
+  the manager's own cleanup.
 
 ### Fixed
 
