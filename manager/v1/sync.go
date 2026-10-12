@@ -521,6 +521,7 @@ func (dm *DBManager) ExecReturning(ctx context.Context, query string, args ...an
 		q.handoff.abandon(responseCh)
 		return nil, err
 	}
+	q.handoff.accept()
 	return extractRawDataFromResponse(resp)
 }
 
@@ -546,15 +547,23 @@ func (h *responseHandoff) start(cancel context.CancelFunc) bool {
 	return true
 }
 
+// accept marks the response the caller's, once it has received it: nothing cancels
+// the query from here on, and its rows live until the caller closes them. A response
+// merely buffered is not accepted: the caller's wait may still time out and abandon it.
+func (h *responseHandoff) accept() {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	h.cancel = nil
+}
+
 // deliver sends resp to the waiting caller, or closes its rows if the caller is gone.
-// Once delivered, the result is the caller's: abandon no longer cancels it.
+// The query stays cancellable until the caller accepts the response.
 func (h *responseHandoff) deliver(responseCh chan<- *QueryResponse, resp *QueryResponse) {
 	h.mu.Lock()
 	defer h.mu.Unlock()
 	if !h.abandoned {
 		select {
 		case responseCh <- resp:
-			h.cancel = nil
 			return
 		default:
 		}

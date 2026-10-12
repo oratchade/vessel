@@ -235,3 +235,31 @@ func TestOneCallerDoesNotCancelABatch(t *testing.T) {
 	}
 	<-gone
 }
+
+// A response sitting in the buffer is not yet the caller's: if its wait expires at
+// the same instant, the select may take the timeout, and abandoning must still cancel
+// the query, or closing its unread rows drains a stalled stream with no bound.
+func TestAbandoningABufferedResponseCancelsTheQuery(t *testing.T) {
+	q := &Query{ctx: context.Background(), handoff: &responseHandoff{}, ResponseCh: newQueryResponseChannel()}
+	ctx, release, ok := executionContext(context.Background(), q)
+	require.True(t, ok)
+	defer release()
+
+	q.handoff.deliver(q.ResponseCh, &QueryResponse{})
+	q.handoff.abandon(q.ResponseCh)
+	assert.Error(t, ctx.Err(), "the abandoned query's context is still live")
+}
+
+// Once the caller has the response, the rows are its own: nothing cancels them
+// until it closes them.
+func TestAnAcceptedResponseIsNotCancelled(t *testing.T) {
+	q := &Query{ctx: context.Background(), handoff: &responseHandoff{}, ResponseCh: newQueryResponseChannel()}
+	ctx, release, ok := executionContext(context.Background(), q)
+	require.True(t, ok)
+	defer release()
+
+	q.handoff.deliver(q.ResponseCh, &QueryResponse{})
+	<-q.ResponseCh
+	q.handoff.accept()
+	assert.NoError(t, ctx.Err())
+}

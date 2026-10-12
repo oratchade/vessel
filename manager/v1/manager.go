@@ -194,6 +194,7 @@ func (dm *DBManager) awaitRawRows(ctx context.Context, operation string, q *Quer
 		q.handoff.abandon(responseCh)
 		return nil, err
 	}
+	q.handoff.accept()
 	return extractRawDataFromResponse(resp)
 }
 
