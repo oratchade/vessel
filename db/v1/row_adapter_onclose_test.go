@@ -39,3 +39,15 @@ func TestRowsAdapterOnCloseHooksCompose(t *testing.T) {
 	assert.NoError(t, ra.Close())
 	assert.Equal(t, []string{"caller", "manager"}, order)
 }
+
+// A caller's hook that panics must not stop the manager's cleanup: the panic still
+// reaches the caller, but every other hook runs while it unwinds.
+func TestRowsAdapterOnCloseRunsEveryHookWhenOnePanics(t *testing.T) {
+	managerRan := false
+	ra := &RowsAdapter{}
+	ra.OnClose(func() { managerRan = true })
+	ra.OnClose(func() { panic("caller's hook") })
+
+	assert.PanicsWithValue(t, "caller's hook", func() { _ = ra.Close() })
+	assert.True(t, managerRan, "the manager's cleanup was skipped")
+}

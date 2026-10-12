@@ -134,11 +134,11 @@ func (r *RowsAdapter) Err() error {
 func (r *RowsAdapter) close() error {
 	hooks := r.onClose
 	r.onClose = nil
-	defer func() {
-		for i := len(hooks) - 1; i >= 0; i-- {
-			hooks[i]()
-		}
-	}()
+	// One defer per hook: they run last registered first, and a hook that panics
+	// does not stop the ones after it, so the manager's cleanup always runs.
+	for _, f := range hooks {
+		defer f()
+	}
 	if r.provider == nil {
 		return nil
 	}
