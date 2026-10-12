@@ -267,7 +267,7 @@ func (de *DBEntry) healthCheck(ctx context.Context) {
 	for {
 		select {
 		case <-ticker.C:
-			err := de.db.Ping(ctx)
+			err := de.ping(ctx)
 			if err != nil {
 				failureCount = de.handleHealthCheckFailure(
 					failureCount,
@@ -696,6 +696,20 @@ func (de *DBEntry) handleHealthCheckFailure(
 	}
 
 	return failureCount
+}
+
+// ping checks the database once, bounded by the health interval. A database that
+// stops answering without closing its connection would otherwise block the ping,
+// and the loop with it, so no failure would ever be counted and the entry would
+// stay healthy through the outage (#81). A ping slower than the interval counts as
+// a failure.
+func (de *DBEntry) ping(ctx context.Context) error {
+	ctx, cancel := context.WithTimeout(ctx, de.healthInterval)
+	defer cancel()
+	if err := de.db.Ping(ctx); err != nil {
+		return fmt.Errorf("health ping: %w", err)
+	}
+	return nil
 }
 
 // handleHealthCheckSuccess handles a successful health check.
