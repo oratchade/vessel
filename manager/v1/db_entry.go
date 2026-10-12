@@ -2,6 +2,7 @@ package v1
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"sync"
 	"sync/atomic"
@@ -30,7 +31,10 @@ type DBEntry struct {
 
 	healthy        atomic.Bool
 	healthInterval time.Duration
-	priority       int
+	// pinging is set while a health ping is outstanding, so a stuck one is never
+	// joined by another.
+	pinging  atomic.Bool
+	priority int
 
 	writeQueue     []*dbEntryWorker
 	readQueue      []*dbEntryWorker
@@ -698,18 +702,42 @@ func (de *DBEntry) handleHealthCheckFailure(
 	return failureCount
 }
 
-// ping checks the database once, bounded by the health interval. A database that
+// errPingInFlight is a health check failure: the previous ping has not returned.
+var errPingInFlight = errors.New("health ping: the previous ping has not returned")
+
+// ping checks the database once, giving up at the health interval. A database that
 // stops answering without closing its connection would otherwise block the ping,
 // and the loop with it, so no failure would ever be counted and the entry would
 // stay healthy through the outage (#81). A ping slower than the interval counts as
 // a failure.
+//
+// The context lets a cooperative driver cancel its I/O and free the connection. The
+// wait is bounded here as well, because some drivers block past cancellation
+// (go-mssqldb waits for the server to acknowledge it). One ping at a time: while a
+// stuck one is outstanding, every tick counts as a failure instead of starting
+// another. Its goroutine is not in de.wg, so a driver stuck past cancellation never
+// holds up stop(); there is at most one per entry, and it ends when the driver
+// returns.
 func (de *DBEntry) ping(ctx context.Context) error {
-	ctx, cancel := context.WithTimeout(ctx, de.healthInterval)
-	defer cancel()
-	if err := de.db.Ping(ctx); err != nil {
-		return fmt.Errorf("health ping: %w", err)
+	if !de.pinging.CompareAndSwap(false, true) {
+		return errPingInFlight
 	}
-	return nil
+	ctx, cancel := context.WithTimeout(ctx, de.healthInterval)
+	done := make(chan error, 1)
+	go func() {
+		defer de.pinging.Store(false)
+		defer cancel()
+		done <- de.db.Ping(ctx)
+	}()
+	select {
+	case err := <-done:
+		if err != nil {
+			return fmt.Errorf("health ping: %w", err)
+		}
+		return nil
+	case <-ctx.Done():
+		return fmt.Errorf("health ping: %w", ctx.Err())
+	}
 }
 
 // handleHealthCheckSuccess handles a successful health check.

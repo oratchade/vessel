@@ -14,7 +14,9 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
   server blocked the ping, no failure was ever counted, and `Ping` and `HealthStatus`
   reported the entry healthy for as long as the stall lasted. Each ping is now bounded
   by the entry's health interval: a slower ping counts as a failure, and the usual five
-  in a row mark the entry unhealthy.
+  in a row mark the entry unhealthy. The wait is bounded by the health check itself, so a
+  driver that blocks past cancellation (go-mssqldb waits for the server to acknowledge it)
+  cannot hold the check either, and a stuck ping is never joined by another.
 
 ## [0.3.0] - 2026-09-30
 
