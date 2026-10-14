@@ -989,3 +989,27 @@ func TestLoadConfig_TOMLBareValueFollowsTOMLIntegers(t *testing.T) {
 		})
 	}
 }
+
+// TestLoadConfig_KeyFromTheEnvironmentCannotRepeatAKey: two equal keys in parsed data
+// leave one value to chance, so a key from the environment that repeats another fails
+// the load, naming its placeholder.
+func TestLoadConfig_KeyFromTheEnvironmentCannotRepeatAKey(t *testing.T) {
+	for name, content := range map[string]string{
+		"config.toml": tomlWith(`password = "literal"`+"\n"+`${KEY} = "from the environment"`, "5432"),
+		"config.json": `{"entries": [{"name": "primary", "type": "readwrite", "postgres": {"user": "app",
+  "password": "literal", "${KEY}": "from the environment", "host": "localhost", "port": 5432, "database": "app"}}]}`,
+	} {
+		t.Run(name, func(t *testing.T) {
+			path := writeConfig(t, name, content)
+			cfg, err := mgr.LoadConfigForTest(path, []mgr.EnvOption{
+				mgr.WithEnvVars(map[string]string{"KEY": "password"}),
+			})
+			if err == nil {
+				t.Fatalf("load succeeded, password = %q", cfg.Entries[0].Postgres.Password)
+			}
+			if !strings.Contains(err.Error(), "${KEY}") {
+				t.Errorf("error should name ${KEY}: %v", err)
+			}
+		})
+	}
+}

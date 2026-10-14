@@ -3,6 +3,7 @@ package v1
 import (
 	"bufio"
 	"bytes"
+	"cmp"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -430,11 +431,18 @@ func (p *placeholders) expandMap(
 	m map[string]any, path string, paths map[string][]string, scalar func(string) any,
 ) (any, error) {
 	out := make(map[string]any, len(m))
-	for key, child := range m {
-		key, fromSource, err := p.expandText(key)
+	asWritten := map[string]string{} // expanded key → the key as written, placeholders restored
+	for written, child := range m {
+		key, fromSource, err := p.expandText(written)
 		if err != nil {
 			return nil, err
 		}
+		// Map order is random, so of two equal keys either could win: refuse them.
+		if earlier, repeated := asWritten[key]; repeated {
+			return nil, fmt.Errorf("%s: keys %s and %s are the same key",
+				cmp.Or(path, "top level"), earlier, p.restore(written))
+		}
+		asWritten[key] = p.restore(written)
 		at := key
 		if path != "" {
 			at = path + "." + key
