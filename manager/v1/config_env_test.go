@@ -476,19 +476,31 @@ entries:
 	}
 }
 
-// TestLoadConfig_TOMLKeyFromTheEnvironmentIsOneKey: a dotted value as a bare key would
-// reach into another table; in the parsed data it is a single key.
+// TestLoadConfig_TOMLKeyFromTheEnvironmentIsOneKey: a key from the environment names a
+// field, and a dotted one is a single key, which would otherwise reach into another
+// table.
 func TestLoadConfig_TOMLKeyFromTheEnvironmentIsOneKey(t *testing.T) {
-	path := writeConfig(t, "config.toml", "[[entries]]\nname = \"primary\"\ntype = \"readwrite\"\n${KEY} = \"evil\"\n"+
-		"[entries.postgres]\nuser = \"app\"\npassword = \"x\"\nhost = \"localhost\"\nport = 5432\ndatabase = \"app\"\n")
-	cfg, err := mgr.LoadConfigForTest(path, []mgr.EnvOption{
-		mgr.WithEnvVars(map[string]string{"KEY": "postgres.ssl_mode"}),
-	})
-	if err != nil {
-		t.Fatalf("load: %v", err)
+	const entry = "[[entries]]\nname = \"primary\"\ntype = \"readwrite\"\n"
+	const postgres = "[entries.postgres]\nuser = \"app\"\npassword = \"x\"\nhost = \"localhost\"\nport = 5432\ndatabase = \"app\"\n"
+	cases := map[string]struct {
+		content, key, want string
+	}{
+		"names a field":   {entry + postgres + "${KEY} = \"verify-full\"\n", "ssl_mode", "verify-full"},
+		"dotted, one key": {entry + "${KEY} = \"verify-full\"\n" + postgres, "postgres.ssl_mode", ""},
 	}
-	if got := cfg.Entries[0].Postgres.SSLMode; got != "" {
-		t.Errorf("ssl_mode = %q, want it untouched", got)
+	for name, c := range cases {
+		t.Run(name, func(t *testing.T) {
+			path := writeConfig(t, "config.toml", c.content)
+			cfg, err := mgr.LoadConfigForTest(path, []mgr.EnvOption{
+				mgr.WithEnvVars(map[string]string{"KEY": c.key}),
+			})
+			if err != nil {
+				t.Fatalf("load: %v", err)
+			}
+			if got := cfg.Entries[0].Postgres.SSLMode; got != c.want {
+				t.Errorf("ssl_mode = %q, want %q", got, c.want)
+			}
+		})
 	}
 }
 
@@ -620,18 +632,18 @@ entries:
 	}
 }
 
-// TestNewDBManager_ValidationErrorDoesNotQuoteSubstitutedValues: validation quotes the
-// field it rejects, and its name. One value holds the other, so each is redacted whole
-// only when the longer goes first.
+// TestNewDBManager_ValidationErrorDoesNotQuoteSubstitutedValues: validation quotes an
+// entry's name. Another value is part of that name, so the name is redacted whole only
+// when the longer value goes first.
 func TestNewDBManager_ValidationErrorDoesNotQuoteSubstitutedValues(t *testing.T) {
 	path := writeConfig(t, "config.yaml", `
 entries:
   - name: ${ENTRY}
-    type: ${ENTRY_TYPE}
-    postgres: {user: app, password: x, host: localhost, port: 5432, database: app}
+    type: unknown
+    postgres: {user: "${DB_USER}", password: x, host: localhost, port: 5432, database: app}
 `)
 	_, err := mgr.NewDBManager(t.Context(), path, nil,
-		mgr.WithEnvVars(map[string]string{"ENTRY": "abc", "ENTRY_TYPE": "abcdef"}))
+		mgr.WithEnvVars(map[string]string{"ENTRY": "abcdef", "DB_USER": "abc"}))
 	if err == nil {
 		t.Fatal("NewDBManager accepted an unknown entry type")
 	}
@@ -825,5 +837,135 @@ entries:
 	})
 	if err == nil || !strings.Contains(err.Error(), "${TAG}") {
 		t.Errorf("error should name ${TAG}: %v", err)
+	}
+}
+
+// jsonWithPort is a JSON config whose port is written as port.
+func jsonWithPort(port string) string {
+	return `{"entries": [{"name": "primary", "type": "readwrite",
+  "postgres": {"user": "app", "password": "x", "host": "localhost", "port": ` + port + `, "database": "app"}}]}`
+}
+
+// TestLoadConfig_BareValueIsTypedAsIfWritten: a whole bare value outside quotes reads as
+// it would written there: spaces around it don't count, TOML takes its bases and
+// underscores, and JSON's null is null. Booleans are TestLoadConfig_BareBooleanIsTyped.
+func TestLoadConfig_BareValueIsTypedAsIfWritten(t *testing.T) {
+	cases := map[string]struct {
+		name, content, value string
+		port                 uint16
+	}{
+		"JSON spaces":      {"config.json", jsonWithPort("${DB_PORT}"), " 6543\n", 6543},
+		"JSON null":        {"config.json", jsonWithPort("${DB_PORT}"), "null", 0},
+		"TOML hexadecimal": {"config.toml", tomlWith(`password = "x"`, "${DB_PORT}"), "0x1F", 31},
+		"TOML underscores": {"config.toml", tomlWith(`password = "x"`, "${DB_PORT}"), "6_543", 6543},
+	}
+	for name, c := range cases {
+		t.Run(name, func(t *testing.T) {
+			path := writeConfig(t, c.name, c.content)
+			cfg, err := mgr.LoadConfigForTest(path, []mgr.EnvOption{
+				mgr.WithEnvVars(map[string]string{"DB_PORT": c.value}),
+			})
+			if err != nil {
+				t.Fatalf("load: %v", err)
+			}
+			if got := cfg.Entries[0].Postgres.Port; got != c.port {
+				t.Errorf("port = %d, want %d", got, c.port)
+			}
+		})
+	}
+}
+
+// TestLoadConfig_GluedBarePlaceholderFails: a token glued to other text outside quotes
+// is part of a number that is not a value, so the load fails, naming the placeholder.
+func TestLoadConfig_GluedBarePlaceholderFails(t *testing.T) {
+	path := writeConfig(t, "config.json", jsonWithPort("54${DB_PORT}"))
+	_, err := mgr.LoadConfigForTest(path, []mgr.EnvOption{
+		mgr.WithEnvVars(map[string]string{"DB_PORT": "32"}),
+	})
+	if err == nil || !strings.Contains(err.Error(), "${DB_PORT}") {
+		t.Errorf("error should name ${DB_PORT}: %v", err)
+	}
+}
+
+// TestLoadConfig_JSONRejectsDataAfterTheValue, as json.Unmarshal does.
+func TestLoadConfig_JSONRejectsDataAfterTheValue(t *testing.T) {
+	path := writeConfig(t, "config.json", jsonWithPort("${DB_PORT}")+` {"entries": []}`)
+	if _, err := mgr.LoadConfigForTest(path, []mgr.EnvOption{
+		mgr.WithEnvVars(map[string]string{"DB_PORT": "5432"}),
+	}); err == nil {
+		t.Error("load accepted a second JSON value")
+	}
+}
+
+// TestLoadConfig_FileHoldingTokenDigitsLoadsThem: tokens start with digits the file does
+// not contain, so a literal value that looks like one stays itself.
+func TestLoadConfig_FileHoldingTokenDigitsLoadsThem(t *testing.T) {
+	path := writeConfig(t, "config.yaml", `
+entries:
+  - name: primary
+    type: readwrite
+    postgres: {user: "700000000000000000", password: "${DB_PASSWORD}", host: localhost, port: 5432, database: app}
+`)
+	cfg, err := mgr.LoadConfigForTest(path, []mgr.EnvOption{
+		mgr.WithEnvVars(map[string]string{"DB_PASSWORD": "secret"}),
+	})
+	if err != nil {
+		t.Fatalf("load: %v", err)
+	}
+	if pg := cfg.Entries[0].Postgres; pg.User != "700000000000000000" || pg.Password != "secret" {
+		t.Errorf("user, password = %q, %q; want 700000000000000000, secret", pg.User, pg.Password)
+	}
+}
+
+// TestLoadConfig_WithholdsAQuotedValueInANumericField: a value quoted into a string that
+// lands in a numeric field is named, not quoted.
+func TestLoadConfig_WithholdsAQuotedValueInANumericField(t *testing.T) {
+	for name, content := range map[string]string{
+		"config.json": jsonWithPort(`"${SECRET}"`),
+		"config.toml": tomlWith(`password = "x"`, `"${SECRET}"`),
+	} {
+		t.Run(name, func(t *testing.T) {
+			path := writeConfig(t, name, content)
+			_, err := mgr.LoadConfigForTest(path, []mgr.EnvOption{
+				mgr.WithEnvVars(map[string]string{"SECRET": "99999999"}),
+			})
+			if err == nil || !strings.Contains(err.Error(), "${SECRET}") || leaks(err, "99999999") {
+				t.Errorf("error should name ${SECRET} and quote nothing of it: %v", err)
+			}
+		})
+	}
+}
+
+// TestLoadConfig_BareBooleanIsTyped: true or false outside quotes reaches a boolean field.
+func TestLoadConfig_BareBooleanIsTyped(t *testing.T) {
+	for name, content := range map[string]string{
+		"config.json": `{"write_batching_enabled": ${BATCH}, "entries": [{"name": "primary", "type": "readwrite",
+  "postgres": {"user": "app", "password": "x", "host": "localhost", "port": 5432, "database": "app"}}]}`,
+		"config.toml": "write_batching_enabled = ${BATCH}\n" + tomlWith(`password = "x"`, "5432"),
+	} {
+		t.Run(name, func(t *testing.T) {
+			path := writeConfig(t, name, content)
+			cfg, err := mgr.LoadConfigForTest(path, []mgr.EnvOption{
+				mgr.WithEnvVars(map[string]string{"BATCH": "true"}),
+			})
+			if err != nil {
+				t.Fatalf("load: %v", err)
+			}
+			if !cfg.WriteBatchingEnabled {
+				t.Error("write_batching_enabled = false, want true")
+			}
+		})
+	}
+}
+
+// TestLoadConfig_WithholdsAnErrorAtAKeyFromTheEnvironment: a rejected value under a key
+// that came from the environment names that key's placeholder.
+func TestLoadConfig_WithholdsAnErrorAtAKeyFromTheEnvironment(t *testing.T) {
+	path := writeConfig(t, "config.toml", tomlWith(`password = "x"`+"\n"+`${KEY} = "not a number"`, "5432"))
+	_, err := mgr.LoadConfigForTest(path, []mgr.EnvOption{
+		mgr.WithEnvVars(map[string]string{"KEY": "pool_max_conns"}),
+	})
+	if err == nil || !strings.Contains(err.Error(), "${KEY}") {
+		t.Errorf("error should name ${KEY}: %v", err)
 	}
 }
