@@ -396,40 +396,54 @@ func loadConfig(path string, envOpts []EnvOption) (*config.ManagerConfig, error)
 	}
 
 	// ${VAR} and ${VAR:default} are expanded when env options are provided, so that a
-	// value is only ever text (#85): YAML after parsing, JSON and TOML escaped for a
-	// quoted string.
+	// value is only ever text (#85): YAML after parsing, JSON and TOML by where each
+	// placeholder sits.
 	resolver := newEnvResolver(envOpts)
 	cfg := &config.ManagerConfig{}
 	ext := filepath.Ext(absPath)
 
 	switch ext {
 	case ".json":
-		err = json.Unmarshal(expandEnvVarsWith(data, resolver, escapeQuoted), cfg)
+		var expanded []byte
+		if expanded, err = expandInText(data, resolver, false); err == nil {
+			err = json.Unmarshal(expanded, cfg)
+		}
 
 	case ".yaml", ".yml":
 		err = decodeYAML(data, resolver, cfg)
 
 	case ".toml":
-		err = toml.Unmarshal(expandEnvVarsWith(data, resolver, escapeQuoted), cfg)
+		var expanded []byte
+		if expanded, err = expandInText(data, resolver, true); err == nil {
+			err = toml.Unmarshal(expanded, cfg)
+		}
 
 	default:
 		return nil, fmt.Errorf("loadConfig: unsupported file extension: %s", ext)
 	}
 
+	if err := loadError(err, resolver); err != nil {
+		return nil, err
+	}
+	return cfg, nil
+}
+
+// loadError is the error a load ends with: a value that is not UTF-8, else the
+// decoder's error. Once a value came from the environment, that leaves only as a
+// redacted message: a decoder's error can hold what it read, as a TOML error holds
+// its source.
+func loadError(err error, resolver *envResolver) error {
 	if len(resolver.invalid) > 0 {
-		return nil, fmt.Errorf("loadConfig: the value of ${%s} is not valid UTF-8",
+		return fmt.Errorf("loadConfig: the value of ${%s} is not valid UTF-8",
 			strings.Join(resolver.invalid, "}, ${"))
 	}
-	if err != nil {
-		if len(resolver.substituted) > 0 {
-			// A decoder's error can hold what it read, as a TOML error holds its source,
-			// so once a value came from the environment only a redacted message leaves.
-			err = errors.New(redact(err.Error(), resolver.substituted))
-		}
-		return nil, fmt.Errorf("loadConfig: failed to load configuration: %w", err)
+	if err == nil {
+		return nil
 	}
-
-	return cfg, nil
+	if len(resolver.substituted) > 0 {
+		err = errors.New(redact(err.Error(), resolver.substituted))
+	}
+	return fmt.Errorf("loadConfig: failed to load configuration: %w", err)
 }
 
 // Start initializes the database entries and starts their worker routines.

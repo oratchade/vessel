@@ -16,7 +16,13 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
   is now parsed with an inert token standing in for each placeholder, so placeholders
   still work in flow collections, anchors and keys, and each value then goes into the
   value that held it, an unquoted value typed from what it expands to (ports and durations still decode) and a quoted one always a string.
-  JSON and TOML values are escaped for a double-quoted string. Load errors replace every
+  JSON and TOML are expanded by where each placeholder sits: escaped in a double-quoted
+  string, as they are in a TOML single-quoted string (which reads no escapes, so
+  escaping changed a password with a backslash), and only a plain number, boolean or
+  date outside quotes. **A value that cannot sit where its placeholder is now fails the
+  load** instead of loading as something else: a `'` or a line break in a TOML
+  single-quoted string ended it early, and a value outside quotes became syntax. A
+  placeholder in a TOML comment is no longer expanded. Load errors replace every
   substituted value with `[REDACTED]`: the YAML decoder quoted the text it rejected,
   which could be a secret. They no longer wrap the decoder's error either, since a TOML
   decode error kept the expanded source, secrets included. A value that is not valid

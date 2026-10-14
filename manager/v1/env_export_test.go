@@ -9,7 +9,20 @@ func LoadConfigForTest(path string, opts []EnvOption) (*config.ManagerConfig, er
 	return loadConfig(path, opts)
 }
 
-// ExpandEnvVarsForTest exposes expandEnvVarsWith, values inserted as they are.
+// ExpandEnvVarsForTest replaces ${VAR} and ${VAR:default} patterns in data, each
+// value inserted as it is:
+//   - ${VAR} with var found → replaced with value
+//   - ${VAR} with var not found → left as literal ${VAR} (fail-loud)
+//   - ${VAR:default} with var found → replaced with value
+//   - ${VAR:default} with var not found → replaced with default
+//   - ${VAR:} with var not found → replaced with empty string
 func ExpandEnvVarsForTest(data []byte, opts []EnvOption) []byte {
-	return expandEnvVarsWith(data, newEnvResolver(opts), func(val string) string { return val })
+	resolver := newEnvResolver(opts)
+	if !resolver.hasAnySource() {
+		return data
+	}
+	return envVarRe.ReplaceAllFunc(data, func(match []byte) []byte {
+		val, _ := resolver.expand(match)
+		return []byte(val)
+	})
 }

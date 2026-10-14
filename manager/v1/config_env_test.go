@@ -318,3 +318,98 @@ entries:
 		})
 	}
 }
+
+// tomlWith is a TOML config whose password line is password, and whose port is port.
+func tomlWith(password, port string) string {
+	return `
+[[entries]]
+name = "primary"
+type = "readwrite"
+
+[entries.postgres]
+user = "app"
+` + password + `
+host = "localhost"
+port = ` + port + `
+database = "app"
+`
+}
+
+// TestLoadConfig_TOMLPlaceholderPlacements loads a placeholder from each kind of TOML
+// string and from a comment, each with values that are syntax in some of them.
+func TestLoadConfig_TOMLPlaceholderPlacements(t *testing.T) {
+	placements := map[string]struct {
+		line   string
+		values []string
+	}{
+		"basic string":     {`password = "${DB_PASSWORD}"`, hostileValues},
+		"multi-line basic": {`password = """${DB_PASSWORD}"""`, append([]string{"\nleading newline"}, hostileValues...)},
+		// A literal string reads no escapes, so a backslash is a backslash.
+		"literal string": {`password = '${DB_PASSWORD}'`, []string{`back\slash`, `"double"`, "*star", "tab\there"}},
+		"multi-line literal": {
+			`password = '''${DB_PASSWORD}'''`,
+			[]string{`back\slash`, "line\nbreak", "it's", "ends with '", "ends with ''"},
+		},
+		// A comment keeps the placeholder as written: a value there could end it.
+		"comment": {
+			"password = \"${DB_PASSWORD}\" # was ${DB_PASSWORD}",
+			[]string{"x\nport = 1", `back\slash`},
+		},
+	}
+	for name, p := range placements {
+		for _, value := range p.values {
+			t.Run(name+"/"+value, func(t *testing.T) {
+				path := writeConfig(t, "config.toml", tomlWith(p.line, "${DB_PORT:5432}"))
+				cfg, err := mgr.LoadConfigForTest(path, []mgr.EnvOption{
+					mgr.WithEnvVars(map[string]string{"DB_PASSWORD": value}),
+				})
+				if err != nil {
+					t.Fatalf("load: %v", err)
+				}
+				pg := cfg.Entries[0].Postgres
+				if pg.Password != value || pg.Port != 5432 {
+					t.Errorf("password, port = %q, %d; want %q, 5432", pg.Password, pg.Port, value)
+				}
+			})
+		}
+	}
+}
+
+// TestLoadConfig_RefusesAValueItsPlaceCannotHold covers values that used to load as
+// something else: a TOML literal string ended early, or a value outside quotes became
+// syntax. The load fails, naming the placeholder and not the value.
+func TestLoadConfig_RefusesAValueItsPlaceCannotHold(t *testing.T) {
+	cases := map[string]struct {
+		name, content, value string
+	}{
+		"TOML literal string, quote":   {"config.toml", tomlWith(`password = '${DB_PASSWORD}'`, "5432"), "x' #"},
+		"TOML literal string, newline": {"config.toml", tomlWith(`password = '${DB_PASSWORD}'`, "5432"), "a\nb"},
+		"TOML multi-line literal":      {"config.toml", tomlWith(`password = '''${DB_PASSWORD}'''`, "5432"), "a'''b"},
+		// TOML drops a newline right after the opening quotes.
+		"TOML multi-line literal, leading newline": {
+			"config.toml", tomlWith(`password = '''${DB_PASSWORD}'''`, "5432"), "\nleading newline",
+		},
+		"TOML outside quotes":          {"config.toml", tomlWith(`password = "x"`, "${DB_PASSWORD}"), "1\nuser = \"root\""},
+		"JSON outside quotes": {"config.json", `{"entries": [{"name": "primary", "type": "readwrite",
+  "postgres": {"user": "app", "password": "x", "host": "localhost", "port": ${DB_PASSWORD}, "database": "app"}}]}`,
+			`1, "user": "root"`},
+	}
+	for name, c := range cases {
+		t.Run(name, func(t *testing.T) {
+			path := writeConfig(t, c.name, c.content)
+			cfg, err := mgr.LoadConfigForTest(path, []mgr.EnvOption{
+				mgr.WithEnvVars(map[string]string{"DB_PASSWORD": c.value}),
+			})
+			if err == nil {
+				pg := cfg.Entries[0].Postgres
+				t.Fatalf("load succeeded: user, password, port = %q, %q, %d", pg.User, pg.Password, pg.Port)
+			}
+			if !strings.Contains(err.Error(), "${DB_PASSWORD}") {
+				t.Errorf("error does not name the placeholder: %v", err)
+			}
+			if leaks(err, c.value) {
+				t.Errorf("error quotes the value: %v", err)
+			}
+		})
+	}
+}

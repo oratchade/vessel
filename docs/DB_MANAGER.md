@@ -90,11 +90,15 @@ A substituted value is only ever text, never syntax, so any password works as it
   is a number, `health_interval: ${HEALTH:30s}` a duration. A quoted one
   (`user: "${DB_USER}"`) is always a string, and so is any non-empty value that would
   otherwise read as null, such as `null` or `~`.
-- **JSON and TOML** are expanded as text, with each value escaped for a double-quoted
-  string. Write string placeholders inside double quotes (`"password": "${DB_PASSWORD}"`)
-  and numbers outside them (`"port": ${DB_PORT:5432}`). A TOML single-quoted string
-  reads no escapes, so a value with a quote, a backslash or a control character would
-  arrive escaped there.
+- **JSON and TOML** are expanded by where each placeholder sits. Write string
+  placeholders inside double quotes (`"password": "${DB_PASSWORD}"`), where each value
+  is escaped for the string, and numbers outside them (`"port": ${DB_PORT:5432}`).
+  - In a TOML single-quoted string, which reads no escapes, a value goes in as it is; a
+    value that string cannot hold, such as one with a `'` or a line break, fails the
+    load.
+  - Outside quotes, only a plain value can go: a number, a boolean or a date. Anything
+    else fails the load and asks for quotes.
+  - In a TOML comment, a placeholder stays as written.
 
 A value that is not valid UTF-8 fails the load, naming the variable.
 

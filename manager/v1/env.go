@@ -141,30 +141,6 @@ func (r *envResolver) hasAnySource() bool {
 	return r.vars != nil || r.fileVars != nil || len(r.prefixes) > 0
 }
 
-// expandEnvVarsWith replaces ${VAR} and ${VAR:default} patterns in data
-// using the resolver's lookup chain, each value found in a source passed through
-// encode. A default goes in as written: it is already in the file's syntax.
-//
-// Behavior:
-//   - ${VAR} with var found → replaced with value
-//   - ${VAR} with var not found → left as literal ${VAR} (fail-loud)
-//   - ${VAR:default} with var found → replaced with value
-//   - ${VAR:default} with var not found → replaced with default
-//   - ${VAR:} with var not found → replaced with empty string
-func expandEnvVarsWith(data []byte, resolver *envResolver, encode func(string) string) []byte {
-	if resolver == nil || !resolver.hasAnySource() {
-		return data
-	}
-
-	return envVarRe.ReplaceAllFunc(data, func(match []byte) []byte {
-		val, fromSource := resolver.expand(match)
-		if fromSource {
-			return []byte(encode(val))
-		}
-		return []byte(val)
-	})
-}
-
 // expand resolves one placeholder as written: to its variable's value, found in a
 // source (fromSource), else to its default, else to itself.
 func (r *envResolver) expand(match []byte) (val string, fromSource bool) {
@@ -270,10 +246,171 @@ func (t *yamlTokens) expand(n *yaml.Node) {
 	}
 }
 
+// expandInText expands the placeholders of a JSON or TOML file by where each one
+// sits, so a value can never become syntax (#85):
+//   - in a double-quoted string, the value is escaped for it;
+//   - in a TOML single-quoted string, which reads no escapes, it goes in as it is, and
+//     a value the string cannot hold fails the load;
+//   - outside quotes, only a plain value goes in: a number, a boolean, a date;
+//   - in a TOML comment, the placeholder stays as written.
+//
+// A default goes in as written: it is already in the file's syntax.
+func expandInText(data []byte, resolver *envResolver, isTOML bool) ([]byte, error) {
+	if !resolver.hasAnySource() {
+		return data, nil
+	}
+	var out bytes.Buffer
+	matches := envVarRe.FindAllIndex(data, -1)
+	at := outside
+	for i := 0; i < len(data); {
+		for len(matches) > 0 && matches[0][0] < i {
+			matches = matches[1:] // began inside an escape sequence: not a placeholder
+		}
+		if len(matches) > 0 && matches[0][0] == i {
+			// TOML drops a newline right after a multi-line string's opening quotes.
+			opened := bytes.HasSuffix(out.Bytes(), []byte("'''"))
+			val, err := expandAt(at, opened, data[i:matches[0][1]], resolver)
+			if err != nil {
+				return nil, err
+			}
+			out.WriteString(val)
+			i, matches = matches[0][1], matches[1:]
+			continue
+		}
+		n, next := scan(at, data[i:], isTOML)
+		out.Write(data[i : i+n])
+		i, at = i+n, next
+	}
+	return out.Bytes(), nil
+}
+
+// textPlace is where a byte of a JSON or TOML file sits.
+type textPlace int
+
+const (
+	outside textPlace = iota
+	comment
+	basicString        // "..."
+	multiBasicString   // """..."""
+	literalString      // '...'
+	multiLiteralString // '''...'''
+)
+
+// plainValue is what a value outside quotes may be: a number, a boolean or a date.
+var plainValue = regexp.MustCompile(`^[A-Za-z0-9_.:+-]+$`)
+
+func expandAt(at textPlace, opened bool, match []byte, resolver *envResolver) (string, error) {
+	if at == comment {
+		return string(match), nil
+	}
+	val, fromSource := resolver.expand(match)
+	if !fromSource {
+		return val, nil
+	}
+	if at == basicString || at == multiBasicString {
+		return escapeQuoted(val), nil
+	}
+	if why := unfit(at, opened, val); why != "" {
+		return "", fmt.Errorf("%s sits %s", match, why)
+	}
+	return val, nil
+}
+
+// unfit says why val cannot go in as it is at place at, or "" when it can. opened is
+// whether it would follow a multi-line string's opening quotes, after which TOML drops
+// a newline.
+func unfit(at textPlace, opened bool, val string) string {
+	const useDoubleQuotes = "which cannot hold its value: use double quotes"
+	switch at {
+	case literalString:
+		if strings.Contains(val, "'") || hasControl(val, "\t") {
+			return "in a single-quoted TOML string, " + useDoubleQuotes
+		}
+	case multiLiteralString:
+		if !fitsMultiLineLiteral(val, opened) {
+			return "in a multi-line literal TOML string, " + useDoubleQuotes
+		}
+	default:
+		if !plainValue.MatchString(val) {
+			return "outside quotes, where only a number, a boolean or a date can go: quote it"
+		}
+	}
+	return ""
+}
+
+func fitsMultiLineLiteral(val string, opened bool) bool {
+	leadingNewline := opened && strings.HasPrefix(strings.TrimPrefix(val, "\r"), "\n")
+	return !strings.Contains(val, "'''") && !hasControl(val, "\t\n\r") && !leadingNewline
+}
+
+// hasControl reports whether val holds a control character other than those allowed.
+func hasControl(val, allowed string) bool {
+	return strings.ContainsFunc(val, func(r rune) bool {
+		return (r < 0x20 || r == 0x7f) && !strings.ContainsRune(allowed, r)
+	})
+}
+
+// A transition moves to place next on reading prefix, which is width bytes long.
+type transition struct {
+	prefix   string
+	next     textPlace
+	width    int // closesRun: the whole run of quotes that ends a multi-line string
+	tomlOnly bool
+}
+
+const closesRun = 0
+
+// transitions lists what leaves place at. JSON only has double-quoted strings.
+func transitions(at textPlace) []transition {
+	switch at {
+	case outside:
+		return []transition{
+			{"#", comment, 1, true},
+			{`"""`, multiBasicString, 3, true},
+			{`"`, basicString, 1, false},
+			{"'''", multiLiteralString, 3, true},
+			{"'", literalString, 1, true},
+		}
+	case comment:
+		return []transition{{"\n", outside, 1, true}}
+	case basicString:
+		return []transition{{`\`, basicString, 2, false}, {`"`, outside, 1, false}, {"\n", outside, 1, false}}
+	case multiBasicString:
+		return []transition{{`\`, multiBasicString, 2, true}, {`"""`, outside, closesRun, true}}
+	case literalString:
+		return []transition{{"'", outside, 1, true}, {"\n", outside, 1, true}}
+	default:
+		return []transition{{"'''", outside, closesRun, true}}
+	}
+}
+
+// scan reads the first bytes of rest, at place at, and returns how many it read and
+// where the next byte sits.
+func scan(at textPlace, rest []byte, isTOML bool) (int, textPlace) {
+	for _, t := range transitions(at) {
+		if (isTOML || !t.tomlOnly) && bytes.HasPrefix(rest, []byte(t.prefix)) {
+			width := t.width
+			if width == closesRun {
+				width = closingRun(rest, t.prefix[0])
+			}
+			return min(width, len(rest)), t.next
+		}
+	}
+	return 1, at
+}
+
+// closingRun is the length of the run of quotes that closes a multi-line string: up to
+// two quotes before the closing three belong to the string.
+func closingRun(rest []byte, quote byte) int {
+	n := 0
+	for n < len(rest) && n < 5 && rest[n] == quote {
+		n++
+	}
+	return n
+}
+
 // escapeQuoted escapes val for a double-quoted JSON or TOML string, which read the
-// same escapes, so the value cannot end the string. A value substituted outside
-// quotes, like a port, has nothing to escape. A TOML single-quoted string reads no
-// escapes, so a value placed there arrives escaped: use double quotes.
+// same escapes, so the value cannot end the string.
 func escapeQuoted(val string) string {
 	var b strings.Builder
 	enc := json.NewEncoder(&b)
