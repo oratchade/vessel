@@ -536,3 +536,29 @@ func TestLoadConfig_TOMLLineBreakAfterAQuoteIsKept(t *testing.T) {
 		t.Errorf("password = %q, want \"'\\nx\"", got)
 	}
 }
+
+// TestLoadConfig_YAMLDefaultCannotForgeAToken: a default goes in before parsing, next to
+// the text around it, so together they must not spell a token standing in for another
+// variable's value.
+func TestLoadConfig_YAMLDefaultCannotForgeAToken(t *testing.T) {
+	path := writeConfig(t, "config.yaml", `
+entries:
+  - name: primary
+    type: readwrite
+    postgres:
+      user: ${DB_USER}
+      password: ${UNSET:vessel}env000000
+      host: localhost
+      port: 5432
+      database: app
+`)
+	cfg, err := mgr.LoadConfigForTest(path, []mgr.EnvOption{
+		mgr.WithEnvVars(map[string]string{"DB_USER": "bob"}),
+	})
+	if err != nil {
+		t.Fatalf("load: %v", err)
+	}
+	if got := cfg.Entries[0].Postgres.Password; got != "vesselenv000000" {
+		t.Errorf("password = %q, want the default and the text after it", got)
+	}
+}

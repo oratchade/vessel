@@ -3,6 +3,7 @@ package v1
 import (
 	"bufio"
 	"bytes"
+	"crypto/rand"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -236,13 +237,11 @@ type yamlPlaceholder struct {
 }
 
 // replace swaps each placeholder whose value comes from a source for a token of
-// letters and digits that data does not otherwise contain, and puts any other in as it
-// expands. The same placeholder gets the same token, so an alias still names its anchor.
+// letters and digits, and puts any other in as it expands. A token starts with a random
+// prefix, which neither the file nor a default next to the text around it can spell.
+// The same placeholder gets the same token, so an alias still names its anchor.
 func (t *yamlTokens) replace(data []byte, resolver *envResolver) []byte {
-	prefix := "vesselenv"
-	for bytes.Contains(data, []byte(prefix)) {
-		prefix += "x"
-	}
+	prefix := "vesselenv" + rand.Text()
 	t.re = regexp.MustCompile(prefix + `\d{6}`)
 	byText := map[string]string{}
 	return envVarRe.ReplaceAllFunc(data, func(match []byte) []byte {
