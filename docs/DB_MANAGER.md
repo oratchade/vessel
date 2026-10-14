@@ -104,7 +104,7 @@ format's own library escapes them. Defaults are values too.
 
 A value that is not valid UTF-8 fails the load, naming the variable.
 
-A load, validation or setup error never quotes a substituted value. A decoder error at
+A load, validation or setup error never quotes a substituted value, returned or logged. A decoder error at
 a YAML line or a JSON or TOML key holding one names the placeholder instead
 (`entries.postgres.port: the value of ${DB_PORT} is not valid here`), since decoders
 quote part of what they reject. Any other error has each value replaced with

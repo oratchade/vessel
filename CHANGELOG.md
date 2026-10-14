@@ -20,7 +20,8 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
     written there, so ports and durations still decode;
   - in a key, it is one key.
 
-  **Load, validation and setup errors never carry a substituted value.** A decoder error
+  **Load, validation and setup errors never carry a substituted value**, returned or
+  logged. A decoder error
   at a YAML line or a JSON or TOML key holding one names the placeholder instead
   (`entries.postgres.port: the value of ${DB_PORT} is not valid here`): decoders quote
   part of a value they reject, YAML up to its first seven characters. Other errors have
@@ -52,6 +53,8 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
     as that string rather than empty.
   - A placeholder in a comment is no longer expanded.
   - The validation error for an unknown entry type no longer quotes the type it got.
+  - A failure to create or ping an entry's database is logged once per level by the
+    setup that called it, redacted, instead of also by the entry itself.
 
 ## [0.4.0] - 2026-10-12
 

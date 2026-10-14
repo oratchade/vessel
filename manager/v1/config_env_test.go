@@ -5,6 +5,7 @@ package v1_test
 import (
 	"errors"
 	"fmt"
+	"log/slog"
 	"os"
 	"path/filepath"
 	"slices"
@@ -14,6 +15,7 @@ import (
 
 	"github.com/jackc/pgx/v5/pgconn"
 
+	db "tounilab.com/vessel/db/v1"
 	mgr "tounilab.com/vessel/manager/v1"
 )
 
@@ -1011,5 +1013,30 @@ func TestLoadConfig_KeyFromTheEnvironmentCannotRepeatAKey(t *testing.T) {
 				t.Errorf("error should name ${KEY}: %v", err)
 			}
 		})
+	}
+}
+
+// TestNewDBManager_SetupLogsDoNotCarrySubstitutedValues: a setup error is logged as well
+// as returned, so the log lines must be redacted too.
+func TestNewDBManager_SetupLogsDoNotCarrySubstitutedValues(t *testing.T) {
+	const host = "secret-host-[::1"
+	path := writeConfig(t, "config.yaml", `
+entries:
+  - name: primary
+    type: readwrite
+    postgres: {user: app, password: x, host: "${DB_HOST}", port: 5432, database: app}
+`)
+	var logs strings.Builder
+	logger := db.NewSlogAdapter(slog.New(slog.NewTextHandler(&logs, nil)))
+	_, err := mgr.NewDBManager(t.Context(), path, logger,
+		mgr.WithEnvVars(map[string]string{"DB_HOST": host}))
+	if err == nil {
+		t.Fatal("NewDBManager accepted a host it cannot parse")
+	}
+	if !strings.Contains(logs.String(), "level=ERROR") {
+		t.Fatalf("no error was logged: %s", logs.String())
+	}
+	if strings.Contains(logs.String(), "secret-host") {
+		t.Errorf("a log line carries the substituted host:\n%s", logs.String())
 	}
 }

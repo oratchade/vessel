@@ -96,20 +96,13 @@ func newDBEntry(
 	)
 
 	//nolint:contextcheck
+	// An error is logged by the caller, redacted of values from the environment.
 	dbInstance, err := db.NewDB(cfg.Config(), logger)
 	if err != nil {
-		logger.Error("Failed to create database instance",
-			"name", cfg.Name,
-			"error", err.Error(),
-		)
 		return nil, fmt.Errorf("newDBEntry: failed to create DB instance: %w", err)
 	}
 
 	if err := dbInstance.Ping(ctx); err != nil {
-		logger.Error("Failed to ping database",
-			"name", cfg.Name,
-			"error", err.Error(),
-		)
 		return nil, fmt.Errorf("newDBEntry: failed to ping DB: %w", err)
 	}
 
