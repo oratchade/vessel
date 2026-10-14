@@ -89,7 +89,8 @@ A substituted value is only ever text, never syntax, so any password works as it
   value is typed from what it expands to, as if written there: `port: ${DB_PORT:5432}`
   is a number, `health_interval: ${HEALTH:30s}` a duration. A quoted one
   (`user: "${DB_USER}"`) is always a string, and so is any non-empty value that would
-  otherwise read as null, such as `null` or `~`.
+  otherwise read as null, such as `null` or `~`. A default (`${DB_PORT:5432}`) is part
+  of the file, so it goes in as written, before parsing, in every format.
 - **JSON and TOML** are expanded by where each placeholder sits. Write string
   placeholders inside double quotes (`"password": "${DB_PASSWORD}"`), where each value
   is escaped for the string, and numbers outside them (`"port": ${DB_PORT:5432}`).

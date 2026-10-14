@@ -152,7 +152,9 @@ func (r *envResolver) expand(match []byte) (val string, fromSource bool) {
 		if !utf8.ValidString(val) {
 			// Escaped, the bytes would become U+FFFD and the manager would connect
 			// with another credential: refuse the value, without quoting it.
-			r.invalid = append(r.invalid, key)
+			if !slices.Contains(r.invalid, key) {
+				r.invalid = append(r.invalid, key)
+			}
 			return string(match), false
 		}
 		r.substituted = append(r.substituted, val)
@@ -164,13 +166,14 @@ func (r *envResolver) expand(match []byte) (val string, fromSource bool) {
 	return string(match), false // no source, no default → leave as-is
 }
 
-// decodeYAML stands an inert token in for each placeholder while YAML parses the file,
-// so the file parses as written wherever a placeholder sits (a flow collection, an
-// anchor, a key), then puts each value into the scalars holding its token: a value can
-// never become YAML syntax (#85). An unquoted scalar is then typed from its expanded
-// text, as if written there, so a port or a duration still decodes; a quoted one stays
-// a string. A value that would read as null stays a string too, unless empty: a
-// password "null" is a password.
+// decodeYAML stands an inert token in for each value from the environment while YAML
+// parses the file, so the file parses as written wherever a placeholder sits (a flow
+// collection, an anchor, a key), then puts each value into the scalars holding its
+// token: a value can never become YAML syntax (#85). An unquoted scalar is then typed
+// from its expanded text, as if written there, so a port or a duration still decodes; a
+// quoted one stays a string. A value that would read as null stays a string too, unless
+// empty: a password "null" is a password. A default, written by the file's author, goes
+// in before parsing as written, as in JSON and TOML.
 func decodeYAML(data []byte, resolver *envResolver, out any) error {
 	tokens := &yamlTokens{byToken: map[string]yamlPlaceholder{}, lines: map[int][]string{}}
 	if resolver.hasAnySource() {
@@ -224,18 +227,17 @@ func addLine(lines map[int][]string, line int, placeholder string) {
 type yamlTokens struct {
 	re      *regexp.Regexp // matches a token; nil when no placeholder was replaced
 	byToken map[string]yamlPlaceholder
-	lines   map[int][]string // placeholders whose value from a source sits on each line
+	lines   map[int][]string // placeholders whose value sits on each line
 }
 
 type yamlPlaceholder struct {
-	text       string // as written, for error messages
-	val        string // what it expands to
-	fromSource bool
+	text string // as written, for error messages
+	val  string // the value from a source it expands to
 }
 
-// replace swaps each placeholder in data for a token of letters and digits that data
-// does not otherwise contain. The same placeholder gets the same token, so an alias
-// still names its anchor.
+// replace swaps each placeholder whose value comes from a source for a token of
+// letters and digits that data does not otherwise contain, and puts any other in as it
+// expands. The same placeholder gets the same token, so an alias still names its anchor.
 func (t *yamlTokens) replace(data []byte, resolver *envResolver) []byte {
 	prefix := "vesselenv"
 	for bytes.Contains(data, []byte(prefix)) {
@@ -244,13 +246,16 @@ func (t *yamlTokens) replace(data []byte, resolver *envResolver) []byte {
 	t.re = regexp.MustCompile(prefix + `\d{6}`)
 	byText := map[string]string{}
 	return envVarRe.ReplaceAllFunc(data, func(match []byte) []byte {
-		token, ok := byText[string(match)]
-		if !ok {
-			token = fmt.Sprintf("%s%06d", prefix, len(byText))
-			byText[string(match)] = token
-			val, fromSource := resolver.expand(match)
-			t.byToken[token] = yamlPlaceholder{text: string(match), val: val, fromSource: fromSource}
+		if token, ok := byText[string(match)]; ok {
+			return []byte(token)
 		}
+		val, fromSource := resolver.expand(match)
+		if !fromSource {
+			return []byte(val) // a default, or the placeholder as written: file syntax
+		}
+		token := fmt.Sprintf("%s%06d", prefix, len(byText))
+		byText[string(match)] = token
+		t.byToken[token] = yamlPlaceholder{text: string(match), val: val}
 		return []byte(token)
 	})
 }
@@ -273,9 +278,7 @@ func (t *yamlTokens) expand(n *yaml.Node) {
 	}
 	n.Value = t.re.ReplaceAllStringFunc(n.Value, func(token string) string {
 		placeholder := t.byToken[token]
-		if placeholder.fromSource {
-			addLine(t.lines, n.Line, placeholder.text)
-		}
+		addLine(t.lines, n.Line, placeholder.text)
 		return placeholder.val
 	})
 	if n.Style == 0 {

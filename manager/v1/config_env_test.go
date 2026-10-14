@@ -306,7 +306,7 @@ entries:
 		t.Run(name, func(t *testing.T) {
 			path := writeConfig(t, "config.yaml", content)
 			cfg, err := mgr.LoadConfigForTest(path, []mgr.EnvOption{
-				mgr.WithEnvVars(map[string]string{"DB_PASSWORD": value}),
+				mgr.WithEnvVars(map[string]string{"DB_PASSWORD": value, "ANCHOR": "pg", "PASSWORD_KEY": "password"}),
 			})
 			if err != nil {
 				t.Fatalf("load: %v", err)
@@ -452,5 +452,23 @@ entries:
 				t.Errorf("error does not name the placeholder: %v", err)
 			}
 		})
+	}
+}
+
+// TestLoadConfig_YAMLDefaultIsFileSyntax: a default is written by the file's author, so
+// it goes in as written, as in JSON and TOML, and YAML reads it in its place.
+func TestLoadConfig_YAMLDefaultIsFileSyntax(t *testing.T) {
+	path := writeConfig(t, "config.yaml", `
+entries:
+  - name: primary
+    type: readwrite
+    postgres: {user: app, password: "${DB_PASSWORD:a\tb}", host: localhost, port: ${DB_PORT:5432}, database: app}
+`)
+	cfg, err := mgr.LoadConfigForTest(path, []mgr.EnvOption{mgr.WithEnvVars(map[string]string{})})
+	if err != nil {
+		t.Fatalf("load: %v", err)
+	}
+	if pg := cfg.Entries[0].Postgres; pg.Password != "a\tb" || pg.Port != 5432 {
+		t.Errorf("password, port = %q, %d; want the escape read, a\\tb, and 5432", pg.Password, pg.Port)
 	}
 }
