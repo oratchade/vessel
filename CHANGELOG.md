@@ -12,43 +12,45 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 - **A substituted config value can no longer change how the file parses (#85).**
   `${VAR}` was expanded in the file's raw text before parsing, so a value was pasted in
   as syntax: a password beginning with `*` was read as a YAML alias, one with `"` broke
-  a JSON or TOML string, and the manager failed to start with a valid credential.
-  - **YAML** is parsed with an inert token standing in for each value from the
-    environment, so placeholders still work in flow collections, anchors and keys. Each
-    value then goes into the value that held it: an unquoted one typed from what it
-    expands to (ports and durations still decode), a quoted one always a string.
-  - **JSON and TOML** are expanded by where each placeholder sits: escaped in a
-    double-quoted string, as it is in a TOML single-quoted string (which reads no
-    escapes), and only a plain number, boolean or date outside quotes.
-  - **Defaults** are part of the file, so they still go in as written, in every format.
-  - **Load, validation and setup errors never carry a substituted value.** A decoder error on
-    a line holding one names the placeholder instead (`line 4: the value of ${DB_PORT}
-    is not valid here`): decoders quote part of a value they reject, YAML up to its
-    first seven characters, TOML its first. Other errors, validation included, have
-    each value replaced with `[REDACTED]`, and the decoder's own error is no longer wrapped, since a TOML decode
-    error kept the expanded source.
+  a JSON or TOML string, and the manager failed to start with a valid credential. Each
+  placeholder now stands as a number while the file parses, and values go into the
+  parsed data, where the format's own library escapes them:
+  - in any string, a value is text, exactly as it is;
+  - unquoted in YAML, or as a whole bare value in JSON and TOML, it is typed as if
+    written there, so ports and durations still decode;
+  - in a key, it is one key.
+
+  **Load, validation and setup errors never carry a substituted value.** A decoder error
+  at a YAML line or a JSON or TOML key holding one names the placeholder instead
+  (`entries.postgres.port: the value of ${DB_PORT} is not valid here`): decoders quote
+  part of a value they reject, YAML up to its first seven characters. Other errors have
+  each value replaced with `[REDACTED]` and are new errors, not wrappers, since a TOML
+  decode error kept the expanded source and the PostgreSQL driver's parse error keeps
+  the connection string.
 
   Behaviour changes:
 
-  - **A value that cannot sit where its placeholder is now fails the load** instead of
-    loading as something else: a `'` or a line break in a TOML single-quoted string
-    ended it early, and a value outside quotes became syntax. The error names the
-    placeholder and says to quote it.
-  - **A value that is not valid UTF-8 fails the load**, naming its variable. JSON and
-    TOML escaping turned its bytes into U+FFFD, connecting with another credential.
   - **A value escaped or quoted for the file now arrives with its escapes or quotes.**
     Expanded as text, a value was read by the file's syntax, so a `\"` in a
-    double-quoted string, a `''` in a YAML single-quoted one, or a value JSON-encoded to
-    survive the file lost its escapes. A value now goes in as it is: drop such
-    workarounds when upgrading.
-  - An alias must repeat its anchor's placeholder as written. With `&${A}`, an alias
-    `*pg` or `*${A:pg}` no longer resolves: the anchor is named by a token while the file
-    parses.
-  - **A YAML value can no longer inject structure:** a placeholder expanding to a list
-    or a map (`[a, b]`) is now that text, a string, not the list.
+    double-quoted string, a doubled quote in a YAML single-quoted one, or a value
+    JSON-encoded to survive the file lost its escapes. A value now goes in as it is: drop
+    such workarounds when upgrading.
+  - **A default is a value too.** Escapes in it are no longer read (`"${X:a\tb}"` gives a
+    backslash and a `t`), and it cannot hold syntax, such as a quote that opens a string
+    for the next placeholder.
+  - **Placeholders glued to other text outside quotes fail the load** (`54${P}`,
+    `${A}${B}`): quote them.
+  - **A value can no longer inject structure.** A value expanding to `[a, b]` is that
+    text, a string; outside quotes in JSON or TOML, a value that is not a number,
+    boolean or null is a string, which a numeric field rejects; a key from the
+    environment is one key, so a dot in it no longer reaches into another table.
+  - **A value that is not valid UTF-8 fails the load**, naming its variable, instead of
+    reaching the database with its bytes replaced.
+  - A YAML alias must repeat its anchor's placeholder as written (`&${A}` … `*${A}`), and
+    a placeholder in a YAML tag fails the load.
   - A non-empty value that YAML would read as null, such as `null` or `~`, now arrives
     as that string rather than empty.
-  - A placeholder in a TOML comment is no longer expanded.
+  - A placeholder in a comment is no longer expanded.
   - The validation error for an unknown entry type no longer quotes the type it got.
 
 ## [0.4.0] - 2026-10-12

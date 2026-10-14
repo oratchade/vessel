@@ -23,7 +23,10 @@ func ExpandEnvVarsForTest(data []byte, opts []EnvOption) []byte {
 		return data
 	}
 	return envVarRe.ReplaceAllFunc(data, func(match []byte) []byte {
-		val, _ := resolver.expand(match)
+		val, _, err := resolver.expand(match)
+		if err != nil {
+			return match
+		}
 		return []byte(val)
 	})
 }

@@ -81,35 +81,35 @@ Available options:
 For production secrets, prefer explicit values from your secret store via
 `WithEnvVars`. Avoid relying on `.env` files in deployed environments.
 
-A substituted value is only ever text, never syntax, so any password works as it is:
+A substituted value is only ever a value, never syntax, so any password works as it is.
+While the file parses, each placeholder stands as a number, which every format accepts
+both inside a string and as a bare value; values then go into the parsed data, and the
+format's own library escapes them. Defaults are values too.
 
-- **YAML** is parsed with an inert token standing in for each placeholder, so a
-  placeholder works wherever it could before (a flow collection, an anchor, a key), and
-  its value then goes into the value that held it. An alias must repeat its anchor's
-  placeholder as written (`&${A}` … `*${A}`). An unquoted
-  value is trimmed and typed from what it expands to, as if written there: `port: ${DB_PORT:5432}`
-  is a number, `health_interval: ${HEALTH:30s}` a duration. A quoted one
-  (`user: "${DB_USER}"`) is always a string, and so is any non-empty value that would
-  otherwise read as null, such as `null` or `~`. A default (`${DB_PORT:5432}`) is part
-  of the file, so it goes in as written, before parsing, in every format.
-- **JSON and TOML** are expanded by where each placeholder sits. Write string
-  placeholders inside double quotes (`"password": "${DB_PASSWORD}"`), where each value
-  is escaped for the string, and numbers outside them (`"port": ${DB_PORT:5432}`).
-  - In a TOML single-quoted string, which reads no escapes, a value goes in as it is; a
-    value that string cannot hold, such as one with a `'` or a line break, fails the
-    load.
-  - Outside quotes, only a plain value can go: a number, a boolean, a date or a single
-    word, which may be a key. Anything else, such as a value with a space or a dotted
-    key, fails the load.
-  - In a TOML comment, a placeholder stays as written.
+- **In a string** of any kind (YAML quoted, a block scalar, JSON, every TOML string), a
+  value goes in as text, exactly as it is.
+- **Unquoted in YAML**, a value is trimmed and typed from what it expands to, as if
+  written there: `port: ${DB_PORT:5432}` is a number, `health_interval: ${HEALTH:30s}`
+  a duration. A non-empty value that would read as null, such as `null` or `~`, stays a
+  string.
+- **Outside quotes in JSON and TOML**, a placeholder that is the whole value is typed as
+  if written there: a number, `true`, `false` (or JSON's `null`), with TOML's bases and
+  underscores; surrounding spaces don't count. Anything else is a string, never
+  structure, so a numeric field rejects it. A placeholder glued to other text outside
+  quotes (`54${P}`, `${A}${B}`) fails the load: quote it.
+- **In a key**, a value is that one key: a dot in it does not reach into another table.
+- **In YAML**, an anchor can be named by a placeholder if its alias repeats it as
+  written (`&${A}` … `*${A}`). A placeholder in a tag fails the load. A placeholder in a
+  comment is never expanded.
 
 A value that is not valid UTF-8 fails the load, naming the variable.
 
-A load, validation or setup error never quotes a substituted value. A decoder error on a line
-holding one names the placeholder instead (`line 4: the value of ${DB_PORT} is not
-valid here`), since decoders quote part of what they reject; any other error,
-validation included, has each value replaced with `[REDACTED]`. The decoder's own error, which can hold the text it read,
-is not returned.
+A load, validation or setup error never quotes a substituted value. A decoder error at
+a YAML line or a JSON or TOML key holding one names the placeholder instead
+(`entries.postgres.port: the value of ${DB_PORT} is not valid here`), since decoders
+quote part of what they reject. Any other error has each value replaced with
+`[REDACTED]` and comes as a new error, not a wrapper: a driver's error, for one, keeps
+the connection string.
 
 ## Lifecycle
 

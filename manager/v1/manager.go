@@ -394,22 +394,21 @@ func loadConfig(path string, envOpts []EnvOption) (*config.ManagerConfig, []stri
 		return nil, nil, fmt.Errorf("loadConfig: failed to read config file: %w", err)
 	}
 
-	// ${VAR} and ${VAR:default} are expanded when env options are provided, so that a
-	// value is only ever text (#85): YAML after parsing, JSON and TOML by where each
-	// placeholder sits.
+	// ${VAR} and ${VAR:default} are expanded when env options are provided, in the
+	// parsed data rather than the file's text, so a value is only ever a value (#85).
 	resolver := newEnvResolver(envOpts)
 	cfg := &config.ManagerConfig{}
 	ext := filepath.Ext(absPath)
 
 	switch ext {
 	case ".json":
-		err = decodeText(data, resolver, false, cfg)
+		err = decodeJSON(data, resolver, cfg)
 
 	case ".yaml", ".yml":
 		err = decodeYAML(data, resolver, cfg)
 
 	case ".toml":
-		err = decodeText(data, resolver, true, cfg)
+		err = decodeTOML(data, resolver, cfg)
 
 	default:
 		return nil, nil, fmt.Errorf("loadConfig: unsupported file extension: %s", ext)
@@ -421,15 +420,9 @@ func loadConfig(path string, envOpts []EnvOption) (*config.ManagerConfig, []stri
 	return cfg, resolver.substituted, nil
 }
 
-// loadError is the error a load ends with: a value that is not UTF-8, else the
-// decoder's error. Once a value came from the environment, that leaves only as a
-// redacted message: a decoder's error can hold what it read, as a TOML error holds
-// its source.
+// loadError is the error a load ends with. Once a value came from the environment it
+// leaves only as a redacted message: a decoder's error can hold what it read.
 func loadError(err error, resolver *envResolver) error {
-	if len(resolver.invalid) > 0 {
-		return fmt.Errorf("loadConfig: the value of ${%s} is not valid UTF-8",
-			strings.Join(resolver.invalid, "}, ${"))
-	}
 	if err == nil {
 		return nil
 	}

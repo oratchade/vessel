@@ -346,25 +346,20 @@ database = "app"
 }
 
 // TestLoadConfig_TOMLPlaceholderPlacements loads a placeholder from each kind of TOML
-// string and from a comment, each with values that are syntax in some of them.
+// string and from a comment, with values that are syntax in some of them: each value
+// goes into the parsed string, so each loads as it is.
 func TestLoadConfig_TOMLPlaceholderPlacements(t *testing.T) {
+	values := append([]string{"x' #", "x''' #", "\nleading newline", "a\nb"}, hostileValues...)
 	placements := map[string]struct {
 		line   string
 		values []string
 	}{
-		"basic string":     {`password = "${DB_PASSWORD}"`, hostileValues},
-		"multi-line basic": {`password = """${DB_PASSWORD}"""`, append([]string{"\nleading newline"}, hostileValues...)},
-		// A literal string reads no escapes, so a backslash is a backslash.
-		"literal string": {`password = '${DB_PASSWORD}'`, []string{`back\slash`, `"double"`, "*star", "tab\there"}},
-		"multi-line literal": {
-			`password = '''${DB_PASSWORD}'''`,
-			[]string{`back\slash`, "line\nbreak", "it's", "ends with '", "ends with ''"},
-		},
-		// A comment keeps the placeholder as written: a value there could end it.
-		"comment": {
-			"password = \"${DB_PASSWORD}\" # was ${DB_PASSWORD}",
-			[]string{"x\nport = 1", `back\slash`},
-		},
+		"basic string":       {`password = "${DB_PASSWORD}"`, values},
+		"multi-line basic":   {`password = """${DB_PASSWORD}"""`, values},
+		"literal string":     {`password = '${DB_PASSWORD}'`, values},
+		"multi-line literal": {`password = '''${DB_PASSWORD}'''`, values},
+		// A comment keeps the placeholder as written: nothing reads it.
+		"comment": {"password = \"${DB_PASSWORD}\" # was ${DB_PASSWORD}", values},
 	}
 	for name, p := range placements {
 		for _, value := range p.values {
@@ -385,29 +380,15 @@ func TestLoadConfig_TOMLPlaceholderPlacements(t *testing.T) {
 	}
 }
 
-// TestLoadConfig_RefusesAValueItsPlaceCannotHold covers values that used to load as
-// something else: a TOML literal string ended early, or a value outside quotes became
-// syntax. The load fails, naming the placeholder and not the value.
-func TestLoadConfig_RefusesAValueItsPlaceCannotHold(t *testing.T) {
+// TestLoadConfig_BareValueThatIsNotAScalarFails: outside quotes a value is typed as if
+// written there; one that is not a number, boolean or null is a string, never syntax,
+// so a numeric field rejects it, naming the placeholder and not the value.
+func TestLoadConfig_BareValueThatIsNotAScalarFails(t *testing.T) {
 	cases := map[string]struct {
 		name, content, value string
 	}{
-		"TOML literal string, quote":   {"config.toml", tomlWith(`password = '${DB_PASSWORD}'`, "5432"), "x' #"},
-		"TOML literal string, newline": {"config.toml", tomlWith(`password = '${DB_PASSWORD}'`, "5432"), "a\nb"},
-		"TOML multi-line literal":      {"config.toml", tomlWith(`password = '''${DB_PASSWORD}'''`, "5432"), "x''' #"},
-		// TOML drops a newline right after the opening quotes.
-		"TOML multi-line literal, leading newline": {
-			"config.toml", tomlWith(`password = '''${DB_PASSWORD}'''`, "5432"), "\nleading newline",
-		},
-		"TOML outside quotes": {"config.toml", tomlWith(`password = "x"`, "${DB_PASSWORD}"), "1\nuser = \"root\""},
-		// A dot outside quotes makes a dotted key, which reaches into another table.
-		"TOML dotted key": {
-			"config.toml",
-			"[[entries]]\nname = \"primary\"\ntype = \"readwrite\"\n${DB_PASSWORD} = \"evil\"\n" +
-				"[entries.postgres]\nuser = \"app\"\npassword = \"x\"\nhost = \"localhost\"\nport = 5432\ndatabase = \"app\"\n",
-			"postgres.sslmode",
-		},
-		"JSON outside quotes": {
+		"TOML": {"config.toml", tomlWith(`password = "x"`, "${DB_PASSWORD}"), "1\nuser = \"root\""},
+		"JSON": {
 			"config.json", `{"entries": [{"name": "primary", "type": "readwrite",
   "postgres": {"user": "app", "password": "x", "host": "localhost", "port": ${DB_PASSWORD}, "database": "app"}}]}`,
 			`1, "user": "root"`,
@@ -476,9 +457,10 @@ entries:
 	}
 }
 
-// TestLoadConfig_YAMLDefaultIsFileSyntax: a default is written by the file's author, so
-// it goes in as written, as in JSON and TOML, and YAML reads it in its place.
-func TestLoadConfig_YAMLDefaultIsFileSyntax(t *testing.T) {
+// TestLoadConfig_DefaultIsAValue: a default goes into the parsed data like a variable's
+// value, so a quoted one is text as written, escapes included, and an unquoted one is
+// typed as if written there.
+func TestLoadConfig_DefaultIsAValue(t *testing.T) {
 	path := writeConfig(t, "config.yaml", `
 entries:
   - name: primary
@@ -489,15 +471,31 @@ entries:
 	if err != nil {
 		t.Fatalf("load: %v", err)
 	}
-	if pg := cfg.Entries[0].Postgres; pg.Password != "a\tb" || pg.Port != 5432 {
-		t.Errorf("password, port = %q, %d; want the escape read, a\\tb, and 5432", pg.Password, pg.Port)
+	if pg := cfg.Entries[0].Postgres; pg.Password != `a\tb` || pg.Port != 5432 {
+		t.Errorf("password, port = %q, %d; want a\\tb as written, and 5432", pg.Password, pg.Port)
 	}
 }
 
-// TestLoadConfig_WithholdingCountsLinesInTheDecodedText puts a value with line breaks
-// above a value the decoder rejects. The decoder counts lines in the expanded text, so
-// the withheld line must be counted there too, or the message quotes the value.
-func TestLoadConfig_WithholdingCountsLinesInTheDecodedText(t *testing.T) {
+// TestLoadConfig_TOMLKeyFromTheEnvironmentIsOneKey: a dotted value as a bare key would
+// reach into another table; in the parsed data it is a single key.
+func TestLoadConfig_TOMLKeyFromTheEnvironmentIsOneKey(t *testing.T) {
+	path := writeConfig(t, "config.toml", "[[entries]]\nname = \"primary\"\ntype = \"readwrite\"\n${KEY} = \"evil\"\n"+
+		"[entries.postgres]\nuser = \"app\"\npassword = \"x\"\nhost = \"localhost\"\nport = 5432\ndatabase = \"app\"\n")
+	cfg, err := mgr.LoadConfigForTest(path, []mgr.EnvOption{
+		mgr.WithEnvVars(map[string]string{"KEY": "postgres.ssl_mode"}),
+	})
+	if err != nil {
+		t.Fatalf("load: %v", err)
+	}
+	if got := cfg.Entries[0].Postgres.SSLMode; got != "" {
+		t.Errorf("ssl_mode = %q, want it untouched", got)
+	}
+}
+
+// TestLoadConfig_WithholdingSurvivesMultiLineValues puts a value with line breaks above
+// a value the decoder rejects: the error must still name the rejected one, and quote
+// nothing of it.
+func TestLoadConfig_WithholdingSurvivesMultiLineValues(t *testing.T) {
 	cases := map[string]struct {
 		password, secret, quoted string
 	}{
@@ -521,8 +519,8 @@ func TestLoadConfig_WithholdingCountsLinesInTheDecodedText(t *testing.T) {
 	}
 }
 
-// TestLoadConfig_WithholdsAJSONErrorAtTheEndOfTheLine: a JSON syntax error found on the
-// line break after a value points one byte past it, on the next line.
+// TestLoadConfig_WithholdsAJSONErrorAtTheEndOfTheLine: a bare value the decoder rejects,
+// followed by a line break, is named, not quoted.
 func TestLoadConfig_WithholdsAJSONErrorAtTheEndOfTheLine(t *testing.T) {
 	path := writeConfig(t, "config.json", `{"entries": [{"name": "primary", "type": "readwrite",
   "postgres": {"user": "app", "password": "x", "host": "localhost", "port": ${SECRET}
@@ -538,9 +536,9 @@ func TestLoadConfig_WithholdsAJSONErrorAtTheEndOfTheLine(t *testing.T) {
 	}
 }
 
-// TestLoadConfig_TOMLLineBreakAfterAQuoteIsKept: in ””${P}”' the fourth quote is the
-// string's first character, so a line break at the start of the value follows it and
-// TOML keeps it; only one right after the opening quotes is dropped.
+// TestLoadConfig_TOMLLineBreakAfterAQuoteIsKept: four quotes open a multi-line literal
+// string whose first character is a quote, so a value starting with a line break keeps
+// it; TOML drops only a line break written right after the opening quotes.
 func TestLoadConfig_TOMLLineBreakAfterAQuoteIsKept(t *testing.T) {
 	path := writeConfig(t, "config.toml", tomlWith(`password = ''''${DB_PASSWORD}'''`, "5432"))
 	cfg, err := mgr.LoadConfigForTest(path, []mgr.EnvOption{
@@ -554,9 +552,8 @@ func TestLoadConfig_TOMLLineBreakAfterAQuoteIsKept(t *testing.T) {
 	}
 }
 
-// TestLoadConfig_YAMLDefaultCannotForgeAToken: a default goes in before parsing, next to
-// the text around it, so together they must not spell a token standing in for another
-// variable's value.
+// TestLoadConfig_YAMLDefaultCannotForgeAToken: a default next to text that, together,
+// spell what a token looks like still loads as that text, never as another variable.
 func TestLoadConfig_YAMLDefaultCannotForgeAToken(t *testing.T) {
 	path := writeConfig(t, "config.yaml", `
 entries:
@@ -581,8 +578,8 @@ entries:
 }
 
 // TestLoadConfig_TOMLKeepsLeadingSpacesAfterALineEndingBackslash: in a multi-line basic
-// string, TOML drops the whitespace after a line-ending backslash, so a value placed
-// there loses its leading spaces unless they are escaped.
+// string TOML drops the whitespace after a line-ending backslash; a value placed there
+// keeps its leading spaces.
 func TestLoadConfig_TOMLKeepsLeadingSpacesAfterALineEndingBackslash(t *testing.T) {
 	path := writeConfig(t, "config.toml", tomlWith("password = \"\"\"a\\\n${DB_PASSWORD}\"\"\"", "5432"))
 	cfg, err := mgr.LoadConfigForTest(path, []mgr.EnvOption{
@@ -675,11 +672,10 @@ entries:
 	}
 }
 
-// TestLoadConfig_TextScannerFollowsQuotesAndEscapes puts a placeholder after the places
-// a scanner could lose track of the string it is in: an escaped quote, and a multi-line
-// string closed by more than three quotes. Lost, it would escape the value outside a
-// string, or paste it raw inside one.
-func TestLoadConfig_TextScannerFollowsQuotesAndEscapes(t *testing.T) {
+// TestLoadConfig_ValueAfterEscapesAndQuoteRuns puts a placeholder after an escaped quote
+// and after a multi-line string closed by four quotes, where reading the file's text
+// could lose track of the string it is in.
+func TestLoadConfig_ValueAfterEscapesAndQuoteRuns(t *testing.T) {
 	const value = `x", "port": 1, "y": "`
 	cases := map[string]struct{ name, content string }{
 		"JSON escaped quote": {"config.json", `{"entries": [{"name": "primary", "type": "readwrite",
@@ -783,5 +779,51 @@ entries:
 				t.Errorf("error quotes the type: %v", err)
 			}
 		})
+	}
+}
+
+// TestLoadConfig_AdjacentValuesStayValues: two values side by side in a TOML multi-line
+// literal string, which together spell its closing quotes and a comment. Each is text in
+// the parsed string, so together they are too.
+func TestLoadConfig_AdjacentValuesStayValues(t *testing.T) {
+	path := writeConfig(t, "config.toml", tomlWith(`password = '''${PART_A}${PART_B}'''`, "5432"))
+	cfg, err := mgr.LoadConfigForTest(path, []mgr.EnvOption{
+		mgr.WithEnvVars(map[string]string{"PART_A": "x''", "PART_B": "' #"}),
+	})
+	if err != nil {
+		t.Fatalf("load: %v", err)
+	}
+	if got := cfg.Entries[0].Postgres.Password; got != "x''' #" {
+		t.Errorf("password = %q, want \"x''' #\"", got)
+	}
+}
+
+// TestLoadConfig_DefaultIsNotSyntax: a default is a value like any other, so one cannot
+// open a string for the next placeholder. Placeholders glued together outside quotes
+// fail the load instead of loading as something else.
+func TestLoadConfig_DefaultIsNotSyntax(t *testing.T) {
+	path := writeConfig(t, "config.toml", tomlWith(`password = ${QUOTE:"}${DB_PASSWORD}${QUOTE:"}`, "5432"))
+	cfg, err := mgr.LoadConfigForTest(path, []mgr.EnvOption{
+		mgr.WithEnvVars(map[string]string{"DB_PASSWORD": "has spaces"}),
+	})
+	if err == nil {
+		t.Fatalf("load succeeded, password = %q", cfg.Entries[0].Postgres.Password)
+	}
+}
+
+// TestLoadConfig_YAMLTagCannotHoldAPlaceholder: a tag is syntax, so a placeholder there
+// fails the load, naming it.
+func TestLoadConfig_YAMLTagCannotHoldAPlaceholder(t *testing.T) {
+	path := writeConfig(t, "config.yaml", `
+entries:
+  - name: primary
+    type: readwrite
+    postgres: {user: app, password: x, host: localhost, port: !!${TAG} 5432, database: app}
+`)
+	_, err := mgr.LoadConfigForTest(path, []mgr.EnvOption{
+		mgr.WithEnvVars(map[string]string{"TAG": "int"}),
+	})
+	if err == nil || !strings.Contains(err.Error(), "${TAG}") {
+		t.Errorf("error should name ${TAG}: %v", err)
 	}
 }
