@@ -490,12 +490,20 @@ func jsonScalar(val string) any {
 	return val
 }
 
-// tomlScalar is jsonScalar for TOML: an integer, with TOML's bases and underscores, true
-// or false. ponytail: no float, as no config field is one; add it with the first.
+// tomlInteger is a TOML integer literal: no leading zero, lowercase base prefixes, no
+// sign on a prefixed one, and an underscore only between two digits.
+var tomlInteger = regexp.MustCompile(
+	`^([+-]?(0|[1-9](_?[0-9])*)|0x[0-9A-Fa-f](_?[0-9A-Fa-f])*|0o[0-7](_?[0-7])*|0b[01](_?[01])*)$`)
+
+// tomlScalar is jsonScalar for TOML: an integer as TOML writes one, true or false.
+// ponytail: no float, as no config field is one; add it with the first.
 func tomlScalar(val string) any {
 	trimmed := strings.Trim(val, " \t\r\n")
-	if i, err := strconv.ParseInt(trimmed, 0, 64); err == nil {
-		return i
+	if tomlInteger.MatchString(trimmed) {
+		// Go reads every literal tomlInteger matches, with the same value.
+		if i, err := strconv.ParseInt(trimmed, 0, 64); err == nil {
+			return i
+		}
 	}
 	if b, ok := boolLiteral(trimmed); ok {
 		return b

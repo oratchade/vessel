@@ -969,3 +969,23 @@ func TestLoadConfig_WithholdsAnErrorAtAKeyFromTheEnvironment(t *testing.T) {
 		t.Errorf("error should name ${KEY}: %v", err)
 	}
 }
+
+// TestLoadConfig_TOMLBareValueFollowsTOMLIntegers: TOML has no leading zeros and only
+// lowercase base prefixes, so 05432 and 0X1F are not integers written there: they fail
+// the load rather than reading as octal or hexadecimal.
+func TestLoadConfig_TOMLBareValueFollowsTOMLIntegers(t *testing.T) {
+	for _, value := range []string{"05432", "0X1F", "0x_1F", "1__000", "+0x1F"} {
+		t.Run(value, func(t *testing.T) {
+			path := writeConfig(t, "config.toml", tomlWith(`password = "x"`, "${DB_PORT}"))
+			cfg, err := mgr.LoadConfigForTest(path, []mgr.EnvOption{
+				mgr.WithEnvVars(map[string]string{"DB_PORT": value}),
+			})
+			if err == nil {
+				t.Fatalf("load succeeded, port = %d", cfg.Entries[0].Postgres.Port)
+			}
+			if !strings.Contains(err.Error(), "${DB_PORT}") {
+				t.Errorf("error should name ${DB_PORT}: %v", err)
+			}
+		})
+	}
+}
