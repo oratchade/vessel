@@ -379,7 +379,10 @@ func errorLine(err error, data []byte) int {
 	default:
 		return 0
 	}
-	return 1 + bytes.Count(data[:min(int(offset), len(data))], []byte("\n"))
+	// Offset counts the bytes read up to and including the one at fault: a syntax error
+	// found on the line break after a value would count that line break.
+	end := min(max(int(offset)-1, 0), len(data))
+	return 1 + bytes.Count(data[:end], []byte("\n"))
 }
 
 // textPlace is where a byte of a JSON or TOML file sits.

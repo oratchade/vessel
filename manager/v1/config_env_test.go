@@ -503,3 +503,20 @@ func TestLoadConfig_WithholdingCountsLinesInTheDecodedText(t *testing.T) {
 		})
 	}
 }
+
+// TestLoadConfig_WithholdsAJSONErrorAtTheEndOfTheLine: a JSON syntax error found on the
+// line break after a value points one byte past it, on the next line.
+func TestLoadConfig_WithholdsAJSONErrorAtTheEndOfTheLine(t *testing.T) {
+	path := writeConfig(t, "config.json", `{"entries": [{"name": "primary", "type": "readwrite",
+  "postgres": {"user": "app", "password": "x", "host": "localhost", "port": ${SECRET}
+  , "database": "app"}}]}`)
+	_, err := mgr.LoadConfigForTest(path, []mgr.EnvOption{
+		mgr.WithEnvVars(map[string]string{"SECRET": "tru"}),
+	})
+	if err == nil {
+		t.Fatal("load succeeded")
+	}
+	if !strings.Contains(err.Error(), "${SECRET}") {
+		t.Errorf("error should name ${SECRET}: %v", err)
+	}
+}
