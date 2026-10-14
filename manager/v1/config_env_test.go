@@ -520,3 +520,19 @@ func TestLoadConfig_WithholdsAJSONErrorAtTheEndOfTheLine(t *testing.T) {
 		t.Errorf("error should name ${SECRET}: %v", err)
 	}
 }
+
+// TestLoadConfig_TOMLLineBreakAfterAQuoteIsKept: in ''''${P}''' the fourth quote is the
+// string's first character, so a line break at the start of the value follows it and
+// TOML keeps it; only one right after the opening quotes is dropped.
+func TestLoadConfig_TOMLLineBreakAfterAQuoteIsKept(t *testing.T) {
+	path := writeConfig(t, "config.toml", tomlWith(`password = ''''${DB_PASSWORD}'''`, "5432"))
+	cfg, err := mgr.LoadConfigForTest(path, []mgr.EnvOption{
+		mgr.WithEnvVars(map[string]string{"DB_PASSWORD": "\nx"}),
+	})
+	if err != nil {
+		t.Fatalf("load: %v", err)
+	}
+	if got := cfg.Entries[0].Postgres.Password; got != "'\nx" {
+		t.Errorf("password = %q, want \"'\\nx\"", got)
+	}
+}

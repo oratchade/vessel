@@ -299,44 +299,68 @@ func (t *yamlTokens) expand(n *yaml.Node) {
 //
 // A default goes in as written: it is already in the file's syntax.
 func expandInText(data []byte, resolver *envResolver, isTOML bool) ([]byte, map[int][]string, error) {
-	lines := map[int][]string{} // placeholders whose value from a source sits on each expanded line
+	x := &textExpansion{resolver: resolver, line: 1, openedAt: -1, lines: map[int][]string{}}
 	if !resolver.hasAnySource() {
-		return data, lines, nil
+		return data, x.lines, nil
 	}
-	var out bytes.Buffer
 	matches := envVarRe.FindAllIndex(data, -1)
-	at, line := outside, 1
 	for i := 0; i < len(data); {
 		for len(matches) > 0 && matches[0][0] < i {
 			matches = matches[1:] // began inside an escape sequence: not a placeholder
 		}
 		if len(matches) > 0 && matches[0][0] == i {
-			// TOML drops a newline right after a multi-line string's opening quotes.
-			opened := bytes.HasSuffix(out.Bytes(), []byte("'''"))
-			match := data[i:matches[0][1]]
-			val, fromSource, err := expandAt(at, opened, match, resolver)
-			if err != nil {
+			if err := x.placeholder(data[i:matches[0][1]]); err != nil {
 				return nil, nil, err
 			}
-			// Lines are counted in the expanded text, where the decoder counts them, so a
-			// value or default with line breaks moves the lines below it.
-			breaks := strings.Count(val, "\n")
-			if fromSource {
-				for l := line; l <= line+breaks; l++ {
-					addLine(lines, l, string(match))
-				}
-			}
-			out.WriteString(val)
-			line += breaks
 			i, matches = matches[0][1], matches[1:]
 			continue
 		}
-		n, next := scan(at, data[i:], isTOML)
-		out.Write(data[i : i+n])
-		line += bytes.Count(data[i:i+n], []byte("\n"))
-		i, at = i+n, next
+		i += x.copyText(data[i:], isTOML)
 	}
-	return out.Bytes(), lines, nil
+	return x.out.Bytes(), x.lines, nil
+}
+
+// textExpansion is where expandInText is in a file, and what it has written.
+type textExpansion struct {
+	resolver *envResolver
+	out      bytes.Buffer
+	at       textPlace
+	line     int // in the expanded text, where the decoder counts lines
+	openedAt int // where the last multi-line string's content began in out
+	lines    map[int][]string
+}
+
+// placeholder writes what match expands to where the text is now, and records the
+// lines its value from a source spans.
+func (x *textExpansion) placeholder(match []byte) error {
+	// TOML drops a newline right after a multi-line string's opening quotes.
+	val, fromSource, err := expandAt(x.at, x.out.Len() == x.openedAt, match, x.resolver)
+	if err != nil {
+		return err
+	}
+	// A value or default with line breaks moves the lines below it.
+	breaks := strings.Count(val, "\n")
+	if fromSource {
+		for l := x.line; l <= x.line+breaks; l++ {
+			addLine(x.lines, l, string(match))
+		}
+	}
+	x.out.WriteString(val)
+	x.line += breaks
+	return nil
+}
+
+// copyText copies the first bytes of rest, notes where the next byte sits, and
+// returns how many it copied.
+func (x *textExpansion) copyText(rest []byte, isTOML bool) int {
+	n, next := scan(x.at, rest, isTOML)
+	x.out.Write(rest[:n])
+	x.line += bytes.Count(rest[:n], []byte("\n"))
+	if next != x.at && (next == multiBasicString || next == multiLiteralString) {
+		x.openedAt = x.out.Len()
+	}
+	x.at = next
+	return n
 }
 
 // decodeText expands a JSON or TOML file and decodes it into out. On a line holding a
