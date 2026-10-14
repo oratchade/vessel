@@ -300,7 +300,7 @@ func (t *yamlTokens) expand(n *yaml.Node) {
 //   - in a TOML comment, the placeholder stays as written.
 //
 // A default goes in as written: it is already in the file's syntax.
-func expandInText(data []byte, resolver *envResolver, isTOML bool) ([]byte, map[int][]string, error) {
+func expandInText(data []byte, resolver *envResolver) ([]byte, map[int][]string, error) {
 	x := &textExpansion{resolver: resolver, line: 1, openedAt: -1, lines: map[int][]string{}}
 	if !resolver.hasAnySource() {
 		return data, x.lines, nil
@@ -317,7 +317,7 @@ func expandInText(data []byte, resolver *envResolver, isTOML bool) ([]byte, map[
 			i, matches = matches[0][1], matches[1:]
 			continue
 		}
-		i += x.copyText(data[i:], isTOML)
+		i += x.copyText(data[i:])
 	}
 	return x.out.Bytes(), x.lines, nil
 }
@@ -354,8 +354,8 @@ func (x *textExpansion) placeholder(match []byte) error {
 
 // copyText copies the first bytes of rest, notes where the next byte sits, and
 // returns how many it copied.
-func (x *textExpansion) copyText(rest []byte, isTOML bool) int {
-	n, next := scan(x.at, rest, isTOML)
+func (x *textExpansion) copyText(rest []byte) int {
+	n, next := scan(x.at, rest)
 	x.out.Write(rest[:n])
 	x.line += bytes.Count(rest[:n], []byte("\n"))
 	if next != x.at && (next == multiBasicString || next == multiLiteralString) {
@@ -369,7 +369,7 @@ func (x *textExpansion) copyText(rest []byte, isTOML bool) int {
 // substituted value, the decoder's error gives way to one naming the placeholder:
 // TOML quotes the first character of a value it rejects, either decoder a number.
 func decodeText(data []byte, resolver *envResolver, isTOML bool, out any) error {
-	expanded, lines, err := expandInText(data, resolver, isTOML)
+	expanded, lines, err := expandInText(data, resolver)
 	if err != nil {
 		return err
 	}
@@ -488,43 +488,44 @@ func hasControl(val, allowed string) bool {
 
 // A transition moves to place next on reading prefix, which is width bytes long.
 type transition struct {
-	prefix   string
-	next     textPlace
-	width    int // closesRun: the whole run of quotes that ends a multi-line string
-	tomlOnly bool
+	prefix string
+	next   textPlace
+	width  int // closesRun: the whole run of quotes that ends a multi-line string
 }
 
 const closesRun = 0
 
-// transitions lists what leaves place at. JSON only has double-quoted strings.
+// transitions lists what leaves place at, in TOML. JSON is read the same way: what
+// only TOML has (comments, single quotes, triple quotes) never sits outside a string in
+// valid JSON.
 func transitions(at textPlace) []transition {
 	switch at {
 	case outside:
 		return []transition{
-			{"#", comment, 1, true},
-			{`"""`, multiBasicString, 3, true},
-			{`"`, basicString, 1, false},
-			{"'''", multiLiteralString, 3, true},
-			{"'", literalString, 1, true},
+			{"#", comment, 1},
+			{`"""`, multiBasicString, 3},
+			{`"`, basicString, 1},
+			{"'''", multiLiteralString, 3},
+			{"'", literalString, 1},
 		}
 	case comment:
-		return []transition{{"\n", outside, 1, true}}
+		return []transition{{"\n", outside, 1}}
 	case basicString:
-		return []transition{{`\`, basicString, 2, false}, {`"`, outside, 1, false}, {"\n", outside, 1, false}}
+		return []transition{{`\`, basicString, 2}, {`"`, outside, 1}, {"\n", outside, 1}}
 	case multiBasicString:
-		return []transition{{`\`, multiBasicString, 2, true}, {`"""`, outside, closesRun, true}}
+		return []transition{{`\`, multiBasicString, 2}, {`"""`, outside, closesRun}}
 	case literalString:
-		return []transition{{"'", outside, 1, true}, {"\n", outside, 1, true}}
+		return []transition{{"'", outside, 1}, {"\n", outside, 1}}
 	default:
-		return []transition{{"'''", outside, closesRun, true}}
+		return []transition{{"'''", outside, closesRun}}
 	}
 }
 
 // scan reads the first bytes of rest, at place at, and returns how many it read and
 // where the next byte sits.
-func scan(at textPlace, rest []byte, isTOML bool) (int, textPlace) {
+func scan(at textPlace, rest []byte) (int, textPlace) {
 	for _, t := range transitions(at) {
-		if (isTOML || !t.tomlOnly) && bytes.HasPrefix(rest, []byte(t.prefix)) {
+		if bytes.HasPrefix(rest, []byte(t.prefix)) {
 			width := t.width
 			if width == closesRun {
 				width = closingRun(rest, t.prefix[0])
