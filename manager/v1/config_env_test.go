@@ -761,3 +761,27 @@ entries:
 		t.Errorf("the error chain hands out the connection string: %v", err)
 	}
 }
+
+// TestNewDBManager_ValidationDoesNotQuoteTheRejectedType: decoding can change a value
+// (YAML trims it) and quoting it in a message escapes it, so redacting the value as
+// substituted misses it there. Validation names the field instead of quoting it.
+func TestNewDBManager_ValidationDoesNotQuoteTheRejectedType(t *testing.T) {
+	for _, value := range []string{" credential-secret ", `credential"secret`} {
+		t.Run(value, func(t *testing.T) {
+			path := writeConfig(t, "config.yaml", `
+entries:
+  - name: primary
+    type: ${ENTRY_TYPE}
+    postgres: {user: app, password: x, host: localhost, port: 5432, database: app}
+`)
+			_, err := mgr.NewDBManager(t.Context(), path, nil,
+				mgr.WithEnvVars(map[string]string{"ENTRY_TYPE": value}))
+			if err == nil {
+				t.Fatal("NewDBManager accepted an unknown entry type")
+			}
+			if leaks(err, "credential") {
+				t.Errorf("error quotes the type: %v", err)
+			}
+		})
+	}
+}

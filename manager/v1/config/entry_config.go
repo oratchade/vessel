@@ -65,10 +65,8 @@ func (ce *ConfigEntry) Validate() error {
 		return fmt.Errorf("ConfigEntry: name is required")
 	}
 	if ce.Type != ReadOnly && ce.Type != ReadWrite {
-		return fmt.Errorf(
-			"ConfigEntry %q: type must be %q or %q, got %q",
-			ce.Name, ReadOnly, ReadWrite, ce.Type,
-		)
+		// The rejected type is not quoted: it may come from the environment.
+		return fmt.Errorf("ConfigEntry %q: type must be %q or %q", ce.Name, ReadOnly, ReadWrite)
 	}
 	count := 0
 	if ce.MySQL != nil {

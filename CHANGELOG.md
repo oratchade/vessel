@@ -49,6 +49,7 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
   - A non-empty value that YAML would read as null, such as `null` or `~`, now arrives
     as that string rather than empty.
   - A placeholder in a TOML comment is no longer expanded.
+  - The validation error for an unknown entry type no longer quotes the type it got.
 
 ## [0.4.0] - 2026-10-12
 
