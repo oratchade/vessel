@@ -3,6 +3,7 @@ package v1
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -416,7 +417,12 @@ func loadConfig(path string, envOpts []EnvOption) (*config.ManagerConfig, error)
 	}
 
 	if err != nil {
-		return nil, fmt.Errorf("loadConfig: failed to load configuration: %w", redact(err, resolver.substituted))
+		if len(resolver.substituted) > 0 {
+			// A decoder's error can hold what it read, as a TOML error holds its source,
+			// so once a value came from the environment only a redacted message leaves.
+			err = errors.New(redact(err.Error(), resolver.substituted))
+		}
+		return nil, fmt.Errorf("loadConfig: failed to load configuration: %w", err)
 	}
 
 	return cfg, nil

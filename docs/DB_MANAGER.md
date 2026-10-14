@@ -94,7 +94,8 @@ A substituted value is only ever text, never syntax, so any password works as it
   reads no escapes, so a value with a quote, a backslash or a control character would
   arrive escaped there.
 
-A load error never quotes a substituted value: each one is replaced with `[REDACTED]`.
+A load error never quotes a substituted value: each one is replaced with `[REDACTED]`,
+and the decoder's own error, which can hold the text it read, is not returned.
 
 ## Lifecycle
 

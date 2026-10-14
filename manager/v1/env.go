@@ -3,7 +3,6 @@ package v1
 import (
 	"bufio"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -231,13 +230,11 @@ func escapeQuoted(val string) string {
 	return strings.ReplaceAll(quoted[1:len(quoted)-1], "\x7f", `\u007f`)
 }
 
-// redact replaces each substituted value in err's message, longest first so a value
-// holding another is replaced whole: a decoder quotes the text it rejects, and that
-// text may be a secret (#85). It returns a new error rather than wrapping err, which
-// would hand the original message to errors.Unwrap. A short value can redact more
-// than itself; a message with too much redacted is the safe side.
-func redact(err error, values []string) error {
-	msg := err.Error()
+// redact replaces each substituted value in msg, longest first so a value holding
+// another is replaced whole: a decoder quotes the text it rejects, and that text may be
+// a secret (#85). A short value can redact more than itself; a message with too much
+// redacted is the safe side.
+func redact(msg string, values []string) string {
 	sorted := slices.Clone(values)
 	slices.SortFunc(sorted, func(a, b string) int { return len(b) - len(a) })
 	for _, val := range sorted {
@@ -245,10 +242,7 @@ func redact(err error, values []string) error {
 			msg = strings.ReplaceAll(msg, val, "[REDACTED]")
 		}
 	}
-	if msg == err.Error() {
-		return err
-	}
-	return errors.New(msg)
+	return msg
 }
 
 // stripQuotes removes surrounding single or double quotes from a value.

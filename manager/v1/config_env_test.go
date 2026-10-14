@@ -3,6 +3,8 @@
 package v1_test
 
 import (
+	"errors"
+	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
@@ -183,5 +185,46 @@ func TestLoadConfig_ErrorsDoNotQuoteSubstitutedValues(t *testing.T) {
 				t.Errorf("error quotes the substituted value: %v", err)
 			}
 		})
+	}
+}
+
+// leaks reports whether err, or any error it wraps, hands out secret: through its
+// message, or through a String method such as a TOML decode error's source excerpt.
+func leaks(err error, secret string) bool {
+	for ; err != nil; err = errors.Unwrap(err) {
+		if strings.Contains(err.Error(), secret) {
+			return true
+		}
+		if s, ok := err.(fmt.Stringer); ok && strings.Contains(s.String(), secret) {
+			return true
+		}
+	}
+	return false
+}
+
+func TestLoadConfig_ErrorChainDoesNotCarrySubstitutedValues(t *testing.T) {
+	const secret = "s3cr3t-full-password"
+	// The password is valid; the port, written in the file, is not. The TOML decoder's
+	// error keeps the source it read, password line included.
+	path := writeConfig(t, "config.toml", `
+[[entries]]
+name = "primary"
+type = "readwrite"
+
+[entries.postgres]
+user = "app"
+password = "${DB_PASSWORD}"
+host = "localhost"
+port = 'not-a-number'
+database = "app"
+`)
+	_, err := mgr.LoadConfigForTest(path, []mgr.EnvOption{
+		mgr.WithEnvVars(map[string]string{"DB_PASSWORD": secret}),
+	})
+	if err == nil {
+		t.Fatal("load succeeded with a non-numeric port")
+	}
+	if leaks(err, secret) {
+		t.Errorf("the error chain hands out the substituted value: %v", err)
 	}
 }

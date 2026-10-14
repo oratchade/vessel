@@ -17,7 +17,8 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
   it expands to (ports and durations still decode) and a quoted one always a string.
   JSON and TOML values are escaped for a double-quoted string. Load errors replace every
   substituted value with `[REDACTED]`: the YAML decoder quoted the text it rejected,
-  which could be a secret. A non-empty value that YAML would read as null, such as
+  which could be a secret. They no longer wrap the decoder's error either, since a TOML
+  decode error kept the expanded source, secrets included. A non-empty value that YAML would read as null, such as
   `null` or `~`, now arrives as that string rather than empty. **A YAML value can no
   longer inject structure:** a placeholder expanding to a list or a map (`[a, b]`) is
   now that text, a string, not the list.
