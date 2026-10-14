@@ -97,8 +97,9 @@ A substituted value is only ever text, never syntax, so any password works as it
   - In a TOML single-quoted string, which reads no escapes, a value goes in as it is; a
     value that string cannot hold, such as one with a `'` or a line break, fails the
     load.
-  - Outside quotes, only a plain value can go: a number, a boolean or a date. Anything
-    else fails the load and asks for quotes.
+  - Outside quotes, only a plain value can go: a number, a boolean, a date or a single
+    word, which may be a key. Anything else, such as a value with a space or a dotted
+    key, fails the load.
   - In a TOML comment, a placeholder stays as written.
 
 A value that is not valid UTF-8 fails the load, naming the variable.

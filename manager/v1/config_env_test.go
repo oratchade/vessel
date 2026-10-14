@@ -390,6 +390,13 @@ func TestLoadConfig_RefusesAValueItsPlaceCannotHold(t *testing.T) {
 			"config.toml", tomlWith(`password = '''${DB_PASSWORD}'''`, "5432"), "\nleading newline",
 		},
 		"TOML outside quotes": {"config.toml", tomlWith(`password = "x"`, "${DB_PASSWORD}"), "1\nuser = \"root\""},
+		// A dot outside quotes makes a dotted key, which reaches into another table.
+		"TOML dotted key": {
+			"config.toml",
+			"[[entries]]\nname = \"primary\"\ntype = \"readwrite\"\n${DB_PASSWORD} = \"evil\"\n" +
+				"[entries.postgres]\nuser = \"app\"\npassword = \"x\"\nhost = \"localhost\"\nport = 5432\ndatabase = \"app\"\n",
+			"postgres.sslmode",
+		},
 		"JSON outside quotes": {
 			"config.json", `{"entries": [{"name": "primary", "type": "readwrite",
   "postgres": {"user": "app", "password": "x", "host": "localhost", "port": ${DB_PASSWORD}, "database": "app"}}]}`,
@@ -521,7 +528,7 @@ func TestLoadConfig_WithholdsAJSONErrorAtTheEndOfTheLine(t *testing.T) {
 	}
 }
 
-// TestLoadConfig_TOMLLineBreakAfterAQuoteIsKept: in ''''${P}''' the fourth quote is the
+// TestLoadConfig_TOMLLineBreakAfterAQuoteIsKept: in ””${P}”' the fourth quote is the
 // string's first character, so a line break at the start of the value follows it and
 // TOML keeps it; only one right after the opening quotes is dropped.
 func TestLoadConfig_TOMLLineBreakAfterAQuoteIsKept(t *testing.T) {

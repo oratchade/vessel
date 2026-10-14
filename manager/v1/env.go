@@ -296,7 +296,7 @@ func (t *yamlTokens) expand(n *yaml.Node) {
 //   - in a double-quoted string, the value is escaped for it;
 //   - in a TOML single-quoted string, which reads no escapes, it goes in as it is, and
 //     a value the string cannot hold fails the load;
-//   - outside quotes, only a plain value goes in: a number, a boolean, a date;
+//   - outside quotes, only a plain value goes in: a number, a boolean, a date, a word;
 //   - in a TOML comment, the placeholder stays as written.
 //
 // A default goes in as written: it is already in the file's syntax.
@@ -423,8 +423,10 @@ const (
 	multiLiteralString // '''...'''
 )
 
-// plainValue is what a value outside quotes may be: a number, a boolean or a date.
-var plainValue = regexp.MustCompile(`^[A-Za-z0-9_.:+-]+$`)
+// plainValue is what a value outside quotes may be: a word (a boolean, inf, a bare key)
+// or a number, date or time, which alone may hold a dot: elsewhere a dot makes a dotted
+// key, which reaches into another table.
+var plainValue = regexp.MustCompile(`^[+-]?([A-Za-z0-9_-]+|[0-9][0-9A-Za-z_.:+-]*)$`)
 
 func expandAt(at textPlace, opened bool, match []byte, resolver *envResolver) (string, bool, error) {
 	if at == comment {
@@ -466,7 +468,7 @@ func unfit(at textPlace, opened bool, val string) string {
 		}
 	default:
 		if !plainValue.MatchString(val) {
-			return "outside quotes, where only a number, a boolean or a date can go: quote it"
+			return "outside quotes, where only a number, a boolean, a date or a word can go: quote it"
 		}
 	}
 	return ""
