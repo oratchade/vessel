@@ -416,6 +416,10 @@ func loadConfig(path string, envOpts []EnvOption) (*config.ManagerConfig, error)
 		return nil, fmt.Errorf("loadConfig: unsupported file extension: %s", ext)
 	}
 
+	if len(resolver.invalid) > 0 {
+		return nil, fmt.Errorf("loadConfig: the value of ${%s} is not valid UTF-8",
+			strings.Join(resolver.invalid, "}, ${"))
+	}
 	if err != nil {
 		if len(resolver.substituted) > 0 {
 			// A decoder's error can hold what it read, as a TOML error holds its source,

@@ -9,6 +9,7 @@ import (
 	"regexp"
 	"slices"
 	"strings"
+	"unicode/utf8"
 
 	"gopkg.in/yaml.v3"
 )
@@ -37,6 +38,8 @@ type envResolver struct {
 	fileVars map[string]string
 	// Values expansion took from the sources above, redacted from load errors
 	substituted []string
+	// Variables left unexpanded because their value is not valid UTF-8
+	invalid []string
 }
 
 // WithEnvVars provides an explicit set of variables for expansion.
@@ -164,6 +167,12 @@ func expandEnvVarsWith(data []byte, resolver *envResolver, encode func(string) s
 		defaultVal := parts[2]
 
 		if val, ok := resolver.lookup(key); ok {
+			if !utf8.ValidString(val) {
+				// Escaped, the bytes would become U+FFFD and the manager would connect
+				// with another credential: refuse the value, without quoting it.
+				resolver.invalid = append(resolver.invalid, key)
+				return match
+			}
 			resolver.substituted = append(resolver.substituted, val)
 			return []byte(encode(val))
 		}

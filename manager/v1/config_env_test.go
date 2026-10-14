@@ -228,3 +228,26 @@ database = "app"
 		t.Errorf("the error chain hands out the substituted value: %v", err)
 	}
 }
+
+func TestLoadConfig_RejectsAValueThatIsNotUTF8(t *testing.T) {
+	const value = "pass\xffword"
+	for name, content := range postgresConfigs {
+		t.Run(name, func(t *testing.T) {
+			path := writeConfig(t, name, content)
+			// Escaping would turn the byte into U+FFFD and connect with another
+			// password; inserted raw, YAML would pass it on as it is.
+			cfg, err := mgr.LoadConfigForTest(path, []mgr.EnvOption{
+				mgr.WithEnvVars(map[string]string{"DB_PASSWORD": value}),
+			})
+			if err == nil {
+				t.Fatalf("load succeeded, password = %q", cfg.Entries[0].Postgres.Password)
+			}
+			if !strings.Contains(err.Error(), "${DB_PASSWORD}") {
+				t.Errorf("error does not name the variable: %v", err)
+			}
+			if leaks(err, "pass") {
+				t.Errorf("error quotes the value: %v", err)
+			}
+		})
+	}
+}
