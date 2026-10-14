@@ -247,7 +247,8 @@ func NewDBManager(ctx context.Context, configPath string, logger db.Logger, envO
 		logger.Error("Failed to setup database entries",
 			"error", err.Error(),
 		)
-		return nil, fmt.Errorf("failed to setup DB entries: %w", err)
+		// A driver's error can keep the connection string, password included.
+		return nil, fmt.Errorf("failed to setup DB entries: %w", redactError(err, substituted))
 	}
 
 	if len(readOnly) == 0 && len(readWrite) == 0 {

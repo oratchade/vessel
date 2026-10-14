@@ -3,6 +3,7 @@
 package v1_test
 
 import (
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -10,6 +11,8 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/jackc/pgx/v5/pgconn"
 
 	mgr "tounilab.com/vessel/manager/v1"
 )
@@ -735,5 +738,26 @@ entries:
 	}
 	if cfg.ReadWorkers != 0 {
 		t.Errorf("read_workers = %d, want 0", cfg.ReadWorkers)
+	}
+}
+
+// TestNewDBManager_SetupErrorDoesNotCarrySubstitutedValues: the PostgreSQL driver's
+// parse error keeps the connection string, password included, for errors.As to reach.
+func TestNewDBManager_SetupErrorDoesNotCarrySubstitutedValues(t *testing.T) {
+	const secret = "credential-secret"
+	path := writeConfig(t, "config.yaml", `
+entries:
+  - name: primary
+    type: readwrite
+    postgres: {user: app, password: "${DB_PASSWORD}", host: localhost, port: 5432, database: app, ssl_mode: invalid}
+`)
+	_, err := mgr.NewDBManager(t.Context(), path, nil,
+		mgr.WithEnvVars(map[string]string{"DB_PASSWORD": secret}))
+	if err == nil {
+		t.Fatal("NewDBManager accepted an invalid ssl_mode")
+	}
+	var parseErr *pgconn.ParseConfigError
+	if errors.As(err, &parseErr) || leaks(err, secret) {
+		t.Errorf("the error chain hands out the connection string: %v", err)
 	}
 }
