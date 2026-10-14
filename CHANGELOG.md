@@ -36,6 +36,14 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
     placeholder and says to quote it.
   - **A value that is not valid UTF-8 fails the load**, naming its variable. JSON and
     TOML escaping turned its bytes into U+FFFD, connecting with another credential.
+  - **A value escaped or quoted for the file now arrives with its escapes or quotes.**
+    Expanded as text, a value was read by the file's syntax, so a `\"` in a
+    double-quoted string, a `''` in a YAML single-quoted one, or a value JSON-encoded to
+    survive the file lost its escapes. A value now goes in as it is: drop such
+    workarounds when upgrading.
+  - An alias must repeat its anchor's placeholder as written. With `&${A}`, an alias
+    `*pg` or `*${A:pg}` no longer resolves: the anchor is named by a token while the file
+    parses.
   - **A YAML value can no longer inject structure:** a placeholder expanding to a list
     or a map (`[a, b]`) is now that text, a string, not the list.
   - A non-empty value that YAML would read as null, such as `null` or `~`, now arrives

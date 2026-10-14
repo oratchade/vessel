@@ -85,7 +85,8 @@ A substituted value is only ever text, never syntax, so any password works as it
 
 - **YAML** is parsed with an inert token standing in for each placeholder, so a
   placeholder works wherever it could before (a flow collection, an anchor, a key), and
-  its value then goes into the value that held it. An unquoted
+  its value then goes into the value that held it. An alias must repeat its anchor's
+  placeholder as written (`&${A}` … `*${A}`). An unquoted
   value is trimmed and typed from what it expands to, as if written there: `port: ${DB_PORT:5432}`
   is a number, `health_interval: ${HEALTH:30s}` a duration. A quoted one
   (`user: "${DB_USER}"`) is always a string, and so is any non-empty value that would
