@@ -562,3 +562,19 @@ entries:
 		t.Errorf("password = %q, want the default and the text after it", got)
 	}
 }
+
+// TestLoadConfig_TOMLKeepsLeadingSpacesAfterALineEndingBackslash: in a multi-line basic
+// string, TOML drops the whitespace after a line-ending backslash, so a value placed
+// there loses its leading spaces unless they are escaped.
+func TestLoadConfig_TOMLKeepsLeadingSpacesAfterALineEndingBackslash(t *testing.T) {
+	path := writeConfig(t, "config.toml", tomlWith("password = \"\"\"a\\\n${DB_PASSWORD}\"\"\"", "5432"))
+	cfg, err := mgr.LoadConfigForTest(path, []mgr.EnvOption{
+		mgr.WithEnvVars(map[string]string{"DB_PASSWORD": "  lead"}),
+	})
+	if err != nil {
+		t.Fatalf("load: %v", err)
+	}
+	if got := cfg.Entries[0].Postgres.Password; got != "a  lead" {
+		t.Errorf("password = %q, want \"a  lead\"", got)
+	}
+}

@@ -431,8 +431,15 @@ func expandAt(at textPlace, opened bool, match []byte, resolver *envResolver) (s
 	if !fromSource {
 		return val, false, nil
 	}
-	if at == basicString || at == multiBasicString {
+	switch at {
+	case basicString:
 		return escapeQuoted(val), true, nil
+	case multiBasicString:
+		// After a line-ending backslash TOML drops whitespace up to the next character,
+		// so leading spaces are escaped; tabs and line breaks already are.
+		escaped := escapeQuoted(val)
+		trimmed := strings.TrimLeft(escaped, " ")
+		return strings.Repeat(`\u0020`, len(escaped)-len(trimmed)) + trimmed, true, nil
 	}
 	if why := unfit(at, opened, val); why != "" {
 		return "", true, fmt.Errorf("%s sits %s", match, why)
