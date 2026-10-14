@@ -2,7 +2,6 @@ package v1
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -228,13 +227,14 @@ type DBManager struct {
 func NewDBManager(ctx context.Context, configPath string, logger db.Logger, envOpts ...EnvOption) (*DBManager, error) {
 	var err error
 
-	cfg, err := loadConfig(configPath, envOpts)
+	cfg, substituted, err := loadConfig(configPath, envOpts)
 	if err != nil {
 		return nil, fmt.Errorf("failed to load config: %w", err)
 	}
 
 	if err := cfg.Validate(); err != nil {
-		return nil, fmt.Errorf("failed to validate config: %w", err)
+		// Validation quotes the field it rejects, which may hold a substituted value.
+		return nil, fmt.Errorf("failed to validate config: %w", redactError(err, substituted))
 	}
 
 	// Use a no-op logger if none is provided
@@ -377,19 +377,20 @@ func validateConfigPath(path string) (string, error) {
 	return absPath, nil
 }
 
-// loadConfig loads the configuration from the specified path.
+// loadConfig loads the configuration from the specified path, and returns the values
+// it took from the environment, for the caller to redact from its own errors.
 // Security: Path must not escape the current working directory (prevents directory traversal).
-func loadConfig(path string, envOpts []EnvOption) (*config.ManagerConfig, error) {
+func loadConfig(path string, envOpts []EnvOption) (*config.ManagerConfig, []string, error) {
 	// Validate and resolve the config path
 	absPath, err := validateConfigPath(path)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
 	//nolint:gosec // G304: Path is validated above to prevent directory traversal
 	data, err := os.ReadFile(absPath)
 	if err != nil {
-		return nil, fmt.Errorf("loadConfig: failed to read config file: %w", err)
+		return nil, nil, fmt.Errorf("loadConfig: failed to read config file: %w", err)
 	}
 
 	// ${VAR} and ${VAR:default} are expanded when env options are provided, so that a
@@ -410,13 +411,13 @@ func loadConfig(path string, envOpts []EnvOption) (*config.ManagerConfig, error)
 		err = decodeText(data, resolver, true, cfg)
 
 	default:
-		return nil, fmt.Errorf("loadConfig: unsupported file extension: %s", ext)
+		return nil, nil, fmt.Errorf("loadConfig: unsupported file extension: %s", ext)
 	}
 
 	if err := loadError(err, resolver); err != nil {
-		return nil, err
+		return nil, nil, err
 	}
-	return cfg, nil
+	return cfg, resolver.substituted, nil
 }
 
 // loadError is the error a load ends with: a value that is not UTF-8, else the
@@ -431,10 +432,7 @@ func loadError(err error, resolver *envResolver) error {
 	if err == nil {
 		return nil
 	}
-	if len(resolver.substituted) > 0 {
-		err = errors.New(redact(err.Error(), resolver.substituted))
-	}
-	return fmt.Errorf("loadConfig: failed to load configuration: %w", err)
+	return fmt.Errorf("loadConfig: failed to load configuration: %w", redactError(err, resolver.substituted))
 }
 
 // Start initializes the database entries and starts their worker routines.

@@ -6,7 +6,8 @@ import "tounilab.com/vessel/manager/v1/config"
 
 // LoadConfigForTest exposes loadConfig for testing.
 func LoadConfigForTest(path string, opts []EnvOption) (*config.ManagerConfig, error) {
-	return loadConfig(path, opts)
+	cfg, _, err := loadConfig(path, opts)
+	return cfg, err
 }
 
 // ExpandEnvVarsForTest replaces ${VAR} and ${VAR:default} patterns in data, each

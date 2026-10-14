@@ -557,6 +557,16 @@ func escapeQuoted(val string) string {
 	return strings.ReplaceAll(quoted[1:len(quoted)-1], "\x7f", `\u007f`)
 }
 
+// redactError is err as a new error with each substituted value redacted, or err itself
+// when nothing was substituted. A new error rather than a wrapper: a decoder's error can
+// hold what it read, as a TOML error holds its source.
+func redactError(err error, substituted []string) error {
+	if len(substituted) == 0 {
+		return err
+	}
+	return errors.New(redact(err.Error(), substituted))
+}
+
 // redact replaces each substituted value in msg, longest first so a value holding
 // another is replaced whole: a decoder quotes the text it rejects, and that text may be
 // a secret (#85). A short value can redact more than itself; a message with too much

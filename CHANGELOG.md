@@ -21,11 +21,11 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
     double-quoted string, as it is in a TOML single-quoted string (which reads no
     escapes), and only a plain number, boolean or date outside quotes.
   - **Defaults** are part of the file, so they still go in as written, in every format.
-  - **Load errors never carry a substituted value.** A decoder error on a line holding
-    one names the placeholder instead (`line 4: the value of ${DB_PORT} is not valid
-    here`): decoders quote part of a value they reject, YAML up to its first seven
-    characters, TOML its first. Other errors have each value replaced with
-    `[REDACTED]`, and the decoder's own error is no longer wrapped, since a TOML decode
+  - **Load and validation errors never carry a substituted value.** A decoder error on
+    a line holding one names the placeholder instead (`line 4: the value of ${DB_PORT}
+    is not valid here`): decoders quote part of a value they reject, YAML up to its
+    first seven characters, TOML its first. Other errors, validation included, have
+    each value replaced with `[REDACTED]`, and the decoder's own error is no longer wrapped, since a TOML decode
     error kept the expanded source.
 
   Behaviour changes:

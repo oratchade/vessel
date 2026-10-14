@@ -612,3 +612,23 @@ entries:
 		t.Errorf("user, password, port = %q, %q, %d; want \" app\\n\", secret, 6543", pg.User, pg.Password, pg.Port)
 	}
 }
+
+// TestNewDBManager_ValidationErrorDoesNotQuoteSubstitutedValues: validation quotes the
+// field it rejects, and its name. One value holds the other, so each is redacted whole
+// only when the longer goes first.
+func TestNewDBManager_ValidationErrorDoesNotQuoteSubstitutedValues(t *testing.T) {
+	path := writeConfig(t, "config.yaml", `
+entries:
+  - name: ${ENTRY}
+    type: ${ENTRY_TYPE}
+    postgres: {user: app, password: x, host: localhost, port: 5432, database: app}
+`)
+	_, err := mgr.NewDBManager(t.Context(), path, nil,
+		mgr.WithEnvVars(map[string]string{"ENTRY": "abc", "ENTRY_TYPE": "abcdef"}))
+	if err == nil {
+		t.Fatal("NewDBManager accepted an unknown entry type")
+	}
+	if leaks(err, "abc") || leaks(err, "def") {
+		t.Errorf("error quotes a substituted value: %v", err)
+	}
+}

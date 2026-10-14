@@ -104,10 +104,10 @@ A substituted value is only ever text, never syntax, so any password works as it
 
 A value that is not valid UTF-8 fails the load, naming the variable.
 
-A load error never quotes a substituted value. A decoder error on a line holding one
-names the placeholder instead (`line 4: the value of ${DB_PORT} is not valid here`),
-since decoders quote part of what they reject; any other error has each value
-replaced with `[REDACTED]`. The decoder's own error, which can hold the text it read,
+A load or validation error never quotes a substituted value. A decoder error on a line
+holding one names the placeholder instead (`line 4: the value of ${DB_PORT} is not
+valid here`), since decoders quote part of what they reject; any other error,
+validation included, has each value replaced with `[REDACTED]`. The decoder's own error, which can hold the text it read,
 is not returned.
 
 ## Lifecycle
