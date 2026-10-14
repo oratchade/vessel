@@ -1092,3 +1092,19 @@ entries:
 		})
 	}
 }
+
+// TestLoadConfig_EmptyYAMLLoadsNothing: an empty file, or one with only comments, loads
+// an empty config, as it does without an EnvOption.
+func TestLoadConfig_EmptyYAMLLoadsNothing(t *testing.T) {
+	for name, content := range map[string]string{"empty": "", "comments only": "# ${DB_PASSWORD}\n"} {
+		t.Run(name, func(t *testing.T) {
+			path := writeConfig(t, "config.yaml", content)
+			cfg, err := mgr.LoadConfigForTest(path, []mgr.EnvOption{
+				mgr.WithEnvVars(map[string]string{"DB_PASSWORD": "x"}),
+			})
+			if err != nil || len(cfg.Entries) != 0 {
+				t.Errorf("cfg, err = %+v, %v; want an empty config", cfg, err)
+			}
+		})
+	}
+}

@@ -244,9 +244,6 @@ func decodeYAML(data []byte, resolver *envResolver, out any) error {
 	if err := yaml.Unmarshal(tokenized, &root); err != nil {
 		return fmt.Errorf("parse yaml: %s", p.restore(err.Error()))
 	}
-	if root.Kind == 0 {
-		return nil // an empty file, which yaml.Unmarshal into a struct also accepts
-	}
 	lines := map[int][]string{}
 	if err := p.expandYAML(&root, lines); err != nil {
 		return err
@@ -337,7 +334,7 @@ func decodeJSON(data []byte, resolver *envResolver, out any) error {
 	dec.UseNumber() // a token is a number too large for a float64
 	var tree any
 	if err := dec.Decode(&tree); err != nil {
-		return fmt.Errorf("parse json: %s", p.restore(err.Error()))
+		return fmt.Errorf("parse json: %w", err)
 	}
 	if _, err := dec.Token(); !errors.Is(err, io.EOF) {
 		return errors.New("parse json: invalid character after top-level value")
@@ -374,7 +371,7 @@ func decodeTOML(data []byte, resolver *envResolver, out any) error {
 	tokenized, p := tokenize(data, resolver)
 	var tree map[string]any
 	if err := toml.Unmarshal(tokenized, &tree); err != nil {
-		return fmt.Errorf("parse toml: %s", p.restore(err.Error()))
+		return fmt.Errorf("parse toml: %w", err)
 	}
 	paths := map[string][]string{}
 	expanded, err := p.expandTree(tree, "", paths, tomlScalar)

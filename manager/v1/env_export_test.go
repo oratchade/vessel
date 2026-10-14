@@ -10,8 +10,9 @@ func LoadConfigForTest(path string, opts []EnvOption) (*config.ManagerConfig, er
 	return cfg, err
 }
 
-// ExpandEnvVarsForTest replaces ${VAR} and ${VAR:default} patterns in data, each
-// value inserted as it is:
+// ExpandEnvVarsForTest runs the resolution rules (envResolver.expand) over each
+// placeholder in data, inserting what it resolves to as text. Production never
+// expands text; this exercises the rules and the sources' precedence:
 //   - ${VAR} with var found → replaced with value
 //   - ${VAR} with var not found → left as literal ${VAR} (fail-loud)
 //   - ${VAR:default} with var found → replaced with value
