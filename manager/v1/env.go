@@ -170,11 +170,12 @@ func (r *envResolver) expand(match []byte) (val string, fromSource bool) {
 // decodeYAML stands an inert token in for each value from the environment while YAML
 // parses the file, so the file parses as written wherever a placeholder sits (a flow
 // collection, an anchor, a key), then puts each value into the scalars holding its
-// token: a value can never become YAML syntax (#85). An unquoted scalar is then typed
-// from its expanded text, as if written there, so a port or a duration still decodes; a
-// quoted one stays a string. A value that would read as null stays a string too, unless
-// empty: a password "null" is a password. A default, written by the file's author, goes
-// in before parsing as written, as in JSON and TOML.
+// token: a value can never become YAML syntax (#85). An unquoted scalar is then
+// trimmed and typed from its expanded text, as if written there, so a port or a
+// duration still decodes; a quoted one stays a string, as it is. A value that would
+// read as null stays a string too, unless empty: a password "null" is a password. A
+// default, written by the file's author, goes in before parsing as written, as in JSON
+// and TOML.
 func decodeYAML(data []byte, resolver *envResolver, out any) error {
 	tokens := &yamlTokens{byToken: map[string]yamlPlaceholder{}, lines: map[int][]string{}}
 	if resolver.hasAnySource() {
@@ -281,6 +282,8 @@ func (t *yamlTokens) expand(n *yaml.Node) {
 		return placeholder.val
 	})
 	if n.Style == 0 {
+		// Written there, YAML would drop the spaces and line breaks around it.
+		n.Value = strings.Trim(n.Value, " \t\r\n")
 		n.Tag = ""
 		if n.ShortTag() == "!!null" && n.Value != "" {
 			n.Tag = "!!str"

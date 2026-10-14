@@ -578,3 +578,30 @@ func TestLoadConfig_TOMLKeepsLeadingSpacesAfterALineEndingBackslash(t *testing.T
 		t.Errorf("password = %q, want \"a  lead\"", got)
 	}
 }
+
+// TestLoadConfig_YAMLUnquotedValueIsTrimmedAsIfWritten: written unquoted, YAML drops the
+// spaces and line breaks around a value, as it always did for a substituted one; a
+// secret mounted from a file often ends with a line break. A quoted value keeps them.
+func TestLoadConfig_YAMLUnquotedValueIsTrimmedAsIfWritten(t *testing.T) {
+	path := writeConfig(t, "config.yaml", `
+entries:
+  - name: primary
+    type: readwrite
+    postgres:
+      user: "${DB_USER}"
+      password: ${DB_PASSWORD}
+      host: localhost
+      port: ${DB_PORT}
+      database: app
+`)
+	cfg, err := mgr.LoadConfigForTest(path, []mgr.EnvOption{
+		mgr.WithEnvVars(map[string]string{"DB_USER": " app\n", "DB_PASSWORD": "  secret \t\n", "DB_PORT": "6543\n"}),
+	})
+	if err != nil {
+		t.Fatalf("load: %v", err)
+	}
+	pg := cfg.Entries[0].Postgres
+	if pg.User != " app\n" || pg.Password != "secret" || pg.Port != 6543 {
+		t.Errorf("user, password, port = %q, %q, %d; want \" app\\n\", secret, 6543", pg.User, pg.Password, pg.Port)
+	}
+}
