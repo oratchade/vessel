@@ -83,7 +83,9 @@ For production secrets, prefer explicit values from your secret store via
 
 A substituted value is only ever text, never syntax, so any password works as it is:
 
-- **YAML** is parsed first, and `${VAR}` is expanded inside each value. An unquoted
+- **YAML** is parsed with an inert token standing in for each placeholder, so a
+  placeholder works wherever it could before (a flow collection, an anchor, a key), and
+  its value then goes into the value that held it. An unquoted
   value is typed from what it expands to, as if written there: `port: ${DB_PORT:5432}`
   is a number, `health_interval: ${HEALTH:30s}` a duration. A quoted one
   (`user: "${DB_USER}"`) is always a string, and so is any non-empty value that would

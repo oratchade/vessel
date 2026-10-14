@@ -251,3 +251,70 @@ func TestLoadConfig_RejectsAValueThatIsNotUTF8(t *testing.T) {
 		})
 	}
 }
+
+// TestLoadConfig_YAMLPlaceholderPlacements loads a placeholder from every place a YAML
+// file could hold one before #85, each with a value that is YAML syntax.
+func TestLoadConfig_YAMLPlaceholderPlacements(t *testing.T) {
+	const value = "*a, b: {c} # d"
+	placements := map[string]string{
+		"flow mapping": `
+entries:
+  - name: primary
+    type: readwrite
+    postgres: {user: app, password: ${DB_PASSWORD}, host: localhost, port: ${DB_PORT:5432}, database: app}
+`,
+		"flow sequence": `
+entries: [{name: primary, type: readwrite, postgres: {user: app, password: "${DB_PASSWORD}", host: localhost, port: 5432, database: app}}]
+`,
+		"anchor and alias": `
+base: &${ANCHOR:pg}
+  user: app
+  password: ${DB_PASSWORD}
+  host: localhost
+  port: 5432
+  database: app
+entries:
+  - name: primary
+    type: readwrite
+    postgres: *${ANCHOR:pg}
+`,
+		"key": `
+entries:
+  - name: primary
+    type: readwrite
+    postgres:
+      user: app
+      ${PASSWORD_KEY:password}: ${DB_PASSWORD}
+      host: localhost
+      port: 5432
+      database: app
+`,
+		"comment": `
+# rotate ${DB_PASSWORD} monthly
+entries:
+  - name: primary
+    type: readwrite
+    postgres:
+      user: app
+      password: ${DB_PASSWORD} # ${DB_PASSWORD}
+      host: localhost
+      port: 5432
+      database: app
+`,
+	}
+	for name, content := range placements {
+		t.Run(name, func(t *testing.T) {
+			path := writeConfig(t, "config.yaml", content)
+			cfg, err := mgr.LoadConfigForTest(path, []mgr.EnvOption{
+				mgr.WithEnvVars(map[string]string{"DB_PASSWORD": value}),
+			})
+			if err != nil {
+				t.Fatalf("load: %v", err)
+			}
+			pg := cfg.Entries[0].Postgres
+			if pg.Password != value || pg.Port != 5432 {
+				t.Errorf("password, port = %q, %d; want %q, 5432", pg.Password, pg.Port, value)
+			}
+		})
+	}
+}

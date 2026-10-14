@@ -2,6 +2,7 @@ package v1
 
 import (
 	"bufio"
+	"bytes"
 	"encoding/json"
 	"fmt"
 	"os"
@@ -140,8 +141,9 @@ func (r *envResolver) hasAnySource() bool {
 	return r.vars != nil || r.fileVars != nil || len(r.prefixes) > 0
 }
 
-// expandEnvVars replaces ${VAR} and ${VAR:default} patterns in data
-// using the resolver's lookup chain.
+// expandEnvVarsWith replaces ${VAR} and ${VAR:default} patterns in data
+// using the resolver's lookup chain, each value found in a source passed through
+// encode. A default goes in as written: it is already in the file's syntax.
 //
 // Behavior:
 //   - ${VAR} with var found → replaced with value
@@ -149,77 +151,120 @@ func (r *envResolver) hasAnySource() bool {
 //   - ${VAR:default} with var found → replaced with value
 //   - ${VAR:default} with var not found → replaced with default
 //   - ${VAR:} with var not found → replaced with empty string
-func expandEnvVars(data []byte, resolver *envResolver) []byte {
-	return expandEnvVarsWith(data, resolver, func(val string) string { return val })
-}
-
-// expandEnvVarsWith is expandEnvVars with each value found in a source passed
-// through encode. A default goes in as written: it is already in the file's syntax.
 func expandEnvVarsWith(data []byte, resolver *envResolver, encode func(string) string) []byte {
 	if resolver == nil || !resolver.hasAnySource() {
 		return data
 	}
 
 	return envVarRe.ReplaceAllFunc(data, func(match []byte) []byte {
-		parts := envVarRe.FindSubmatch(match)
-		key := string(parts[1])
-		hasDefault := parts[2] != nil
-		defaultVal := parts[2]
-
-		if val, ok := resolver.lookup(key); ok {
-			if !utf8.ValidString(val) {
-				// Escaped, the bytes would become U+FFFD and the manager would connect
-				// with another credential: refuse the value, without quoting it.
-				resolver.invalid = append(resolver.invalid, key)
-				return match
-			}
-			resolver.substituted = append(resolver.substituted, val)
+		val, fromSource := resolver.expand(match)
+		if fromSource {
 			return []byte(encode(val))
 		}
-		if hasDefault {
-			return defaultVal
-		}
-		return match // no source, no default → leave as-is
+		return []byte(val)
 	})
 }
 
-// decodeYAML parses data first and expands ${VAR} inside each scalar, so a value can
-// never become YAML syntax: an alias, an anchor, a comment, a key (#85). An unquoted
-// scalar is then typed from its expanded text, as if written there, so a port or a
-// duration still decodes; a quoted one stays a string. A value that would read as
-// null stays a string too, unless empty: a password "null" is a password.
+// expand resolves one placeholder as written: to its variable's value, found in a
+// source (fromSource), else to its default, else to itself.
+func (r *envResolver) expand(match []byte) (val string, fromSource bool) {
+	parts := envVarRe.FindSubmatch(match)
+	key := string(parts[1])
+	if val, ok := r.lookup(key); ok {
+		if !utf8.ValidString(val) {
+			// Escaped, the bytes would become U+FFFD and the manager would connect
+			// with another credential: refuse the value, without quoting it.
+			r.invalid = append(r.invalid, key)
+			return string(match), false
+		}
+		r.substituted = append(r.substituted, val)
+		return val, true
+	}
+	if parts[2] != nil {
+		return string(parts[2]), false
+	}
+	return string(match), false // no source, no default → leave as-is
+}
+
+// decodeYAML stands an inert token in for each placeholder while YAML parses the file,
+// so the file parses as written wherever a placeholder sits (a flow collection, an
+// anchor, a key), then puts each value into the scalars holding its token: a value can
+// never become YAML syntax (#85). An unquoted scalar is then typed from its expanded
+// text, as if written there, so a port or a duration still decodes; a quoted one stays
+// a string. A value that would read as null stays a string too, unless empty: a
+// password "null" is a password.
 func decodeYAML(data []byte, resolver *envResolver, out any) error {
+	tokens := &yamlTokens{byToken: map[string]yamlPlaceholder{}}
+	if resolver.hasAnySource() {
+		data = tokens.replace(data, resolver)
+	}
 	var root yaml.Node
 	if err := yaml.Unmarshal(data, &root); err != nil {
-		return fmt.Errorf("parse yaml: %w", err)
+		return fmt.Errorf("parse yaml: %s", tokens.restore(err.Error()))
 	}
 	if root.Kind == 0 {
 		return nil // an empty file, which yaml.Unmarshal into a struct also accepts
 	}
-	if resolver.hasAnySource() {
-		expandYAMLNode(&root, resolver)
-	}
+	tokens.expand(&root)
 	if err := root.Decode(out); err != nil {
 		return fmt.Errorf("decode yaml: %w", err)
 	}
 	return nil
 }
 
-func expandYAMLNode(n *yaml.Node, resolver *envResolver) {
+// yamlTokens maps the tokens standing in for placeholders while YAML parses a file.
+type yamlTokens struct {
+	re      *regexp.Regexp // matches a token; nil when no placeholder was replaced
+	byToken map[string]yamlPlaceholder
+}
+
+type yamlPlaceholder struct {
+	text string // as written, for error messages
+	val  string // what it expands to
+}
+
+// replace swaps each placeholder in data for a token of letters and digits that data
+// does not otherwise contain. The same placeholder gets the same token, so an alias
+// still names its anchor.
+func (t *yamlTokens) replace(data []byte, resolver *envResolver) []byte {
+	prefix := "vesselenv"
+	for bytes.Contains(data, []byte(prefix)) {
+		prefix += "x"
+	}
+	t.re = regexp.MustCompile(prefix + `\d{6}`)
+	byText := map[string]string{}
+	return envVarRe.ReplaceAllFunc(data, func(match []byte) []byte {
+		token, ok := byText[string(match)]
+		if !ok {
+			token = fmt.Sprintf("%s%06d", prefix, len(byText))
+			byText[string(match)] = token
+			val, _ := resolver.expand(match)
+			t.byToken[token] = yamlPlaceholder{text: string(match), val: val}
+		}
+		return []byte(token)
+	})
+}
+
+// restore puts the placeholders back into a parser message in place of their tokens.
+func (t *yamlTokens) restore(msg string) string {
+	if t.re == nil {
+		return msg
+	}
+	return t.re.ReplaceAllStringFunc(msg, func(token string) string { return t.byToken[token].text })
+}
+
+// expand puts each placeholder's value into the scalars under n that hold its token.
+func (t *yamlTokens) expand(n *yaml.Node) {
 	for _, child := range n.Content {
-		expandYAMLNode(child, resolver)
+		t.expand(child)
 	}
-	if n.Kind != yaml.ScalarNode {
+	if t.re == nil || n.Kind != yaml.ScalarNode || !t.re.MatchString(n.Value) {
 		return
 	}
-	expanded := string(expandEnvVars([]byte(n.Value), resolver))
-	if expanded == n.Value {
-		return
-	}
-	n.Value = expanded
+	n.Value = t.re.ReplaceAllStringFunc(n.Value, func(token string) string { return t.byToken[token].val })
 	if n.Style == 0 {
 		n.Tag = ""
-		if n.ShortTag() == "!!null" && expanded != "" {
+		if n.ShortTag() == "!!null" && n.Value != "" {
 			n.Tag = "!!str"
 		}
 	}

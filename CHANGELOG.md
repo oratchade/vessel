@@ -13,8 +13,9 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
   `${VAR}` was expanded in the file's raw text before parsing, so a value was pasted in
   as syntax: a password beginning with `*` was read as a YAML alias, one with `"` broke
   a JSON or TOML string, and the manager failed to start with a valid credential. YAML
-  is now parsed first and expanded inside each value, an unquoted value typed from what
-  it expands to (ports and durations still decode) and a quoted one always a string.
+  is now parsed with an inert token standing in for each placeholder, so placeholders
+  still work in flow collections, anchors and keys, and each value then goes into the
+  value that held it, an unquoted value typed from what it expands to (ports and durations still decode) and a quoted one always a string.
   JSON and TOML values are escaped for a double-quoted string. Load errors replace every
   substituted value with `[REDACTED]`: the YAML decoder quoted the text it rejected,
   which could be a secret. They no longer wrap the decoder's error either, since a TOML

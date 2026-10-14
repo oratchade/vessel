@@ -9,7 +9,7 @@ func LoadConfigForTest(path string, opts []EnvOption) (*config.ManagerConfig, er
 	return loadConfig(path, opts)
 }
 
-// ExpandEnvVarsForTest exposes expandEnvVars for testing.
+// ExpandEnvVarsForTest exposes expandEnvVarsWith, values inserted as they are.
 func ExpandEnvVarsForTest(data []byte, opts []EnvOption) []byte {
-	return expandEnvVars(data, newEnvResolver(opts))
+	return expandEnvVarsWith(data, newEnvResolver(opts), func(val string) string { return val })
 }
