@@ -389,10 +389,12 @@ func TestLoadConfig_RefusesAValueItsPlaceCannotHold(t *testing.T) {
 		"TOML multi-line literal, leading newline": {
 			"config.toml", tomlWith(`password = '''${DB_PASSWORD}'''`, "5432"), "\nleading newline",
 		},
-		"TOML outside quotes":          {"config.toml", tomlWith(`password = "x"`, "${DB_PASSWORD}"), "1\nuser = \"root\""},
-		"JSON outside quotes": {"config.json", `{"entries": [{"name": "primary", "type": "readwrite",
+		"TOML outside quotes": {"config.toml", tomlWith(`password = "x"`, "${DB_PASSWORD}"), "1\nuser = \"root\""},
+		"JSON outside quotes": {
+			"config.json", `{"entries": [{"name": "primary", "type": "readwrite",
   "postgres": {"user": "app", "password": "x", "host": "localhost", "port": ${DB_PASSWORD}, "database": "app"}}]}`,
-			`1, "user": "root"`},
+			`1, "user": "root"`,
+		},
 	}
 	for name, c := range cases {
 		t.Run(name, func(t *testing.T) {
@@ -428,13 +430,15 @@ entries:
 	cases := map[string]struct {
 		name, content, value, quoted string
 	}{
-		"YAML, value first":    {"config.yaml", "read_workers: ${SECRET}\n" + pg, "abcdefghijk-secret", "abcdefg"},
-		"YAML, value inside":   {"config.yaml", "read_workers: x-${SECRET}\n" + pg, "abcdefghijk-secret", "abcde"},
+		"YAML, value first":     {"config.yaml", "read_workers: ${SECRET}\n" + pg, "abcdefghijk-secret", "abcdefg"},
+		"YAML, value inside":    {"config.yaml", "read_workers: x-${SECRET}\n" + pg, "abcdefghijk-secret", "abcde"},
 		"TOML, first character": {"config.toml", tomlWith(`password = "x"`, "${SECRET}"), "hunter2xyz", "'h'"},
 		"TOML, whole number":    {"config.toml", tomlWith(`password = "x"`, "${SECRET}"), "99999999", "99999999"},
-		"JSON, whole number": {"config.json", `{"entries": [{"name": "primary", "type": "readwrite",
+		"JSON, whole number": {
+			"config.json", `{"entries": [{"name": "primary", "type": "readwrite",
   "postgres": {"user": "app", "password": "x", "host": "localhost", "port": ${SECRET}, "database": "app"}}]}`,
-			"99999999", "99999999"},
+			"99999999", "99999999",
+		},
 	}
 	for name, c := range cases {
 		t.Run(name, func(t *testing.T) {
