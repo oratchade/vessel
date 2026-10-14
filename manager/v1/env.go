@@ -299,7 +299,7 @@ func (t *yamlTokens) expand(n *yaml.Node) {
 //
 // A default goes in as written: it is already in the file's syntax.
 func expandInText(data []byte, resolver *envResolver, isTOML bool) ([]byte, map[int][]string, error) {
-	lines := map[int][]string{} // placeholders whose value from a source sits on each line
+	lines := map[int][]string{} // placeholders whose value from a source sits on each expanded line
 	if !resolver.hasAnySource() {
 		return data, lines, nil
 	}
@@ -318,10 +318,16 @@ func expandInText(data []byte, resolver *envResolver, isTOML bool) ([]byte, map[
 			if err != nil {
 				return nil, nil, err
 			}
+			// Lines are counted in the expanded text, where the decoder counts them, so a
+			// value or default with line breaks moves the lines below it.
+			breaks := strings.Count(val, "\n")
 			if fromSource {
-				addLine(lines, line, string(match))
+				for l := line; l <= line+breaks; l++ {
+					addLine(lines, l, string(match))
+				}
 			}
 			out.WriteString(val)
+			line += breaks
 			i, matches = matches[0][1], matches[1:]
 			continue
 		}

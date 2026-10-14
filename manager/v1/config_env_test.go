@@ -476,3 +476,30 @@ entries:
 		t.Errorf("password, port = %q, %d; want the escape read, a\\tb, and 5432", pg.Password, pg.Port)
 	}
 }
+
+// TestLoadConfig_WithholdingCountsLinesInTheDecodedText puts a value with line breaks
+// above a value the decoder rejects. The decoder counts lines in the expanded text, so
+// the withheld line must be counted there too, or the message quotes the value.
+func TestLoadConfig_WithholdingCountsLinesInTheDecodedText(t *testing.T) {
+	cases := map[string]struct {
+		password, secret, quoted string
+	}{
+		"value with line breaks":       {`password = '''${ML}'''`, "hunter2xyz", "'h'"},
+		"default with line breaks":     {`password = """${UNSET:l1` + "\n" + `l2}"""`, "hunter2xyz", "'h'"},
+		"number the decoder reformats": {`password = '''${ML}'''`, "99_999_999", "99999999"},
+	}
+	for name, c := range cases {
+		t.Run(name, func(t *testing.T) {
+			path := writeConfig(t, "config.toml", tomlWith(c.password, "${SECRET}"))
+			_, err := mgr.LoadConfigForTest(path, []mgr.EnvOption{
+				mgr.WithEnvVars(map[string]string{"ML": "l1\nl2\nl3", "SECRET": c.secret}),
+			})
+			if err == nil {
+				t.Fatal("load succeeded")
+			}
+			if leaks(err, c.quoted) || !strings.Contains(err.Error(), "${SECRET}") {
+				t.Errorf("error should name ${SECRET} and quote nothing of its value: %v", err)
+			}
+		})
+	}
+}
