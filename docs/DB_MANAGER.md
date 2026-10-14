@@ -93,8 +93,8 @@ format's own library escapes them. Defaults are values too.
   a duration. A non-empty value that would read as null, such as `null` or `~`, stays a
   string.
 - **Outside quotes in JSON and TOML**, a placeholder that is the whole value is typed as
-  if written there: a number, `true`, `false` (or JSON's `null`), with TOML's bases and
-  underscores; surrounding spaces don't count. Anything else is a string, never
+  if written there: a number (in TOML, an integer, with its bases and underscores),
+  `true`, `false`, or JSON's `null`; surrounding spaces don't count. Anything else is a string, never
   structure, so a numeric field rejects it. A placeholder glued to other text outside
   quotes (`54${P}`, `${A}${B}`) fails the load: quote it.
 - **In a key**, a value is that one key: a dot in it does not reach into another table.

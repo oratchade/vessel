@@ -490,15 +490,12 @@ func jsonScalar(val string) any {
 	return val
 }
 
-// tomlScalar is jsonScalar for TOML: an integer (with TOML's bases and underscores), a
-// float, inf, nan, true or false.
+// tomlScalar is jsonScalar for TOML: an integer, with TOML's bases and underscores, true
+// or false. ponytail: no float, as no config field is one; add it with the first.
 func tomlScalar(val string) any {
 	trimmed := strings.Trim(val, " \t\r\n")
 	if i, err := strconv.ParseInt(trimmed, 0, 64); err == nil {
 		return i
-	}
-	if f, err := strconv.ParseFloat(trimmed, 64); err == nil {
-		return f
 	}
 	if b, ok := boolLiteral(trimmed); ok {
 		return b
