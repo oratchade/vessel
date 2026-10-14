@@ -12,27 +12,35 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 - **A substituted config value can no longer change how the file parses (#85).**
   `${VAR}` was expanded in the file's raw text before parsing, so a value was pasted in
   as syntax: a password beginning with `*` was read as a YAML alias, one with `"` broke
-  a JSON or TOML string, and the manager failed to start with a valid credential. YAML
-  is now parsed with an inert token standing in for each placeholder, so placeholders
-  still work in flow collections, anchors and keys, and each value then goes into the
-  value that held it, an unquoted value typed from what it expands to (ports and durations still decode) and a quoted one always a string.
-  JSON and TOML are expanded by where each placeholder sits: escaped in a double-quoted
-  string, as they are in a TOML single-quoted string (which reads no escapes, so
-  escaping changed a password with a backslash), and only a plain number, boolean or
-  date outside quotes. **A value that cannot sit where its placeholder is now fails the
-  load** instead of loading as something else: a `'` or a line break in a TOML
-  single-quoted string ended it early, and a value outside quotes became syntax. A
-  placeholder in a TOML comment is no longer expanded. A decoder error on a
-  line holding a substituted value now names the placeholder instead of quoting what it
-  read: decoders quote part of a value they reject (YAML its first seven characters,
-  TOML its first character), and that could be a secret. Other load errors replace every
-  substituted value with `[REDACTED]`. They no longer wrap the decoder's error either, since a TOML
-  decode error kept the expanded source, secrets included. A value that is not valid
-  UTF-8 now fails the load, naming its variable: JSON and TOML escaping turned its bytes
-  into U+FFFD, connecting with a different credential. A non-empty value that YAML would read as null, such as
-  `null` or `~`, now arrives as that string rather than empty. **A YAML value can no
-  longer inject structure:** a placeholder expanding to a list or a map (`[a, b]`) is
-  now that text, a string, not the list.
+  a JSON or TOML string, and the manager failed to start with a valid credential.
+  - **YAML** is parsed with an inert token standing in for each value from the
+    environment, so placeholders still work in flow collections, anchors and keys. Each
+    value then goes into the value that held it: an unquoted one typed from what it
+    expands to (ports and durations still decode), a quoted one always a string.
+  - **JSON and TOML** are expanded by where each placeholder sits: escaped in a
+    double-quoted string, as it is in a TOML single-quoted string (which reads no
+    escapes), and only a plain number, boolean or date outside quotes.
+  - **Defaults** are part of the file, so they still go in as written, in every format.
+  - **Load errors never carry a substituted value.** A decoder error on a line holding
+    one names the placeholder instead (`line 4: the value of ${DB_PORT} is not valid
+    here`): decoders quote part of a value they reject, YAML up to its first seven
+    characters, TOML its first. Other errors have each value replaced with
+    `[REDACTED]`, and the decoder's own error is no longer wrapped, since a TOML decode
+    error kept the expanded source.
+
+  Behaviour changes:
+
+  - **A value that cannot sit where its placeholder is now fails the load** instead of
+    loading as something else: a `'` or a line break in a TOML single-quoted string
+    ended it early, and a value outside quotes became syntax. The error names the
+    placeholder and says to quote it.
+  - **A value that is not valid UTF-8 fails the load**, naming its variable. JSON and
+    TOML escaping turned its bytes into U+FFFD, connecting with another credential.
+  - **A YAML value can no longer inject structure:** a placeholder expanding to a list
+    or a map (`[a, b]`) is now that text, a string, not the list.
+  - A non-empty value that YAML would read as null, such as `null` or `~`, now arrives
+    as that string rather than empty.
+  - A placeholder in a TOML comment is no longer expanded.
 
 ## [0.4.0] - 2026-10-12
 
