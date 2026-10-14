@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"bytes"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -12,6 +13,7 @@ import (
 	"strings"
 	"unicode/utf8"
 
+	"github.com/pelletier/go-toml/v2"
 	"gopkg.in/yaml.v3"
 )
 
@@ -170,7 +172,7 @@ func (r *envResolver) expand(match []byte) (val string, fromSource bool) {
 // a string. A value that would read as null stays a string too, unless empty: a
 // password "null" is a password.
 func decodeYAML(data []byte, resolver *envResolver, out any) error {
-	tokens := &yamlTokens{byToken: map[string]yamlPlaceholder{}}
+	tokens := &yamlTokens{byToken: map[string]yamlPlaceholder{}, lines: map[int][]string{}}
 	if resolver.hasAnySource() {
 		data = tokens.replace(data, resolver)
 	}
@@ -183,20 +185,52 @@ func decodeYAML(data []byte, resolver *envResolver, out any) error {
 	}
 	tokens.expand(&root)
 	if err := root.Decode(out); err != nil {
-		return fmt.Errorf("decode yaml: %w", err)
+		return fmt.Errorf("decode yaml: %w", withholdYAML(err, tokens.lines))
 	}
 	return nil
+}
+
+// withholdYAML replaces each message of a YAML type error that points at a line holding
+// a substituted value: the decoder quotes up to seven characters of what it rejects,
+// wherever the value sits in it.
+func withholdYAML(err error, lines map[int][]string) error {
+	var typeErr *yaml.TypeError
+	if !errors.As(err, &typeErr) {
+		return err
+	}
+	for i, msg := range typeErr.Errors {
+		var line int
+		if _, scanErr := fmt.Sscanf(msg, "line %d:", &line); scanErr == nil && len(lines[line]) > 0 {
+			typeErr.Errors[i] = withheld(line, lines[line])
+		}
+	}
+	return err
+}
+
+// withheld is the message for a decoder error on a line holding the values of
+// placeholders, which names them instead of quoting what the decoder read.
+func withheld(line int, placeholders []string) string {
+	return fmt.Sprintf("line %d: the value of %s is not valid here", line, strings.Join(placeholders, ", "))
+}
+
+// addLine records that line holds the value of placeholder.
+func addLine(lines map[int][]string, line int, placeholder string) {
+	if !slices.Contains(lines[line], placeholder) {
+		lines[line] = append(lines[line], placeholder)
+	}
 }
 
 // yamlTokens maps the tokens standing in for placeholders while YAML parses a file.
 type yamlTokens struct {
 	re      *regexp.Regexp // matches a token; nil when no placeholder was replaced
 	byToken map[string]yamlPlaceholder
+	lines   map[int][]string // placeholders whose value from a source sits on each line
 }
 
 type yamlPlaceholder struct {
-	text string // as written, for error messages
-	val  string // what it expands to
+	text       string // as written, for error messages
+	val        string // what it expands to
+	fromSource bool
 }
 
 // replace swaps each placeholder in data for a token of letters and digits that data
@@ -214,8 +248,8 @@ func (t *yamlTokens) replace(data []byte, resolver *envResolver) []byte {
 		if !ok {
 			token = fmt.Sprintf("%s%06d", prefix, len(byText))
 			byText[string(match)] = token
-			val, _ := resolver.expand(match)
-			t.byToken[token] = yamlPlaceholder{text: string(match), val: val}
+			val, fromSource := resolver.expand(match)
+			t.byToken[token] = yamlPlaceholder{text: string(match), val: val, fromSource: fromSource}
 		}
 		return []byte(token)
 	})
@@ -237,7 +271,13 @@ func (t *yamlTokens) expand(n *yaml.Node) {
 	if t.re == nil || n.Kind != yaml.ScalarNode || !t.re.MatchString(n.Value) {
 		return
 	}
-	n.Value = t.re.ReplaceAllStringFunc(n.Value, func(token string) string { return t.byToken[token].val })
+	n.Value = t.re.ReplaceAllStringFunc(n.Value, func(token string) string {
+		placeholder := t.byToken[token]
+		if placeholder.fromSource {
+			addLine(t.lines, n.Line, placeholder.text)
+		}
+		return placeholder.val
+	})
 	if n.Style == 0 {
 		n.Tag = ""
 		if n.ShortTag() == "!!null" && n.Value != "" {
@@ -255,13 +295,14 @@ func (t *yamlTokens) expand(n *yaml.Node) {
 //   - in a TOML comment, the placeholder stays as written.
 //
 // A default goes in as written: it is already in the file's syntax.
-func expandInText(data []byte, resolver *envResolver, isTOML bool) ([]byte, error) {
+func expandInText(data []byte, resolver *envResolver, isTOML bool) ([]byte, map[int][]string, error) {
+	lines := map[int][]string{} // placeholders whose value from a source sits on each line
 	if !resolver.hasAnySource() {
-		return data, nil
+		return data, lines, nil
 	}
 	var out bytes.Buffer
 	matches := envVarRe.FindAllIndex(data, -1)
-	at := outside
+	at, line := outside, 1
 	for i := 0; i < len(data); {
 		for len(matches) > 0 && matches[0][0] < i {
 			matches = matches[1:] // began inside an escape sequence: not a placeholder
@@ -269,9 +310,13 @@ func expandInText(data []byte, resolver *envResolver, isTOML bool) ([]byte, erro
 		if len(matches) > 0 && matches[0][0] == i {
 			// TOML drops a newline right after a multi-line string's opening quotes.
 			opened := bytes.HasSuffix(out.Bytes(), []byte("'''"))
-			val, err := expandAt(at, opened, data[i:matches[0][1]], resolver)
+			match := data[i:matches[0][1]]
+			val, fromSource, err := expandAt(at, opened, match, resolver)
 			if err != nil {
-				return nil, err
+				return nil, nil, err
+			}
+			if fromSource {
+				addLine(lines, line, string(match))
 			}
 			out.WriteString(val)
 			i, matches = matches[0][1], matches[1:]
@@ -279,9 +324,53 @@ func expandInText(data []byte, resolver *envResolver, isTOML bool) ([]byte, erro
 		}
 		n, next := scan(at, data[i:], isTOML)
 		out.Write(data[i : i+n])
+		line += bytes.Count(data[i:i+n], []byte("\n"))
 		i, at = i+n, next
 	}
-	return out.Bytes(), nil
+	return out.Bytes(), lines, nil
+}
+
+// decodeText expands a JSON or TOML file and decodes it into out. On a line holding a
+// substituted value, the decoder's error gives way to one naming the placeholder:
+// TOML quotes the first character of a value it rejects, either decoder a number.
+func decodeText(data []byte, resolver *envResolver, isTOML bool, out any) error {
+	expanded, lines, err := expandInText(data, resolver, isTOML)
+	if err != nil {
+		return err
+	}
+	if isTOML {
+		err = toml.Unmarshal(expanded, out)
+	} else {
+		err = json.Unmarshal(expanded, out)
+	}
+	if err == nil {
+		return nil
+	}
+	if line := errorLine(err, expanded); len(lines[line]) > 0 {
+		return errors.New(withheld(line, lines[line]))
+	}
+	return fmt.Errorf("decode: %w", err)
+}
+
+// errorLine is the line a JSON or TOML decoder's error points at, or 0 if none.
+func errorLine(err error, data []byte) int {
+	var tomlErr *toml.DecodeError
+	if errors.As(err, &tomlErr) {
+		row, _ := tomlErr.Position()
+		return row
+	}
+	var syntaxErr *json.SyntaxError
+	var typeErr *json.UnmarshalTypeError
+	var offset int64
+	switch {
+	case errors.As(err, &syntaxErr):
+		offset = syntaxErr.Offset
+	case errors.As(err, &typeErr):
+		offset = typeErr.Offset
+	default:
+		return 0
+	}
+	return 1 + bytes.Count(data[:min(int(offset), len(data))], []byte("\n"))
 }
 
 // textPlace is where a byte of a JSON or TOML file sits.
@@ -299,21 +388,21 @@ const (
 // plainValue is what a value outside quotes may be: a number, a boolean or a date.
 var plainValue = regexp.MustCompile(`^[A-Za-z0-9_.:+-]+$`)
 
-func expandAt(at textPlace, opened bool, match []byte, resolver *envResolver) (string, error) {
+func expandAt(at textPlace, opened bool, match []byte, resolver *envResolver) (string, bool, error) {
 	if at == comment {
-		return string(match), nil
+		return string(match), false, nil
 	}
 	val, fromSource := resolver.expand(match)
 	if !fromSource {
-		return val, nil
+		return val, false, nil
 	}
 	if at == basicString || at == multiBasicString {
-		return escapeQuoted(val), nil
+		return escapeQuoted(val), true, nil
 	}
 	if why := unfit(at, opened, val); why != "" {
-		return "", fmt.Errorf("%s sits %s", match, why)
+		return "", true, fmt.Errorf("%s sits %s", match, why)
 	}
-	return val, nil
+	return val, true, nil
 }
 
 // unfit says why val cannot go in as it is at place at, or "" when it can. opened is

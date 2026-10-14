@@ -22,9 +22,11 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
   date outside quotes. **A value that cannot sit where its placeholder is now fails the
   load** instead of loading as something else: a `'` or a line break in a TOML
   single-quoted string ended it early, and a value outside quotes became syntax. A
-  placeholder in a TOML comment is no longer expanded. Load errors replace every
-  substituted value with `[REDACTED]`: the YAML decoder quoted the text it rejected,
-  which could be a secret. They no longer wrap the decoder's error either, since a TOML
+  placeholder in a TOML comment is no longer expanded. A decoder error on a
+  line holding a substituted value now names the placeholder instead of quoting what it
+  read: decoders quote part of a value they reject (YAML its first seven characters,
+  TOML its first character), and that could be a secret. Other load errors replace every
+  substituted value with `[REDACTED]`. They no longer wrap the decoder's error either, since a TOML
   decode error kept the expanded source, secrets included. A value that is not valid
   UTF-8 now fails the load, naming its variable: JSON and TOML escaping turned its bytes
   into U+FFFD, connecting with a different credential. A non-empty value that YAML would read as null, such as

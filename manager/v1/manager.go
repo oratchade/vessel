@@ -2,15 +2,12 @@ package v1
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
 	"time"
-
-	"github.com/pelletier/go-toml/v2"
 
 	db "tounilab.com/vessel/db/v1"
 	"tounilab.com/vessel/manager/v1/config"
@@ -404,19 +401,13 @@ func loadConfig(path string, envOpts []EnvOption) (*config.ManagerConfig, error)
 
 	switch ext {
 	case ".json":
-		var expanded []byte
-		if expanded, err = expandInText(data, resolver, false); err == nil {
-			err = json.Unmarshal(expanded, cfg)
-		}
+		err = decodeText(data, resolver, false, cfg)
 
 	case ".yaml", ".yml":
 		err = decodeYAML(data, resolver, cfg)
 
 	case ".toml":
-		var expanded []byte
-		if expanded, err = expandInText(data, resolver, true); err == nil {
-			err = toml.Unmarshal(expanded, cfg)
-		}
+		err = decodeText(data, resolver, true, cfg)
 
 	default:
 		return nil, fmt.Errorf("loadConfig: unsupported file extension: %s", ext)

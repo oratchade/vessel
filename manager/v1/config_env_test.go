@@ -413,3 +413,44 @@ func TestLoadConfig_RefusesAValueItsPlaceCannotHold(t *testing.T) {
 		})
 	}
 }
+
+// TestLoadConfig_ErrorsWithholdTheDecoderOnASubstitutedLine puts a value where the
+// decoder rejects it. Decoders quote part of what they reject: YAML its first seven
+// characters, TOML its first character, JSON a whole number. Redacting the value
+// misses a part of it, so the message for that line names the placeholder instead.
+func TestLoadConfig_ErrorsWithholdTheDecoderOnASubstitutedLine(t *testing.T) {
+	const pg = `
+entries:
+  - name: primary
+    type: readwrite
+    postgres: {user: app, password: x, host: localhost, port: 5432, database: app}
+`
+	cases := map[string]struct {
+		name, content, value, quoted string
+	}{
+		"YAML, value first":    {"config.yaml", "read_workers: ${SECRET}\n" + pg, "abcdefghijk-secret", "abcdefg"},
+		"YAML, value inside":   {"config.yaml", "read_workers: x-${SECRET}\n" + pg, "abcdefghijk-secret", "abcde"},
+		"TOML, first character": {"config.toml", tomlWith(`password = "x"`, "${SECRET}"), "hunter2xyz", "'h'"},
+		"TOML, whole number":    {"config.toml", tomlWith(`password = "x"`, "${SECRET}"), "99999999", "99999999"},
+		"JSON, whole number": {"config.json", `{"entries": [{"name": "primary", "type": "readwrite",
+  "postgres": {"user": "app", "password": "x", "host": "localhost", "port": ${SECRET}, "database": "app"}}]}`,
+			"99999999", "99999999"},
+	}
+	for name, c := range cases {
+		t.Run(name, func(t *testing.T) {
+			path := writeConfig(t, c.name, c.content)
+			_, err := mgr.LoadConfigForTest(path, []mgr.EnvOption{
+				mgr.WithEnvVars(map[string]string{"SECRET": c.value}),
+			})
+			if err == nil {
+				t.Fatal("load succeeded")
+			}
+			if leaks(err, c.quoted) {
+				t.Errorf("error quotes part of the value: %v", err)
+			}
+			if !strings.Contains(err.Error(), "${SECRET}") {
+				t.Errorf("error does not name the placeholder: %v", err)
+			}
+		})
+	}
+}
