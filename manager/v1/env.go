@@ -2,11 +2,16 @@ package v1
 
 import (
 	"bufio"
+	"encoding/json"
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
 	"regexp"
+	"slices"
 	"strings"
+
+	"gopkg.in/yaml.v3"
 )
 
 // envVarRe matches ${VAR} and ${VAR:default} patterns.
@@ -31,6 +36,8 @@ type envResolver struct {
 	prefixes []string
 	// File-scoped vars (loaded from .env files)
 	fileVars map[string]string
+	// Values expansion took from the sources above, redacted from load errors
+	substituted []string
 }
 
 // WithEnvVars provides an explicit set of variables for expansion.
@@ -141,6 +148,12 @@ func (r *envResolver) hasAnySource() bool {
 //   - ${VAR:default} with var not found → replaced with default
 //   - ${VAR:} with var not found → replaced with empty string
 func expandEnvVars(data []byte, resolver *envResolver) []byte {
+	return expandEnvVarsWith(data, resolver, func(val string) string { return val })
+}
+
+// expandEnvVarsWith is expandEnvVars with each value found in a source passed
+// through encode. A default goes in as written: it is already in the file's syntax.
+func expandEnvVarsWith(data []byte, resolver *envResolver, encode func(string) string) []byte {
 	if resolver == nil || !resolver.hasAnySource() {
 		return data
 	}
@@ -152,13 +165,90 @@ func expandEnvVars(data []byte, resolver *envResolver) []byte {
 		defaultVal := parts[2]
 
 		if val, ok := resolver.lookup(key); ok {
-			return []byte(val)
+			resolver.substituted = append(resolver.substituted, val)
+			return []byte(encode(val))
 		}
 		if hasDefault {
 			return defaultVal
 		}
 		return match // no source, no default → leave as-is
 	})
+}
+
+// decodeYAML parses data first and expands ${VAR} inside each scalar, so a value can
+// never become YAML syntax: an alias, an anchor, a comment, a key (#85). An unquoted
+// scalar is then typed from its expanded text, as if written there, so a port or a
+// duration still decodes; a quoted one stays a string. A value that would read as
+// null stays a string too, unless empty: a password "null" is a password.
+func decodeYAML(data []byte, resolver *envResolver, out any) error {
+	var root yaml.Node
+	if err := yaml.Unmarshal(data, &root); err != nil {
+		return fmt.Errorf("parse yaml: %w", err)
+	}
+	if root.Kind == 0 {
+		return nil // an empty file, which yaml.Unmarshal into a struct also accepts
+	}
+	if resolver.hasAnySource() {
+		expandYAMLNode(&root, resolver)
+	}
+	if err := root.Decode(out); err != nil {
+		return fmt.Errorf("decode yaml: %w", err)
+	}
+	return nil
+}
+
+func expandYAMLNode(n *yaml.Node, resolver *envResolver) {
+	for _, child := range n.Content {
+		expandYAMLNode(child, resolver)
+	}
+	if n.Kind != yaml.ScalarNode {
+		return
+	}
+	expanded := string(expandEnvVars([]byte(n.Value), resolver))
+	if expanded == n.Value {
+		return
+	}
+	n.Value = expanded
+	if n.Style == 0 {
+		n.Tag = ""
+		if n.ShortTag() == "!!null" && expanded != "" {
+			n.Tag = "!!str"
+		}
+	}
+}
+
+// escapeQuoted escapes val for a double-quoted JSON or TOML string, which read the
+// same escapes, so the value cannot end the string. A value substituted outside
+// quotes, like a port, has nothing to escape. A TOML single-quoted string reads no
+// escapes, so a value placed there arrives escaped: use double quotes.
+func escapeQuoted(val string) string {
+	var b strings.Builder
+	enc := json.NewEncoder(&b)
+	enc.SetEscapeHTML(false)
+	_ = enc.Encode(val) // a string always encodes
+	quoted := strings.TrimSuffix(b.String(), "\n")
+	// JSON leaves DEL as it is; TOML requires it escaped.
+	return strings.ReplaceAll(quoted[1:len(quoted)-1], "\x7f", `\u007f`)
+}
+
+// redact replaces each substituted value in err's message, longest first so a value
+// holding another is replaced whole: a decoder quotes the text it rejects, and that
+// text may be a secret (#85). It returns a new error rather than wrapping err, which
+// would hand the original message to errors.Unwrap. A short value can redact more
+// than itself; a message with too much redacted is the safe side.
+func redact(err error, values []string) error {
+	msg := err.Error()
+	sorted := slices.Clone(values)
+	slices.SortFunc(sorted, func(a, b string) int { return len(b) - len(a) })
+	for _, val := range sorted {
+		if val != "" {
+			msg = strings.ReplaceAll(msg, val, "[REDACTED]")
+		}
+	}
+	if msg == err.Error() {
+		return err
+	}
+	return errors.New(msg)
 }
 
 // stripQuotes removes surrounding single or double quotes from a value.

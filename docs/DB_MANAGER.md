@@ -81,6 +81,21 @@ Available options:
 For production secrets, prefer explicit values from your secret store via
 `WithEnvVars`. Avoid relying on `.env` files in deployed environments.
 
+A substituted value is only ever text, never syntax, so any password works as it is:
+
+- **YAML** is parsed first, and `${VAR}` is expanded inside each value. An unquoted
+  value is typed from what it expands to, as if written there: `port: ${DB_PORT:5432}`
+  is a number, `health_interval: ${HEALTH:30s}` a duration. A quoted one
+  (`user: "${DB_USER}"`) is always a string, and so is any non-empty value that would
+  otherwise read as null, such as `null` or `~`.
+- **JSON and TOML** are expanded as text, with each value escaped for a double-quoted
+  string. Write string placeholders inside double quotes (`"password": "${DB_PASSWORD}"`)
+  and numbers outside them (`"port": ${DB_PORT:5432}`). A TOML single-quoted string
+  reads no escapes, so a value with a quote, a backslash or a control character would
+  arrive escaped there.
+
+A load error never quotes a substituted value: each one is replaced with `[REDACTED]`.
+
 ## Lifecycle
 
 ```go

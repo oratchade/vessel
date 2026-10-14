@@ -10,7 +10,6 @@ import (
 	"time"
 
 	"github.com/pelletier/go-toml/v2"
-	"gopkg.in/yaml.v3"
 
 	db "tounilab.com/vessel/db/v1"
 	"tounilab.com/vessel/manager/v1/config"
@@ -395,28 +394,29 @@ func loadConfig(path string, envOpts []EnvOption) (*config.ManagerConfig, error)
 		return nil, fmt.Errorf("loadConfig: failed to read config file: %w", err)
 	}
 
-	// Expand ${VAR} and ${VAR:default} patterns if env options are provided
-	data = expandEnvVars(data, newEnvResolver(envOpts))
-
+	// ${VAR} and ${VAR:default} are expanded when env options are provided, so that a
+	// value is only ever text (#85): YAML after parsing, JSON and TOML escaped for a
+	// quoted string.
+	resolver := newEnvResolver(envOpts)
 	cfg := &config.ManagerConfig{}
 	ext := filepath.Ext(absPath)
 
 	switch ext {
 	case ".json":
-		err = json.Unmarshal(data, cfg)
+		err = json.Unmarshal(expandEnvVarsWith(data, resolver, escapeQuoted), cfg)
 
 	case ".yaml", ".yml":
-		err = yaml.Unmarshal(data, cfg)
+		err = decodeYAML(data, resolver, cfg)
 
 	case ".toml":
-		err = toml.Unmarshal(data, cfg)
+		err = toml.Unmarshal(expandEnvVarsWith(data, resolver, escapeQuoted), cfg)
 
 	default:
 		return nil, fmt.Errorf("loadConfig: unsupported file extension: %s", ext)
 	}
 
 	if err != nil {
-		return nil, fmt.Errorf("loadConfig: failed to load configuration: %w", err)
+		return nil, fmt.Errorf("loadConfig: failed to load configuration: %w", redact(err, resolver.substituted))
 	}
 
 	return cfg, nil

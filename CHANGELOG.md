@@ -5,6 +5,23 @@ All notable changes to Vessel are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Fixed
+
+- **A substituted config value can no longer change how the file parses (#85).**
+  `${VAR}` was expanded in the file's raw text before parsing, so a value was pasted in
+  as syntax: a password beginning with `*` was read as a YAML alias, one with `"` broke
+  a JSON or TOML string, and the manager failed to start with a valid credential. YAML
+  is now parsed first and expanded inside each value, an unquoted value typed from what
+  it expands to (ports and durations still decode) and a quoted one always a string.
+  JSON and TOML values are escaped for a double-quoted string. Load errors replace every
+  substituted value with `[REDACTED]`: the YAML decoder quoted the text it rejected,
+  which could be a secret. A non-empty value that YAML would read as null, such as
+  `null` or `~`, now arrives as that string rather than empty. **A YAML value can no
+  longer inject structure:** a placeholder expanding to a list or a map (`[a, b]`) is
+  now that text, a string, not the list.
+
 ## [0.4.0] - 2026-10-12
 
 ### Changed
