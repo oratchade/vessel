@@ -3,10 +3,10 @@
 package v1_test
 
 import (
-	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -191,13 +191,20 @@ func TestLoadConfig_ErrorsDoNotQuoteSubstitutedValues(t *testing.T) {
 // leaks reports whether err, or any error it wraps, hands out secret: through its
 // message, or through a String method such as a TOML decode error's source excerpt.
 func leaks(err error, secret string) bool {
-	for ; err != nil; err = errors.Unwrap(err) {
-		if strings.Contains(err.Error(), secret) {
-			return true
-		}
-		if s, ok := err.(fmt.Stringer); ok && strings.Contains(s.String(), secret) {
-			return true
-		}
+	if err == nil {
+		return false
+	}
+	if strings.Contains(err.Error(), secret) {
+		return true
+	}
+	if s, ok := err.(fmt.Stringer); ok && strings.Contains(s.String(), secret) {
+		return true
+	}
+	switch wrapped := err.(type) {
+	case interface{ Unwrap() error }:
+		return leaks(wrapped.Unwrap(), secret)
+	case interface{ Unwrap() []error }:
+		return slices.ContainsFunc(wrapped.Unwrap(), func(e error) bool { return leaks(e, secret) })
 	}
 	return false
 }
@@ -384,7 +391,7 @@ func TestLoadConfig_RefusesAValueItsPlaceCannotHold(t *testing.T) {
 	}{
 		"TOML literal string, quote":   {"config.toml", tomlWith(`password = '${DB_PASSWORD}'`, "5432"), "x' #"},
 		"TOML literal string, newline": {"config.toml", tomlWith(`password = '${DB_PASSWORD}'`, "5432"), "a\nb"},
-		"TOML multi-line literal":      {"config.toml", tomlWith(`password = '''${DB_PASSWORD}'''`, "5432"), "a'''b"},
+		"TOML multi-line literal":      {"config.toml", tomlWith(`password = '''${DB_PASSWORD}'''`, "5432"), "x''' #"},
 		// TOML drops a newline right after the opening quotes.
 		"TOML multi-line literal, leading newline": {
 			"config.toml", tomlWith(`password = '''${DB_PASSWORD}'''`, "5432"), "\nleading newline",
@@ -630,5 +637,103 @@ entries:
 	}
 	if leaks(err, "abc") || leaks(err, "def") {
 		t.Errorf("error quotes a substituted value: %v", err)
+	}
+}
+
+// TestLoadConfig_NoEnvOptionExpandsNothing: without an EnvOption a placeholder stays as
+// written, a default included, in every format (secure by default).
+func TestLoadConfig_NoEnvOptionExpandsNothing(t *testing.T) {
+	for name, content := range map[string]string{
+		"config.yaml": `
+entries:
+  - name: primary
+    type: readwrite
+    postgres: {user: "${DB_USER:app}", password: "${DB_PASSWORD}", host: localhost, port: 5432, database: app}
+`,
+		"config.json": `{"entries": [{"name": "primary", "type": "readwrite", "postgres": {"user": "${DB_USER:app}",
+  "password": "${DB_PASSWORD}", "host": "localhost", "port": 5432, "database": "app"}}]}`,
+		"config.toml": tomlWith(`password = "${DB_PASSWORD}"`+"\n"+`ssl_mode = "${DB_USER:app}"`, "5432"),
+	} {
+		t.Run(name, func(t *testing.T) {
+			path := writeConfig(t, name, content)
+			cfg, err := mgr.LoadConfigForTest(path, nil)
+			if err != nil {
+				t.Fatalf("load: %v", err)
+			}
+			pg := cfg.Entries[0].Postgres
+			defaulted := pg.User
+			if name == "config.toml" {
+				defaulted = pg.SSLMode
+			}
+			if pg.Password != "${DB_PASSWORD}" || defaulted != "${DB_USER:app}" {
+				t.Errorf("password, defaulted = %q, %q; want both placeholders as written", pg.Password, defaulted)
+			}
+		})
+	}
+}
+
+// TestLoadConfig_TextScannerFollowsQuotesAndEscapes puts a placeholder after the places
+// a scanner could lose track of the string it is in: an escaped quote, and a multi-line
+// string closed by more than three quotes. Lost, it would escape the value outside a
+// string, or paste it raw inside one.
+func TestLoadConfig_TextScannerFollowsQuotesAndEscapes(t *testing.T) {
+	const value = `x", "port": 1, "y": "`
+	cases := map[string]struct{ name, content string }{
+		"JSON escaped quote": {"config.json", `{"entries": [{"name": "primary", "type": "readwrite",
+  "postgres": {"user": "a\"b", "password": "${DB_PASSWORD}", "host": "localhost", "port": 5432, "database": "app"}}]}`},
+		"TOML escaped quote": {"config.toml", tomlWith(`ssl_mode = "a\"b"`+"\n"+`password = "${DB_PASSWORD}"`, "5432")},
+		// A closing run of four quotes ends the string after the fourth; a placeholder
+		// on the same line, in an inline table, must be read as in a string.
+		"TOML closing run of four double quotes": {
+			"config.toml", tomlWith(`extra = {a = """a"""", b = "${DB_PASSWORD}"}`+"\n"+`password = "${DB_PASSWORD}"`, "5432"),
+		},
+		"TOML closing run of four single quotes": {
+			"config.toml", tomlWith(`extra = {a = '''a'''', b = "${DB_PASSWORD}"}`+"\n"+`password = "${DB_PASSWORD}"`, "5432"),
+		},
+	}
+	for name, c := range cases {
+		t.Run(name, func(t *testing.T) {
+			path := writeConfig(t, c.name, c.content)
+			cfg, err := mgr.LoadConfigForTest(path, []mgr.EnvOption{
+				mgr.WithEnvVars(map[string]string{"DB_PASSWORD": value}),
+			})
+			if err != nil {
+				t.Fatalf("load: %v", err)
+			}
+			if pg := cfg.Entries[0].Postgres; pg.Password != value || pg.Port != 5432 {
+				t.Errorf("password, port = %q, %d; want %q, 5432", pg.Password, pg.Port, value)
+			}
+		})
+	}
+}
+
+// TestLoadConfig_YAMLParseErrorNamesThePlaceholder: a token never reaches a message.
+func TestLoadConfig_YAMLParseErrorNamesThePlaceholder(t *testing.T) {
+	path := writeConfig(t, "config.yaml", "pg: *${ANCHOR}\n")
+	_, err := mgr.LoadConfigForTest(path, []mgr.EnvOption{
+		mgr.WithEnvVars(map[string]string{"ANCHOR": "pg"}),
+	})
+	if err == nil || !strings.Contains(err.Error(), "${ANCHOR}") {
+		t.Errorf("error should name ${ANCHOR}: %v", err)
+	}
+}
+
+// TestLoadConfig_YAMLEmptyUnquotedValueIsNull: an empty value reads as null, as it would
+// written there, so a numeric field keeps its zero value.
+func TestLoadConfig_YAMLEmptyUnquotedValueIsNull(t *testing.T) {
+	path := writeConfig(t, "config.yaml", "read_workers: ${WORKERS}\n"+`
+entries:
+  - name: primary
+    type: readwrite
+    postgres: {user: app, password: x, host: localhost, port: 5432, database: app}
+`)
+	cfg, err := mgr.LoadConfigForTest(path, []mgr.EnvOption{
+		mgr.WithEnvVars(map[string]string{"WORKERS": ""}),
+	})
+	if err != nil {
+		t.Fatalf("load: %v", err)
+	}
+	if cfg.ReadWorkers != 0 {
+		t.Errorf("read_workers = %d, want 0", cfg.ReadWorkers)
 	}
 }
