@@ -1020,24 +1020,28 @@ func TestLoadConfig_KeyFromTheEnvironmentCannotRepeatAKey(t *testing.T) {
 // as returned, so the log lines must be redacted too.
 func TestNewDBManager_SetupLogsDoNotCarrySubstitutedValues(t *testing.T) {
 	const host = "secret-host-[::1"
-	path := writeConfig(t, "config.yaml", `
+	for _, entryType := range []string{"readonly", "readwrite"} {
+		t.Run(entryType, func(t *testing.T) {
+			path := writeConfig(t, "config.yaml", `
 entries:
   - name: primary
-    type: readwrite
+    type: `+entryType+`
     postgres: {user: app, password: x, host: "${DB_HOST}", port: 5432, database: app}
 `)
-	var logs strings.Builder
-	logger := db.NewSlogAdapter(slog.New(slog.NewTextHandler(&logs, nil)))
-	_, err := mgr.NewDBManager(t.Context(), path, logger,
-		mgr.WithEnvVars(map[string]string{"DB_HOST": host}))
-	if err == nil {
-		t.Fatal("NewDBManager accepted a host it cannot parse")
-	}
-	if !strings.Contains(logs.String(), "level=ERROR") {
-		t.Fatalf("no error was logged: %s", logs.String())
-	}
-	if strings.Contains(logs.String(), "secret-host") {
-		t.Errorf("a log line carries the substituted host:\n%s", logs.String())
+			var logs strings.Builder
+			logger := db.NewSlogAdapter(slog.New(slog.NewTextHandler(&logs, nil)))
+			_, err := mgr.NewDBManager(t.Context(), path, logger,
+				mgr.WithEnvVars(map[string]string{"DB_HOST": host}))
+			if err == nil {
+				t.Fatal("NewDBManager accepted a host it cannot parse")
+			}
+			if strings.Count(logs.String(), "level=ERROR") < 2 {
+				t.Fatalf("want the entry's and the manager's error lines:\n%s", logs.String())
+			}
+			if strings.Contains(logs.String(), "secret-host") {
+				t.Errorf("a log line carries the substituted host:\n%s", logs.String())
+			}
+		})
 	}
 }
 
