@@ -104,12 +104,13 @@ format's own library escapes them. Defaults are values too.
 
 A value that is not valid UTF-8 fails the load, naming the variable.
 
-A load, validation or setup error never quotes a substituted value, returned or logged. A decoder error at
-a YAML line or a JSON or TOML key holding one names the placeholder instead
-(`entries.postgres.port: the value of ${DB_PORT} is not valid here`), since decoders
-quote part of what they reject. Any other error has each value replaced with
-`[REDACTED]` and comes as a new error, not a wrapper: a driver's error, for one, keeps
-the connection string.
+A load, validation or setup error never quotes a substituted value, returned or
+logged. A decoder error at a YAML line or a JSON or TOML key holding one names the
+placeholder instead (`entries.postgres.port: the value of ${DB_PORT} is not valid
+here`), since decoders quote part of what they reject. Any other error has each value
+replaced with `[REDACTED]`, in every form a message can give it (trimmed, `%q`-escaped,
+or escaped in a connection string), and comes as a new error rather than a wrapper,
+since a driver's error can keep the connection string.
 
 ## Lifecycle
 

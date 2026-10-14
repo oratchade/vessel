@@ -8,6 +8,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"net/url"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -352,8 +353,13 @@ func decodeJSON(data []byte, resolver *envResolver, out any) error {
 	}
 	if err := json.Unmarshal(encoded, out); err != nil {
 		var typeErr *json.UnmarshalTypeError
-		if errors.As(err, &typeErr) && len(paths[typeErr.Field]) > 0 {
-			return errors.New(withheld(typeErr.Field, paths[typeErr.Field]))
+		if errors.As(err, &typeErr) {
+			// JSON matches a key to its field ignoring case, so PORT is the port.
+			for at, placeholders := range paths {
+				if strings.EqualFold(at, typeErr.Field) {
+					return errors.New(withheld(typeErr.Field, placeholders))
+				}
+			}
 		}
 		return wrapDecode("json", err)
 	}
@@ -545,7 +551,10 @@ func redactError(err error, substituted []string) error {
 // a secret (#85). A short value can redact more than itself; a message with too much
 // redacted is the safe side.
 func redact(msg string, values []string) string {
-	sorted := slices.Clone(values)
+	sorted := make([]string, 0, len(values))
+	for _, val := range values {
+		sorted = append(sorted, redactedForms(val)...)
+	}
 	slices.SortFunc(sorted, func(a, b string) int { return len(b) - len(a) })
 	for _, val := range sorted {
 		if val != "" {
@@ -553,6 +562,19 @@ func redact(msg string, values []string) string {
 		}
 	}
 	return msg
+}
+
+// redactedForms are the forms a value can take in a message: as the environment holds
+// it, trimmed as a decoder trims an unquoted value, escaped as %q prints it, and escaped
+// as a connection string's user, password or parameter.
+func redactedForms(val string) []string {
+	forms := make([]string, 0, 8)
+	for _, v := range []string{val, strings.TrimSpace(val)} {
+		quoted := strconv.Quote(v)
+		forms = append(forms, v, quoted[1:len(quoted)-1], url.User(v).String(), url.QueryEscape(v))
+	}
+	slices.Sort(forms)
+	return slices.Compact(forms)
 }
 
 // stripQuotes removes surrounding single or double quotes from a value.

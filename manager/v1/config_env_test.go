@@ -1040,3 +1040,55 @@ entries:
 		t.Errorf("a log line carries the substituted host:\n%s", logs.String())
 	}
 }
+
+// TestLoadConfig_WithholdsAJSONErrorAtACaseVariantKey: JSON matches a key to its field
+// ignoring case, so an error at PORT is the error at port.
+func TestLoadConfig_WithholdsAJSONErrorAtACaseVariantKey(t *testing.T) {
+	path := writeConfig(t, "config.json", `{"entries": [{"name": "primary", "type": "readwrite",
+  "postgres": {"user": "app", "password": "x", "host": "localhost", "PORT": ${SECRET}, "database": "app"}}]}`)
+	_, err := mgr.LoadConfigForTest(path, []mgr.EnvOption{
+		mgr.WithEnvVars(map[string]string{"SECRET": "123456789\n"}),
+	})
+	if err == nil || !strings.Contains(err.Error(), "${SECRET}") || leaks(err, "123456789") {
+		t.Errorf("error should name ${SECRET} and quote nothing of it: %v", err)
+	}
+}
+
+// TestNewDBManager_ErrorsDoNotCarryAValueAsDecodedOrEncoded: decoding trims an unquoted
+// value, a message quoting it escapes it, and a connection string URL-escapes it; each
+// form is redacted, not only the value as the environment holds it.
+func TestNewDBManager_ErrorsDoNotCarryAValueAsDecodedOrEncoded(t *testing.T) {
+	cases := map[string]struct {
+		postgres string
+		vars     map[string]string
+	}{
+		"entry name with a quote": {
+			"{user: app, password: x, host: localhost, port: 5432, database: app}",
+			map[string]string{"ENTRY": `secret"name`, "ENTRY_TYPE": "unknown"},
+		},
+		"entry name YAML trims": {
+			"{user: app, password: x, host: localhost, port: 5432, database: app}",
+			map[string]string{"ENTRY": " secretname\n", "ENTRY_TYPE": "unknown"},
+		},
+		"user in the connection string": {
+			`{user: "${DB_USER}", password: x, host: localhost, port: 5432, database: app, ssl_mode: invalid}`,
+			map[string]string{"ENTRY": "primary", "ENTRY_TYPE": "readwrite", "DB_USER": "secret user"},
+		},
+	}
+	for name, c := range cases {
+		t.Run(name, func(t *testing.T) {
+			path := writeConfig(t, "config.yaml", `
+entries:
+  - name: ${ENTRY}
+    type: ${ENTRY_TYPE}
+    postgres: `+c.postgres+"\n")
+			_, err := mgr.NewDBManager(t.Context(), path, nil, mgr.WithEnvVars(c.vars))
+			if err == nil {
+				t.Fatal("NewDBManager succeeded")
+			}
+			if leaks(err, "secret") {
+				t.Errorf("error carries a form of a substituted value: %v", err)
+			}
+		})
+	}
+}
