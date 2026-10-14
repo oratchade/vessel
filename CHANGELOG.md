@@ -39,16 +39,19 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
   - **A default is a value too.** Escapes in it are no longer read (`"${X:a\tb}"` gives a
     backslash and a `t`), and it cannot hold syntax, such as a quote that opens a string
     for the next placeholder.
-  - **Placeholders glued to other text outside quotes fail the load** (`54${P}`,
-    `${A}${B}`): quote them.
+  - **In JSON and TOML, placeholders glued to other text outside quotes fail the load**
+    (`54${P}`, `${A}${B}`): quote them. In YAML that text is a plain scalar, typed as
+    a whole.
   - **A value can no longer inject structure.** A value expanding to `[a, b]` is that
-    text, a string; outside quotes in JSON or TOML, a value that is not a number,
-    boolean or null is a string, which a numeric field rejects; a key from the
+    text, a string; outside quotes, a value that is not a JSON number, boolean or null,
+    or a TOML integer or boolean, is a string, which a numeric field rejects; a key from the
     environment is one key, so a dot in it no longer reaches into another table.
   - **A value that is not valid UTF-8 fails the load**, naming its variable, instead of
     reaching the database with its bytes replaced.
   - A YAML alias must repeat its anchor's placeholder as written (`&${A}` … `*${A}`), and
     a placeholder in a YAML tag fails the load.
+  - In JSON, two keys equal but for case, which the decoder matches to one field, now
+    resolve in sorted order rather than the order written, once any EnvOption is set.
   - A non-empty value that YAML would read as null, such as `null` or `~`, now arrives
     as that string rather than empty.
   - A placeholder in a comment is no longer expanded.

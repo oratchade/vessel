@@ -460,8 +460,8 @@ func (p *placeholders) expandMap(
 	return out, nil
 }
 
-// expandBare puts a value in place of a bare token: a number, a boolean or a date
-// otherwise.
+// expandBare puts a value in place of a bare token, typed by scalar; any other bare
+// value is left as it is.
 func (p *placeholders) expandBare(v any, path string, paths map[string][]string, scalar func(string) any) (any, error) {
 	text := fmt.Sprint(v)
 	token := p.token.FindString(text)
