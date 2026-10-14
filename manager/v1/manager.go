@@ -103,6 +103,9 @@ type Query struct {
 	Data       *QueryData
 	ResponseCh chan *QueryResponse
 
+	// ctx is the caller's context, set when the query is enqueued: the query runs in
+	// a context derived from it, so the caller's cancellation reaches the driver (#82).
+	ctx     context.Context
 	handoff *responseHandoff
 }
 
@@ -191,6 +194,7 @@ func (dm *DBManager) awaitRawRows(ctx context.Context, operation string, q *Quer
 		q.handoff.abandon(responseCh)
 		return nil, err
 	}
+	q.handoff.accept()
 	return extractRawDataFromResponse(resp)
 }
 

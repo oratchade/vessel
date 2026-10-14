@@ -111,8 +111,12 @@ Selection is health-aware:
 4. If every entry in a category is unhealthy, fall back to all entries by
    priority so the caller receives the real database error.
 
-Health checks call `Ping()` periodically. An entry is marked unhealthy after
-five consecutive failures and healthy again after the next successful ping.
+Health checks call `Ping()` at each entry's health interval. An entry is marked
+unhealthy after five consecutive failures and healthy again after the next
+successful ping. Each ping is bounded by the interval: a ping slower than that
+counts as a failure, even when the driver ignores cancellation, and no new ping
+starts while one is still outstanding. A database that stalls without closing
+its connections therefore turns unhealthy too.
 
 Use exported health methods:
 
@@ -179,7 +183,14 @@ err := dm.WithTransaction(ctx, "primary", func(tx db.Tx) error {
 ## Synchronous API
 
 The synchronous methods block until the queued operation returns or the context
-is canceled.
+is canceled. The context governs the query itself, not only the wait: a query
+runs in a context derived from the caller's, so cancelling it, or reaching its
+deadline, cancels the statement in the database. A caller with no deadline gets
+the 30-second default, which then bounds the query too. A query whose caller
+gave up while it waited in the queue is not run. To keep work running after its
+caller's context ends, detach it with `context.WithoutCancel`. Batched inserts
+are the exception: one batch carries several callers' rows, so it runs with the
+worker's context and no single caller cancels it.
 
 ```go
 rows, err := dm.Get(
@@ -236,9 +247,14 @@ Supported synchronous methods:
 `*db.RowsAdapter`. Use `ScanRowsTo`, `ScanAll`, `ScanOne`, or close the rows
 manually.
 
+These rows keep their query's context alive until they are closed, because the
+driver reads them under it: read and close them while that context lasts.
+`RowsAdapter.OnClose(f)` registers a function to run once they are closed; every
+function registered runs, so it never replaces the manager's own cleanup.
+
 If the caller's context is cancelled, or the default timeout expires, before the
-rows arrive, these methods return the context error and the manager closes the
-rows when they do arrive, so their connection goes back to the pool. Their async
+rows arrive, these methods cancel the query, return the context error, and close
+the rows if they still arrive, so their connection goes back to the pool. Their async
 variants (`GetRawAsync`, `GetByIDRawAsync`, `QueryRawAsync`,
 `ExecReturningAsync`) hand the response to the caller, who must close `RawData`.
 
