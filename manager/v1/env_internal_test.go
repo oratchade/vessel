@@ -27,3 +27,13 @@ func TestRedactingLogger_RedactsEveryPart(t *testing.T) {
 		t.Errorf("want every part of every line redacted:\n%s", logs.String())
 	}
 }
+
+// TestWithoutIndices: Go 1.27 writes array indices into a JSON type error's field path,
+// earlier releases do not; both must match the path recorded for a placeholder.
+func TestWithoutIndices(t *testing.T) {
+	for _, field := range []string{"entries.postgres.port", "entries.0.postgres.port", "entries.12.postgres.port"} {
+		if got := withoutIndices(field); got != "entries.postgres.port" {
+			t.Errorf("withoutIndices(%q) = %q, want entries.postgres.port", field, got)
+		}
+	}
+}
