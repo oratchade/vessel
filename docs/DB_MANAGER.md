@@ -118,8 +118,8 @@ error rather than a wrapper, since a driver's error can keep the connection stri
 
 Once anything was substituted, every line the manager logs is redacted the same way for
 its lifetime, including what the drivers and entries log through it, such as a failed
-ping naming the connection's user. Numbers in log fields are left as they are, and the
-trace spans the drivers record are not redacted.
+ping naming the connection's user, in every kind of field. The trace spans the drivers
+record are not redacted.
 
 ## Lifecycle
 

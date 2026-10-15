@@ -9,6 +9,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"log/slog"
 	"net/url"
 	"os"
 	"path/filepath"
@@ -692,8 +693,7 @@ func redact(msg string, forms []string) string {
 
 // redactingLogger redacts the substituted values from every message and field it logs.
 // The manager hands its logger to the drivers and entries, which log their own errors,
-// a connection's user and an entry's name, for as long as the manager runs. Numbers
-// are left as they are.
+// a connection's user and an entry's name, for as long as the manager runs.
 type redactingLogger struct {
 	logger db.Logger
 	forms  []string
@@ -719,23 +719,35 @@ func (l redactingLogger) With(fields ...any) db.Logger {
 	return redactingLogger{logger: l.logger.With(l.redactAll(fields)...), forms: l.forms}
 }
 
-// redactAll redacts each text argument; an error or a Stringer becomes its text,
-// redacted.
+// redactAll redacts each argument.
 func (l redactingLogger) redactAll(args []any) []any {
 	out := make([]any, len(args))
 	for i, arg := range args {
-		switch v := arg.(type) {
-		case string:
-			out[i] = redact(v, l.forms)
-		case error:
-			out[i] = redact(v.Error(), l.forms)
-		case fmt.Stringer:
-			out[i] = redact(v.String(), l.forms)
-		default:
-			out[i] = arg
-		}
+		out[i] = l.redactArg(arg)
 	}
 	return out
+}
+
+// redactArg redacts one argument. Text, bytes, an error or a Stringer become their text,
+// redacted; a slog.Attr keeps its key. Anything else is redacted as fmt prints it, and
+// kept as it is when that holds no value, so a number stays a number.
+func (l redactingLogger) redactArg(arg any) any {
+	switch v := arg.(type) {
+	case string:
+		return redact(v, l.forms)
+	case []byte:
+		return redact(string(v), l.forms)
+	case error:
+		return redact(v.Error(), l.forms)
+	case slog.Attr: // before fmt.Stringer, which it is
+		return slog.Any(v.Key, l.redactArg(v.Value.Any()))
+	case fmt.Stringer:
+		return redact(v.String(), l.forms)
+	}
+	if text := fmt.Sprint(arg); redact(text, l.forms) != text {
+		return redact(text, l.forms)
+	}
+	return arg
 }
 
 // redactedForms are the forms a value can take in a message: as the environment holds

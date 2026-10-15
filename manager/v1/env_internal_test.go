@@ -37,3 +37,20 @@ func TestWithoutIndices(t *testing.T) {
 		}
 	}
 }
+
+// TestRedactingLogger_RedactsEveryKindOfField: a field can hold bytes, a slice, a map or
+// a slog.Attr, whose key and value must stay paired.
+func TestRedactingLogger_RedactsEveryKindOfField(t *testing.T) {
+	var logs strings.Builder
+	logger := redactingLogger{
+		logger: db.NewSlogAdapter(slog.New(slog.NewJSONHandler(&logs, nil))),
+		forms:  redactions([]string{"s3cret"}),
+	}
+	logger.Info("connecting",
+		"bytes", []byte("s3cret"), "slice", []string{"s3cret"}, "map", map[string]string{"pw": "s3cret"},
+		slog.String("attr", "s3cret"), "port", 5432)
+	got := logs.String()
+	if strings.Contains(got, "s3cret") || strings.Contains(got, "BADKEY") || !strings.Contains(got, `"port":5432`) {
+		t.Errorf("want every field redacted, paired, numbers kept:\n%s", got)
+	}
+}
