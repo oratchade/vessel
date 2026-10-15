@@ -567,6 +567,90 @@ func TestLoadConfig_TOMLLineBreakAfterAQuoteIsKept(t *testing.T) {
 	}
 }
 
+// TestLoadConfig_DigitsBeforeAPlaceholderStayText: a file holding 700000000000 to
+// 700000000069 would push a token's prefix to 700000000070, whose 70 the 7000000000
+// written before a placeholder could complete into a token starting in that text.
+func TestLoadConfig_DigitsBeforeAPlaceholderStayText(t *testing.T) {
+	var taken strings.Builder
+	for i := range 70 {
+		fmt.Fprintf(&taken, "# %d\n", 700_000_000_000+i)
+	}
+	path := writeConfig(t, "config.yaml", taken.String()+`
+entries:
+  - name: primary
+    type: readwrite
+    postgres: {user: app, password: "7000000000${DB_PASSWORD}", host: localhost, port: 5432, database: app}
+`)
+	cfg, err := mgr.LoadConfigForTest(path, []mgr.EnvOption{
+		mgr.WithEnvVars(map[string]string{"DB_PASSWORD": "secret"}),
+	})
+	if err != nil {
+		t.Fatalf("load: %v", err)
+	}
+	if got := cfg.Entries[0].Postgres.Password; got != "7000000000secret" {
+		t.Errorf("password = %q, want 7000000000secret", got)
+	}
+}
+
+// TestLoadConfig_TextDecodingToATokenIsText: an escape or a TOML integer can spell a
+// token's digits without the file holding them as written; they stay what they are.
+// ${DB_PASSWORD} takes the first token, 700000000000000000.
+func TestLoadConfig_TextDecodingToATokenIsText(t *testing.T) {
+	cases := map[string]struct {
+		file, content, name string
+		priority            int
+	}{
+		"JSON escape, a token in use": {
+			"config.json", `{"entries": [{"name": "70000\u0030000000000000",
+  "type": "readwrite", "priority": 1,
+  "postgres": {"user": "app", "password": "${DB_PASSWORD}", "host": "localhost", "port": 5432, "database": "app"}}]}`,
+			"700000000000000000", 1,
+		},
+		"JSON escape, a token not in use": {
+			"config.json", `{"entries": [{"name": "70000\u0030000000000001",
+  "type": "readwrite", "priority": 1,
+  "postgres": {"user": "app", "password": "${DB_PASSWORD}", "host": "localhost", "port": 5432, "database": "app"}}]}`,
+			"700000000000000001", 1,
+		},
+		"YAML escape": {"config.yaml", `
+entries:
+  - name: "70000\x30000000000000"
+    type: readwrite
+    priority: 1
+    postgres: {user: app, password: "${DB_PASSWORD}", host: localhost, port: 5432, database: app}
+`, "700000000000000000", 1},
+		"TOML integer with underscores": {"config.toml", `
+[[entries]]
+name = "primary"
+type = "readwrite"
+priority = 700_000_000_000_000_000
+
+[entries.postgres]
+user = "app"
+password = "${DB_PASSWORD}"
+host = "localhost"
+port = 5432
+database = "app"
+`, "primary", 700_000_000_000_000_000},
+	}
+	for name, c := range cases {
+		t.Run(name, func(t *testing.T) {
+			path := writeConfig(t, c.file, c.content)
+			cfg, err := mgr.LoadConfigForTest(path, []mgr.EnvOption{
+				mgr.WithEnvVars(map[string]string{"DB_PASSWORD": "secret"}),
+			})
+			if err != nil {
+				t.Fatalf("load: %v", err)
+			}
+			e := cfg.Entries[0]
+			if e.Name != c.name || *e.Priority != c.priority || e.Postgres.Password != "secret" {
+				t.Errorf("name, priority, password = %q, %d, %q; want %q, %d, secret",
+					e.Name, *e.Priority, e.Postgres.Password, c.name, c.priority)
+			}
+		})
+	}
+}
+
 // TestLoadConfig_YAMLDefaultCannotForgeAToken: a default next to text that, together,
 // spell what a token looks like still loads as that text, never as another variable.
 func TestLoadConfig_YAMLDefaultCannotForgeAToken(t *testing.T) {
@@ -1127,8 +1211,8 @@ entries:
 	_, err := mgr.NewDBManager(t.Context(), path, nil, mgr.WithEnvVars(map[string]string{
 		"DB_USER": base64.StdEncoding.EncodeToString([]byte("decoded-secret")),
 	}))
-	if err == nil {
-		t.Fatal("NewDBManager accepted an invalid ssl_mode")
+	if err == nil || !strings.Contains(err.Error(), "sslmode is invalid") {
+		t.Fatalf("want the driver's error about ssl_mode: %v", err)
 	}
 	if leaks(err, "decoded-secret") {
 		t.Errorf("error carries the decoded value: %v", err)

@@ -174,15 +174,34 @@ func (r *envResolver) expand(match []byte) (val string, fromSource bool, err err
 // data afterwards, and an encoder, not this package, escapes them.
 type placeholders struct {
 	resolver *envResolver
-	token    *regexp.Regexp    // a token: a prefix the file does not contain, then six digits
+	token    *regexp.Regexp    // a token: a prefix the file neither holds nor decodes to, then six digits
 	byToken  map[string]string // token → the placeholder as written
 }
 
-// tokenize replaces each placeholder in data with a token. The same placeholder gets the
-// same token, so a YAML alias still names its anchor.
-func tokenize(data []byte, resolver *envResolver) ([]byte, *placeholders) {
-	prefix := 700_000_000_000 // twelve digits, so a token fits an int64 and has no leading zero
-	for bytes.Contains(data, []byte(strconv.Itoa(prefix))) {
+// tokenizeDecoded tokenizes data for parse, with a prefix that appears neither in data
+// nor in what parse decodes from it: an escape, or a TOML integer such as
+// 700_000_000_000_000_000, spells digits the file does not hold as written. So data is
+// parsed once with stand-in tokens first, from their own range, to see what it decodes.
+func tokenizeDecoded(
+	data []byte, resolver *envResolver, parse func([]byte) (any, error),
+) ([]byte, *placeholders, error) {
+	standIn, p := tokenize(data, resolver, 800_000_000_000, nil)
+	decoded, err := parse(standIn)
+	if err != nil {
+		return nil, p, err
+	}
+	tokenized, p := tokenize(data, resolver, 700_000_000_000, fmt.Append(nil, decoded))
+	return tokenized, p, nil
+}
+
+// tokenize replaces each placeholder in data with a token, the first prefix from start
+// that appears in neither data nor avoid, then six digits. The prefix holds its first
+// digit nowhere else, so text before a token cannot run into it to spell another. The
+// same placeholder gets the same token, so a YAML alias still names its anchor.
+func tokenize(data []byte, resolver *envResolver, start int, avoid []byte) ([]byte, *placeholders) {
+	prefix := start // twelve digits, so a token fits an int64 and has no leading zero
+	for text := strconv.Itoa(prefix); bytes.Contains(data, []byte(text)) || bytes.Contains(avoid, []byte(text)) ||
+		strings.Count(text, text[:1]) > 1; text = strconv.Itoa(prefix) {
 		prefix++
 	}
 	p := &placeholders{
@@ -242,7 +261,14 @@ func decodeYAML(data []byte, resolver *envResolver, out any) error {
 		}
 		return nil
 	}
-	tokenized, p := tokenize(data, resolver)
+	tokenized, p, err := tokenizeDecoded(data, resolver, func(standIn []byte) (any, error) {
+		var root yaml.Node
+		err := yaml.Unmarshal(standIn, &root)
+		return scalarTexts(&root), err
+	})
+	if err != nil {
+		return fmt.Errorf("parse yaml: %s", p.restore(err.Error()))
+	}
 	var root yaml.Node
 	if err := yaml.Unmarshal(tokenized, &root); err != nil {
 		return fmt.Errorf("parse yaml: %s", p.restore(err.Error()))
@@ -255,6 +281,16 @@ func decodeYAML(data []byte, resolver *envResolver, out any) error {
 		return fmt.Errorf("decode yaml: %w", withholdYAML(err, lines))
 	}
 	return nil
+}
+
+// scalarTexts lists the text of n and each node under it: what expandYAML reads, with
+// escapes decoded and no tag resolved, as a stand-in token is no value a tag accepts.
+func scalarTexts(n *yaml.Node) []string {
+	texts := append(make([]string, 0, 1+len(n.Content)), n.Value)
+	for _, child := range n.Content {
+		texts = append(texts, scalarTexts(child)...)
+	}
+	return texts
 }
 
 // expandYAML puts each placeholder's value into the scalars under n that hold its token,
@@ -341,15 +377,13 @@ func decodeJSON(data []byte, resolver *envResolver, out any) error {
 	if !resolver.hasAnySource() {
 		return wrapDecode("json", json.Unmarshal(data, out))
 	}
-	tokenized, p := tokenize(data, resolver)
-	dec := json.NewDecoder(bytes.NewReader(tokenized))
-	dec.UseNumber() // a token is a number too large for a float64
-	var tree any
-	if err := dec.Decode(&tree); err != nil {
-		return fmt.Errorf("parse json: %w", err)
+	tokenized, p, err := tokenizeDecoded(data, resolver, parseJSON)
+	if err != nil {
+		return err
 	}
-	if _, err := dec.Token(); !errors.Is(err, io.EOF) {
-		return errors.New("parse json: invalid character after top-level value")
+	tree, err := parseJSON(tokenized)
+	if err != nil {
+		return err
 	}
 	paths := map[string][]string{}
 	expanded, err := p.expandTree(tree, "", paths, jsonScalar)
@@ -386,15 +420,32 @@ func withoutIndices(field string) string {
 	}), ".")
 }
 
+// parseJSON parses one JSON value into a generic tree.
+func parseJSON(data []byte) (any, error) {
+	dec := json.NewDecoder(bytes.NewReader(data))
+	dec.UseNumber() // a token is a number too large for a float64
+	var tree any
+	if err := dec.Decode(&tree); err != nil {
+		return nil, fmt.Errorf("parse json: %w", err)
+	}
+	if _, err := dec.Token(); !errors.Is(err, io.EOF) {
+		return nil, errors.New("parse json: invalid character after top-level value")
+	}
+	return tree, nil
+}
+
 // decodeTOML is decodeJSON for TOML, written back by go-toml.
 func decodeTOML(data []byte, resolver *envResolver, out any) error {
 	if !resolver.hasAnySource() {
 		return wrapDecode("toml", toml.Unmarshal(data, out))
 	}
-	tokenized, p := tokenize(data, resolver)
-	var tree map[string]any
-	if err := toml.Unmarshal(tokenized, &tree); err != nil {
-		return fmt.Errorf("parse toml: %w", err)
+	tokenized, p, err := tokenizeDecoded(data, resolver, parseTOML)
+	if err != nil {
+		return err
+	}
+	tree, err := parseTOML(tokenized)
+	if err != nil {
+		return err
 	}
 	paths := map[string][]string{}
 	expanded, err := p.expandTree(tree, "", paths, tomlScalar)
@@ -415,6 +466,15 @@ func decodeTOML(data []byte, resolver *envResolver, out any) error {
 		return wrapDecode("toml", err)
 	}
 	return nil
+}
+
+// parseTOML parses a TOML document into a generic tree.
+func parseTOML(data []byte) (any, error) {
+	var tree map[string]any
+	if err := toml.Unmarshal(data, &tree); err != nil {
+		return nil, fmt.Errorf("parse toml: %w", err)
+	}
+	return tree, nil
 }
 
 func wrapDecode(format string, err error) error {
