@@ -1077,6 +1077,30 @@ func TestLoadConfig_TOMLBareValueFollowsTOMLIntegers(t *testing.T) {
 	}
 }
 
+// TestLoadConfig_KeysEqualButForCaseFail: JSON and TOML both match a key to its field
+// ignoring case, so of host and Host the last written wins; the generic tree the values
+// go into keeps no order, so neither may win.
+func TestLoadConfig_KeysEqualButForCaseFail(t *testing.T) {
+	for name, content := range map[string]string{
+		"config.toml": tomlWith(`password = "${DB_PASSWORD}"`+"\n"+`Host = "other.internal"`, "5432"),
+		"config.json": `{"entries": [{"name": "primary", "type": "readwrite", "postgres": {"user": "app",
+  "password": "${DB_PASSWORD}", "host": "localhost", "Host": "other.internal", "port": 5432, "database": "app"}}]}`,
+	} {
+		t.Run(name, func(t *testing.T) {
+			path := writeConfig(t, name, content)
+			cfg, err := mgr.LoadConfigForTest(path, []mgr.EnvOption{
+				mgr.WithEnvVars(map[string]string{"DB_PASSWORD": "secret"}),
+			})
+			if err == nil {
+				t.Fatalf("load succeeded, host = %q", cfg.Entries[0].Postgres.Host)
+			}
+			if !strings.Contains(err.Error(), "Host") || !strings.Contains(err.Error(), "host") {
+				t.Errorf("error should name both keys: %v", err)
+			}
+		})
+	}
+}
+
 // TestLoadConfig_KeyFromTheEnvironmentCannotRepeatAKey: two equal keys in parsed data
 // leave one value to chance, so a key from the environment that repeats another fails
 // the load, naming its placeholder.

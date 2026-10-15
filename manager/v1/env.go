@@ -523,10 +523,13 @@ func (p *placeholders) expandMap(
 		if err != nil {
 			return nil, err
 		}
-		// Map order is random, so of two equal keys either could win: refuse them.
-		if earlier, repeated := asWritten[key]; repeated {
-			return nil, fmt.Errorf("%s: keys %s and %s are the same key",
-				cmp.Or(path, "top level"), earlier, p.restore(written))
+		// JSON and TOML match a key to its field ignoring case, and map order is random,
+		// so of two keys naming one field either could win: refuse them.
+		for other, earlier := range asWritten {
+			if strings.EqualFold(other, key) {
+				return nil, fmt.Errorf("%s: keys %s and %s name the same field",
+					cmp.Or(path, "top level"), earlier, p.restore(written))
+			}
 		}
 		asWritten[key] = p.restore(written)
 		at := key

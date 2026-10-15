@@ -98,6 +98,8 @@ format's own library escapes them. Defaults are values too.
   structure, so a numeric field rejects it. A placeholder glued to other text outside
   quotes (`54${P}`, `${A}${B}`) fails the load: quote it.
 - **In a key**, a value is that one key: a dot in it does not reach into another table.
+  In JSON and TOML, two keys of one object that name the same field, equal or equal but
+  for case, fail the load.
 - **In YAML**, an anchor can be named by a placeholder if its alias repeats it as
   written (`&${A}` … `*${A}`). A placeholder in a tag fails the load. A placeholder in a
   comment is never expanded.

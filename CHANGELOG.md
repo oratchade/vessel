@@ -51,8 +51,9 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
     reaching the database with its bytes replaced.
   - A YAML alias must repeat its anchor's placeholder as written (`&${A}` … `*${A}`), and
     a placeholder in a YAML tag fails the load.
-  - In JSON, two keys equal but for case, which the decoder matches to one field, now
-    resolve in sorted order rather than the order written, once any EnvOption is set.
+  - In JSON and TOML, two keys equal but for case, which the decoder matches to one
+    field, now fail the load once any EnvOption is set, rather than the last one
+    written winning.
   - A non-empty value that YAML would read as null, such as `null` or `~`, now arrives
     as that string rather than empty.
   - A placeholder in a comment is no longer expanded.
