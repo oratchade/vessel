@@ -111,7 +111,7 @@ logged. A decoder error at a YAML line or a JSON or TOML key holding one names t
 placeholder instead (`entries.postgres.port: the value of ${DB_PORT} is not valid
 here`), since decoders quote part of what they reject. Any other error has each value
 replaced with `[REDACTED]`, in every form a message can give it (trimmed, `%q`-escaped,
-or escaped in a connection string), and comes as a new error rather than a wrapper,
+escaped in a connection string, or decoded by a YAML `!!binary` tag), and comes as a new error rather than a wrapper,
 since a driver's error can keep the connection string.
 
 ## Lifecycle

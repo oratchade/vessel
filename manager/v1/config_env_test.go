@@ -3,6 +3,7 @@
 package v1_test
 
 import (
+	"encoding/base64"
 	"errors"
 	"fmt"
 	"log/slog"
@@ -1110,5 +1111,26 @@ func TestLoadConfig_EmptyYAMLLoadsNothing(t *testing.T) {
 				t.Errorf("cfg, err = %+v, %v; want an empty config", cfg, err)
 			}
 		})
+	}
+}
+
+// TestNewDBManager_ErrorsDoNotCarryAValueDecodedByAYAMLTag: !!binary decodes its base64
+// text, so the driver receives a value the environment never held as such. The
+// PostgreSQL driver masks a password in its parse error, not a user.
+func TestNewDBManager_ErrorsDoNotCarryAValueDecodedByAYAMLTag(t *testing.T) {
+	path := writeConfig(t, "config.yaml", `
+entries:
+  - name: primary
+    type: readwrite
+    postgres: {user: !!binary "${DB_USER}", password: x, host: localhost, port: 5432, database: app, ssl_mode: invalid}
+`)
+	_, err := mgr.NewDBManager(t.Context(), path, nil, mgr.WithEnvVars(map[string]string{
+		"DB_USER": base64.StdEncoding.EncodeToString([]byte("decoded-secret")),
+	}))
+	if err == nil {
+		t.Fatal("NewDBManager accepted an invalid ssl_mode")
+	}
+	if leaks(err, "decoded-secret") {
+		t.Errorf("error carries the decoded value: %v", err)
 	}
 }

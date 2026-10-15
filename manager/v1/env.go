@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"bytes"
 	"cmp"
+	"encoding/base64"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -276,10 +277,19 @@ func (p *placeholders) expandYAML(n *yaml.Node, lines map[int][]string) error {
 		addLine(lines, n.Line, placeholder)
 	}
 	n.Value = val
+	p.redactDecoded(n)
 	if n.Style == 0 {
 		retypePlain(n)
 	}
 	return nil
+}
+
+// redactDecoded records for redaction the value a !!binary scalar hands its field: its
+// base64 text decoded, a form the environment never held.
+func (p *placeholders) redactDecoded(n *yaml.Node) {
+	if decoded, err := base64.StdEncoding.DecodeString(n.Value); err == nil && n.ShortTag() == "!!binary" {
+		p.resolver.substituted = append(p.resolver.substituted, string(decoded))
+	}
 }
 
 // retypePlain types an unquoted scalar from its expanded text, as if written there:
