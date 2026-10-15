@@ -104,9 +104,9 @@ format's own library escapes them. Defaults are values too.
   written (`&${A}` … `*${A}`). A placeholder in a tag fails the load. A placeholder in a
   comment is never expanded.
 
-A value that is not valid UTF-8 fails the load, naming the variable. A placeholder whose
-default spans several lines stands as a one-line token while YAML parses, so a YAML
-parse error after it reports a line number short by those lines.
+A value or a default that is not valid UTF-8 fails the load, naming the variable. A
+placeholder whose default spans several lines stands as a one-line token while YAML
+parses, so a YAML parse error after it reports a line number short by those lines.
 
 A load, validation or setup error never quotes a substituted value, returned or
 logged. A decoder error at a YAML line or a JSON or TOML key holding one names the

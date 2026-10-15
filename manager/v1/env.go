@@ -149,9 +149,9 @@ func (r *envResolver) hasAnySource() bool {
 }
 
 // expand resolves one placeholder as written: to its variable's value, found in a
-// source (fromSource), else to its default, else to itself. A value that is not valid
-// UTF-8 is refused without being quoted: escaped by an encoder, its bytes would become
-// U+FFFD and the manager would connect with another credential.
+// source (fromSource), else to its default, else to itself. A value or a default that
+// is not valid UTF-8 is refused without being quoted: escaped by an encoder, its bytes
+// would change and the manager would connect with another credential.
 func (r *envResolver) expand(match []byte) (val string, fromSource bool, err error) {
 	parts := envVarRe.FindSubmatch(match)
 	key := string(parts[1])
@@ -163,6 +163,9 @@ func (r *envResolver) expand(match []byte) (val string, fromSource bool, err err
 		return val, true, nil
 	}
 	if parts[2] != nil {
+		if !utf8.Valid(parts[2]) {
+			return "", false, fmt.Errorf("the default of ${%s} is not valid UTF-8", key)
+		}
 		return string(parts[2]), false, nil
 	}
 	return string(match), false, nil // no source, no default → leave as-is

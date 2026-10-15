@@ -1341,3 +1341,25 @@ entries:
 		t.Errorf("write_queue_size = %d, want it unset: the key merged the anchor", *got)
 	}
 }
+
+// TestLoadConfig_RejectsADefaultThatIsNotUTF8: the parser no longer reads a default, so
+// it no longer refuses invalid bytes in one; YAML handed them on and TOML re-encoded
+// them into another credential.
+func TestLoadConfig_RejectsADefaultThatIsNotUTF8(t *testing.T) {
+	for name, content := range map[string]string{
+		"config.yaml": "entries:\n  - name: primary\n    type: readwrite\n" +
+			"    postgres: {user: app, password: \"${DB_PASSWORD:a\xffb}\", host: localhost, port: 5432, database: app}\n",
+		"config.toml": tomlWith("password = \"${DB_PASSWORD:a\xffb}\"", "5432"),
+	} {
+		t.Run(name, func(t *testing.T) {
+			path := writeConfig(t, name, content)
+			cfg, err := mgr.LoadConfigForTest(path, []mgr.EnvOption{mgr.WithEnvVars(map[string]string{})})
+			if err == nil {
+				t.Fatalf("load succeeded, password = %q", cfg.Entries[0].Postgres.Password)
+			}
+			if !strings.Contains(err.Error(), "${DB_PASSWORD") {
+				t.Errorf("error should name the placeholder: %v", err)
+			}
+		})
+	}
+}
