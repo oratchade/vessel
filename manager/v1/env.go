@@ -352,15 +352,26 @@ func decodeJSON(data []byte, resolver *envResolver, out any) error {
 		var typeErr *json.UnmarshalTypeError
 		if errors.As(err, &typeErr) {
 			// JSON matches a key to its field ignoring case, so PORT is the port.
+			field := withoutIndices(typeErr.Field)
 			for at, placeholders := range paths {
-				if strings.EqualFold(at, typeErr.Field) {
-					return errors.New(withheld(typeErr.Field, placeholders))
+				if strings.EqualFold(at, field) {
+					return errors.New(withheld(field, placeholders))
 				}
 			}
 		}
 		return wrapDecode("json", err)
 	}
 	return nil
+}
+
+// withoutIndices is a decoder's field path as paths records it, without array indices:
+// Go 1.27 writes entries.0.postgres.port where earlier releases write
+// entries.postgres.port.
+func withoutIndices(field string) string {
+	return strings.Join(slices.DeleteFunc(strings.Split(field, "."), func(segment string) bool {
+		_, err := strconv.Atoi(segment)
+		return err == nil
+	}), ".")
 }
 
 // decodeTOML is decodeJSON for TOML, written back by go-toml.
