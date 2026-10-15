@@ -332,11 +332,12 @@ func (p *placeholders) redactDecoded(n *yaml.Node) {
 
 // retypePlain types an unquoted scalar from its expanded text, as if written there:
 // trimmed, as YAML would trim it, and a string if it would read as null but is not
-// empty.
+// empty, or as the merge key <<, which would pull another mapping's fields in.
 func retypePlain(n *yaml.Node) {
 	n.Value = strings.Trim(n.Value, " \t\r\n")
 	n.Tag = ""
-	if n.ShortTag() == "!!null" && n.Value != "" {
+	// yaml.v3 merges at an untagged <<, though ShortTag calls it a string.
+	if n.Value == "<<" || n.ShortTag() == "!!null" && n.Value != "" {
 		n.Tag = "!!str"
 	}
 }

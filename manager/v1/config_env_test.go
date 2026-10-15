@@ -1319,3 +1319,25 @@ entries:
 		})
 	}
 }
+
+// TestLoadConfig_YAMLKeyFromTheEnvironmentIsNoMergeKey: a key whose value is << is that
+// key, never YAML's merge key pulling an anchor's fields into the entry.
+func TestLoadConfig_YAMLKeyFromTheEnvironmentIsNoMergeKey(t *testing.T) {
+	path := writeConfig(t, "config.yaml", `
+defaults: &defaults {write_queue_size: 7}
+entries:
+  - name: primary
+    type: readwrite
+    ${KEY}: *defaults
+    postgres: {user: app, password: x, host: localhost, port: 5432, database: app}
+`)
+	cfg, err := mgr.LoadConfigForTest(path, []mgr.EnvOption{
+		mgr.WithEnvVars(map[string]string{"KEY": "<<"}),
+	})
+	if err != nil {
+		t.Fatalf("load: %v", err)
+	}
+	if got := cfg.Entries[0].WriteQueueSize; got != nil {
+		t.Errorf("write_queue_size = %d, want it unset: the key merged the anchor", *got)
+	}
+}
