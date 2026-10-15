@@ -5,6 +5,7 @@ package v1_test
 import (
 	"testing"
 
+	"github.com/denisenkom/go-mssqldb/msdsn"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -146,6 +147,28 @@ func TestMSSQLConfigDSN(t *testing.T) {
 	assert.Contains(t, dsn, "database=testdb")
 	assert.Contains(t, dsn, "encrypt=true")
 	assert.Contains(t, dsn, "trustservercertificate=false")
+}
+
+// TestMSSQLConfigDSNKeepsSyntaxCharacters: the driver reads back the user, password and
+// database as given, whatever URL syntax they hold. A password pasted into the URL
+// unescaped reached the server altered (%41 as A), or failed to parse with an error
+// quoting part of it.
+func TestMSSQLConfigDSNKeepsSyntaxCharacters(t *testing.T) {
+	cfg := v1.MSSQLConfig{
+		User:     "dom@in\\user",
+		Password: "p%ZX%41@:/?#&=+ w",
+		Host:     "localhost",
+		Port:     1433,
+		Database: "a&b=c d",
+		Encrypt:  "true",
+	}
+	parsed, _, err := msdsn.Parse(cfg.DSN())
+	require.NoError(t, err)
+	assert.Equal(t, cfg.User, parsed.User)
+	assert.Equal(t, cfg.Password, parsed.Password)
+	assert.Equal(t, cfg.Database, parsed.Database)
+	assert.Equal(t, "localhost", parsed.Host)
+	assert.Equal(t, uint64(1433), parsed.Port)
 }
 
 // TestDatabaseConfigs tests all database config types

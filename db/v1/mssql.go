@@ -4,6 +4,8 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
+	"net/url"
+	"strconv"
 	"time"
 
 	// Import the MSSQL driver
@@ -63,14 +65,23 @@ func (cfg MSSQLConfig) Driver() string {
 // * connection timeout: the maximum time to wait for a connection to be established
 // * read timeout: the maximum time to wait for a read operation to complete
 // * write timeout: the maximum time to wait for a write operation to complete
+//
+// Each value is escaped, so a password holding URL syntax reaches the server as given.
 func (cfg MSSQLConfig) DSN() string {
-	auth := fmt.Sprintf("%s:%s@%s:%d", cfg.User, cfg.Password, cfg.Host, cfg.Port)
-	encryption := fmt.Sprintf("encrypt=%s&trustservercertificate=%t", cfg.Encrypt, cfg.TrustServerCert)
-	timeout := fmt.Sprintf(
-		"connection+timeout=%d&read+timeout=%s&write+timeout=%s",
-		int(cfg.ConnectionTimeout.Seconds()), cfg.ReadTimeout, cfg.WriteTimeout,
-	)
-	return fmt.Sprintf("sqlserver://%s?database=%s&%s&%s", auth, cfg.Database, encryption, timeout)
+	u := &url.URL{
+		Scheme: "sqlserver",
+		User:   url.UserPassword(cfg.User, cfg.Password),
+		Host:   fmt.Sprintf("%s:%d", cfg.Host, cfg.Port),
+		RawQuery: url.Values{
+			"database":               {cfg.Database},
+			"encrypt":                {cfg.Encrypt},
+			"trustservercertificate": {strconv.FormatBool(cfg.TrustServerCert)},
+			"connection timeout":     {strconv.Itoa(int(cfg.ConnectionTimeout.Seconds()))},
+			"read timeout":           {cfg.ReadTimeout.String()},
+			"write timeout":          {cfg.WriteTimeout.String()},
+		}.Encode(),
+	}
+	return u.String()
 }
 
 // MSSQL is a DB implementation for Microsoft SQL Server using database/sql.

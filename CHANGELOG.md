@@ -59,6 +59,11 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
   - A failure to create or ping an entry's database is logged once per level by the
     setup that called it, redacted, instead of also by the entry itself.
 
+- **An MSSQL user, password or database holding URL syntax reaches the server as
+  given.** The connection string pasted them in unescaped: `%41` in a password arrived
+  as `A`, and `@`, `/` or `%` could make it fail to parse with an error quoting part of
+  the password.
+
 ## [0.4.0] - 2026-10-12
 
 ### Changed
