@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"time"
 
@@ -241,9 +242,15 @@ func NewDBManager(ctx context.Context, configPath string, logger db.Logger, envO
 	if logger == nil {
 		logger = &noOpLogger{}
 	}
+	// Decoded, the config says which fields are secret: from setup on, the passwords are
+	// redacted, and the user, host and database an operator needs stay readable.
+	var secrets []string
 	if len(substituted) > 0 {
+		secrets = passwords(cfg)
+	}
+	if len(secrets) > 0 {
 		// The drivers and entries log through it for the manager's lifetime.
-		logger = redactingLogger{logger: logger, forms: redactions(substituted)}
+		logger = redactingLogger{logger: logger, forms: redactions(secrets)}
 	}
 
 	readOnly, readWrite, err := setupDBs(ctx, cfg, logger)
@@ -252,7 +259,7 @@ func NewDBManager(ctx context.Context, configPath string, logger db.Logger, envO
 			"error", err.Error(),
 		)
 		// A driver's error can keep the connection string, password included.
-		return nil, fmt.Errorf("failed to setup DB entries: %w", redactError(err, substituted))
+		return nil, fmt.Errorf("failed to setup DB entries: %w", redactError(err, secrets))
 	}
 
 	if len(readOnly) == 0 && len(readWrite) == 0 {
@@ -283,6 +290,22 @@ func NewDBManager(ctx context.Context, configPath string, logger db.Logger, envO
 	)
 
 	return dm, nil
+}
+
+// passwords are the passwords the config's entries hold.
+func passwords(cfg *config.ManagerConfig) []string {
+	var found []string
+	for _, entry := range cfg.Entries {
+		switch {
+		case entry.Postgres != nil:
+			found = append(found, entry.Postgres.Password)
+		case entry.MySQL != nil:
+			found = append(found, entry.MySQL.Password)
+		case entry.MSSQL != nil:
+			found = append(found, entry.MSSQL.Password)
+		}
+	}
+	return slices.DeleteFunc(found, func(password string) bool { return password == "" })
 }
 
 func getRoundRobinCounters(

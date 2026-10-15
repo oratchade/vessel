@@ -109,18 +109,24 @@ placeholder whose default spans several lines stands as a one-line token while Y
 parses, so a YAML parse or decode error after it reports a line number short by those
 lines.
 
-A load, validation or setup error never quotes a substituted value, returned or
-logged. A decoder error at a YAML line or a JSON or TOML key holding one names the
-placeholder instead (`entries.postgres.port: the value of ${DB_PORT} is not valid
-here`), since decoders quote part of what they reject. Any other error has each value
-replaced with `[REDACTED]`, in every form a message can give it (trimmed, `%q`-escaped,
-escaped in a connection string, or decoded by a YAML `!!binary` tag), and comes as a new
-error rather than a wrapper, since a driver's error can keep the connection string.
+A load or validation error never quotes a substituted value. A decoder error at a YAML
+line or a JSON or TOML key holding one names the placeholder instead
+(`entries.postgres.port: the value of ${DB_PORT} is not valid here`), since decoders
+quote part of what they reject. Any other has each value replaced with `[REDACTED]`, in
+every form a message can give it (trimmed, `%q`-escaped, escaped in a connection string,
+or decoded by a YAML `!!binary` tag): which field is secret is not known before the
+config is decoded.
 
-Once anything was substituted, every line the manager logs is redacted the same way for
-its lifetime, including what the drivers and entries log through it, such as a failed
-ping naming the connection's user, in every kind of field. The trace spans the drivers
-record are not redacted.
+From setup on it is known: once anything was substituted, a setup error and every line
+the manager logs for its lifetime, including what the drivers and entries log through
+it, have each password the config holds redacted the same way. The user, host and
+database stay readable, so an operator can tell what failed. The trace spans the
+drivers record are not redacted.
+
+A redacted error is a new error rather than a wrapper, since a driver's error can keep
+the connection string. It unwraps only to the causes that hold no value, so
+`errors.Is(err, syscall.ECONNREFUSED)` and `errors.Is(err, context.DeadlineExceeded)`
+still work; `errors.As` reaches no driver error.
 
 ## Lifecycle
 

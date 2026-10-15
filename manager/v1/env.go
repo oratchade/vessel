@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"bytes"
 	"cmp"
+	"context"
 	"encoding/base64"
 	"encoding/json"
 	"errors"
@@ -17,6 +18,7 @@ import (
 	"slices"
 	"strconv"
 	"strings"
+	"syscall"
 	"unicode/utf8"
 
 	"github.com/pelletier/go-toml/v2"
@@ -659,15 +661,34 @@ func boolLiteral(s string) (value, ok bool) {
 	return false, false
 }
 
-// redactError is err as a new error with each substituted value redacted, or err itself
-// when nothing was substituted. A new error rather than a wrapper: a decoder's error can
-// hold what it read, as a TOML error holds its source.
-func redactError(err error, substituted []string) error {
-	if len(substituted) == 0 {
+// redactError is err with each of values redacted, or err itself when there are none. It
+// is a new error rather than a wrapper, since a decoder's error can hold what it read,
+// as a TOML error holds its source; it unwraps only to the causes that carry no input.
+func redactError(err error, values []string) error {
+	if len(values) == 0 {
 		return err
 	}
-	return errors.New(redact(err.Error(), redactions(substituted)))
+	redacted := &redactedError{msg: redact(err.Error(), redactions(values))}
+	if errno := syscall.Errno(0); errors.As(err, &errno) {
+		redacted.causes = append(redacted.causes, errno)
+	}
+	for _, cause := range []error{context.Canceled, context.DeadlineExceeded} {
+		if errors.Is(err, cause) {
+			redacted.causes = append(redacted.causes, cause)
+		}
+	}
+	return redacted
 }
+
+// redactedError is an error's message redacted. Its causes are what a caller retries
+// on, an errno or a context error, which hold no value.
+type redactedError struct {
+	msg    string
+	causes []error
+}
+
+func (e *redactedError) Error() string   { return e.msg }
+func (e *redactedError) Unwrap() []error { return e.causes }
 
 // redactions are the forms of the substituted values to replace in a message, longest
 // first so a value holding another is replaced whole: a decoder quotes the text it
@@ -691,9 +712,9 @@ func redact(msg string, forms []string) string {
 	return msg
 }
 
-// redactingLogger redacts the substituted values from every message and field it logs.
-// The manager hands its logger to the drivers and entries, which log their own errors,
-// a connection's user and an entry's name, for as long as the manager runs.
+// redactingLogger redacts the config's passwords from every message and field it logs.
+// The manager hands its logger to the drivers and entries, which log their own errors
+// for as long as the manager runs, a connection string among them.
 type redactingLogger struct {
 	logger db.Logger
 	forms  []string

@@ -11,6 +11,7 @@ import (
 	"path/filepath"
 	"slices"
 	"strings"
+	"syscall"
 	"testing"
 	"time"
 
@@ -1164,35 +1165,6 @@ func TestLoadConfig_KeyFromTheEnvironmentCannotRepeatAKey(t *testing.T) {
 	}
 }
 
-// TestNewDBManager_SetupLogsDoNotCarrySubstitutedValues: a setup error is logged as well
-// as returned, so the log lines must be redacted too.
-func TestNewDBManager_SetupLogsDoNotCarrySubstitutedValues(t *testing.T) {
-	const host = "secret-host-[::1"
-	for _, entryType := range []string{"readonly", "readwrite"} {
-		t.Run(entryType, func(t *testing.T) {
-			path := writeConfig(t, "config.yaml", `
-entries:
-  - name: primary
-    type: `+entryType+`
-    postgres: {user: app, password: x, host: "${DB_HOST}", port: 5432, database: app}
-`)
-			var logs strings.Builder
-			logger := db.NewSlogAdapter(slog.New(slog.NewTextHandler(&logs, nil)))
-			_, err := mgr.NewDBManager(t.Context(), path, logger,
-				mgr.WithEnvVars(map[string]string{"DB_HOST": host}))
-			if err == nil {
-				t.Fatal("NewDBManager accepted a host it cannot parse")
-			}
-			if strings.Count(logs.String(), "level=ERROR") < 2 {
-				t.Fatalf("want the entry's and the manager's error lines:\n%s", logs.String())
-			}
-			if strings.Contains(logs.String(), "secret-host") {
-				t.Errorf("a log line carries the substituted host:\n%s", logs.String())
-			}
-		})
-	}
-}
-
 // TestLoadConfig_WithholdsAJSONErrorAtACaseVariantKey: JSON matches a key to its field
 // ignoring case, so an error at PORT is the error at port.
 func TestLoadConfig_WithholdsAJSONErrorAtACaseVariantKey(t *testing.T) {
@@ -1207,8 +1179,8 @@ func TestLoadConfig_WithholdsAJSONErrorAtACaseVariantKey(t *testing.T) {
 }
 
 // TestNewDBManager_ErrorsDoNotCarryAValueAsDecodedOrEncoded: decoding trims an unquoted
-// value, a message quoting it escapes it, and a connection string URL-escapes it; each
-// form is redacted, not only the value as the environment holds it.
+// value and a message quoting it escapes it; each form is redacted, not only the value
+// as the environment holds it.
 func TestNewDBManager_ErrorsDoNotCarryAValueAsDecodedOrEncoded(t *testing.T) {
 	cases := map[string]struct {
 		postgres string
@@ -1221,10 +1193,6 @@ func TestNewDBManager_ErrorsDoNotCarryAValueAsDecodedOrEncoded(t *testing.T) {
 		"entry name YAML trims": {
 			"{user: app, password: x, host: localhost, port: 5432, database: app}",
 			map[string]string{"ENTRY": " secretname\n", "ENTRY_TYPE": "unknown"},
-		},
-		"user in the connection string": {
-			`{user: "${DB_USER}", password: x, host: localhost, port: 5432, database: app, ssl_mode: invalid}`,
-			map[string]string{"ENTRY": "primary", "ENTRY_TYPE": "readwrite", "DB_USER": "secret user"},
 		},
 	}
 	for name, c := range cases {
@@ -1256,65 +1224,6 @@ func TestLoadConfig_EmptyYAMLLoadsNothing(t *testing.T) {
 			})
 			if err != nil || len(cfg.Entries) != 0 {
 				t.Errorf("cfg, err = %+v, %v; want an empty config", cfg, err)
-			}
-		})
-	}
-}
-
-// TestNewDBManager_ErrorsDoNotCarryAValueDecodedByAYAMLTag: !!binary decodes its base64
-// text, so the driver receives a value the environment never held as such. The
-// PostgreSQL driver masks a password in its parse error, not a user.
-func TestNewDBManager_ErrorsDoNotCarryAValueDecodedByAYAMLTag(t *testing.T) {
-	path := writeConfig(t, "config.yaml", `
-entries:
-  - name: primary
-    type: readwrite
-    postgres: {user: !!binary "${DB_USER}", password: x, host: localhost, port: 5432, database: app, ssl_mode: invalid}
-`)
-	_, err := mgr.NewDBManager(t.Context(), path, nil, mgr.WithEnvVars(map[string]string{
-		"DB_USER": base64.StdEncoding.EncodeToString([]byte("decoded-secret")),
-	}))
-	if err == nil || !strings.Contains(err.Error(), "sslmode is invalid") {
-		t.Fatalf("want the driver's error about ssl_mode: %v", err)
-	}
-	if leaks(err, "decoded-secret") {
-		t.Errorf("error carries the decoded value: %v", err)
-	}
-}
-
-// TestNewDBManager_LogsDoNotCarrySubstitutedValues: the manager hands its logger to the
-// drivers and entries, which log their own errors and their entry's name for the
-// manager's lifetime, so every line it writes is redacted, not only the setup errors.
-func TestNewDBManager_LogsDoNotCarrySubstitutedValues(t *testing.T) {
-	cases := map[string]string{
-		// The PostgreSQL driver logs its failed ping, connection user included.
-		"driver error": `{user: "${DB_USER}", password: x, host: 127.0.0.1, port: 1, database: app, ssl_mode: disable}`,
-		"entry name":   "",
-	}
-	for name, postgres := range cases {
-		t.Run(name, func(t *testing.T) {
-			entry := "sqlite: {file_path: test.db}"
-			if postgres != "" {
-				entry = "postgres: " + postgres
-			}
-			path := writeConfig(t, "config.yaml", `
-entries:
-  - name: ${ENTRY}
-    type: readwrite
-    `+entry+"\n")
-			var logs strings.Builder
-			logger := db.NewSlogAdapter(slog.New(slog.NewTextHandler(&logs, &slog.HandlerOptions{Level: slog.LevelDebug})))
-			dm, err := mgr.NewDBManager(t.Context(), path, logger, mgr.WithEnvVars(map[string]string{
-				"ENTRY": "sensitive-name", "DB_USER": "sensitive-user",
-			}))
-			if dm != nil {
-				dm.Stop()
-			}
-			if (err == nil) == (postgres != "") {
-				t.Fatalf("NewDBManager: %v", err)
-			}
-			if strings.Contains(logs.String(), "sensitive") {
-				t.Errorf("a log line carries a substituted value:\n%s", logs.String())
 			}
 		})
 	}
@@ -1361,5 +1270,117 @@ func TestLoadConfig_RejectsADefaultThatIsNotUTF8(t *testing.T) {
 				t.Errorf("error should name the placeholder: %v", err)
 			}
 		})
+	}
+}
+
+// mssqlNamedInstance is an MSSQL entry whose host, a named instance, fails to parse with
+// an error quoting the connection string, password included.
+func mssqlNamedInstance(entryType, password string) string {
+	return `
+entries:
+  - name: primary
+    type: ` + entryType + `
+    mssql: {user: "${DB_USER}", password: ` + password + `, host: "srv\\INSTANCE", port: 1433, database: app, encrypt: "true"}
+`
+}
+
+// TestNewDBManager_SetupRedactsPasswordsOnly: once the config is decoded the password is
+// the field known to be secret; setup errors and logs redact it in every form, and keep
+// the user, host and database an operator needs to tell what failed.
+func TestNewDBManager_SetupRedactsPasswordsOnly(t *testing.T) {
+	for _, entryType := range []string{"readonly", "readwrite"} {
+		t.Run(entryType, func(t *testing.T) {
+			path := writeConfig(t, "config.yaml", mssqlNamedInstance(entryType, `"${DB_PASSWORD}"`))
+			var logs strings.Builder
+			logger := db.NewSlogAdapter(slog.New(slog.NewTextHandler(&logs, nil)))
+			_, err := mgr.NewDBManager(t.Context(), path, logger, mgr.WithEnvVars(map[string]string{
+				"DB_USER": "visible-user", "DB_PASSWORD": "pass word&x",
+			}))
+			if err == nil {
+				t.Fatal("NewDBManager accepted a host it cannot parse")
+			}
+			if strings.Count(logs.String(), "level=ERROR") < 2 {
+				t.Fatalf("want the entry's and the manager's error lines:\n%s", logs.String())
+			}
+			for _, out := range []string{err.Error(), logs.String()} {
+				if strings.Contains(out, "pass") || !strings.Contains(out, "visible-user") {
+					t.Errorf("want the password redacted and the user kept:\n%s", out)
+				}
+			}
+		})
+	}
+}
+
+// TestNewDBManager_RedactsAPasswordAsDecoded: !!binary hands the field its base64 text
+// decoded, and that is the password redacted.
+func TestNewDBManager_RedactsAPasswordAsDecoded(t *testing.T) {
+	path := writeConfig(t, "config.yaml", mssqlNamedInstance("readwrite", `!!binary "${DB_PASSWORD}"`))
+	_, err := mgr.NewDBManager(t.Context(), path, nil, mgr.WithEnvVars(map[string]string{
+		"DB_USER":     "app",
+		"DB_PASSWORD": base64.StdEncoding.EncodeToString([]byte("decoded secret")),
+	}))
+	if err == nil || !strings.Contains(err.Error(), "INSTANCE") {
+		t.Fatalf("want the error about the host: %v", err)
+	}
+	if leaks(err, "decoded") {
+		t.Errorf("error carries the decoded password: %v", err)
+	}
+}
+
+// TestNewDBManager_LogsKeepWhatIsNotAPassword: values from the environment such as a
+// user postgres are ordinary words; a log line keeps them, and so the driver's name.
+func TestNewDBManager_LogsKeepWhatIsNotAPassword(t *testing.T) {
+	path := writeConfig(t, "config.yaml", `
+entries:
+  - name: ${ENTRY}
+    type: readwrite
+    postgres: {user: "${DB_USER}", password: "${DB_PASSWORD}", host: 127.0.0.1, port: 1, database: app, ssl_mode: disable}
+`)
+	var logs strings.Builder
+	logger := db.NewSlogAdapter(slog.New(slog.NewTextHandler(&logs, nil)))
+	_, err := mgr.NewDBManager(t.Context(), path, logger, mgr.WithEnvVars(map[string]string{
+		"ENTRY": "registry", "DB_USER": "postgres", "DB_PASSWORD": "pw-secret",
+	}))
+	if err == nil {
+		t.Fatal("NewDBManager connected to a closed port")
+	}
+	for _, want := range []string{"postgres.Ping: failed", "user=postgres", "entry_name=registry"} {
+		if !strings.Contains(logs.String(), want) {
+			t.Errorf("logs lack %q:\n%s", want, logs.String())
+		}
+	}
+	if strings.Contains(logs.String(), "pw-secret") {
+		t.Errorf("logs carry the password:\n%s", logs.String())
+	}
+}
+
+// TestNewDBManager_SetupErrorKeepsItsErrno: the redacted error still tells a refused
+// connection from others, whether or not a value came from the environment.
+func TestNewDBManager_SetupErrorKeepsItsErrno(t *testing.T) {
+	path := writeConfig(t, "config.yaml", `
+entries:
+  - name: primary
+    type: readwrite
+    postgres: {user: app, password: "${DB_PASSWORD}", host: 127.0.0.1, port: 1, database: app, ssl_mode: disable}
+`)
+	_, err := mgr.NewDBManager(t.Context(), path, nil, mgr.WithEnvVars(map[string]string{"DB_PASSWORD": "pw"}))
+	if !errors.Is(err, syscall.ECONNREFUSED) {
+		t.Errorf("errors.Is(err, ECONNREFUSED) = false: %v", err)
+	}
+}
+
+// TestNewDBManager_WithoutEnvOptionSetupErrorIsAsBefore: with nothing substituted, a
+// setup error is the driver's own, chain and all.
+func TestNewDBManager_WithoutEnvOptionSetupErrorIsAsBefore(t *testing.T) {
+	path := writeConfig(t, "config.yaml", `
+entries:
+  - name: primary
+    type: readwrite
+    postgres: {user: app, password: x, host: localhost, port: 5432, database: app, ssl_mode: invalid}
+`)
+	_, err := mgr.NewDBManager(t.Context(), path, nil)
+	var parseErr *pgconn.ParseConfigError
+	if !errors.As(err, &parseErr) {
+		t.Errorf("want the driver's ParseConfigError: %v", err)
 	}
 }

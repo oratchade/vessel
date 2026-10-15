@@ -3,12 +3,18 @@
 package v1
 
 import (
+	"context"
+	"errors"
+	"fmt"
 	"log/slog"
 	"net/url"
+	"slices"
 	"strings"
+	"syscall"
 	"testing"
 
 	db "tounilab.com/vessel/db/v1"
+	"tounilab.com/vessel/manager/v1/config"
 )
 
 // TestRedactingLogger_RedactsEveryPart: a value can reach a log line through its
@@ -52,5 +58,42 @@ func TestRedactingLogger_RedactsEveryKindOfField(t *testing.T) {
 	got := logs.String()
 	if strings.Contains(got, "s3cret") || strings.Contains(got, "BADKEY") || !strings.Contains(got, `"port":5432`) {
 		t.Errorf("want every field redacted, paired, numbers kept:\n%s", got)
+	}
+}
+
+// TestRedactError_KeepsCausesThatCarryNoInput: a caller retries on an errno or a
+// context error; those reach it, and nothing else of the chain does.
+func TestRedactError_KeepsCausesThatCarryNoInput(t *testing.T) {
+	for _, cause := range []error{syscall.ECONNREFUSED, context.DeadlineExceeded, context.Canceled} {
+		err := redactError(fmt.Errorf("dial s3cret: %w", cause), []string{"s3cret"})
+		if !errors.Is(err, cause) || strings.Contains(err.Error(), "s3cret") {
+			t.Errorf("redactError(%v) = %v; want the cause kept and the value redacted", cause, err)
+		}
+	}
+	var wrapped *url.Error
+	if errors.As(redactError(&url.Error{Op: "parse", URL: "s3cret", Err: syscall.EINVAL}, []string{"s3cret"}), &wrapped) {
+		t.Error("the redacted error reaches a cause that holds the value")
+	}
+}
+
+// TestRedactions_CoverAQueryEscapedValue: a connection string's parameter holds a value
+// query-escaped.
+func TestRedactions_CoverAQueryEscapedValue(t *testing.T) {
+	if got := redact("sslmode=secret+mode%26x", redactions([]string{"secret mode&x"})); got != "sslmode=[REDACTED]" {
+		t.Errorf("redact = %q, want sslmode=[REDACTED]", got)
+	}
+}
+
+// TestPasswords: every engine with a password gives it; an empty one is no secret.
+func TestPasswords(t *testing.T) {
+	cfg := &config.ManagerConfig{Entries: []config.ConfigEntry{
+		{Postgres: &db.PostgresConfig{Password: "pg"}},
+		{MySQL: &db.MysqlConfig{Password: "my"}},
+		{MSSQL: &db.MSSQLConfig{Password: "ms"}},
+		{SQLite: &db.SQLiteConfig{FilePath: "x.db"}},
+		{Postgres: &db.PostgresConfig{}},
+	}}
+	if got := passwords(cfg); !slices.Equal(got, []string{"pg", "my", "ms"}) {
+		t.Errorf("passwords = %q, want pg, my, ms", got)
 	}
 }

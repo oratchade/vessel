@@ -20,15 +20,16 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
     written there, so ports and durations still decode;
   - in a key, it is one key.
 
-  **Load, validation and setup errors never carry a substituted value**, returned or
-  logged, and neither does any line the manager, its entries or their drivers log for
-  as long as it runs. A decoder error
-  at a YAML line or a JSON or TOML key holding one names the placeholder instead
+  **Load and validation errors never carry a substituted value.** A decoder error at a
+  YAML line or a JSON or TOML key holding one names the placeholder instead
   (`entries.postgres.port: the value of ${DB_PORT} is not valid here`): decoders quote
   part of a value they reject, YAML up to its first seven characters. Other errors have
-  each value replaced with `[REDACTED]` and are new errors, not wrappers, since a TOML
-  decode error kept the expanded source and the PostgreSQL driver's parse error keeps
-  the connection string.
+  each value replaced with `[REDACTED]`. **From setup on, the passwords are redacted**,
+  once anything was substituted: from setup errors and from every line the manager, its
+  entries and their drivers log for as long as it runs, while the user, host and
+  database stay readable. A redacted error is new, not a wrapper, since a TOML decode
+  error kept the expanded source and the PostgreSQL driver's parse error keeps the
+  connection string.
 
   Behaviour changes:
 
@@ -61,6 +62,9 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
   - The validation error for an unknown entry type no longer quotes the type it got.
   - A failure to create or ping an entry's database is logged once per level by the
     setup that called it, redacted, instead of also by the entry itself.
+  - Once anything was substituted, `errors.Is` and `errors.As` on a load or validation
+    error, and on a setup error when the config holds a password, reach only an errno or
+    a context error, not the driver's or decoder's own error.
 
 - **An MSSQL user, password or database holding URL syntax reaches the server as
   given.** The connection string pasted them in unescaped: `%41` in a password arrived
