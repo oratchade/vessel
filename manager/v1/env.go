@@ -385,6 +385,9 @@ func decodeJSON(data []byte, resolver *envResolver, out any) error {
 	if err != nil {
 		return err
 	}
+	if key, repeated := repeatedJSONKey(json.NewDecoder(bytes.NewReader(tokenized))); repeated {
+		return fmt.Errorf("parse json: key %q written twice in one object", p.restore(key))
+	}
 	paths := map[string][]string{}
 	expanded, err := p.expandTree(tree, "", paths, jsonScalar)
 	if err != nil {
@@ -395,19 +398,25 @@ func decodeJSON(data []byte, resolver *envResolver, out any) error {
 		return fmt.Errorf("encode json: %w", err)
 	}
 	if err := json.Unmarshal(encoded, out); err != nil {
-		var typeErr *json.UnmarshalTypeError
-		if errors.As(err, &typeErr) {
-			// JSON matches a key to its field ignoring case, so PORT is the port.
-			field := withoutIndices(typeErr.Field)
-			for at, placeholders := range paths {
-				if strings.EqualFold(at, field) {
-					return errors.New(withheld(field, placeholders))
-				}
-			}
-		}
-		return wrapDecode("json", err)
+		return withholdJSON(err, paths)
 	}
 	return nil
+}
+
+// withholdJSON replaces a type error at a key holding a substituted value with one
+// naming its placeholders.
+func withholdJSON(err error, paths map[string][]string) error {
+	var typeErr *json.UnmarshalTypeError
+	if errors.As(err, &typeErr) {
+		// JSON matches a key to its field ignoring case, so PORT is the port.
+		field := withoutIndices(typeErr.Field)
+		for at, placeholders := range paths {
+			if strings.EqualFold(at, field) {
+				return errors.New(withheld(field, placeholders))
+			}
+		}
+	}
+	return wrapDecode("json", err)
 }
 
 // withoutIndices is a decoder's field path as paths records it, without array indices:
@@ -432,6 +441,32 @@ func parseJSON(data []byte) (any, error) {
 		return nil, errors.New("parse json: invalid character after top-level value")
 	}
 	return tree, nil
+}
+
+// repeatedJSONKey reads one value from dec, which parseJSON has read whole, and finds a
+// key written twice in one object within it. Decoding into the config merged two
+// objects under one key; the generic tree keeps only the last of them.
+func repeatedJSONKey(dec *json.Decoder) (string, bool) {
+	open, _ := dec.Token()
+	if open != json.Delim('{') && open != json.Delim('[') {
+		return "", false
+	}
+	keys := map[string]bool{}
+	for dec.More() {
+		if open == json.Delim('{') {
+			token, _ := dec.Token()
+			key, _ := token.(string)
+			if keys[key] {
+				return key, true
+			}
+			keys[key] = true
+		}
+		if key, repeated := repeatedJSONKey(dec); repeated {
+			return key, true
+		}
+	}
+	_, _ = dec.Token() // the closing delimiter
+	return "", false
 }
 
 // decodeTOML is decodeJSON for TOML, written back by go-toml.

@@ -1077,6 +1077,45 @@ func TestLoadConfig_TOMLBareValueFollowsTOMLIntegers(t *testing.T) {
 	}
 }
 
+// TestLoadConfig_JSONKeyWrittenTwiceFails: decoding into the config merged two objects
+// under one key and took the last of two values; the generic tree keeps only the last
+// object, dropping the first one's fields, so a repeated key fails the load.
+func TestLoadConfig_JSONKeyWrittenTwiceFails(t *testing.T) {
+	for name, entry := range map[string]string{
+		"object": `"postgres": {"user": "app", "password": "${DB_PASSWORD}", "host": "localhost"},
+  "postgres": {"port": 5432, "database": "app"}`,
+		"value": `"name": "secondary", "postgres": {"user": "app", "password": "${DB_PASSWORD}", "host": "localhost",
+  "port": 5432, "database": "app"}`,
+		"nested value": `"postgres": {"user": "app", "password": "${DB_PASSWORD}", "host": "localhost",
+  "port": 5432, "database": "app", "database": "other"}`,
+	} {
+		t.Run(name, func(t *testing.T) {
+			path := writeConfig(t, "config.json", `{"entries": [{"name": "primary", "type": "readwrite", `+entry+`}]}`)
+			_, err := mgr.LoadConfigForTest(path, []mgr.EnvOption{
+				mgr.WithEnvVars(map[string]string{"DB_PASSWORD": "secret"}),
+			})
+			if err == nil || !strings.Contains(err.Error(), "written twice") {
+				t.Errorf("want the repeated key refused: %v", err)
+			}
+		})
+	}
+}
+
+// TestLoadConfig_SameKeyInSiblingObjectsLoads: a key repeats only within one object; two
+// entries each have their own name.
+func TestLoadConfig_SameKeyInSiblingObjectsLoads(t *testing.T) {
+	entry := `{"name": "%s", "type": "readwrite", "postgres": {"user": "app", "password": "${DB_PASSWORD}",
+  "host": "localhost", "port": 5432, "database": "app"}}`
+	path := writeConfig(t, "config.json",
+		`{"entries": [`+fmt.Sprintf(entry, "primary")+", "+fmt.Sprintf(entry, "secondary")+`]}`)
+	cfg, err := mgr.LoadConfigForTest(path, []mgr.EnvOption{
+		mgr.WithEnvVars(map[string]string{"DB_PASSWORD": "secret"}),
+	})
+	if err != nil || len(cfg.Entries) != 2 || cfg.Entries[1].Postgres.Password != "secret" {
+		t.Fatalf("cfg, err = %+v, %v; want two entries", cfg, err)
+	}
+}
+
 // TestLoadConfig_KeysEqualButForCaseFail: JSON and TOML both match a key to its field
 // ignoring case, so of host and Host the last written wins; the generic tree the values
 // go into keeps no order, so neither may win.

@@ -53,7 +53,8 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
     a placeholder in a YAML tag fails the load.
   - In JSON and TOML, two keys equal but for case, which the decoder matches to one
     field, now fail the load once any EnvOption is set, rather than the last one
-    written winning.
+    written winning. So does a JSON key written twice in one object, where two objects
+    under one key were merged and the last of two values won.
   - A non-empty value that YAML would read as null, such as `null` or `~`, now arrives
     as that string rather than empty.
   - A placeholder in a comment is no longer expanded.
