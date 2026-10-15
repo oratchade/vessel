@@ -111,8 +111,13 @@ logged. A decoder error at a YAML line or a JSON or TOML key holding one names t
 placeholder instead (`entries.postgres.port: the value of ${DB_PORT} is not valid
 here`), since decoders quote part of what they reject. Any other error has each value
 replaced with `[REDACTED]`, in every form a message can give it (trimmed, `%q`-escaped,
-escaped in a connection string, or decoded by a YAML `!!binary` tag), and comes as a new error rather than a wrapper,
-since a driver's error can keep the connection string.
+escaped in a connection string, or decoded by a YAML `!!binary` tag), and comes as a new
+error rather than a wrapper, since a driver's error can keep the connection string.
+
+Once anything was substituted, every line the manager logs is redacted the same way for
+its lifetime, including what the drivers and entries log through it, such as a failed
+ping naming the connection's user. Numbers in log fields are left as they are, and the
+trace spans the drivers record are not redacted.
 
 ## Lifecycle
 

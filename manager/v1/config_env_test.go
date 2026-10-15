@@ -1134,3 +1134,41 @@ entries:
 		t.Errorf("error carries the decoded value: %v", err)
 	}
 }
+
+// TestNewDBManager_LogsDoNotCarrySubstitutedValues: the manager hands its logger to the
+// drivers and entries, which log their own errors and their entry's name for the
+// manager's lifetime, so every line it writes is redacted, not only the setup errors.
+func TestNewDBManager_LogsDoNotCarrySubstitutedValues(t *testing.T) {
+	cases := map[string]string{
+		// The PostgreSQL driver logs its failed ping, connection user included.
+		"driver error": `{user: "${DB_USER}", password: x, host: 127.0.0.1, port: 1, database: app, ssl_mode: disable}`,
+		"entry name":   "",
+	}
+	for name, postgres := range cases {
+		t.Run(name, func(t *testing.T) {
+			entry := "sqlite: {file_path: test.db}"
+			if postgres != "" {
+				entry = "postgres: " + postgres
+			}
+			path := writeConfig(t, "config.yaml", `
+entries:
+  - name: ${ENTRY}
+    type: readwrite
+    `+entry+"\n")
+			var logs strings.Builder
+			logger := db.NewSlogAdapter(slog.New(slog.NewTextHandler(&logs, &slog.HandlerOptions{Level: slog.LevelDebug})))
+			dm, err := mgr.NewDBManager(t.Context(), path, logger, mgr.WithEnvVars(map[string]string{
+				"ENTRY": "sensitive-name", "DB_USER": "sensitive-user",
+			}))
+			if dm != nil {
+				dm.Stop()
+			}
+			if (err == nil) == (postgres != "") {
+				t.Fatalf("NewDBManager: %v", err)
+			}
+			if strings.Contains(logs.String(), "sensitive") {
+				t.Errorf("a log line carries a substituted value:\n%s", logs.String())
+			}
+		})
+	}
+}

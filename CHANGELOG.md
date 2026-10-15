@@ -21,7 +21,8 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
   - in a key, it is one key.
 
   **Load, validation and setup errors never carry a substituted value**, returned or
-  logged. A decoder error
+  logged, and neither does any line the manager, its entries or their drivers log for
+  as long as it runs (numbers in log fields aside). A decoder error
   at a YAML line or a JSON or TOML key holding one names the placeholder instead
   (`entries.postgres.port: the value of ${DB_PORT} is not valid here`): decoders quote
   part of a value they reject, YAML up to its first seven characters. Other errors have

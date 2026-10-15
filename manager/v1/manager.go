@@ -15,13 +15,11 @@ import (
 )
 
 // setupDBs initializes DBEntry maps for read-only and read-write databases
-// based on the provided configuration. substituted holds the values the config took
-// from the environment, redacted from the errors it logs.
+// based on the provided configuration.
 func setupDBs(
 	ctx context.Context,
 	cfg *config.ManagerConfig,
 	logger db.Logger,
-	substituted []string,
 ) (map[string]*DBEntry, map[string]*DBEntry, error) {
 	var err error
 	readOnly := make(map[string]*DBEntry)
@@ -44,7 +42,7 @@ func setupDBs(
 			if err != nil {
 				logger.Error("Failed to create read-only database entry",
 					"entry_name", entry.Name,
-					"error", redactError(err, substituted).Error(),
+					"error", err.Error(),
 				)
 				return nil, nil, fmt.Errorf("failed to create read-only DB entry: %w", err)
 			}
@@ -53,7 +51,7 @@ func setupDBs(
 			if err != nil {
 				logger.Error("Failed to create read-write database entry",
 					"entry_name", entry.Name,
-					"error", redactError(err, substituted).Error(),
+					"error", err.Error(),
 				)
 				return nil, nil, fmt.Errorf("failed to create read-write DB entry: %w", err)
 			}
@@ -243,11 +241,15 @@ func NewDBManager(ctx context.Context, configPath string, logger db.Logger, envO
 	if logger == nil {
 		logger = &noOpLogger{}
 	}
+	if len(substituted) > 0 {
+		// The drivers and entries log through it for the manager's lifetime.
+		logger = redactingLogger{logger: logger, forms: redactions(substituted)}
+	}
 
-	readOnly, readWrite, err := setupDBs(ctx, cfg, logger, substituted)
+	readOnly, readWrite, err := setupDBs(ctx, cfg, logger)
 	if err != nil {
 		logger.Error("Failed to setup database entries",
-			"error", redactError(err, substituted).Error(),
+			"error", err.Error(),
 		)
 		// A driver's error can keep the connection string, password included.
 		return nil, fmt.Errorf("failed to setup DB entries: %w", redactError(err, substituted))
