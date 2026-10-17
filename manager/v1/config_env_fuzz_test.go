@@ -3,6 +3,8 @@
 package v1_test
 
 import (
+	"encoding/json"
+	"fmt"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -82,6 +84,75 @@ func FuzzLoadConfig_TOMLString(f *testing.F) {
 		})
 		fuzzLoad(t, before, after, "config.toml", func(password string) string {
 			return tomlWith(`password = '`+password+`'`, "5432")
+		})
+	})
+}
+
+// fuzzKeySeeds are keys written beside a key holding ${K}: the same text spelled with an
+// escape, the field it expands to in another case, and stand-in or token digits.
+func fuzzKeySeeds(f *testing.F) {
+	for _, key := range []string{"", "${K}", "$\\u007bK}", "postgres", "Postgres", "<", `"`, "81111", "70000\\u003"} {
+		f.Add(key, "\\uD8")
+		f.Add(key, "")
+	}
+}
+
+// fuzzKeys loads a file holding a fuzzed key beside ${K}, with text before a placeholder
+// under ${K}, four times: the loads must agree, and none may hand a field a stand-in.
+func fuzzKeys(t *testing.T, key, before, name string, file func(key, password string) string) {
+	t.Helper()
+	if writtenDigits.MatchString(key + before) {
+		t.Skip()
+	}
+	dir := t.TempDir()
+	if err := os.WriteFile(filepath.Join(dir, name), []byte(file(key, before+"${X}")), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	t.Chdir(dir)
+	var first string
+	for i := range 4 {
+		cfg, err := mgr.LoadConfigForTest(name, []mgr.EnvOption{
+			mgr.WithEnvVars(map[string]string{"X": "vv", "K": "postgres"}),
+		})
+		loaded, _ := json.Marshal(cfg)
+		got := fmt.Sprintf("%v %s", err, loaded)
+		if i == 0 {
+			first = got
+		} else if got != first {
+			t.Fatalf("loads disagree:\n%s\n%s", first, got)
+		}
+	}
+	if standInDigits.MatchString(first) {
+		t.Fatalf("a stand-in reached the result: %s", first)
+	}
+}
+
+func FuzzLoadConfig_JSONKey(f *testing.F) {
+	fuzzKeySeeds(f)
+	f.Fuzz(func(t *testing.T, key, before string) {
+		fuzzKeys(t, key, before, "config.json", func(key, password string) string {
+			return `{"entries": [{"name": "primary", "type": "readwrite", "${K}": {"user": "app", "password": "` +
+				password + `", "host": "localhost", "port": 5432, "database": "app"}, "` + key + `": {}}]}`
+		})
+	})
+}
+
+func FuzzLoadConfig_YAMLKey(f *testing.F) {
+	fuzzKeySeeds(f)
+	f.Fuzz(func(t *testing.T, key, before string) {
+		fuzzKeys(t, key, before, "config.yaml", func(key, password string) string {
+			return "entries:\n  - name: primary\n    type: readwrite\n    ${K}: {user: app, password: \"" + password +
+				"\", host: localhost, port: 5432, database: app}\n    \"" + key + "\": {}\n"
+		})
+	})
+}
+
+func FuzzLoadConfig_TOMLKey(f *testing.F) {
+	fuzzKeySeeds(f)
+	f.Fuzz(func(t *testing.T, key, before string) {
+		fuzzKeys(t, key, before, "config.toml", func(key, password string) string {
+			return "[[entries]]\nname = \"primary\"\ntype = \"readwrite\"\n\"" + key + "\" = {}\n[entries.${K}]\n" +
+				"user = \"app\"\npassword = \"" + password + "\"\nhost = \"localhost\"\nport = 5432\ndatabase = \"app\"\n"
 		})
 	})
 }
