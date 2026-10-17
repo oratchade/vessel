@@ -2,15 +2,12 @@ package v1
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"time"
-
-	"github.com/pelletier/go-toml/v2"
-	"gopkg.in/yaml.v3"
 
 	db "tounilab.com/vessel/db/v1"
 	"tounilab.com/vessel/manager/v1/config"
@@ -231,26 +228,30 @@ type DBManager struct {
 func NewDBManager(ctx context.Context, configPath string, logger db.Logger, envOpts ...EnvOption) (*DBManager, error) {
 	var err error
 
-	cfg, err := loadConfig(configPath, envOpts)
+	cfg, substituted, err := loadConfig(configPath, envOpts)
 	if err != nil {
 		return nil, fmt.Errorf("failed to load config: %w", err)
 	}
 
 	if err := cfg.Validate(); err != nil {
-		return nil, fmt.Errorf("failed to validate config: %w", err)
+		// Validation quotes the field it rejects, which may hold a substituted value.
+		return nil, fmt.Errorf("failed to validate config: %w", redactError(err, substituted))
 	}
 
 	// Use a no-op logger if none is provided
 	if logger == nil {
 		logger = &noOpLogger{}
 	}
+	secrets, logger := redactSetup(cfg, logger)
 
 	readOnly, readWrite, err := setupDBs(ctx, cfg, logger)
 	if err != nil {
 		logger.Error("Failed to setup database entries",
 			"error", err.Error(),
 		)
-		return nil, fmt.Errorf("failed to setup DB entries: %w", err)
+		// A driver's error can keep the connection string, and a password the driver read
+		// itself (PGPASSWORD): only its message, redacted, and its safe causes leave.
+		return nil, fmt.Errorf("failed to setup DB entries: %w", redacted(err, secrets))
 	}
 
 	if len(readOnly) == 0 && len(readWrite) == 0 {
@@ -281,6 +282,34 @@ func NewDBManager(ctx context.Context, configPath string, logger db.Logger, envO
 	)
 
 	return dm, nil
+}
+
+// redactSetup is what setup redacts, and the logger that redacts it: the config's
+// passwords, wherever each came from (the environment, a default, the file as written),
+// while the user, host and database an operator needs stay readable. The drivers and
+// entries log through the logger for the manager's lifetime.
+func redactSetup(cfg *config.ManagerConfig, logger db.Logger) ([]string, db.Logger) {
+	secrets := passwords(cfg)
+	if len(secrets) == 0 {
+		return nil, logger
+	}
+	return secrets, redactingLogger{logger: logger, forms: redactions(secrets)}
+}
+
+// passwords are the passwords the config's entries hold.
+func passwords(cfg *config.ManagerConfig) []string {
+	var found []string
+	for _, entry := range cfg.Entries {
+		switch {
+		case entry.Postgres != nil:
+			found = append(found, entry.Postgres.Password)
+		case entry.MySQL != nil:
+			found = append(found, entry.MySQL.Password)
+		case entry.MSSQL != nil:
+			found = append(found, entry.MSSQL.Password)
+		}
+	}
+	return slices.DeleteFunc(found, func(password string) bool { return password == "" })
 }
 
 func getRoundRobinCounters(
@@ -380,46 +409,55 @@ func validateConfigPath(path string) (string, error) {
 	return absPath, nil
 }
 
-// loadConfig loads the configuration from the specified path.
+// loadConfig loads the configuration from the specified path, and returns the values
+// it took from the environment, for the caller to redact from its own errors.
 // Security: Path must not escape the current working directory (prevents directory traversal).
-func loadConfig(path string, envOpts []EnvOption) (*config.ManagerConfig, error) {
+func loadConfig(path string, envOpts []EnvOption) (*config.ManagerConfig, []string, error) {
 	// Validate and resolve the config path
 	absPath, err := validateConfigPath(path)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
 	//nolint:gosec // G304: Path is validated above to prevent directory traversal
 	data, err := os.ReadFile(absPath)
 	if err != nil {
-		return nil, fmt.Errorf("loadConfig: failed to read config file: %w", err)
+		return nil, nil, fmt.Errorf("loadConfig: failed to read config file: %w", err)
 	}
 
-	// Expand ${VAR} and ${VAR:default} patterns if env options are provided
-	data = expandEnvVars(data, newEnvResolver(envOpts))
-
+	// ${VAR} and ${VAR:default} are expanded when env options are provided, in the
+	// parsed data rather than the file's text, so a value is only ever a value (#85).
+	resolver := newEnvResolver(envOpts)
 	cfg := &config.ManagerConfig{}
 	ext := filepath.Ext(absPath)
 
 	switch ext {
 	case ".json":
-		err = json.Unmarshal(data, cfg)
+		err = decodeJSON(data, resolver, cfg)
 
 	case ".yaml", ".yml":
-		err = yaml.Unmarshal(data, cfg)
+		err = decodeYAML(data, resolver, cfg)
 
 	case ".toml":
-		err = toml.Unmarshal(data, cfg)
+		err = decodeTOML(data, resolver, cfg)
 
 	default:
-		return nil, fmt.Errorf("loadConfig: unsupported file extension: %s", ext)
+		return nil, nil, fmt.Errorf("loadConfig: unsupported file extension: %s", ext)
 	}
 
-	if err != nil {
-		return nil, fmt.Errorf("loadConfig: failed to load configuration: %w", err)
+	if err := loadError(err, resolver); err != nil {
+		return nil, nil, err
 	}
+	return cfg, resolver.substituted, nil
+}
 
-	return cfg, nil
+// loadError is the error a load ends with. Once a value came from the environment it
+// leaves only as a redacted message: a decoder's error can hold what it read.
+func loadError(err error, resolver *envResolver) error {
+	if err == nil {
+		return nil
+	}
+	return fmt.Errorf("loadConfig: failed to load configuration: %w", redactError(err, resolver.substituted))
 }
 
 // Start initializes the database entries and starts their worker routines.

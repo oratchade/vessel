@@ -81,6 +81,72 @@ Available options:
 For production secrets, prefer explicit values from your secret store via
 `WithEnvVars`. Avoid relying on `.env` files in deployed environments.
 
+A substituted value is only ever a value, never syntax, so any password works as it is.
+While the file parses, each placeholder stands as a number, which every format accepts
+both inside a string and as a bare value; values then go into the parsed data, and the
+format's own library escapes them. Defaults are values too.
+
+- **In a string** of any kind (YAML quoted, a block scalar, JSON, every TOML string), a
+  value goes in as text, exactly as it is.
+- **Unquoted in YAML**, a value is trimmed and typed from what it expands to, as if
+  written there: `port: ${DB_PORT:5432}` is a number, `health_interval: ${HEALTH:30s}`
+  a duration. A non-empty value that would read as null, such as `null` or `~`, stays a
+  string.
+- **Outside quotes in JSON and TOML**, a placeholder that is the whole value is typed as
+  if written there: a number (in TOML, an integer, with its bases and underscores),
+  `true`, `false`, or JSON's `null`; surrounding spaces don't count. Anything else is a string, never
+  structure, so a numeric field rejects it. A placeholder glued to other text outside
+  quotes (`54${P}`, `${A}${B}`) fails the load: quote it.
+- **In a key**, a value is that one key: a dot in it does not reach into another table.
+  In JSON and TOML, two keys of one object that name the same field, equal or equal but
+  for case, fail the load.
+- **Inside an escape or a number**, where the file's syntax would read part of the
+  placeholder (`"\u${X}"`, `"\x${X}"`, `${X}.5` in TOML), the load fails naming it: a
+  value never builds an escape or a number. Where a backslash is text, as in a TOML
+  literal string or YAML outside double quotes, a placeholder after it expands as usual.
+- **In YAML**, an anchor can be named by a placeholder if its alias repeats it as
+  written (`&${A}` … `*${A}`). A placeholder in a tag fails the load. A placeholder in a
+  comment is never expanded.
+
+A value or a default that is not valid UTF-8 fails the load, naming the variable. A
+placeholder whose default spans several lines stands as a one-line token while YAML
+parses, so a YAML parse or decode error after it reports a line number short by those
+lines.
+
+A load or validation error never quotes a substituted value. A decoder error at a YAML
+line or a JSON or TOML key holding one names the placeholder instead
+(`entries.postgres.port: the value of ${DB_PORT} is not valid here`), since decoders
+quote part of what they reject. Any other has each value replaced with `[REDACTED]`, in
+every form a message can give it (trimmed, `%q`-escaped, escaped in a connection string,
+or decoded by a YAML `!!binary` tag): which field is secret is not known before the
+config is decoded.
+
+From setup on it is known. A setup error and every line the manager logs for its
+lifetime, including what the drivers and entries log through it, have each password the
+config holds redacted the same way, wherever it came from: the environment, a default,
+or the file as written, with or without an EnvOption. The user, host and database stay
+readable, so an operator can tell what failed.
+
+A setup error, and once anything was substituted a load or validation error too, is a
+new error rather than a wrapper, since a driver's error can keep the connection string,
+or a password the driver read itself (`PGPASSWORD`). It unwraps only to the causes that
+hold no value, so
+`errors.Is(err, syscall.ECONNREFUSED)` and `errors.Is(err, context.DeadlineExceeded)`
+still work; `errors.As` reaches no driver error.
+
+What this does not cover:
+
+- **Without any EnvOption**, nothing is expanded, and load and validation errors are
+  the decoders' own, as before; setup errors and logs are redacted as above.
+- **Trace spans** the drivers record for queries and pings are not redacted. Setup,
+  where a connection string can be quoted, records none.
+- **A password the config does not hold**, such as one a driver reads from
+  `PGPASSWORD`, is not redacted from messages. pgx does not print it, and no error
+  hands out the driver's own.
+- **A TOML placeholder glued to a number** (`54${P}`) fails with the TOML library's own
+  message, which may not name it.
+- **YAML truncates a float into an integer field**, as it does for a value written there.
+
 ## Lifecycle
 
 ```go

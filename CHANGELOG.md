@@ -5,6 +5,78 @@ All notable changes to Vessel are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Fixed
+
+- **A substituted config value can no longer change how the file parses (#85).**
+  `${VAR}` was expanded in the file's raw text before parsing, so a value was pasted in
+  as syntax: a password beginning with `*` was read as a YAML alias, one with `"` broke
+  a JSON or TOML string, and the manager failed to start with a valid credential. Each
+  placeholder now stands as a number while the file parses, and values go into the
+  parsed data, where the format's own library escapes them:
+  - in any string, a value is text, exactly as it is;
+  - unquoted in YAML, or as a whole bare value in JSON and TOML, it is typed as if
+    written there, so ports and durations still decode;
+  - in a key, it is one key.
+
+  **Load and validation errors never carry a substituted value.** A decoder error at a
+  YAML line or a JSON or TOML key holding one names the placeholder instead
+  (`entries.postgres.port: the value of ${DB_PORT} is not valid here`): decoders quote
+  part of a value they reject, YAML up to its first seven characters. Other errors have
+  each value replaced with `[REDACTED]`. **From setup on, the passwords are redacted**,
+  wherever each came from and with or without an EnvOption: from setup errors and from
+  every line the manager, its entries and their drivers log for as long as it runs,
+  while the user, host and database stay readable. A redacted error is new, not a wrapper, since a TOML decode
+  error kept the expanded source and the PostgreSQL driver's parse error keeps the
+  connection string.
+
+  Behaviour changes:
+
+  - **A value escaped or quoted for the file now arrives with its escapes or quotes.**
+    Expanded as text, a value was read by the file's syntax, so a `\"` in a
+    double-quoted string, a doubled quote in a YAML single-quoted one, or a value
+    JSON-encoded to survive the file lost its escapes. A value now goes in as it is: drop
+    such workarounds when upgrading.
+  - **A default is a value too**, redacted from load errors like one from the
+    environment. Escapes in it are no longer read (`"${X:a\tb}"` gives a
+    backslash and a `t`), and it cannot hold syntax, such as a quote that opens a string
+    for the next placeholder.
+  - **In JSON and TOML, placeholders glued to other text outside quotes fail the load**
+    (`54${P}`, `${A}${B}`): quote them. In YAML that text is a plain scalar, typed as
+    a whole.
+  - **A value can no longer inject structure.** A value expanding to `[a, b]` is that
+    text, a string; outside quotes, a value that is not a JSON number, boolean or null,
+    or a TOML integer or boolean, is a string, which a numeric field rejects; a key from the
+    environment is one key, so a dot in it no longer reaches into another table.
+  - **A placeholder the file's syntax reads part of fails the load**, naming it: inside
+    an escape (`"\u${X}"`, `"\x${X}"`), or in a number written around it (`${X}.5` in
+    TOML). Expanded as text, the value built the escape or the number.
+  - **A value or a default that is not valid UTF-8 fails the load**, naming its
+    variable, instead of reaching the database with its bytes replaced.
+  - A YAML alias must repeat its anchor's placeholder as written (`&${A}` … `*${A}`), and
+    a placeholder in a YAML tag fails the load.
+  - In JSON and TOML, two keys equal but for case, which the decoder matches to one
+    field, now fail the load once any EnvOption is set, rather than the last one
+    written winning. So does a JSON key written twice in one object, where two objects
+    under one key were merged and the last of two values won.
+  - A non-empty value that YAML would read as null, such as `null` or `~`, now arrives
+    as that string rather than empty.
+  - A placeholder in a comment is no longer expanded.
+  - The validation error for an unknown entry type no longer quotes the type it got.
+  - A failure to create or ping an entry's database is logged once per level by the
+    setup that called it, redacted, instead of also by the entry itself.
+  - `errors.Is` and `errors.As` on a setup error, and once anything was substituted on a
+    load or validation error, reach only an errno or a context error, not the driver's or
+    decoder's own error, which can hold a password the driver read itself (`PGPASSWORD`).
+    **This applies without an EnvOption too**, as does the redaction of passwords from
+    setup errors and logs.
+
+- **An MSSQL user, password or database holding URL syntax reaches the server as
+  given.** The connection string pasted them in unescaped: `%41` in a password arrived
+  as `A`, and `@`, `/` or `%` could make it fail to parse with an error quoting part of
+  the password.
+
 ## [0.4.0] - 2026-10-12
 
 ### Changed
