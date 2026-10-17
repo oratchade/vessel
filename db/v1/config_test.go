@@ -201,6 +201,16 @@ func TestMSSQLConfigDSNNamedInstance(t *testing.T) {
 	assert.Equal(t, cfg.Database, parsed.Database)
 }
 
+// TestMSSQLConfigDSNIPv6Host: an IPv6 host is bracketed beside its port, so the driver
+// reads the host and the port apart.
+func TestMSSQLConfigDSNIPv6Host(t *testing.T) {
+	cfg := v1.MSSQLConfig{User: "app", Password: "pw", Host: "fd00::5", Port: 1433, Database: "app", Encrypt: "true"}
+	parsed, _, err := msdsn.Parse(cfg.DSN())
+	require.NoError(t, err)
+	assert.Equal(t, "fd00::5", parsed.Host)
+	assert.Equal(t, uint64(1433), parsed.Port)
+}
+
 // TestDatabaseConfigs tests all database config types
 func TestDatabaseConfigs(t *testing.T) {
 	testCases := []struct {

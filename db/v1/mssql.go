@@ -5,6 +5,7 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
+	"net"
 	"net/url"
 	"strconv"
 	"strings"
@@ -83,7 +84,7 @@ func (cfg MSSQLConfig) DSN() string {
 	}
 	// A named instance is written server\instance; the driver takes it as the path (#89).
 	host, instance, _ := strings.Cut(cfg.Host, `\`)
-	address := fmt.Sprintf("%s:%d", host, cfg.Port)
+	address := net.JoinHostPort(host, strconv.Itoa(int(cfg.Port))) // brackets an IPv6 host
 	if instance != "" {
 		// SQL Server Browser gives the instance's port; the driver calls a port given
 		// beside an instance a misconfiguration, and builds its SPN from it.

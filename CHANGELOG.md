@@ -77,6 +77,8 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
   instance now goes in the path, where the driver reads it. The driver then finds the
   instance's port through SQL Server Browser (UDP 1434), so the configured `port` is not
   sent with an instance: to connect on a fixed port, write the host without it.
+- **An MSSQL host given as an IPv6 address (`fd00::5`) connects.** It went beside its port
+  unbracketed, so the driver could not tell the host from the port.
 - **An MSSQL entry without `encrypt` connects, encrypted (#88).** The connection string
   wrote it empty, which the driver rejects. Unset now means `true`: the whole session is
   encrypted, a server without encryption is refused, and its certificate is verified
