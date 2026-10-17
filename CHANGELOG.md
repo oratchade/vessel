@@ -72,6 +72,9 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
     **This applies without an EnvOption too**, as does the redaction of passwords from
     setup errors and logs.
 
+- **An MSSQL entry without `encrypt` connects (#88).** The connection string wrote it
+  empty, which the driver rejects; left unset, it is now left out and the driver applies
+  its default.
 - **An MSSQL user, password or database holding URL syntax reaches the server as
   given.** The connection string pasted them in unescaped: `%41` in a password arrived
   as `A`, and `@`, `/` or `%` could make it fail to parse with an error quoting part of
