@@ -3,6 +3,7 @@
 package v1_test
 
 import (
+	"net/url"
 	"testing"
 
 	"github.com/denisenkom/go-mssqldb/msdsn"
@@ -191,6 +192,11 @@ func TestMSSQLConfigDSNNamedInstance(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, "srv", parsed.Host)
 	assert.Equal(t, "INSTANCE", parsed.Instance)
+	// The driver finds the instance's port through SQL Server Browser, and calls a port
+	// given with an instance a misconfiguration: none is sent.
+	sent, err := url.Parse(cfg.DSN())
+	require.NoError(t, err)
+	assert.Empty(t, sent.Port())
 	assert.Equal(t, cfg.Password, parsed.Password)
 	assert.Equal(t, cfg.Database, parsed.Database)
 }

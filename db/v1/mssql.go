@@ -61,8 +61,7 @@ func (cfg MSSQLConfig) Driver() string {
 //   - password: the password for authentication
 //   - host: the hostname or IP address of the MSSQL server, or server\instance for a
 //     named instance, whose port the driver then finds through SQL Server Browser
-//   - port: the port number to use for the connection, which the driver ignores for a
-//     named instance
+//   - port: the port number to use for the connection, not sent for a named instance
 //   - database: the database name
 //   - encrypt: the encryption mode (disable, true, false), true when unset
 //   - trustservercertificate: whether to trust the server certificate
@@ -84,10 +83,16 @@ func (cfg MSSQLConfig) DSN() string {
 	}
 	// A named instance is written server\instance; the driver takes it as the path (#89).
 	host, instance, _ := strings.Cut(cfg.Host, `\`)
+	address := fmt.Sprintf("%s:%d", host, cfg.Port)
+	if instance != "" {
+		// SQL Server Browser gives the instance's port; the driver calls a port given
+		// beside an instance a misconfiguration, and builds its SPN from it.
+		address = host
+	}
 	u := &url.URL{
 		Scheme:   "sqlserver",
 		User:     url.UserPassword(cfg.User, cfg.Password),
-		Host:     fmt.Sprintf("%s:%d", host, cfg.Port),
+		Host:     address,
 		Path:     instance,
 		RawQuery: query.Encode(),
 	}

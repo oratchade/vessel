@@ -156,8 +156,8 @@ Notes:
   `TrustServerCert` is set, as a self-signed one needs. `"false"` encrypts at most the
   login, and `"disable"` nothing.
 - A named instance is written as the host, `Host: "srv\\INSTANCE"`. The driver then
-  finds the instance's port through SQL Server Browser (UDP 1434) and ignores `Port`;
-  to connect on a fixed port, give the host without the instance.
+  finds the instance's port through SQL Server Browser (UDP 1434), so `Port` is not sent
+  with an instance; to connect on a fixed port, give the host without it.
 - vessel does **not** generate `MERGE` for MSSQL upserts. Calls to
   `OnConflict/DoUpdate/Upsert` against MSSQL return an explicit
   unsupported-feature error rather than silently producing risky SQL.
