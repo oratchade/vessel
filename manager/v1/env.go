@@ -718,6 +718,11 @@ func redactError(err error, values []string) error {
 	if len(values) == 0 {
 		return err
 	}
+	return redacted(err, values)
+}
+
+// redacted is err as a redactedError, its message redacted of values.
+func redacted(err error, values []string) error {
 	redacted := &redactedError{msg: redact(err.Error(), redactions(values))}
 	if errno := syscall.Errno(0); errors.As(err, &errno) {
 		redacted.causes = append(redacted.causes, errno)

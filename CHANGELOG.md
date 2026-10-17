@@ -65,9 +65,9 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
   - The validation error for an unknown entry type no longer quotes the type it got.
   - A failure to create or ping an entry's database is logged once per level by the
     setup that called it, redacted, instead of also by the entry itself.
-  - Once anything was substituted, `errors.Is` and `errors.As` on a load or validation
-    error, and on a setup error when the config holds a password, reach only an errno or
-    a context error, not the driver's or decoder's own error.
+  - Once anything was substituted, `errors.Is` and `errors.As` on a load, validation or
+    setup error reach only an errno or a context error, not the driver's or decoder's own
+    error, which can hold a password the driver read itself (`PGPASSWORD`).
 
 - **An MSSQL user, password or database holding URL syntax reaches the server as
   given.** The connection string pasted them in unescaped: `%41` in a password arrived

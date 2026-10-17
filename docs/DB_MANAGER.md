@@ -127,8 +127,9 @@ it, have each password the config holds redacted the same way. The user, host an
 database stay readable, so an operator can tell what failed. The trace spans the
 drivers record are not redacted.
 
-A redacted error is a new error rather than a wrapper, since a driver's error can keep
-the connection string. It unwraps only to the causes that hold no value, so
+Once anything was substituted, every error `NewDBManager` returns is a new error rather
+than a wrapper, since a driver's error can keep the connection string, or a password the
+driver read itself (`PGPASSWORD`). It unwraps only to the causes that hold no value, so
 `errors.Is(err, syscall.ECONNREFUSED)` and `errors.Is(err, context.DeadlineExceeded)`
 still work; `errors.As` reaches no driver error.
 

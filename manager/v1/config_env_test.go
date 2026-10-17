@@ -1468,3 +1468,24 @@ func TestLoadConfig_TextSpellingAStandInFails(t *testing.T) {
 		t.Errorf("want the stand-in refused: %v", err)
 	}
 }
+
+// TestNewDBManager_SetupErrorHandsOutNoDriverError: a driver can read a password itself,
+// as pgx reads PGPASSWORD, and keep it in its error; once anything was substituted, the
+// setup error reaches no driver error, whether or not the config holds a password.
+func TestNewDBManager_SetupErrorHandsOutNoDriverError(t *testing.T) {
+	t.Setenv("PGPASSWORD", "env-secret")
+	path := writeConfig(t, "config.yaml", `
+entries:
+  - name: primary
+    type: readwrite
+    postgres: {user: "${DB_USER}", host: 127.0.0.1, port: 1, database: app, ssl_mode: disable}
+`)
+	_, err := mgr.NewDBManager(t.Context(), path, nil, mgr.WithEnvVars(map[string]string{"DB_USER": "app"}))
+	var connectErr *pgconn.ConnectError
+	if errors.As(err, &connectErr) {
+		t.Errorf("the error hands out the driver's, password %q included", connectErr.Config.Password)
+	}
+	if !errors.Is(err, syscall.ECONNREFUSED) || !strings.Contains(err.Error(), "user=app") {
+		t.Errorf("want the errno kept and the user readable: %v", err)
+	}
+}

@@ -242,24 +242,19 @@ func NewDBManager(ctx context.Context, configPath string, logger db.Logger, envO
 	if logger == nil {
 		logger = &noOpLogger{}
 	}
-	// Decoded, the config says which fields are secret: from setup on, the passwords are
-	// redacted, and the user, host and database an operator needs stay readable.
-	var secrets []string
-	if len(substituted) > 0 {
-		secrets = passwords(cfg)
-	}
-	if len(secrets) > 0 {
-		// The drivers and entries log through it for the manager's lifetime.
-		logger = redactingLogger{logger: logger, forms: redactions(secrets)}
-	}
+	secrets, logger := redactSetup(cfg, substituted, logger)
 
 	readOnly, readWrite, err := setupDBs(ctx, cfg, logger)
 	if err != nil {
 		logger.Error("Failed to setup database entries",
 			"error", err.Error(),
 		)
-		// A driver's error can keep the connection string, password included.
-		return nil, fmt.Errorf("failed to setup DB entries: %w", redactError(err, secrets))
+		if len(substituted) > 0 {
+			// A driver's error can keep the connection string, and a password the driver
+			// read itself (PGPASSWORD): only its message, redacted, and its safe causes leave.
+			err = redacted(err, secrets)
+		}
+		return nil, fmt.Errorf("failed to setup DB entries: %w", err)
 	}
 
 	if len(readOnly) == 0 && len(readWrite) == 0 {
@@ -290,6 +285,21 @@ func NewDBManager(ctx context.Context, configPath string, logger db.Logger, envO
 	)
 
 	return dm, nil
+}
+
+// redactSetup is what setup redacts once anything was substituted, and the logger
+// that redacts it. Decoded, the config says which fields are secret: from setup on, the
+// passwords are redacted, and the user, host and database an operator needs stay
+// readable. The drivers and entries log through the logger for the manager's lifetime.
+func redactSetup(cfg *config.ManagerConfig, substituted []string, logger db.Logger) ([]string, db.Logger) {
+	if len(substituted) == 0 {
+		return nil, logger
+	}
+	secrets := passwords(cfg)
+	if len(secrets) == 0 {
+		return nil, logger
+	}
+	return secrets, redactingLogger{logger: logger, forms: redactions(secrets)}
 }
 
 // passwords are the passwords the config's entries hold.
