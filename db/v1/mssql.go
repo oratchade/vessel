@@ -60,7 +60,8 @@ func (cfg MSSQLConfig) Driver() string {
 //   - password: the password for authentication
 //   - host: the hostname or IP address of the MSSQL server, or server\instance for a
 //     named instance, whose port the driver then finds through SQL Server Browser
-//   - port: the port number to use for the connection
+//   - port: the port number to use for the connection, which the driver ignores for a
+//     named instance
 //   - database: the database name
 //   - encrypt: the encryption mode (disable, true, false), left out when unset
 //   - trustservercertificate: whether to trust the server certificate
@@ -78,7 +79,7 @@ func (cfg MSSQLConfig) DSN() string {
 		"write timeout":          {cfg.WriteTimeout.String()},
 	}
 	if cfg.Encrypt != "" {
-		query.Set("encrypt", cfg.Encrypt) // unset, the driver applies its default (#88)
+		query.Set("encrypt", cfg.Encrypt) // unset: only the login is encrypted (#88)
 	}
 	// A named instance is written server\instance; the driver takes it as the path (#89).
 	host, instance, _ := strings.Cut(cfg.Host, `\`)

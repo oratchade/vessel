@@ -151,6 +151,11 @@ database, err := db.NewDB(cfg, logger)
 
 Notes:
 
+- `Encrypt` is optional. Left unset, only the login is encrypted, and the server's
+  certificate is verified unless `TrustServerCert` is set, as a self-signed one needs.
+- A named instance is written as the host, `Host: "srv\\INSTANCE"`. The driver then
+  finds the instance's port through SQL Server Browser (UDP 1434) and ignores `Port`;
+  to connect on a fixed port, give the host without the instance.
 - vessel does **not** generate `MERGE` for MSSQL upserts. Calls to
   `OnConflict/DoUpdate/Upsert` against MSSQL return an explicit
   unsupported-feature error rather than silently producing risky SQL.
