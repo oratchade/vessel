@@ -11,6 +11,7 @@ import (
 	"fmt"
 	"io"
 	"log/slog"
+	"maps"
 	"net/url"
 	"os"
 	"path/filepath"
@@ -666,7 +667,9 @@ func (p *placeholders) expandMap(
 ) (any, error) {
 	out := make(map[string]any, len(m))
 	asWritten := map[string]string{} // expanded key → the key as written, placeholders restored
-	for written, child := range m {
+	// In key order, so an error naming two keys names them the same way every time.
+	for _, written := range slices.Sorted(maps.Keys(m)) {
+		child := m[written]
 		key, fromSource, err := p.expandText(written)
 		if err != nil {
 			return nil, err

@@ -1575,3 +1575,23 @@ user = "app"
 		t.Errorf("error should name ${KEY}, not its stand-in: %v", err)
 	}
 }
+
+// TestLoadConfig_SameFieldErrorIsStable: of two keys naming one field, the error names
+// them in the same order every time, not in map order.
+func TestLoadConfig_SameFieldErrorIsStable(t *testing.T) {
+	content := `{"entries": [{"name": "primary", "type": "readwrite", "${KEY}": {"user": "app", "password": "x",
+  "host": "localhost", "port": 5432, "database": "app"}, "Postgres": {}}]}`
+	var first string
+	for range 20 {
+		path := writeConfig(t, "config.json", content)
+		_, err := mgr.LoadConfigForTest(path, []mgr.EnvOption{mgr.WithEnvVars(map[string]string{"KEY": "postgres"})})
+		if err == nil {
+			t.Fatal("load succeeded with two keys naming one field")
+		}
+		if first == "" {
+			first = err.Error()
+		} else if err.Error() != first {
+			t.Fatalf("error changed between loads:\n%s\n%s", first, err)
+		}
+	}
+}
