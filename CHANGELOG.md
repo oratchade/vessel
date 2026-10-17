@@ -78,7 +78,8 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
   port through SQL Server Browser.
 - **An MSSQL entry without `encrypt` connects (#88).** The connection string wrote it
   empty, which the driver rejects; left unset, it is now left out and the driver applies
-  its default.
+  its default, which encrypts and verifies the server's certificate: set
+  `trust_server_cert` for a self-signed one.
 - **An MSSQL user, password or database holding URL syntax reaches the server as
   given.** The connection string pasted them in unescaped: `%41` in a password arrived
   as `A`, and `@`, `/` or `%` could make it fail to parse with an error quoting part of
