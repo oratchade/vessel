@@ -176,15 +176,19 @@ func TestMSSQLConfigDSNKeepsSyntaxCharacters(t *testing.T) {
 // value the driver rejects (#88).
 func TestMSSQLConfigDSNWithoutEncrypt(t *testing.T) {
 	cfg := v1.MSSQLConfig{User: "app", Password: "pw", Host: "localhost", Port: 1433, Database: "app"}
-	_, _, err := msdsn.Parse(cfg.DSN())
+	parsed, _, err := msdsn.Parse(cfg.DSN())
 	require.NoError(t, err)
 	assert.NotContains(t, cfg.DSN(), "encrypt=")
+	// Only the login is encrypted, and the server's certificate is still verified.
+	assert.Equal(t, msdsn.Encryption(msdsn.EncryptionOff), parsed.Encryption)
+	require.NotNil(t, parsed.TLSConfig)
+	assert.False(t, parsed.TLSConfig.InsecureSkipVerify)
 }
 
 // TestMSSQLConfigDSNNamedInstance: a host written server\instance, as SQL Server names a
 // named instance, reaches the driver as that server and instance (#89).
 func TestMSSQLConfigDSNNamedInstance(t *testing.T) {
-	cfg := v1.MSSQLConfig{User: "app", Password: "p@ss/w", Host: `srv\INSTANCE`, Port: 1433, Database: "app"}
+	cfg := v1.MSSQLConfig{User: "app", Password: "p@ss/w", Host: `srv\INSTANCE`, Port: 1433, Database: "app", Encrypt: "true"}
 	parsed, _, err := msdsn.Parse(cfg.DSN())
 	require.NoError(t, err)
 	assert.Equal(t, "srv", parsed.Host)
