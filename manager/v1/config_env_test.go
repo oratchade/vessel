@@ -1274,14 +1274,14 @@ func TestLoadConfig_RejectsADefaultThatIsNotUTF8(t *testing.T) {
 	}
 }
 
-// mssqlNamedInstance is an MSSQL entry whose host, a named instance, fails to parse with
+// mssqlBadHost is an MSSQL entry whose host, holding a space, fails to parse with
 // an error quoting the connection string, password included.
-func mssqlNamedInstance(entryType, password string) string {
+func mssqlBadHost(entryType, password string) string {
 	return `
 entries:
   - name: primary
     type: ` + entryType + `
-    mssql: {user: "${DB_USER}", password: ` + password + `, host: "srv\\INSTANCE", port: 1433, database: app, encrypt: "true"}
+    mssql: {user: "${DB_USER}", password: ` + password + `, host: "srv host", port: 1433, database: app, encrypt: "true"}
 `
 }
 
@@ -1291,7 +1291,7 @@ entries:
 func TestNewDBManager_SetupRedactsPasswordsOnly(t *testing.T) {
 	for _, entryType := range []string{"readonly", "readwrite"} {
 		t.Run(entryType, func(t *testing.T) {
-			path := writeConfig(t, "config.yaml", mssqlNamedInstance(entryType, `"${DB_PASSWORD}"`))
+			path := writeConfig(t, "config.yaml", mssqlBadHost(entryType, `"${DB_PASSWORD}"`))
 			var logs strings.Builder
 			logger := db.NewSlogAdapter(slog.New(slog.NewTextHandler(&logs, nil)))
 			_, err := mgr.NewDBManager(t.Context(), path, logger, mgr.WithEnvVars(map[string]string{
@@ -1315,12 +1315,12 @@ func TestNewDBManager_SetupRedactsPasswordsOnly(t *testing.T) {
 // TestNewDBManager_RedactsAPasswordAsDecoded: !!binary hands the field its base64 text
 // decoded, and that is the password redacted.
 func TestNewDBManager_RedactsAPasswordAsDecoded(t *testing.T) {
-	path := writeConfig(t, "config.yaml", mssqlNamedInstance("readwrite", `!!binary "${DB_PASSWORD}"`))
+	path := writeConfig(t, "config.yaml", mssqlBadHost("readwrite", `!!binary "${DB_PASSWORD}"`))
 	_, err := mgr.NewDBManager(t.Context(), path, nil, mgr.WithEnvVars(map[string]string{
 		"DB_USER":     "app",
 		"DB_PASSWORD": base64.StdEncoding.EncodeToString([]byte("decoded secret")),
 	}))
-	if err == nil || !strings.Contains(err.Error(), "INSTANCE") {
+	if err == nil || !strings.Contains(err.Error(), "srv%20host") {
 		t.Fatalf("want the error about the host: %v", err)
 	}
 	if leaks(err, "decoded") {
@@ -1581,12 +1581,12 @@ func TestNewDBManager_PasswordsAreRedactedWhereverTheyCameFrom(t *testing.T) {
 entries:
   - name: primary
     type: readwrite
-    mssql: {user: app, password: `+c.password+`, host: 'srv\INSTANCE', port: 1433, database: app, encrypt: "true"}
+    mssql: {user: app, password: `+c.password+`, host: "srv host", port: 1433, database: app, encrypt: "true"}
 `)
 			var logs strings.Builder
 			logger := db.NewSlogAdapter(slog.New(slog.NewTextHandler(&logs, nil)))
 			_, err := mgr.NewDBManager(t.Context(), path, logger, c.opts...)
-			if err == nil || !strings.Contains(err.Error(), "INSTANCE") {
+			if err == nil || !strings.Contains(err.Error(), "srv%20host") {
 				t.Fatalf("want the error about the host: %v", err)
 			}
 			if leaks(err, "pw-secret") || strings.Contains(logs.String(), "pw-secret") {

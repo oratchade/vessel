@@ -1,11 +1,14 @@
 package v1
 
 import (
+	"cmp"
 	"context"
 	"database/sql"
 	"fmt"
+	"net"
 	"net/url"
 	"strconv"
+	"strings"
 	"time"
 
 	// Import the MSSQL driver
@@ -55,31 +58,44 @@ func (cfg MSSQLConfig) Driver() string {
 //
 // This DSN includes the following options:
 //
-// * user: the username for authentication
-// * password: the password for authentication
-// * host: the hostname or IP address of the MSSQL server
-// * port: the port number to use for the connection
-// * database: the database name
-// * encrypt: the encryption mode (disable, true, false)
-// * trustservercertificate: whether to trust the server certificate
-// * connection timeout: the maximum time to wait for a connection to be established
-// * read timeout: the maximum time to wait for a read operation to complete
-// * write timeout: the maximum time to wait for a write operation to complete
+//   - user: the username for authentication
+//   - password: the password for authentication
+//   - host: the hostname or IP address of the MSSQL server, or server\instance for a
+//     named instance, whose port the driver then finds through SQL Server Browser
+//   - port: the port number to use for the connection, not sent for a named instance
+//   - database: the database name
+//   - encrypt: the encryption mode (disable, true, false), true when unset
+//   - trustservercertificate: whether to trust the server certificate
+//   - connection timeout: the maximum time to wait for a connection to be established
+//   - read timeout: the maximum time to wait for a read operation to complete
+//   - write timeout: the maximum time to wait for a write operation to complete
 //
 // Each value is escaped, so a password holding URL syntax reaches the server as given.
 func (cfg MSSQLConfig) DSN() string {
+	query := url.Values{
+		"database": {cfg.Database},
+		// Unset means encryption required: the driver's own default encrypts at most
+		// the login, and none of it when the server says it has no encryption (#88).
+		"encrypt":                {cmp.Or(cfg.Encrypt, "true")},
+		"trustservercertificate": {strconv.FormatBool(cfg.TrustServerCert)},
+		"connection timeout":     {strconv.Itoa(int(cfg.ConnectionTimeout.Seconds()))},
+		"read timeout":           {cfg.ReadTimeout.String()},
+		"write timeout":          {cfg.WriteTimeout.String()},
+	}
+	// A named instance is written server\instance; the driver takes it as the path (#89).
+	host, instance, _ := strings.Cut(cfg.Host, `\`)
+	address := net.JoinHostPort(host, strconv.Itoa(int(cfg.Port))) // brackets an IPv6 host
+	if instance != "" {
+		// SQL Server Browser gives the instance's port; the driver calls a port given
+		// beside an instance a misconfiguration, and builds its SPN from it.
+		address = host
+	}
 	u := &url.URL{
-		Scheme: "sqlserver",
-		User:   url.UserPassword(cfg.User, cfg.Password),
-		Host:   fmt.Sprintf("%s:%d", cfg.Host, cfg.Port),
-		RawQuery: url.Values{
-			"database":               {cfg.Database},
-			"encrypt":                {cfg.Encrypt},
-			"trustservercertificate": {strconv.FormatBool(cfg.TrustServerCert)},
-			"connection timeout":     {strconv.Itoa(int(cfg.ConnectionTimeout.Seconds()))},
-			"read timeout":           {cfg.ReadTimeout.String()},
-			"write timeout":          {cfg.WriteTimeout.String()},
-		}.Encode(),
+		Scheme:   "sqlserver",
+		User:     url.UserPassword(cfg.User, cfg.Password),
+		Host:     address,
+		Path:     instance,
+		RawQuery: query.Encode(),
 	}
 	return u.String()
 }

@@ -3,6 +3,7 @@
 package v1_test
 
 import (
+	"net/url"
 	"testing"
 
 	"github.com/denisenkom/go-mssqldb/msdsn"
@@ -168,6 +169,45 @@ func TestMSSQLConfigDSNKeepsSyntaxCharacters(t *testing.T) {
 	assert.Equal(t, cfg.Password, parsed.Password)
 	assert.Equal(t, cfg.Database, parsed.Database)
 	assert.Equal(t, "localhost", parsed.Host)
+	assert.Equal(t, uint64(1433), parsed.Port)
+}
+
+// TestMSSQLConfigDSNWithoutEncrypt: encrypt is optional, and left unset it means
+// encryption required: the driver's own default encrypts at most the login, and none of
+// it when the server, or anyone between, answers that it has no encryption (#88).
+func TestMSSQLConfigDSNWithoutEncrypt(t *testing.T) {
+	cfg := v1.MSSQLConfig{User: "app", Password: "pw", Host: "localhost", Port: 1433, Database: "app"}
+	parsed, _, err := msdsn.Parse(cfg.DSN())
+	require.NoError(t, err)
+	assert.Equal(t, msdsn.Encryption(msdsn.EncryptionRequired), parsed.Encryption)
+	require.NotNil(t, parsed.TLSConfig)
+	assert.False(t, parsed.TLSConfig.InsecureSkipVerify)
+}
+
+// TestMSSQLConfigDSNNamedInstance: a host written server\instance, as SQL Server names a
+// named instance, reaches the driver as that server and instance (#89).
+func TestMSSQLConfigDSNNamedInstance(t *testing.T) {
+	cfg := v1.MSSQLConfig{User: "app", Password: "p@ss/w", Host: `srv\INSTANCE`, Port: 1433, Database: "app", Encrypt: "true"}
+	parsed, _, err := msdsn.Parse(cfg.DSN())
+	require.NoError(t, err)
+	assert.Equal(t, "srv", parsed.Host)
+	assert.Equal(t, "INSTANCE", parsed.Instance)
+	// The driver finds the instance's port through SQL Server Browser, and calls a port
+	// given with an instance a misconfiguration: none is sent.
+	sent, err := url.Parse(cfg.DSN())
+	require.NoError(t, err)
+	assert.Empty(t, sent.Port())
+	assert.Equal(t, cfg.Password, parsed.Password)
+	assert.Equal(t, cfg.Database, parsed.Database)
+}
+
+// TestMSSQLConfigDSNIPv6Host: an IPv6 host is bracketed beside its port, so the driver
+// reads the host and the port apart.
+func TestMSSQLConfigDSNIPv6Host(t *testing.T) {
+	cfg := v1.MSSQLConfig{User: "app", Password: "pw", Host: "fd00::5", Port: 1433, Database: "app", Encrypt: "true"}
+	parsed, _, err := msdsn.Parse(cfg.DSN())
+	require.NoError(t, err)
+	assert.Equal(t, "fd00::5", parsed.Host)
 	assert.Equal(t, uint64(1433), parsed.Port)
 }
 

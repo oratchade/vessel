@@ -72,6 +72,19 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
     **This applies without an EnvOption too**, as does the redaction of passwords from
     setup errors and logs.
 
+- **An MSSQL named instance written as the host (`srv\INSTANCE`) reaches the driver
+  (#89).** The backslash went into the URL's host, escaped, which the driver rejects; the
+  instance now goes in the path, where the driver reads it. The driver then finds the
+  instance's port through SQL Server Browser (UDP 1434), so the configured `port` is not
+  sent with an instance: to connect on a fixed port, write the host without it.
+- **An MSSQL host given as an IPv6 address (`fd00::5`) connects.** It went beside its port
+  unbracketed, so the driver could not tell the host from the port.
+- **An MSSQL entry without `encrypt` connects, encrypted (#88).** The connection string
+  wrote it empty, which the driver rejects. Unset now means `true`: the whole session is
+  encrypted, a server without encryption is refused, and its certificate is verified
+  unless `trust_server_cert` is set, as a self-signed one needs. The driver's own
+  default would encrypt at most the login, and none of it when the server answers that
+  it has no encryption; write `false` or `disable` to choose less.
 - **An MSSQL user, password or database holding URL syntax reaches the server as
   given.** The connection string pasted them in unescaped: `%41` in a password arrived
   as `A`, and `@`, `/` or `%` could make it fail to parse with an error quoting part of
