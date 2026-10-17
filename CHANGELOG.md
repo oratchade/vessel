@@ -77,10 +77,12 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
   instance now goes in the path, where the driver reads it. The driver then finds the
   instance's port through SQL Server Browser (UDP 1434) and ignores the configured
   `port`: to connect on a fixed port, write the host without the instance.
-- **An MSSQL entry without `encrypt` is accepted (#88).** The connection string wrote it
-  empty, which the driver rejects; left unset, it is now left out. The driver then
-  encrypts only the login, and verifies the server's certificate unless
-  `trust_server_cert` is set, as a self-signed one needs.
+- **An MSSQL entry without `encrypt` connects, encrypted (#88).** The connection string
+  wrote it empty, which the driver rejects. Unset now means `true`: the whole session is
+  encrypted, a server without encryption is refused, and its certificate is verified
+  unless `trust_server_cert` is set, as a self-signed one needs. The driver's own
+  default would encrypt at most the login, and none of it when the server answers that
+  it has no encryption; write `false` or `disable` to choose less.
 - **An MSSQL user, password or database holding URL syntax reaches the server as
   given.** The connection string pasted them in unescaped: `%41` in a password arrived
   as `A`, and `@`, `/` or `%` could make it fail to parse with an error quoting part of

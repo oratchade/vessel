@@ -171,16 +171,14 @@ func TestMSSQLConfigDSNKeepsSyntaxCharacters(t *testing.T) {
 	assert.Equal(t, uint64(1433), parsed.Port)
 }
 
-// TestMSSQLConfigDSNWithoutEncrypt: encrypt is optional; left unset, the connection
-// string leaves it out for the driver to apply its default, rather than writing an empty
-// value the driver rejects (#88).
+// TestMSSQLConfigDSNWithoutEncrypt: encrypt is optional, and left unset it means
+// encryption required: the driver's own default encrypts at most the login, and none of
+// it when the server, or anyone between, answers that it has no encryption (#88).
 func TestMSSQLConfigDSNWithoutEncrypt(t *testing.T) {
 	cfg := v1.MSSQLConfig{User: "app", Password: "pw", Host: "localhost", Port: 1433, Database: "app"}
 	parsed, _, err := msdsn.Parse(cfg.DSN())
 	require.NoError(t, err)
-	assert.NotContains(t, cfg.DSN(), "encrypt=")
-	// Only the login is encrypted, and the server's certificate is still verified.
-	assert.Equal(t, msdsn.Encryption(msdsn.EncryptionOff), parsed.Encryption)
+	assert.Equal(t, msdsn.Encryption(msdsn.EncryptionRequired), parsed.Encryption)
 	require.NotNil(t, parsed.TLSConfig)
 	assert.False(t, parsed.TLSConfig.InsecureSkipVerify)
 }

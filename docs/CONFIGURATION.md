@@ -151,8 +151,10 @@ database, err := db.NewDB(cfg, logger)
 
 Notes:
 
-- `Encrypt` is optional. Left unset, only the login is encrypted, and the server's
-  certificate is verified unless `TrustServerCert` is set, as a self-signed one needs.
+- `Encrypt` is optional, and unset means `"true"`: the session is encrypted, a server
+  without encryption is refused, and its certificate is verified unless
+  `TrustServerCert` is set, as a self-signed one needs. `"false"` encrypts at most the
+  login, and `"disable"` nothing.
 - A named instance is written as the host, `Host: "srv\\INSTANCE"`. The driver then
   finds the instance's port through SQL Server Browser (UDP 1434) and ignores `Port`;
   to connect on a fixed port, give the host without the instance.

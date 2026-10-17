@@ -1,6 +1,7 @@
 package v1
 
 import (
+	"cmp"
 	"context"
 	"database/sql"
 	"fmt"
@@ -63,7 +64,7 @@ func (cfg MSSQLConfig) Driver() string {
 //   - port: the port number to use for the connection, which the driver ignores for a
 //     named instance
 //   - database: the database name
-//   - encrypt: the encryption mode (disable, true, false), left out when unset
+//   - encrypt: the encryption mode (disable, true, false), true when unset
 //   - trustservercertificate: whether to trust the server certificate
 //   - connection timeout: the maximum time to wait for a connection to be established
 //   - read timeout: the maximum time to wait for a read operation to complete
@@ -72,14 +73,14 @@ func (cfg MSSQLConfig) Driver() string {
 // Each value is escaped, so a password holding URL syntax reaches the server as given.
 func (cfg MSSQLConfig) DSN() string {
 	query := url.Values{
-		"database":               {cfg.Database},
+		"database": {cfg.Database},
+		// Unset means encryption required: the driver's own default encrypts at most
+		// the login, and none of it when the server says it has no encryption (#88).
+		"encrypt":                {cmp.Or(cfg.Encrypt, "true")},
 		"trustservercertificate": {strconv.FormatBool(cfg.TrustServerCert)},
 		"connection timeout":     {strconv.Itoa(int(cfg.ConnectionTimeout.Seconds()))},
 		"read timeout":           {cfg.ReadTimeout.String()},
 		"write timeout":          {cfg.WriteTimeout.String()},
-	}
-	if cfg.Encrypt != "" {
-		query.Set("encrypt", cfg.Encrypt) // unset: only the login is encrypted (#88)
 	}
 	// A named instance is written server\instance; the driver takes it as the path (#89).
 	host, instance, _ := strings.Cut(cfg.Host, `\`)
