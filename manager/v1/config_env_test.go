@@ -1612,3 +1612,22 @@ entries:
 		t.Errorf("want only the errno reachable: %v", err)
 	}
 }
+
+// TestLoadConfig_ErrorsWithholdADefaultToo: a default is a value, so a decoder error at
+// the line holding it names its placeholder instead of quoting it, as for a value from
+// the environment.
+func TestLoadConfig_ErrorsWithholdADefaultToo(t *testing.T) {
+	path := writeConfig(t, "config.yaml", `
+entries:
+  - name: primary
+    type: readwrite
+    postgres:
+      user: app
+      password: "${PW:fallback-secret}"
+      port: ${PW:fallback-secret}
+`)
+	_, err := mgr.LoadConfigForTest(path, []mgr.EnvOption{mgr.WithEnvVars(map[string]string{})})
+	if err == nil || leaks(err, "fallbac") || !strings.Contains(err.Error(), "${PW:") {
+		t.Errorf("error should name the placeholder and quote nothing of its default: %v", err)
+	}
+}

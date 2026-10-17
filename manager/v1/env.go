@@ -153,10 +153,12 @@ func (r *envResolver) hasAnySource() bool {
 }
 
 // expand resolves one placeholder as written: to its variable's value, found in a
-// source (fromSource), else to its default, else to itself. A value or a default that
-// is not valid UTF-8 is refused without being quoted: escaped by an encoder, its bytes
-// would change and the manager would connect with another credential.
-func (r *envResolver) expand(match []byte) (val string, fromSource bool, err error) {
+// source, else to its default, else to itself. A value or a default it resolves to is
+// substituted: redacted from load errors and named, not quoted, by a decoder error, as
+// a default is a value too, a password among them. A value or a default that is not
+// valid UTF-8 is refused without being quoted: escaped by an encoder, its bytes would
+// change and the manager would connect with another credential.
+func (r *envResolver) expand(match []byte) (val string, substituted bool, err error) {
 	parts := envVarRe.FindSubmatch(match)
 	key := string(parts[1])
 	if val, ok := r.lookup(key); ok {
@@ -170,7 +172,8 @@ func (r *envResolver) expand(match []byte) (val string, fromSource bool, err err
 		if !utf8.Valid(parts[2]) {
 			return "", false, fmt.Errorf("the default of ${%s} is not valid UTF-8", key)
 		}
-		return string(parts[2]), false, nil
+		r.substituted = append(r.substituted, string(parts[2]))
+		return string(parts[2]), true, nil
 	}
 	return string(match), false, nil // no source, no default → leave as-is
 }
@@ -331,7 +334,7 @@ func tokenize(data []byte, resolver *envResolver, prefix string) ([]byte, *place
 }
 
 // value is what the placeholder behind token expands to.
-func (p *placeholders) value(token string) (val string, fromSource bool, err error) {
+func (p *placeholders) value(token string) (val string, substituted bool, err error) {
 	placeholder, ok := p.byToken[token]
 	if !ok {
 		return token, false, nil // digits no placeholder stands behind
@@ -340,9 +343,9 @@ func (p *placeholders) value(token string) (val string, fromSource bool, err err
 }
 
 // expandText replaces each token in s with its value, and lists the placeholders whose
-// value came from a source.
+// value was substituted.
 func (p *placeholders) expandText(s string) (string, []string, error) {
-	var fromSource []string
+	var substituted []string
 	var firstErr error
 	expanded := p.token.ReplaceAllStringFunc(s, func(token string) string {
 		val, found, err := p.value(token)
@@ -350,11 +353,11 @@ func (p *placeholders) expandText(s string) (string, []string, error) {
 			firstErr = err
 		}
 		if found {
-			fromSource = append(fromSource, p.byToken[token])
+			substituted = append(substituted, p.byToken[token])
 		}
 		return val
 	})
-	return expanded, fromSource, firstErr
+	return expanded, substituted, firstErr
 }
 
 // restore puts the placeholders back into a parser's message in place of their tokens.
@@ -407,7 +410,7 @@ func scalarTexts(n *yaml.Node) []string {
 }
 
 // expandYAML puts each placeholder's value into the scalars under n that hold its token,
-// and records the lines holding a value from a source.
+// and records the lines holding a substituted value.
 func (p *placeholders) expandYAML(n *yaml.Node, lines map[int][]string) error {
 	for _, child := range n.Content {
 		if err := p.expandYAML(child, lines); err != nil {
@@ -420,11 +423,11 @@ func (p *placeholders) expandYAML(n *yaml.Node, lines map[int][]string) error {
 	if n.Kind != yaml.ScalarNode || !p.token.MatchString(n.Value) {
 		return nil
 	}
-	val, fromSource, err := p.expandText(n.Value)
+	val, substituted, err := p.expandText(n.Value)
 	if err != nil {
 		return err
 	}
-	for _, placeholder := range fromSource {
+	for _, placeholder := range substituted {
 		addLine(lines, n.Line, placeholder)
 	}
 	n.Value = val
@@ -636,7 +639,7 @@ func wrapDecode(format string, err error) error {
 // expandTree puts placeholder values into a decoded JSON or TOML tree: as text into a
 // string or a key, and as the value scalar types in place of a bare token. A token glued
 // to other text outside quotes fails. paths records, per key path, the placeholders
-// whose value from a source sits there, for decode errors to name.
+// whose substituted value sits there, for decode errors to name.
 func (p *placeholders) expandTree(v any, path string, paths map[string][]string, scalar func(string) any) (any, error) {
 	switch v := v.(type) {
 	case map[string]any:
@@ -651,8 +654,8 @@ func (p *placeholders) expandTree(v any, path string, paths map[string][]string,
 		}
 		return out, nil
 	case string:
-		expanded, fromSource, err := p.expandText(v)
-		for _, placeholder := range fromSource {
+		expanded, substituted, err := p.expandText(v)
+		for _, placeholder := range substituted {
 			addLine(paths, path, placeholder)
 		}
 		return expanded, err
@@ -670,7 +673,7 @@ func (p *placeholders) expandMap(
 	// In key order, so an error naming two keys names them the same way every time.
 	for _, written := range slices.Sorted(maps.Keys(m)) {
 		child := m[written]
-		key, fromSource, err := p.expandText(written)
+		key, substituted, err := p.expandText(written)
 		if err != nil {
 			return nil, err
 		}
@@ -687,7 +690,7 @@ func (p *placeholders) expandMap(
 		if path != "" {
 			at = path + "." + key
 		}
-		for _, placeholder := range fromSource {
+		for _, placeholder := range substituted {
 			addLine(paths, at, placeholder)
 		}
 		if out[key], err = p.expandTree(child, at, paths, scalar); err != nil {
@@ -708,11 +711,11 @@ func (p *placeholders) expandBare(v any, path string, paths map[string][]string,
 	if token != text {
 		return nil, fmt.Errorf("%s: %s sits next to other text outside quotes: quote it", path, p.byToken[token])
 	}
-	val, fromSource, err := p.value(token)
+	val, substituted, err := p.value(token)
 	if err != nil {
 		return nil, err
 	}
-	if fromSource {
+	if substituted {
 		addLine(paths, path, p.byToken[token])
 	}
 	return scalar(val), nil

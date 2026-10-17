@@ -38,7 +38,8 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
     double-quoted string, a doubled quote in a YAML single-quoted one, or a value
     JSON-encoded to survive the file lost its escapes. A value now goes in as it is: drop
     such workarounds when upgrading.
-  - **A default is a value too.** Escapes in it are no longer read (`"${X:a\tb}"` gives a
+  - **A default is a value too**, redacted from load errors like one from the
+    environment. Escapes in it are no longer read (`"${X:a\tb}"` gives a
     backslash and a `t`), and it cannot hold syntax, such as a quote that opens a string
     for the next placeholder.
   - **In JSON and TOML, placeholders glued to other text outside quotes fail the load**
