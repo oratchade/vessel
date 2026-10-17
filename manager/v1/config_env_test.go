@@ -1526,3 +1526,31 @@ entries:
 		t.Errorf("want the caller's logger, unwrapped:\n%s", logs.String())
 	}
 }
+
+// keySpellingAPlaceholder is a JSON entry holding ${KEY} as a key and, next to it, the
+// same text spelled with an escape, a literal key that is no placeholder, as is one
+// spelling how the comparison writes a placeholder.
+func keySpellingAPlaceholder(password string) string {
+	return `{"entries": [{"name": "primary", "type": "readwrite",
+  "${KEY}": {"user": "app", "password": ` + password + `, "host": "localhost", "port": 5432, "database": "app"},
+  "$\u007bKEY}": {}, "<\"$\u007bKEY}\">": {}}]}`
+}
+
+// TestLoadConfig_KeySpellingAPlaceholderHidesNothing: the two parses are compared in a
+// form that keeps every key and tells a placeholder from text spelling one, so a literal
+// key reading ${KEY} neither hides what the syntax read of another placeholder nor, by
+// map order, fails a valid load. Each case loads repeatedly, since map order varies.
+func TestLoadConfig_KeySpellingAPlaceholderHidesNothing(t *testing.T) {
+	vars := map[string]string{"KEY": "postgres", "HEX": "41", "PW": "secret"}
+	for range 20 {
+		path := writeConfig(t, "config.json", keySpellingAPlaceholder(`"\uD8${HEX}"`))
+		if cfg, err := mgr.LoadConfigForTest(path, []mgr.EnvOption{mgr.WithEnvVars(vars)}); err == nil {
+			t.Fatalf("load succeeded, password = %q", cfg.Entries[0].Postgres.Password)
+		}
+		path = writeConfig(t, "config.json", keySpellingAPlaceholder(`"${PW}"`))
+		cfg, err := mgr.LoadConfigForTest(path, []mgr.EnvOption{mgr.WithEnvVars(vars)})
+		if err != nil || cfg.Entries[0].Postgres.Password != "secret" {
+			t.Fatalf("cfg, err = %+v, %v; want password secret", cfg, err)
+		}
+	}
+}

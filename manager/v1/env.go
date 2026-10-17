@@ -211,7 +211,7 @@ func tokenizeDecoded(
 		if err != nil {
 			return nil, p, err
 		}
-		if read = fmt.Sprint(p.readBack(again)); read == fmt.Sprint(first.readBack(decoded)) {
+		if read = p.readBack(again); read == first.readBack(decoded) {
 			return tokenized, p, nil
 		}
 		avoid = fmt.Appendf(avoid, "%v %v", decoded, again)
@@ -239,23 +239,51 @@ func shiftDigits(digits string) string {
 	return strings.Map(func(r rune) rune { return '0' + (r-'0'+1)%10 }, digits)
 }
 
-// readBack is v with each token in its keys and values read back as its placeholder.
-func (p *placeholders) readBack(v any) any {
+// readBack is v in a form two parses can be compared in. Each text is quoted, with each
+// token in it read back as its placeholder outside the quotes, so no text can read as
+// one; an object is its key-value pairs, sorted, so none is lost to another whose key
+// reads the same.
+func (p *placeholders) readBack(v any) string {
+	var items []string
 	switch v := v.(type) {
 	case map[string]any:
-		out := make(map[string]any, len(v))
 		for key, child := range v {
-			out[p.restore(key)] = p.readBack(child)
+			items = append(items, p.readText(key)+":"+p.readBack(child))
 		}
-		return out
+		slices.Sort(items)
+		return "{" + strings.Join(items, ",") + "}"
 	case []any:
-		out := make([]any, len(v))
-		for i, child := range v {
-			out[i] = p.readBack(child)
+		for _, child := range v {
+			items = append(items, p.readBack(child))
 		}
-		return out
+	case []string:
+		for _, text := range v {
+			items = append(items, p.readText(text))
+		}
+	default:
+		return p.readText(fmt.Sprint(v))
 	}
-	return p.restore(fmt.Sprint(v))
+	return "[" + strings.Join(items, ",") + "]"
+}
+
+// readText is s quoted, with each token in it read back as <placeholder> between quoted
+// runs of text. Digits no placeholder stands behind are text.
+func (p *placeholders) readText(s string) string {
+	var read strings.Builder
+	last := 0
+	for _, at := range p.token.FindAllStringIndex(s, -1) {
+		if placeholder, ok := p.byToken[s[at[0]:at[1]]]; ok {
+			read.WriteString(strconv.Quote(s[last:at[0]]) + p.marker(placeholder))
+			last = at[1]
+		}
+	}
+	read.WriteString(strconv.Quote(s[last:]))
+	return read.String()
+}
+
+// marker is how readText writes placeholder: never inside quotes, so no text matches it.
+func (p *placeholders) marker(placeholder string) string {
+	return "<" + strconv.Quote(placeholder) + ">"
 }
 
 // unreadable is the error for a file whose two parses differ. It names the placeholders
@@ -263,7 +291,7 @@ func (p *placeholders) readBack(v any) any {
 func (p *placeholders) unreadable(read string) error {
 	var lost []string
 	for _, placeholder := range p.byToken {
-		if !strings.Contains(read, placeholder) {
+		if !strings.Contains(read, p.marker(placeholder)) {
 			lost = append(lost, placeholder)
 		}
 	}
