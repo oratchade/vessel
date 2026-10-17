@@ -1405,6 +1405,7 @@ func TestLoadConfig_PlaceholderTheSyntaxReadsPartOfFails(t *testing.T) {
 	cases := map[string]struct{ file, content string }{
 		"JSON u-escape":            {"config.json", jsonPassword(`"\u${HEX}"`)},
 		"JSON u-escape, hex begun": {"config.json", jsonPassword(`"\u00${HEX}"`)},
+		"JSON surrogate":           {"config.json", jsonPassword(`"\uD8${HEX}"`)},
 		"YAML x-escape":            {"config.yaml", yamlPassword(`"\x${HEX}"`)},
 		"YAML u-escape":            {"config.yaml", yamlPassword(`"\u${HEX}"`)},
 		"TOML u-escape":            {"config.toml", tomlWith(`password = "\u${HEX}"`, "5432")},
@@ -1454,18 +1455,35 @@ func TestLoadConfig_BackslashThatEscapesNothingKeepsThePlaceholder(t *testing.T)
 	}
 }
 
-// TestLoadConfig_TextSpellingAStandInFails: a key spelling the stand-in of another
-// placeholder collapses with it in the first parse, hiding what the second one reads;
-// the two parses then differ and the load fails, where it used to panic.
-func TestLoadConfig_TextSpellingAStandInFails(t *testing.T) {
-	path := writeConfig(t, "config.json", `{"entries": [{"name": "primary", "type": "readwrite",
-  "postgres": {"user": "app", "password": "${DB_PASSWORD}", "host": "localhost", "port": 5432, "database": "app"},
-  "80000\u0030000000000001": "70000\u0030000000000099", "${KEY}": "ignored"}]}`)
-	_, err := mgr.LoadConfigForTest(path, []mgr.EnvOption{
-		mgr.WithEnvVars(map[string]string{"DB_PASSWORD": "secret", "KEY": "unused"}),
-	})
-	if err == nil || !strings.Contains(err.Error(), "stand-in") {
-		t.Errorf("want the stand-in refused: %v", err)
+// TestLoadConfig_TextSpellingAStandInLoadsAsText: escaped digits can spell a token or
+// the stand-in the first parse uses for it; tokens are then chosen again, and the text
+// loads as written.
+func TestLoadConfig_TextSpellingAStandInLoadsAsText(t *testing.T) {
+	cases := map[string]struct{ name, user string }{
+		"a stand-in":              {`81111\u0031111111111111`, "app"},
+		"a token":                 {`70000\u0030000000000000`, "app"},
+		"both":                    {`81111\u0031111111111111`, `70000\u0030000000000000`},
+		"two stand-ins as digits": {"811111111111111111", "811111111112111111"},
+		"a stand-in as digits":    {"811111111111111111", "app"},
+		"an earlier prefix":       {`80000\u0030000000000000`, "app"},
+	}
+	for label, c := range cases {
+		t.Run(label, func(t *testing.T) {
+			path := writeConfig(t, "config.json", `{"entries": [{"name": "`+c.name+`", "type": "readwrite",
+  "postgres": {"user": "`+c.user+`", "password": "${DB_PASSWORD}", "host": "localhost", "port": 5432, "database": "app"}}]}`)
+			cfg, err := mgr.LoadConfigForTest(path, []mgr.EnvOption{
+				mgr.WithEnvVars(map[string]string{"DB_PASSWORD": "secret"}),
+			})
+			if err != nil {
+				t.Fatalf("load: %v", err)
+			}
+			e := cfg.Entries[0]
+			wantName, wantUser := strings.ReplaceAll(c.name, `\u003`, ""), strings.ReplaceAll(c.user, `\u003`, "")
+			if e.Name != wantName || e.Postgres.User != wantUser || e.Postgres.Password != "secret" {
+				t.Errorf("name, user, password = %q, %q, %q; want %q, %q, secret",
+					e.Name, e.Postgres.User, e.Postgres.Password, wantName, wantUser)
+			}
+		})
 	}
 }
 

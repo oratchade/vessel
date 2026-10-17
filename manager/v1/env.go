@@ -184,30 +184,59 @@ type placeholders struct {
 	byToken  map[string]string // token → the placeholder as written
 }
 
-// tokenizeDecoded tokenizes data for parse, with a prefix that appears neither in data
-// nor in what parse decodes from it: an escape, or a TOML integer such as
-// 700_000_000_000_000_000, spells digits the file does not hold as written. So data is
-// parsed once with stand-in tokens first, from their own range, to see what it decodes.
-// Both parses must then read the same once each token is read back as its placeholder:
-// where they differ, the file's syntax read part of a token, as an escape or a number
-// around it does, or text in the file reads as one.
+// tokenizeDecoded tokenizes data for parse, and checks the parser takes each token
+// whole: data is parsed with stand-ins too, each a token with every digit shifted
+// (0 to 1, ..., 9 to 0), and both parses must read the same once each is read back as
+// its placeholder. Where an escape or a number around a token reads part of it, what is
+// left of the token differs in every digit between the two, even when what the escape
+// made of its part does not. Text in the file can also spell a token, as an escape or a
+// TOML integer such as 700_000_000_000_000_000 does: then tokens are chosen once more,
+// clear of what both parses read, and only a second difference fails the load.
 func tokenizeDecoded(
 	data []byte, resolver *envResolver, parse func([]byte) (any, error),
 ) ([]byte, *placeholders, error) {
-	standIn, first := tokenize(data, resolver, 800_000_000_000, nil)
-	decoded, err := parse(standIn)
-	if err != nil {
-		return nil, first, err
+	avoid := data
+	var p *placeholders
+	var read string
+	for range 2 {
+		prefix := tokenPrefix(avoid)
+		standIn, first := tokenize(data, resolver, shiftDigits(prefix))
+		decoded, err := parse(standIn)
+		if err != nil {
+			return nil, first, err
+		}
+		var tokenized []byte
+		tokenized, p = tokenize(data, resolver, prefix)
+		again, err := parse(tokenized)
+		if err != nil {
+			return nil, p, err
+		}
+		if read = fmt.Sprint(p.readBack(again)); read == fmt.Sprint(first.readBack(decoded)) {
+			return tokenized, p, nil
+		}
+		avoid = fmt.Appendf(avoid, "%v %v", decoded, again)
 	}
-	tokenized, p := tokenize(data, resolver, 700_000_000_000, fmt.Append(nil, decoded))
-	again, err := parse(tokenized)
-	if err != nil {
-		return nil, p, err
+	return nil, p, p.unreadable(read)
+}
+
+// tokenPrefix is the first prefix from 700000000000 found in avoid neither as it is nor
+// with its digits shifted, and holding its first digit nowhere else either way, so text
+// before a token cannot run into it to spell another. Twelve digits, so a token fits an
+// int64 and has no leading zero.
+func tokenPrefix(avoid []byte) string {
+	for prefix := 700_000_000_000; ; prefix++ {
+		text := strconv.Itoa(prefix)
+		if spelled := func(t string) bool {
+			return bytes.Contains(avoid, []byte(t)) || strings.Count(t, t[:1]) > 1
+		}; !spelled(text) && !spelled(shiftDigits(text)) {
+			return text
+		}
 	}
-	if read := fmt.Sprint(p.readBack(again)); read != fmt.Sprint(first.readBack(decoded)) {
-		return nil, p, p.unreadable(read)
-	}
-	return tokenized, p, nil
+}
+
+// shiftDigits is digits with each one shifted: 0 to 1, ..., 8 to 9, 9 to 0.
+func shiftDigits(digits string) string {
+	return strings.Map(func(r rune) rune { return '0' + (r-'0'+1)%10 }, digits)
 }
 
 // readBack is v with each token in its keys and values read back as its placeholder.
@@ -246,26 +275,24 @@ func (p *placeholders) unreadable(read string) error {
 		"or a number around it does, so no value can go there", strings.Join(lost, ", "))
 }
 
-// tokenize replaces each placeholder in data with a token, the first prefix from start
-// that appears in neither data nor avoid, then six digits. The prefix holds its first
-// digit nowhere else, so text before a token cannot run into it to spell another. The
-// same placeholder gets the same token, so a YAML alias still names its anchor.
-func tokenize(data []byte, resolver *envResolver, start int, avoid []byte) ([]byte, *placeholders) {
-	prefix := start // twelve digits, so a token fits an int64 and has no leading zero
-	for text := strconv.Itoa(prefix); bytes.Contains(data, []byte(text)) || bytes.Contains(avoid, []byte(text)) ||
-		strings.Count(text, text[:1]) > 1; text = strconv.Itoa(prefix) {
-		prefix++
-	}
+// tokenize replaces each placeholder in data with a token: prefix, then six digits, all
+// shifted when prefix is a shifted one. The same placeholder gets the same token, so a
+// YAML alias still names its anchor.
+func tokenize(data []byte, resolver *envResolver, prefix string) ([]byte, *placeholders) {
 	p := &placeholders{
 		resolver: resolver,
-		token:    regexp.MustCompile(strconv.Itoa(prefix) + `\d{6}`),
+		token:    regexp.MustCompile(prefix + `\d{6}`),
 		byToken:  map[string]string{},
 	}
+	shifted := prefix[0] != '7'
 	byText := map[string]string{}
 	return envVarRe.ReplaceAllFunc(data, func(match []byte) []byte {
 		token, ok := byText[string(match)]
 		if !ok {
-			token = fmt.Sprintf("%d%06d", prefix, len(byText))
+			token = fmt.Sprintf("%s%06d", prefix, len(byText))
+			if shifted {
+				token = prefix + shiftDigits(token[len(prefix):])
+			}
 			byText[string(match)] = token
 			p.byToken[token] = string(match)
 		}
