@@ -9,6 +9,7 @@ import (
 	"log/slog"
 	"os"
 	"path/filepath"
+	"regexp"
 	"slices"
 	"strings"
 	"syscall"
@@ -1552,5 +1553,25 @@ func TestLoadConfig_KeySpellingAPlaceholderHidesNothing(t *testing.T) {
 		if err != nil || cfg.Entries[0].Postgres.Password != "secret" {
 			t.Fatalf("cfg, err = %+v, %v; want password secret", cfg, err)
 		}
+	}
+}
+
+// TestLoadConfig_ParseErrorNamesThePlaceholder: a parse error quotes what the parser
+// read, a stand-in where a placeholder was; it names the placeholder instead, in every
+// format.
+func TestLoadConfig_ParseErrorNamesThePlaceholder(t *testing.T) {
+	// ${KEY} is both a value and a table: the parser rejects it, quoting the key.
+	path := writeConfig(t, "config.toml", `
+[[entries]]
+name = "primary"
+type = "readwrite"
+"${KEY}" = {}
+
+[entries.${KEY}]
+user = "app"
+`)
+	_, err := mgr.LoadConfigForTest(path, []mgr.EnvOption{mgr.WithEnvVars(map[string]string{"KEY": "postgres"})})
+	if err == nil || !strings.Contains(err.Error(), "${KEY}") || regexp.MustCompile(`[0-9]{10}`).MatchString(err.Error()) {
+		t.Errorf("error should name ${KEY}, not its stand-in: %v", err)
 	}
 }

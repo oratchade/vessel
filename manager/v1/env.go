@@ -203,13 +203,14 @@ func tokenizeDecoded(
 		standIn, first := tokenize(data, resolver, shiftDigits(prefix))
 		decoded, err := parse(standIn)
 		if err != nil {
-			return nil, first, err
+			// A parser quotes what it read: name the placeholder, not its stand-in.
+			return nil, first, errors.New(first.restore(err.Error()))
 		}
 		var tokenized []byte
 		tokenized, p = tokenize(data, resolver, prefix)
 		again, err := parse(tokenized)
 		if err != nil {
-			return nil, p, err
+			return nil, p, errors.New(p.restore(err.Error()))
 		}
 		if read = p.readBack(again); read == first.readBack(decoded) {
 			return tokenized, p, nil
@@ -378,7 +379,7 @@ func decodeYAML(data []byte, resolver *envResolver, out any) error {
 		return scalarTexts(&root), err
 	})
 	if err != nil {
-		return fmt.Errorf("parse yaml: %s", p.restore(err.Error()))
+		return fmt.Errorf("parse yaml: %w", err)
 	}
 	var root yaml.Node
 	if err := yaml.Unmarshal(tokenized, &root); err != nil {
