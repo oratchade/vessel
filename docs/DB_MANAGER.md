@@ -100,6 +100,10 @@ format's own library escapes them. Defaults are values too.
 - **In a key**, a value is that one key: a dot in it does not reach into another table.
   In JSON and TOML, two keys of one object that name the same field, equal or equal but
   for case, fail the load.
+- **Inside an escape or a number**, where the file's syntax would read part of the
+  placeholder (`"\u${X}"`, `"\x${X}"`, `${X}.5` in TOML), the load fails naming it: a
+  value never builds an escape or a number. Where a backslash is text, as in a TOML
+  literal string or YAML outside double quotes, a placeholder after it expands as usual.
 - **In YAML**, an anchor can be named by a placeholder if its alias repeats it as
   written (`&${A}` … `*${A}`). A placeholder in a tag fails the load. A placeholder in a
   comment is never expanded.

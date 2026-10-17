@@ -1384,3 +1384,87 @@ entries:
 		t.Errorf("want the driver's ParseConfigError: %v", err)
 	}
 }
+
+// yamlPassword is a YAML config whose postgres password is written as given.
+func yamlPassword(password string) string {
+	return "entries:\n  - name: primary\n    type: readwrite\n    postgres:\n      user: app\n      password: " +
+		password + "\n      host: localhost\n      port: 5432\n      database: app\n"
+}
+
+// jsonPassword is jsonWithPort's JSON config with its password written as given.
+func jsonPassword(password string) string {
+	return `{"entries": [{"name": "primary", "type": "readwrite", "postgres": {"user": "app", "password": ` +
+		password + `, "host": "localhost", "port": 5432, "database": "app"}}]}`
+}
+
+// TestLoadConfig_PlaceholderTheSyntaxReadsPartOfFails: an escape that takes hex digits,
+// or a number written around a placeholder, reads part of what stands in for it while
+// the file parses; no value can go there, and the load fails naming it rather than
+// connecting with the stand-in's digits.
+func TestLoadConfig_PlaceholderTheSyntaxReadsPartOfFails(t *testing.T) {
+	cases := map[string]struct{ file, content string }{
+		"JSON u-escape":            {"config.json", jsonPassword(`"\u${HEX}"`)},
+		"JSON u-escape, hex begun": {"config.json", jsonPassword(`"\u00${HEX}"`)},
+		"YAML x-escape":            {"config.yaml", yamlPassword(`"\x${HEX}"`)},
+		"YAML u-escape":            {"config.yaml", yamlPassword(`"\u${HEX}"`)},
+		"TOML u-escape":            {"config.toml", tomlWith(`password = "\u${HEX}"`, "5432")},
+		"TOML float":               {"config.toml", tomlWith(`password = "x"`, "${HEX}.5")},
+	}
+	for name, c := range cases {
+		t.Run(name, func(t *testing.T) {
+			path := writeConfig(t, c.file, c.content)
+			cfg, err := mgr.LoadConfigForTest(path, []mgr.EnvOption{
+				mgr.WithEnvVars(map[string]string{"HEX": "0041"}),
+			})
+			if err == nil {
+				t.Fatalf("load succeeded, password = %q", cfg.Entries[0].Postgres.Password)
+			}
+			if !strings.Contains(err.Error(), "${HEX}") {
+				t.Errorf("error should name ${HEX}: %v", err)
+			}
+		})
+	}
+}
+
+// TestLoadConfig_BackslashThatEscapesNothingKeepsThePlaceholder: where a backslash is
+// text, not an escape, a placeholder after it is whole and takes its value.
+func TestLoadConfig_BackslashThatEscapesNothingKeepsThePlaceholder(t *testing.T) {
+	cases := map[string]struct{ file, content, want string }{
+		"TOML literal":       {"config.toml", tomlWith(`password = 'C:\u${X}'`, "5432"), `C:\user`},
+		"TOML escaped":       {"config.toml", tomlWith(`password = "\\u${X}"`, "5432"), `\user`},
+		"YAML single-quoted": {"config.yaml", yamlPassword(`'\u${X}'`), `\user`},
+		"YAML plain":         {"config.yaml", yamlPassword(`a\u${X}`), `a\user`},
+		"YAML block":         {"config.yaml", yamlPassword("|-\n        " + `\u${X}`), `\user`},
+		"YAML escaped":       {"config.yaml", yamlPassword(`"\\u${X}"`), `\user`},
+		"JSON escaped":       {"config.json", jsonPassword(`"\\u${X}"`), `\user`},
+	}
+	for name, c := range cases {
+		t.Run(name, func(t *testing.T) {
+			path := writeConfig(t, c.file, c.content)
+			cfg, err := mgr.LoadConfigForTest(path, []mgr.EnvOption{
+				mgr.WithEnvVars(map[string]string{"X": "ser"}),
+			})
+			if err != nil {
+				t.Fatalf("load: %v", err)
+			}
+			if got := cfg.Entries[0].Postgres.Password; got != c.want {
+				t.Errorf("password = %q, want %q", got, c.want)
+			}
+		})
+	}
+}
+
+// TestLoadConfig_TextSpellingAStandInFails: a key spelling the stand-in of another
+// placeholder collapses with it in the first parse, hiding what the second one reads;
+// the two parses then differ and the load fails, where it used to panic.
+func TestLoadConfig_TextSpellingAStandInFails(t *testing.T) {
+	path := writeConfig(t, "config.json", `{"entries": [{"name": "primary", "type": "readwrite",
+  "postgres": {"user": "app", "password": "${DB_PASSWORD}", "host": "localhost", "port": 5432, "database": "app"},
+  "80000\u0030000000000001": "70000\u0030000000000099", "${KEY}": "ignored"}]}`)
+	_, err := mgr.LoadConfigForTest(path, []mgr.EnvOption{
+		mgr.WithEnvVars(map[string]string{"DB_PASSWORD": "secret", "KEY": "unused"}),
+	})
+	if err == nil || !strings.Contains(err.Error(), "stand-in") {
+		t.Errorf("want the stand-in refused: %v", err)
+	}
+}

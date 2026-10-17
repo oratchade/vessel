@@ -188,16 +188,62 @@ type placeholders struct {
 // nor in what parse decodes from it: an escape, or a TOML integer such as
 // 700_000_000_000_000_000, spells digits the file does not hold as written. So data is
 // parsed once with stand-in tokens first, from their own range, to see what it decodes.
+// Both parses must then read the same once each token is read back as its placeholder:
+// where they differ, the file's syntax read part of a token, as an escape or a number
+// around it does, or text in the file reads as one.
 func tokenizeDecoded(
 	data []byte, resolver *envResolver, parse func([]byte) (any, error),
 ) ([]byte, *placeholders, error) {
-	standIn, p := tokenize(data, resolver, 800_000_000_000, nil)
+	standIn, first := tokenize(data, resolver, 800_000_000_000, nil)
 	decoded, err := parse(standIn)
+	if err != nil {
+		return nil, first, err
+	}
+	tokenized, p := tokenize(data, resolver, 700_000_000_000, fmt.Append(nil, decoded))
+	again, err := parse(tokenized)
 	if err != nil {
 		return nil, p, err
 	}
-	tokenized, p := tokenize(data, resolver, 700_000_000_000, fmt.Append(nil, decoded))
+	if read := fmt.Sprint(p.readBack(again)); read != fmt.Sprint(first.readBack(decoded)) {
+		return nil, p, p.unreadable(read)
+	}
 	return tokenized, p, nil
+}
+
+// readBack is v with each token in its keys and values read back as its placeholder.
+func (p *placeholders) readBack(v any) any {
+	switch v := v.(type) {
+	case map[string]any:
+		out := make(map[string]any, len(v))
+		for key, child := range v {
+			out[p.restore(key)] = p.readBack(child)
+		}
+		return out
+	case []any:
+		out := make([]any, len(v))
+		for i, child := range v {
+			out[i] = p.readBack(child)
+		}
+		return out
+	}
+	return p.restore(fmt.Sprint(v))
+}
+
+// unreadable is the error for a file whose two parses differ. It names the placeholders
+// missing from what was read: one the syntax read part of is no longer there.
+func (p *placeholders) unreadable(read string) error {
+	var lost []string
+	for _, placeholder := range p.byToken {
+		if !strings.Contains(read, placeholder) {
+			lost = append(lost, placeholder)
+		}
+	}
+	if len(lost) == 0 {
+		return errors.New("text in the file reads as the stand-in for a placeholder")
+	}
+	slices.Sort(lost)
+	return fmt.Errorf("%s: the file's syntax reads part of the placeholder there, as an escape "+
+		"or a number around it does, so no value can go there", strings.Join(lost, ", "))
 }
 
 // tokenize replaces each placeholder in data with a token, the first prefix from start
@@ -229,7 +275,11 @@ func tokenize(data []byte, resolver *envResolver, start int, avoid []byte) ([]by
 
 // value is what the placeholder behind token expands to.
 func (p *placeholders) value(token string) (val string, fromSource bool, err error) {
-	return p.resolver.expand([]byte(p.byToken[token]))
+	placeholder, ok := p.byToken[token]
+	if !ok {
+		return token, false, nil // digits no placeholder stands behind
+	}
+	return p.resolver.expand([]byte(placeholder))
 }
 
 // expandText replaces each token in s with its value, and lists the placeholders whose

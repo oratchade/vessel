@@ -48,6 +48,9 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
     text, a string; outside quotes, a value that is not a JSON number, boolean or null,
     or a TOML integer or boolean, is a string, which a numeric field rejects; a key from the
     environment is one key, so a dot in it no longer reaches into another table.
+  - **A placeholder the file's syntax reads part of fails the load**, naming it: inside
+    an escape (`"\u${X}"`, `"\x${X}"`), or in a number written around it (`${X}.5` in
+    TOML). Expanded as text, the value built the escape or the number.
   - **A value or a default that is not valid UTF-8 fails the load**, naming its
     variable, instead of reaching the database with its bytes replaced.
   - A YAML alias must repeat its anchor's placeholder as written (`&${A}` … `*${A}`), and
