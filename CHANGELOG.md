@@ -25,9 +25,9 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
   (`entries.postgres.port: the value of ${DB_PORT} is not valid here`): decoders quote
   part of a value they reject, YAML up to its first seven characters. Other errors have
   each value replaced with `[REDACTED]`. **From setup on, the passwords are redacted**,
-  once anything was substituted: from setup errors and from every line the manager, its
-  entries and their drivers log for as long as it runs, while the user, host and
-  database stay readable. A redacted error is new, not a wrapper, since a TOML decode
+  wherever each came from and with or without an EnvOption: from setup errors and from
+  every line the manager, its entries and their drivers log for as long as it runs,
+  while the user, host and database stay readable. A redacted error is new, not a wrapper, since a TOML decode
   error kept the expanded source and the PostgreSQL driver's parse error keeps the
   connection string.
 
@@ -65,9 +65,11 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
   - The validation error for an unknown entry type no longer quotes the type it got.
   - A failure to create or ping an entry's database is logged once per level by the
     setup that called it, redacted, instead of also by the entry itself.
-  - Once anything was substituted, `errors.Is` and `errors.As` on a load, validation or
-    setup error reach only an errno or a context error, not the driver's or decoder's own
-    error, which can hold a password the driver read itself (`PGPASSWORD`).
+  - `errors.Is` and `errors.As` on a setup error, and once anything was substituted on a
+    load or validation error, reach only an errno or a context error, not the driver's or
+    decoder's own error, which can hold a password the driver read itself (`PGPASSWORD`).
+    **This applies without an EnvOption too**, as does the redaction of passwords from
+    setup errors and logs.
 
 - **An MSSQL user, password or database holding URL syntax reaches the server as
   given.** The connection string pasted them in unescaped: `%41` in a password arrived

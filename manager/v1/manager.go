@@ -242,19 +242,16 @@ func NewDBManager(ctx context.Context, configPath string, logger db.Logger, envO
 	if logger == nil {
 		logger = &noOpLogger{}
 	}
-	secrets, logger := redactSetup(cfg, substituted, logger)
+	secrets, logger := redactSetup(cfg, logger)
 
 	readOnly, readWrite, err := setupDBs(ctx, cfg, logger)
 	if err != nil {
 		logger.Error("Failed to setup database entries",
 			"error", err.Error(),
 		)
-		if len(substituted) > 0 {
-			// A driver's error can keep the connection string, and a password the driver
-			// read itself (PGPASSWORD): only its message, redacted, and its safe causes leave.
-			err = redacted(err, secrets)
-		}
-		return nil, fmt.Errorf("failed to setup DB entries: %w", err)
+		// A driver's error can keep the connection string, and a password the driver read
+		// itself (PGPASSWORD): only its message, redacted, and its safe causes leave.
+		return nil, fmt.Errorf("failed to setup DB entries: %w", redacted(err, secrets))
 	}
 
 	if len(readOnly) == 0 && len(readWrite) == 0 {
@@ -287,14 +284,11 @@ func NewDBManager(ctx context.Context, configPath string, logger db.Logger, envO
 	return dm, nil
 }
 
-// redactSetup is what setup redacts once anything was substituted, and the logger
-// that redacts it. Decoded, the config says which fields are secret: from setup on, the
-// passwords are redacted, and the user, host and database an operator needs stay
-// readable. The drivers and entries log through the logger for the manager's lifetime.
-func redactSetup(cfg *config.ManagerConfig, substituted []string, logger db.Logger) ([]string, db.Logger) {
-	if len(substituted) == 0 {
-		return nil, logger
-	}
+// redactSetup is what setup redacts, and the logger that redacts it: the config's
+// passwords, wherever each came from (the environment, a default, the file as written),
+// while the user, host and database an operator needs stay readable. The drivers and
+// entries log through the logger for the manager's lifetime.
+func redactSetup(cfg *config.ManagerConfig, logger db.Logger) ([]string, db.Logger) {
 	secrets := passwords(cfg)
 	if len(secrets) == 0 {
 		return nil, logger

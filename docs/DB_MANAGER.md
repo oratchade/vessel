@@ -121,21 +121,23 @@ every form a message can give it (trimmed, `%q`-escaped, escaped in a connection
 or decoded by a YAML `!!binary` tag): which field is secret is not known before the
 config is decoded.
 
-From setup on it is known: once anything was substituted, a setup error and every line
-the manager logs for its lifetime, including what the drivers and entries log through
-it, have each password the config holds redacted the same way. The user, host and
-database stay readable, so an operator can tell what failed.
+From setup on it is known. A setup error and every line the manager logs for its
+lifetime, including what the drivers and entries log through it, have each password the
+config holds redacted the same way, wherever it came from: the environment, a default,
+or the file as written, with or without an EnvOption. The user, host and database stay
+readable, so an operator can tell what failed.
 
-Once anything was substituted, every error `NewDBManager` returns is a new error rather
-than a wrapper, since a driver's error can keep the connection string, or a password the
-driver read itself (`PGPASSWORD`). It unwraps only to the causes that hold no value, so
+A setup error, and once anything was substituted a load or validation error too, is a
+new error rather than a wrapper, since a driver's error can keep the connection string,
+or a password the driver read itself (`PGPASSWORD`). It unwraps only to the causes that
+hold no value, so
 `errors.Is(err, syscall.ECONNREFUSED)` and `errors.Is(err, context.DeadlineExceeded)`
 still work; `errors.As` reaches no driver error.
 
 What this does not cover:
 
-- **Without any EnvOption**, nothing is expanded or redacted, and errors and logs are
-  the drivers' own, as before.
+- **Without any EnvOption**, nothing is expanded, and load and validation errors are
+  the decoders' own, as before; setup errors and logs are redacted as above.
 - **Trace spans** the drivers record for queries and pings are not redacted. Setup,
   where a connection string can be quoted, records none.
 - **A password the config does not hold**, such as one a driver reads from

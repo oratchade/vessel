@@ -1370,22 +1370,6 @@ entries:
 	}
 }
 
-// TestNewDBManager_WithoutEnvOptionSetupErrorIsAsBefore: with nothing substituted, a
-// setup error is the driver's own, chain and all.
-func TestNewDBManager_WithoutEnvOptionSetupErrorIsAsBefore(t *testing.T) {
-	path := writeConfig(t, "config.yaml", `
-entries:
-  - name: primary
-    type: readwrite
-    postgres: {user: app, password: x, host: localhost, port: 5432, database: app, ssl_mode: invalid}
-`)
-	_, err := mgr.NewDBManager(t.Context(), path, nil)
-	var parseErr *pgconn.ParseConfigError
-	if !errors.As(err, &parseErr) {
-		t.Errorf("want the driver's ParseConfigError: %v", err)
-	}
-}
-
 // yamlPassword is a YAML config whose postgres password is written as given.
 func yamlPassword(password string) string {
 	return "entries:\n  - name: primary\n    type: readwrite\n    postgres:\n      user: app\n      password: " +
@@ -1509,25 +1493,6 @@ entries:
 	}
 }
 
-// TestNewDBManager_WithoutEnvOptionLogsAsBefore: with nothing substituted the logger is
-// the caller's own, as before; the manager redacts nothing it did not substitute.
-func TestNewDBManager_WithoutEnvOptionLogsAsBefore(t *testing.T) {
-	path := writeConfig(t, "config.yaml", `
-entries:
-  - name: primary
-    type: readwrite
-    mssql: {user: app, password: as-written, host: "srv\\INSTANCE", port: 1433, database: app, encrypt: "true"}
-`)
-	var logs strings.Builder
-	logger := db.NewSlogAdapter(slog.New(slog.NewTextHandler(&logs, nil)))
-	if _, err := mgr.NewDBManager(t.Context(), path, logger); err == nil {
-		t.Fatal("NewDBManager accepted a host it cannot parse")
-	}
-	if !strings.Contains(logs.String(), "as-written") {
-		t.Errorf("want the caller's logger, unwrapped:\n%s", logs.String())
-	}
-}
-
 // keySpellingAPlaceholder is a JSON entry holding ${KEY} as a key and, next to it, the
 // same text spelled with an escape, a literal key that is no placeholder, as is one
 // spelling how the comparison writes a placeholder.
@@ -1593,5 +1558,57 @@ func TestLoadConfig_SameFieldErrorIsStable(t *testing.T) {
 		} else if err.Error() != first {
 			t.Fatalf("error changed between loads:\n%s\n%s", first, err)
 		}
+	}
+}
+
+// TestNewDBManager_PasswordsAreRedactedWhereverTheyCameFrom: a password is a secret
+// whether the environment gave it, a default did, or the file holds it as written, and
+// with or without an EnvOption: no setup error or log line carries it, and no setup
+// error hands out the driver's.
+func TestNewDBManager_PasswordsAreRedactedWhereverTheyCameFrom(t *testing.T) {
+	cases := map[string]struct {
+		password string
+		opts     []mgr.EnvOption
+	}{
+		"from the environment": {`"${DB_PASSWORD}"`, []mgr.EnvOption{mgr.WithEnvVars(map[string]string{"DB_PASSWORD": "pw-secret"})}},
+		"a default":            {`"${DB_PASSWORD:pw-secret}"`, []mgr.EnvOption{mgr.WithEnvVars(map[string]string{})}},
+		"written, an option":   {"pw-secret", []mgr.EnvOption{mgr.WithEnvVars(map[string]string{})}},
+		"written, no option":   {"pw-secret", nil},
+	}
+	for name, c := range cases {
+		t.Run(name, func(t *testing.T) {
+			path := writeConfig(t, "config.yaml", `
+entries:
+  - name: primary
+    type: readwrite
+    mssql: {user: app, password: `+c.password+`, host: 'srv\INSTANCE', port: 1433, database: app, encrypt: "true"}
+`)
+			var logs strings.Builder
+			logger := db.NewSlogAdapter(slog.New(slog.NewTextHandler(&logs, nil)))
+			_, err := mgr.NewDBManager(t.Context(), path, logger, c.opts...)
+			if err == nil || !strings.Contains(err.Error(), "INSTANCE") {
+				t.Fatalf("want the error about the host: %v", err)
+			}
+			if leaks(err, "pw-secret") || strings.Contains(logs.String(), "pw-secret") {
+				t.Errorf("the password leaves:\n%v\n%s", err, logs.String())
+			}
+		})
+	}
+}
+
+// TestNewDBManager_SetupErrorWithoutEnvOptionHandsOutNoDriverError: a driver's error
+// can hold a password it read itself; without an EnvOption too, only the errno leaves.
+func TestNewDBManager_SetupErrorWithoutEnvOptionHandsOutNoDriverError(t *testing.T) {
+	t.Setenv("PGPASSWORD", "env-secret")
+	path := writeConfig(t, "config.yaml", `
+entries:
+  - name: primary
+    type: readwrite
+    postgres: {user: app, host: 127.0.0.1, port: 1, database: app, ssl_mode: disable}
+`)
+	_, err := mgr.NewDBManager(t.Context(), path, nil)
+	var connectErr *pgconn.ConnectError
+	if errors.As(err, &connectErr) || !errors.Is(err, syscall.ECONNREFUSED) {
+		t.Errorf("want only the errno reachable: %v", err)
 	}
 }
