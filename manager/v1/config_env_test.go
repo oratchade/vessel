@@ -1489,3 +1489,22 @@ entries:
 		t.Errorf("want the errno kept and the user readable: %v", err)
 	}
 }
+
+// TestNewDBManager_WithoutEnvOptionLogsAsBefore: with nothing substituted the logger is
+// the caller's own, as before; the manager redacts nothing it did not substitute.
+func TestNewDBManager_WithoutEnvOptionLogsAsBefore(t *testing.T) {
+	path := writeConfig(t, "config.yaml", `
+entries:
+  - name: primary
+    type: readwrite
+    mssql: {user: app, password: as-written, host: "srv\\INSTANCE", port: 1433, database: app, encrypt: "true"}
+`)
+	var logs strings.Builder
+	logger := db.NewSlogAdapter(slog.New(slog.NewTextHandler(&logs, nil)))
+	if _, err := mgr.NewDBManager(t.Context(), path, logger); err == nil {
+		t.Fatal("NewDBManager accepted a host it cannot parse")
+	}
+	if !strings.Contains(logs.String(), "as-written") {
+		t.Errorf("want the caller's logger, unwrapped:\n%s", logs.String())
+	}
+}
