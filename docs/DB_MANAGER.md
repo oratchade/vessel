@@ -124,14 +124,26 @@ config is decoded.
 From setup on it is known: once anything was substituted, a setup error and every line
 the manager logs for its lifetime, including what the drivers and entries log through
 it, have each password the config holds redacted the same way. The user, host and
-database stay readable, so an operator can tell what failed. The trace spans the
-drivers record are not redacted.
+database stay readable, so an operator can tell what failed.
 
 Once anything was substituted, every error `NewDBManager` returns is a new error rather
 than a wrapper, since a driver's error can keep the connection string, or a password the
 driver read itself (`PGPASSWORD`). It unwraps only to the causes that hold no value, so
 `errors.Is(err, syscall.ECONNREFUSED)` and `errors.Is(err, context.DeadlineExceeded)`
 still work; `errors.As` reaches no driver error.
+
+What this does not cover:
+
+- **Without any EnvOption**, nothing is expanded or redacted, and errors and logs are
+  the drivers' own, as before.
+- **Trace spans** the drivers record for queries and pings are not redacted. Setup,
+  where a connection string can be quoted, records none.
+- **A password the config does not hold**, such as one a driver reads from
+  `PGPASSWORD`, is not redacted from messages. pgx does not print it, and no error
+  hands out the driver's own.
+- **A TOML placeholder glued to a number** (`54${P}`) fails with the TOML library's own
+  message, which may not name it.
+- **YAML truncates a float into an integer field**, as it does for a value written there.
 
 ## Lifecycle
 
