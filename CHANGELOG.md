@@ -72,6 +72,10 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
     **This applies without an EnvOption too**, as does the redaction of passwords from
     setup errors and logs.
 
+- **An MSSQL named instance written as the host (`srv\INSTANCE`) connects (#89).** The
+  backslash went into the URL's host, escaped, which the driver rejects; the instance
+  now goes in the path, where the driver reads it. The driver then finds the instance's
+  port through SQL Server Browser.
 - **An MSSQL entry without `encrypt` connects (#88).** The connection string wrote it
   empty, which the driver rejects; left unset, it is now left out and the driver applies
   its default.

@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"net/url"
 	"strconv"
+	"strings"
 	"time"
 
 	// Import the MSSQL driver
@@ -55,16 +56,17 @@ func (cfg MSSQLConfig) Driver() string {
 //
 // This DSN includes the following options:
 //
-// * user: the username for authentication
-// * password: the password for authentication
-// * host: the hostname or IP address of the MSSQL server
-// * port: the port number to use for the connection
-// * database: the database name
-// * encrypt: the encryption mode (disable, true, false), left out when unset
-// * trustservercertificate: whether to trust the server certificate
-// * connection timeout: the maximum time to wait for a connection to be established
-// * read timeout: the maximum time to wait for a read operation to complete
-// * write timeout: the maximum time to wait for a write operation to complete
+//   - user: the username for authentication
+//   - password: the password for authentication
+//   - host: the hostname or IP address of the MSSQL server, or server\instance for a
+//     named instance, whose port the driver then finds through SQL Server Browser
+//   - port: the port number to use for the connection
+//   - database: the database name
+//   - encrypt: the encryption mode (disable, true, false), left out when unset
+//   - trustservercertificate: whether to trust the server certificate
+//   - connection timeout: the maximum time to wait for a connection to be established
+//   - read timeout: the maximum time to wait for a read operation to complete
+//   - write timeout: the maximum time to wait for a write operation to complete
 //
 // Each value is escaped, so a password holding URL syntax reaches the server as given.
 func (cfg MSSQLConfig) DSN() string {
@@ -78,10 +80,13 @@ func (cfg MSSQLConfig) DSN() string {
 	if cfg.Encrypt != "" {
 		query.Set("encrypt", cfg.Encrypt) // unset, the driver applies its default (#88)
 	}
+	// A named instance is written server\instance; the driver takes it as the path (#89).
+	host, instance, _ := strings.Cut(cfg.Host, `\`)
 	u := &url.URL{
 		Scheme:   "sqlserver",
 		User:     url.UserPassword(cfg.User, cfg.Password),
-		Host:     fmt.Sprintf("%s:%d", cfg.Host, cfg.Port),
+		Host:     fmt.Sprintf("%s:%d", host, cfg.Port),
+		Path:     instance,
 		RawQuery: query.Encode(),
 	}
 	return u.String()

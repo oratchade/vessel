@@ -181,6 +181,18 @@ func TestMSSQLConfigDSNWithoutEncrypt(t *testing.T) {
 	assert.NotContains(t, cfg.DSN(), "encrypt=")
 }
 
+// TestMSSQLConfigDSNNamedInstance: a host written server\instance, as SQL Server names a
+// named instance, reaches the driver as that server and instance (#89).
+func TestMSSQLConfigDSNNamedInstance(t *testing.T) {
+	cfg := v1.MSSQLConfig{User: "app", Password: "p@ss/w", Host: `srv\INSTANCE`, Port: 1433, Database: "app"}
+	parsed, _, err := msdsn.Parse(cfg.DSN())
+	require.NoError(t, err)
+	assert.Equal(t, "srv", parsed.Host)
+	assert.Equal(t, "INSTANCE", parsed.Instance)
+	assert.Equal(t, cfg.Password, parsed.Password)
+	assert.Equal(t, cfg.Database, parsed.Database)
+}
+
 // TestDatabaseConfigs tests all database config types
 func TestDatabaseConfigs(t *testing.T) {
 	testCases := []struct {
