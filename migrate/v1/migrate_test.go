@@ -24,6 +24,12 @@ type unknownConfig struct{}
 func (unknownConfig) Driver() string { return "clickhouse" }
 func (unknownConfig) DSN() string    { return "" }
 
+// appConfig is a caller's own config around a vessel one, with a Validate of its own
+// that has nothing to do with migrating.
+type appConfig struct{ db.SQLiteConfig }
+
+func (appConfig) Validate() error { return errors.New("app: tenant_id is required") }
+
 func sqliteConfig(t *testing.T) db.SQLiteConfig {
 	t.Helper()
 	return db.SQLiteConfig{FilePath: filepath.Join(t.TempDir(), "migrate.db")}
@@ -70,6 +76,17 @@ func TestNewRejectsWhatItCannotMigrate(t *testing.T) {
 	if assert.Error(t, err) {
 		assert.Contains(t, err.Error(), "named instance")
 	}
+	// Only SQL Server's own host check runs: a caller's config is not judged by a
+	// Validate method it has for other reasons.
+	_, err = migrate.New(appConfig{sqliteConfig(t)}, baseMigrations())
+	assert.NoError(t, err)
+
+	// A pointer to the SQL Server config is checked too.
+	_, err = migrate.New(&db.MSSQLConfig{Host: `fd00::5\INST`, Database: "x", Encrypt: "true"}, baseMigrations())
+	if assert.Error(t, err) {
+		assert.Contains(t, err.Error(), "named instance")
+	}
+
 	// A host the driver would misread is refused at New: left to Up, the driver's parse
 	// error quoted the DSN, password included.
 	_, err = migrate.New(db.MSSQLConfig{Host: "[::1", Port: 1434, Password: "pw-secret", Database: "x", Encrypt: "true"}, baseMigrations())

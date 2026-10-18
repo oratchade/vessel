@@ -116,12 +116,20 @@ func lockerFor(dialect goose.Dialect) (goose.ProviderOption, error) {
 	}
 }
 
-// checkConfig refuses a config before any connection is opened: one that can tell a
-// host its driver cannot reach (MSSQLConfig.Validate) says so, as opening a manager
-// does, then the DSN is checked for what migrating needs.
+// checkConfig refuses a config before any connection is opened: an SQL Server host
+// its driver cannot reach (MSSQLConfig.Validate), as opening a manager refuses it, then
+// a DSN missing what migrating needs. Only vessel's own config is asked: a caller's
+// type may have a Validate of its own, for other reasons.
 func checkConfig(cfg db.DBConfig, dialect goose.Dialect, dsn string) error {
-	if v, ok := cfg.(interface{ Validate() error }); ok {
-		if err := v.Validate(); err != nil {
+	var mssql *db.MSSQLConfig
+	switch c := cfg.(type) {
+	case db.MSSQLConfig:
+		mssql = &c
+	case *db.MSSQLConfig:
+		mssql = c
+	}
+	if mssql != nil {
+		if err := mssql.Validate(); err != nil {
 			return fmt.Errorf("migrate: %w", err)
 		}
 	}
