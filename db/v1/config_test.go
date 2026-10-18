@@ -258,6 +258,10 @@ func TestDSNsJoinAnyOtherHostAsWritten(t *testing.T) {
 			assert.Contains(t, pg, "@"+host+":6432/", "postgres address")
 			my := v1.MysqlConfig{Host: host, Port: 3307, User: "u", Password: "p", Database: "db"}.DSN()
 			assert.Contains(t, my, "@tcp("+host+":3307)/", "mysql address")
+			// SQL Server joined any host with net.JoinHostPort, bracketing one with a colon,
+			// so a malformed [::1 became [[::1]:1434 and connected; it is passed as written.
+			ms := v1.MSSQLConfig{Host: host, Port: 1434, User: "u", Password: "p", Database: "db", Encrypt: "true"}.DSN()
+			assert.Contains(t, ms, "@"+host+":1434?", "mssql address")
 		})
 	}
 	_, err := pgx.ParseConfig(v1.PostgresConfig{Host: "[]", Port: 6432, User: "u", Password: "p", Database: "db"}.DSN())

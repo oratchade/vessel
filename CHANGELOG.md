@@ -13,7 +13,9 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
   joined host and port with a bare colon, so `fd00::5` and its port read as one invalid
   address, and the SQL Server DSN, which bracketed the host, turned `[fd00::5]` into
   `[[fd00::5]]`. Each now brackets an IPv6 address, given either way, beside its port.
-  Any other host is passed as written, as before.
+  Any other host is passed as written: as before for PostgreSQL and MySQL, while SQL
+  Server, which bracketed any host holding a colon, now fails on a malformed one such as
+  `[::1` instead of connecting.
 - **An SQL Server named instance at an IPv6 address is refused, saying why.** The driver
   cannot find one there in either spelling, and failed on an unparseable URL or a
   lookup; give the instance's port instead. A zoned IPv6 address (`fe80::1%eth0`) is

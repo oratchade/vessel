@@ -21,8 +21,10 @@ func ipv6(host string) (addr string, ok bool) {
 
 // hostPort is host and port as a DSN writes an address: an IPv6 address in brackets,
 // given bare or already bracketed, so fd00::5 and [fd00::5] reach the driver alike. Any
-// other host keeps the address it always had, joined as written: whatever a driver made
-// of a malformed one ([], [fd00::5, db:5432) before, it makes of it still.
+// other host is joined as written. PostgreSQL and MySQL always joined it so, and
+// whatever they made of a malformed one ([], [fd00::5, db:5432) they make of it still;
+// SQL Server bracketed any host holding a colon, so a malformed [::1 connected, and it
+// now fails to parse.
 func hostPort(host string, port int) string {
 	if addr, ok := ipv6(host); ok {
 		return net.JoinHostPort(addr, strconv.Itoa(port))
