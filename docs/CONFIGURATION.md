@@ -157,7 +157,10 @@ Notes:
   login, and `"disable"` nothing.
 - A named instance is written as the host, `Host: "srv\\INSTANCE"`. The driver then
   finds the instance's port through SQL Server Browser (UDP 1434), so `Port` is not sent
-  with an instance; to connect on a fixed port, give the host without it.
+  with an instance; to connect on a fixed port, give the host without it. A named
+  instance cannot be found at an IPv6 address: the driver asks SQL Server Browser at an
+  address it writes without brackets. The manager refuses that host; give the
+  instance's port instead.
 - vessel does **not** generate `MERGE` for MSSQL upserts. Calls to
   `OnConflict/DoUpdate/Upsert` against MSSQL return an explicit
   unsupported-feature error rather than silently producing risky SQL.

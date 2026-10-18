@@ -110,6 +110,15 @@ type MSSQL struct {
 
 // newMSSQL initializes a new MSSQL connection using the provided config.
 func newMSSQL(cfg MSSQLConfig, logger Logger) (*MSSQL, error) {
+	// The driver asks SQL Server Browser for a named instance at host:1434, joined
+	// without brackets, then looks the host up with them kept: at an IPv6 address
+	// neither spelling can work, and its own error names neither cause.
+	if host, instance, _ := strings.Cut(cfg.Host, `\`); instance != "" {
+		if _, ok := ipv6(host); ok {
+			return nil, fmt.Errorf("MSSQL host %s: a named instance cannot be found at an IPv6 address; "+
+				"give the instance's port instead", host)
+		}
+	}
 	dsn := cfg.DSN()
 
 	db, err := sql.Open("sqlserver", dsn)

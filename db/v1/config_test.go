@@ -259,6 +259,20 @@ func TestDSNsJoinAnyOtherHostAsWritten(t *testing.T) {
 	assert.Error(t, err, "an empty host in brackets is refused, not taken for the default")
 }
 
+// TestMSSQLNamedInstanceAtIPv6IsRefused: the driver finds a named instance by asking
+// SQL Server Browser at host:1434, joined unbracketed, then looks the host up with the
+// brackets kept, so neither spelling of an IPv6 address can work. The manager says so
+// rather than failing on a parse or lookup error that names neither cause.
+func TestMSSQLNamedInstanceAtIPv6IsRefused(t *testing.T) {
+	for _, host := range []string{`fd00::5\INST`, `[fd00::5]\INST`} {
+		t.Run(host, func(t *testing.T) {
+			_, err := v1.MSSQLCfgToDB(v1.MSSQLConfig{Host: host, User: "u", Password: "p", Database: "db", Encrypt: "true"}, nil)
+			require.Error(t, err)
+			assert.Contains(t, err.Error(), "named instance")
+		})
+	}
+}
+
 // TestDatabaseConfigs tests all database config types
 func TestDatabaseConfigs(t *testing.T) {
 	testCases := []struct {
