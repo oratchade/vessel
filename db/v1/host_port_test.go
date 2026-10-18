@@ -25,6 +25,8 @@ var hostSpellings = []struct{ written, host string }{
 	{"[::1]", "::1"},
 	{"fd00::5", "fd00::5"},
 	{"[fd00::5]", "fd00::5"},
+	{"fe80::1%eth0", "fe80::1%eth0"},
+	{"[fe80::1%eth0]", "fe80::1%eth0"},
 }
 
 // TestDSNsReachEveryKindOfHost: each driver reads the host and the port apart, an IPv6
@@ -50,4 +52,21 @@ func TestDSNsReachEveryKindOfHost(t *testing.T) {
 			assert.Equal(t, uint64(1434), ms.Port, "mssql port")
 		})
 	}
+}
+
+// TestDSNsJoinAnyOtherHostAsWritten: only an IPv6 address is bracketed. Any other host
+// keeps the address it always had, so whatever the driver made of it before it makes of
+// it still; stripping brackets from [] turned a parse error into a connection to PGHOST
+// or localhost.
+func TestDSNsJoinAnyOtherHostAsWritten(t *testing.T) {
+	for _, host := range []string{"[]", "[db.internal]", "[fd00::5", "[[fd00::5]]", "db.internal:5433"} {
+		t.Run(host, func(t *testing.T) {
+			pg := v1.PostgresConfig{Host: host, Port: 6432, User: "u", Password: "p", Database: "db"}.DSN()
+			assert.Contains(t, pg, "@"+host+":6432/", "postgres address")
+			my := v1.MysqlConfig{Host: host, Port: 3307, User: "u", Password: "p", Database: "db"}.DSN()
+			assert.Contains(t, my, "@tcp("+host+":3307)/", "mysql address")
+		})
+	}
+	_, err := pgx.ParseConfig(v1.PostgresConfig{Host: "[]", Port: 6432, User: "u", Password: "p", Database: "db"}.DSN())
+	assert.Error(t, err, "an empty host in brackets is refused, not taken for the default")
 }
