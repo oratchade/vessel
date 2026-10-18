@@ -248,9 +248,9 @@ func TestDSNsReachEveryKindOfHost(t *testing.T) {
 }
 
 // TestDSNsJoinAnyOtherHostAsWritten: only an IPv6 address is bracketed. Any other host
-// keeps the address it always had, so whatever the driver made of it before it makes of
-// it still; stripping brackets from [] turned a parse error into a connection to PGHOST
-// or localhost.
+// keeps the address it always had, so whatever a driver made of it before it makes of
+// it still: stripping brackets from [] turned the PostgreSQL parse error into a
+// connection to PGHOST or localhost.
 func TestDSNsJoinAnyOtherHostAsWritten(t *testing.T) {
 	for _, host := range []string{"[]", "[db.internal]", "[fd00::5", "[[fd00::5]]", "db.internal:5433"} {
 		t.Run(host, func(t *testing.T) {
