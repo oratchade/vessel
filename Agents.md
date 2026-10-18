@@ -2,8 +2,8 @@
 
 **Project:** Vessel — multi-database SQL toolkit for Go services  
 **Language:** Go 1.26+  
-**Current version:** v0.5.0  
-**Last updated:** 2026-10-17
+**Current version:** v0.5.1  
+**Last updated:** 2026-10-18
 
 Instructions for AI agents and automation working on this repository.
 Human contributors should read [CONTRIBUTING.md](CONTRIBUTING.md); this file
