@@ -1276,12 +1276,16 @@ func TestLoadConfig_RejectsADefaultThatIsNotUTF8(t *testing.T) {
 
 // mssqlBadHost is an MSSQL entry whose host, holding a space, fails to parse with
 // an error quoting the connection string, password included.
-func mssqlBadHost(entryType, password string) string {
+// echoesPassword is an entry whose setup fails with an error holding the password: the
+// PostgreSQL driver names the database it could not reach, and the database is the
+// password's value. An SQL Server host the driver cannot parse used to do it, quoting
+// the whole DSN; MSSQLConfig.Validate now refuses such a host first.
+func echoesPassword(entryType, password, database string) string {
 	return `
 entries:
   - name: primary
     type: ` + entryType + `
-    mssql: {user: "${DB_USER}", password: ` + password + `, host: "srv host", port: 1433, database: app, encrypt: "true"}
+    postgres: {user: "${DB_USER}", password: ` + password + `, host: 127.0.0.1, port: 1, database: ` + database + `, ssl_mode: disable}
 `
 }
 
@@ -1291,14 +1295,14 @@ entries:
 func TestNewDBManager_SetupRedactsPasswordsOnly(t *testing.T) {
 	for _, entryType := range []string{"readonly", "readwrite"} {
 		t.Run(entryType, func(t *testing.T) {
-			path := writeConfig(t, "config.yaml", mssqlBadHost(entryType, `"${DB_PASSWORD}"`))
+			path := writeConfig(t, "config.yaml", echoesPassword(entryType, `"${DB_PASSWORD}"`, `"${DB_PASSWORD}"`))
 			var logs strings.Builder
 			logger := db.NewSlogAdapter(slog.New(slog.NewTextHandler(&logs, nil)))
 			_, err := mgr.NewDBManager(t.Context(), path, logger, mgr.WithEnvVars(map[string]string{
 				"DB_USER": "visible-user", "DB_PASSWORD": "pass word&x",
 			}))
 			if err == nil {
-				t.Fatal("NewDBManager accepted a host it cannot parse")
+				t.Fatal("NewDBManager reached a server on port 1")
 			}
 			if strings.Count(logs.String(), "level=ERROR") < 2 {
 				t.Fatalf("want the entry's and the manager's error lines:\n%s", logs.String())
@@ -1315,13 +1319,13 @@ func TestNewDBManager_SetupRedactsPasswordsOnly(t *testing.T) {
 // TestNewDBManager_RedactsAPasswordAsDecoded: !!binary hands the field its base64 text
 // decoded, and that is the password redacted.
 func TestNewDBManager_RedactsAPasswordAsDecoded(t *testing.T) {
-	path := writeConfig(t, "config.yaml", mssqlBadHost("readwrite", `!!binary "${DB_PASSWORD}"`))
+	path := writeConfig(t, "config.yaml", echoesPassword("readwrite", `!!binary "${DB_PASSWORD}"`, `"decoded secret"`))
 	_, err := mgr.NewDBManager(t.Context(), path, nil, mgr.WithEnvVars(map[string]string{
 		"DB_USER":     "app",
 		"DB_PASSWORD": base64.StdEncoding.EncodeToString([]byte("decoded secret")),
 	}))
-	if err == nil || !strings.Contains(err.Error(), "srv%20host") {
-		t.Fatalf("want the error about the host: %v", err)
+	if err == nil || !strings.Contains(err.Error(), "127.0.0.1") {
+		t.Fatalf("want the error about the server: %v", err)
 	}
 	if leaks(err, "decoded") {
 		t.Errorf("error carries the decoded password: %v", err)
@@ -1581,13 +1585,13 @@ func TestNewDBManager_PasswordsAreRedactedWhereverTheyCameFrom(t *testing.T) {
 entries:
   - name: primary
     type: readwrite
-    mssql: {user: app, password: `+c.password+`, host: "srv host", port: 1433, database: app, encrypt: "true"}
+    postgres: {user: app, password: `+c.password+`, host: 127.0.0.1, port: 1, database: pw-secret, ssl_mode: disable}
 `)
 			var logs strings.Builder
 			logger := db.NewSlogAdapter(slog.New(slog.NewTextHandler(&logs, nil)))
 			_, err := mgr.NewDBManager(t.Context(), path, logger, c.opts...)
-			if err == nil || !strings.Contains(err.Error(), "srv%20host") {
-				t.Fatalf("want the error about the host: %v", err)
+			if err == nil {
+				t.Fatal("NewDBManager reached a server on port 1")
 			}
 			if leaks(err, "pw-secret") || strings.Contains(logs.String(), "pw-secret") {
 				t.Errorf("the password leaves:\n%v\n%s", err, logs.String())

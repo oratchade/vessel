@@ -292,6 +292,61 @@ func TestMSSQLConfigValidate(t *testing.T) {
 	}
 }
 
+// TestMSSQLConfigValidateRefusesWhatTheDriverWouldMisread: a host the driver would not
+// read back as written is refused, naming the host and never the DSN. Handed on, it
+// connected elsewhere (on Go 1.27, 0:0:0:0:0:0:0 reached [::1]:1433), or failed with
+// the driver's parse error, which quotes the whole DSN, password included.
+func TestMSSQLConfigValidateRefusesWhatTheDriverWouldMisread(t *testing.T) {
+	for _, host := range []string{"0:0:0:0:0:0:0", "::1%", "[::1", "srv host", "[db.internal]", "db.internal:5433"} {
+		t.Run(host, func(t *testing.T) {
+			err := v1.MSSQLConfig{Host: host, Port: 1434, User: "u", Password: "pw-secret", Encrypt: "true"}.Validate()
+			if assert.Error(t, err) {
+				assert.Contains(t, err.Error(), host)
+				assert.NotContains(t, err.Error(), "pw-secret")
+			}
+		})
+	}
+}
+
+// TestMSSQLConfigValidateAcceptsWhatTheDriverReadsBack: every host Validate lets through
+// reaches the driver's own parser as the host, port and instance configured.
+func TestMSSQLConfigValidateAcceptsWhatTheDriverReadsBack(t *testing.T) {
+	tests := []struct {
+		written, host, instance string
+		port                    uint64
+	}{
+		{"localhost", "localhost", "", 1434},
+		{"db.internal", "db.internal", "", 1434},
+		{"10.0.0.5", "10.0.0.5", "", 1434},
+		{"::1", "::1", "", 1434},
+		{"[fd00::5]", "fd00::5", "", 1434},
+		{`srv\INST`, "srv", "INST", 0},
+		{`10.0.0.5\INST`, "10.0.0.5", "INST", 0},
+	}
+	for _, tt := range tests {
+		t.Run(tt.written, func(t *testing.T) {
+			cfg := v1.MSSQLConfig{Host: tt.written, Port: 1434, User: "u", Password: "p", Database: "db", Encrypt: "true"}
+			require.NoError(t, cfg.Validate())
+			parsed, _, err := msdsn.Parse(cfg.DSN())
+			require.NoError(t, err)
+			assert.Equal(t, tt.host, parsed.Host)
+			assert.Equal(t, tt.instance, parsed.Instance)
+			assert.Equal(t, tt.port, parsed.Port)
+		})
+	}
+}
+
+// TestNewMSSQLKeepsThePasswordOutOfAHostError: a malformed host stops the manager with
+// Validate's error, before the driver can quote the DSN.
+func TestNewMSSQLKeepsThePasswordOutOfAHostError(t *testing.T) {
+	_, err := v1.MSSQLCfgToDB(v1.MSSQLConfig{
+		Host: "[::1", Port: 1434, User: "u", Password: "pw-secret", Database: "db", Encrypt: "true", ConnectionTimeout: time.Second,
+	}, nil)
+	if assert.Error(t, err) {
+		assert.NotContains(t, err.Error(), "pw-secret")
+	}
+}
+
 // TestNewMSSQLValidatesTheHost: opening a manager runs Validate before the driver. The
 // timeout bounds the dial a regression would make.
 func TestNewMSSQLValidatesTheHost(t *testing.T) {

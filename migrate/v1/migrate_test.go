@@ -70,6 +70,12 @@ func TestNewRejectsWhatItCannotMigrate(t *testing.T) {
 	if assert.Error(t, err) {
 		assert.Contains(t, err.Error(), "named instance")
 	}
+	// A host the driver would misread is refused at New: left to Up, the driver's parse
+	// error quoted the DSN, password included.
+	_, err = migrate.New(db.MSSQLConfig{Host: "[::1", Port: 1434, Password: "pw-secret", Database: "x", Encrypt: "true"}, baseMigrations())
+	if assert.Error(t, err) {
+		assert.NotContains(t, err.Error(), "pw-secret")
+	}
 }
 
 func TestUpAppliesPendingMigrationsOnce(t *testing.T) {
