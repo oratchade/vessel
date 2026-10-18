@@ -5,6 +5,16 @@ All notable changes to Vessel are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Fixed
+
+- **An IPv6 host reaches every driver, written bare or in brackets.** The PostgreSQL
+  and MySQL DSNs joined host and port with a bare colon, so `fd00::5` and its port read
+  as one invalid address, and the SQL Server DSN, which bracketed the host, turned
+  `[fd00::5]` into `[[fd00::5]]`. All three now take either spelling, strip one pair of
+  brackets, and write the address as `net.JoinHostPort` does.
+
 ## [0.5.0] - 2026-10-17
 
 ### Fixed

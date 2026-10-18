@@ -3,6 +3,9 @@ package v1
 import (
 	"context"
 	"fmt"
+	"net"
+	"strconv"
+	"strings"
 
 	"tounilab.com/vessel/db/v1/dberror"
 	builder "tounilab.com/vessel/internal/pkg/builder"
@@ -502,4 +505,15 @@ func deleteQuery(
 	}
 
 	return query, args, nil
+}
+
+// hostPort is host and port as a DSN writes an address: an IPv6 host in brackets,
+// given bare or already bracketed, so fd00::5 and [fd00::5] reach the driver alike.
+func hostPort(host string, port int) string {
+	if inner, ok := strings.CutPrefix(host, "["); ok {
+		if inner, ok := strings.CutSuffix(inner, "]"); ok {
+			host = inner
+		}
+	}
+	return net.JoinHostPort(host, strconv.Itoa(port))
 }
