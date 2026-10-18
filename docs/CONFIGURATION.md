@@ -165,9 +165,11 @@ Notes:
 - A named instance is written as the host, `Host: "srv\\INSTANCE"`. The driver then
   finds the instance's port through SQL Server Browser (UDP 1434), so `Port` is not sent
   with an instance; to connect on a fixed port, give the host without it. A named
-  instance cannot be found at an IPv6 address: the driver asks SQL Server Browser at an
-  address it writes without brackets. `MSSQLConfig.Validate` refuses that host, as
-  opening a manager and `migrate.New` do; give the instance's port instead.
+  instance cannot be found at an IPv6 address: written bare, the driver cannot reach
+  SQL Server Browser at it, since it joins host and Browser port without brackets;
+  bracketed, it cannot look the host up, since it keeps the brackets.
+  `MSSQLConfig.Validate` refuses that host, as opening a manager and `migrate.New` do;
+  give the instance's port instead.
 - vessel does **not** generate `MERGE` for MSSQL upserts. Calls to
   `OnConflict/DoUpdate/Upsert` against MSSQL return an explicit
   unsupported-feature error rather than silently producing risky SQL.
