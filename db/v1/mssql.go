@@ -119,19 +119,20 @@ func (cfg MSSQLConfig) hostInstance() (host, instance string) {
 // with an error naming neither cause, or worse, read as another address. At an IPv6
 // address it cannot find a named instance, as it asks SQL Server Browser at host:1434
 // joined without brackets, then looks the host up with them kept; and it dials a zoned
-// address with the zone dropped, which a link-local one needs. Any other host must
+// address with the zone dropped, which only a link-local one needs: the loopback or a
+// global address routes without it. Any other host must
 // come back from the driver's own parser as the host, port and instance configured:
 // otherwise it connected elsewhere (how much the URL parser accepts changes between Go
 // releases) or failed on a parse error quoting the whole DSN, password included. The
 // error names the host only. Opening a manager and migrate.New both call it.
 func (cfg MSSQLConfig) Validate() error {
 	host, instance := cfg.hostInstance()
-	addr, ok := ipv6(host)
+	_, ip, ok := ipv6(host)
 	switch {
 	case ok && instance != "":
 		return fmt.Errorf("MSSQL host %s: a named instance cannot be found at an IPv6 address; "+
 			"give the instance's port instead", host)
-	case ok && strings.Contains(addr, "%"):
+	case ok && needsZone(ip):
 		return fmt.Errorf("MSSQL host %s: the SQL Server driver dials an IPv6 address without its zone; "+
 			"give an address that needs none", host)
 	}
@@ -145,7 +146,7 @@ func (cfg MSSQLConfig) readsBack() error {
 		return nil // the driver's own default, localhost
 	}
 	host, instance := cfg.hostInstance()
-	if addr, ok := ipv6(host); ok {
+	if addr, _, ok := ipv6(host); ok {
 		host = addr
 	}
 	port := uint64(cfg.Port)

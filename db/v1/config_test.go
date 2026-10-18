@@ -322,6 +322,10 @@ func TestMSSQLConfigValidateAcceptsWhatTheDriverReadsBack(t *testing.T) {
 		{"[fd00::5]", "fd00::5", "", 1434},
 		{`srv\INST`, "srv", "INST", 0},
 		{`10.0.0.5\INST`, "10.0.0.5", "INST", 0},
+		// A zone the dial can do without: the loopback and a global address route
+		// without one, so dropping it loses nothing. These connected before.
+		{"::1%lo0", "::1%lo0", "", 1434},
+		{"fd00::5%eth0", "fd00::5%eth0", "", 1434},
 	}
 	for _, tt := range tests {
 		t.Run(tt.written, func(t *testing.T) {

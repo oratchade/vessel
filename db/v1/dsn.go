@@ -7,16 +7,24 @@ import (
 )
 
 // ipv6 returns host's IPv6 address, written bare or in one pair of brackets, its zone
-// included; ok is false for anything else, a name or an IPv4 address among them.
-func ipv6(host string) (addr string, ok bool) {
+// included, as text and parsed; ok is false for anything else, a name or an IPv4
+// address among them.
+func ipv6(host string) (addr string, ip netip.Addr, ok bool) {
 	addr = host
 	if len(addr) >= 2 && addr[0] == '[' && addr[len(addr)-1] == ']' {
 		addr = addr[1 : len(addr)-1]
 	}
 	if a, err := netip.ParseAddr(addr); err == nil && a.Is6() {
-		return addr, true
+		return addr, a, true
 	}
-	return "", false
+	return "", netip.Addr{}, false
+}
+
+// needsZone reports whether ip is zoned and reachable only through its zone: a
+// link-local or interface-local address. The loopback and a global address route
+// without one.
+func needsZone(ip netip.Addr) bool {
+	return ip.Zone() != "" && (ip.IsLinkLocalUnicast() || ip.IsLinkLocalMulticast() || ip.IsInterfaceLocalMulticast())
 }
 
 // hostPort is host and port as a DSN writes an address: an IPv6 address in brackets,
@@ -26,7 +34,7 @@ func ipv6(host string) (addr string, ok bool) {
 // SQL Server bracketed any host holding a colon, so a malformed [::1 connected;
 // MSSQLConfig.Validate now refuses a host its driver would not read back as written.
 func hostPort(host string, port int) string {
-	if addr, ok := ipv6(host); ok {
+	if addr, _, ok := ipv6(host); ok {
 		return net.JoinHostPort(addr, strconv.Itoa(port))
 	}
 	return host + ":" + strconv.Itoa(port)
