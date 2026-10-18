@@ -104,6 +104,10 @@ yet.
   `New` returns `ErrMySQLParseTime` otherwise.
 - **SQLite** migrations run on a single connection, because every connection to
   an in-memory database is a separate, empty database.
+- **SQL Server**: `New` refuses, as opening a manager does, a host
+  `MSSQLConfig.Validate` refuses: a named instance or a link-local zone at an IPv6
+  address, or a host the driver would not read back as written. The error names the
+  host, never the connection string.
 - Drivers registered through the plugin package return `ErrUnsupportedDriver`.
 
 ## Concurrency

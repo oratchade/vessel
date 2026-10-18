@@ -7,6 +7,14 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+### Added
+
+- **`MSSQLConfig.Validate`** refuses a host the SQL Server driver cannot reach or would
+  read as another address, naming the host only: a named instance or a link-local zone
+  at an IPv6 address, or any host the driver's parser does not give back as configured.
+  Opening a manager and `migrate.New` call it, so `migrate.New` refuses such a host
+  where it used to return a migrator that failed at `Up`.
+
 ### Fixed
 
 - **An IPv6 host may be written bare or in brackets.** The PostgreSQL and MySQL DSNs
