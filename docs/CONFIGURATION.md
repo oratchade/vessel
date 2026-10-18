@@ -23,8 +23,9 @@ application code that goes through the `DB` interface stays portable.
 `Host` takes a name, an IPv4 address or an IPv6 address. An IPv6 address may be
 written bare or in brackets, `fd00::5` or `[fd00::5]`, and is bracketed beside the
 port as the drivers need. A zone (`fe80::1%eth0`) reaches PostgreSQL and MySQL; for
-SQL Server, `MSSQLConfig.Validate` refuses one, since its driver dials without it. Any
-other host is passed as written.
+SQL Server, `MSSQLConfig.Validate` refuses one, since its driver dials without it. Write
+the zone raw, `fe80::1%eth0`: the DSN escapes it, so the URL form `%25eth0` would reach
+the driver as the zone `25eth0`. Any other host is passed as written.
 
 ## Connection pool concepts
 
