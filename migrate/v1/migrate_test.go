@@ -24,6 +24,12 @@ type unknownConfig struct{}
 func (unknownConfig) Driver() string { return "clickhouse" }
 func (unknownConfig) DSN() string    { return "" }
 
+// appConfig is a caller's own config around a vessel one, with a Validate of its own
+// that has nothing to do with migrating.
+type appConfig struct{ db.SQLiteConfig }
+
+func (appConfig) Validate() error { return errors.New("app: tenant_id is required") }
+
 func sqliteConfig(t *testing.T) db.SQLiteConfig {
 	t.Helper()
 	return db.SQLiteConfig{FilePath: filepath.Join(t.TempDir(), "migrate.db")}
@@ -63,6 +69,36 @@ func TestNewRejectsWhatItCannotMigrate(t *testing.T) {
 	// without parseTime. Refused before any connection is opened.
 	_, err = migrate.New(db.MysqlConfig{Host: "localhost", Port: 3306, Database: "x"}, baseMigrations())
 	assert.ErrorIs(t, err, migrate.ErrMySQLParseTime)
+
+	// A host the SQL Server driver cannot reach is refused as the manager refuses it,
+	// not left to fail on the driver's own parse or lookup error.
+	_, err = migrate.New(db.MSSQLConfig{Host: `fd00::5\INST`, Database: "x", Encrypt: "true"}, baseMigrations())
+	if assert.Error(t, err) {
+		assert.Contains(t, err.Error(), "named instance")
+	}
+	// Only SQL Server's own host check runs: a caller's config is not judged by a
+	// Validate method it has for other reasons.
+	_, err = migrate.New(appConfig{sqliteConfig(t)}, baseMigrations())
+	assert.NoError(t, err)
+
+	// A link-local zone the SQL Server driver would drop is refused as well.
+	_, err = migrate.New(db.MSSQLConfig{Host: "fe80::1%eth0", Database: "x", Encrypt: "true"}, baseMigrations())
+	if assert.Error(t, err) {
+		assert.Contains(t, err.Error(), "zone")
+	}
+
+	// A pointer to the SQL Server config is checked too.
+	_, err = migrate.New(&db.MSSQLConfig{Host: `fd00::5\INST`, Database: "x", Encrypt: "true"}, baseMigrations())
+	if assert.Error(t, err) {
+		assert.Contains(t, err.Error(), "named instance")
+	}
+
+	// A host the driver would misread is refused at New: left to Up, the driver's parse
+	// error quoted the DSN, password included.
+	_, err = migrate.New(db.MSSQLConfig{Host: "[::1", Port: 1434, Password: "pw-secret", Database: "x", Encrypt: "true"}, baseMigrations())
+	if assert.Error(t, err) {
+		assert.NotContains(t, err.Error(), "pw-secret")
+	}
 }
 
 func TestUpAppliesPendingMigrationsOnce(t *testing.T) {

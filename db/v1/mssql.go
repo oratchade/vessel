@@ -5,7 +5,6 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
-	"net"
 	"net/url"
 	"strconv"
 	"strings"
@@ -13,6 +12,7 @@ import (
 
 	// Import the MSSQL driver
 	_ "github.com/denisenkom/go-mssqldb"
+	"github.com/denisenkom/go-mssqldb/msdsn"
 	"go.opentelemetry.io/otel/codes"
 	semconv "go.opentelemetry.io/otel/semconv/v1.37.0"
 	"go.opentelemetry.io/otel/trace"
@@ -82,9 +82,8 @@ func (cfg MSSQLConfig) DSN() string {
 		"read timeout":           {cfg.ReadTimeout.String()},
 		"write timeout":          {cfg.WriteTimeout.String()},
 	}
-	// A named instance is written server\instance; the driver takes it as the path (#89).
-	host, instance, _ := strings.Cut(cfg.Host, `\`)
-	address := net.JoinHostPort(host, strconv.Itoa(int(cfg.Port))) // brackets an IPv6 host
+	host, instance := cfg.hostInstance()
+	address := hostPort(host, int(cfg.Port))
 	if instance != "" {
 		// SQL Server Browser gives the instance's port; the driver calls a port given
 		// beside an instance a misconfiguration, and builds its SPN from it.
@@ -109,8 +108,64 @@ type MSSQL struct {
 	safeLogger   *SafeLogger          // SafeLogger for automatic error classification and logging
 }
 
+// hostInstance splits Host into the server and a named instance, written
+// server\instance; the driver takes the instance as the URL's path (#89).
+func (cfg MSSQLConfig) hostInstance() (host, instance string) {
+	host, instance, _ = strings.Cut(cfg.Host, `\`)
+	return host, instance
+}
+
+// Validate refuses a host the SQL Server driver cannot reach, which it would fail on
+// with an error naming neither cause, or worse, read as another address. At an IPv6
+// address it cannot find a named instance, as it asks SQL Server Browser at host:1434
+// joined without brackets, then looks the host up with them kept; and it dials a zoned
+// address with the zone dropped, which only a link-local one needs: the loopback or a
+// global address routes without it. Any other host must
+// come back from the driver's own parser as the host, port and instance configured:
+// otherwise it connected elsewhere (how much the URL parser accepts changes between Go
+// releases) or failed on a parse error quoting the whole DSN, password included. The
+// error names the host only. Opening a manager and migrate.New both call it.
+func (cfg MSSQLConfig) Validate() error {
+	host, instance := cfg.hostInstance()
+	_, ip, ok := ipv6(host)
+	switch {
+	case ok && instance != "":
+		return fmt.Errorf("MSSQL host %s: a named instance cannot be found at an IPv6 address; "+
+			"give the instance's port instead", host)
+	case ok && needsZone(ip):
+		return fmt.Errorf("MSSQL host %s: the SQL Server driver dials an IPv6 address without its zone; "+
+			"give an address that needs none", host)
+	}
+	return cfg.readsBack()
+}
+
+// readsBack checks that the driver reads cfg's address back as configured. It parses
+// a DSN holding the address alone, so no credential can reach the error.
+func (cfg MSSQLConfig) readsBack() error {
+	if cfg.Host == "" {
+		return nil // the driver's own default, localhost
+	}
+	host, instance := cfg.hostInstance()
+	if addr, _, ok := ipv6(host); ok {
+		host = addr
+	}
+	port := uint64(cfg.Port)
+	if instance != "" {
+		port = 0 // not sent beside an instance
+	}
+	parsed, _, err := msdsn.Parse(MSSQLConfig{Host: cfg.Host, Port: cfg.Port, Encrypt: "true"}.DSN())
+	if err != nil || parsed.Host != host || parsed.Port != port || parsed.Instance != instance {
+		return fmt.Errorf("MSSQL host %q: the SQL Server driver does not read it as written; "+
+			"check its spelling", cfg.Host)
+	}
+	return nil
+}
+
 // newMSSQL initializes a new MSSQL connection using the provided config.
 func newMSSQL(cfg MSSQLConfig, logger Logger) (*MSSQL, error) {
+	if err := cfg.Validate(); err != nil {
+		return nil, err
+	}
 	dsn := cfg.DSN()
 
 	db, err := sql.Open("sqlserver", dsn)

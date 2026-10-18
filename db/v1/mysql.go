@@ -86,7 +86,7 @@ func (cfg MysqlConfig) DSN() string {
 		User:   cfg.User,
 		Passwd: cfg.Password,
 		Net:    "tcp",
-		Addr:   fmt.Sprintf("%s:%d", cfg.Host, cfg.Port),
+		Addr:   hostPort(cfg.Host, int(cfg.Port)),
 		DBName: cfg.Database,
 		Params: cfgMap,
 	}

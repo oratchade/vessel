@@ -5,6 +5,33 @@ All notable changes to Vessel are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+
+- **`MSSQLConfig.Validate`** refuses a host the SQL Server driver cannot reach or would
+  read as another address, naming the host only: a named instance or a link-local zone
+  at an IPv6 address, or any host the driver's parser does not give back as configured.
+  Opening a manager and `migrate.New` call it, so `migrate.New` refuses such a host
+  where it used to return a migrator that failed at `Up`.
+
+### Fixed
+
+- **An IPv6 host may be written bare or in brackets.** The PostgreSQL and MySQL DSNs
+  joined host and port with a bare colon, so `fd00::5` and its port read as one invalid
+  address, and the SQL Server DSN, which bracketed the host, turned `[fd00::5]` into
+  `[[fd00::5]]`. Each now brackets an IPv6 address, given either way, beside its port.
+  Any other host is passed as written, as before for PostgreSQL and MySQL. For SQL
+  Server, a host its driver would not read back as written, such as `[::1`,
+  `0:0:0:0:0:0:0` or `srv host`, is refused naming only the host: it connected to
+  another address (on Go 1.27, `0:0:0:0:0:0:0` reached `[::1]:1433`), or failed on a
+  driver parse error that quoted the whole DSN, password included, outside the manager.
+- **An SQL Server named instance at an IPv6 address is refused, saying why.** The driver
+  cannot find one there in either spelling, and failed on its own parse, Browser or
+  lookup error; give the instance's port instead. A link-local IPv6 address with its zone
+  (`fe80::1%eth0`) is refused for SQL Server too, since its driver dials without the
+  zone, which only a link-local address needs; PostgreSQL and MySQL keep it.
+
 ## [0.5.0] - 2026-10-17
 
 ### Fixed

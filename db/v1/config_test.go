@@ -4,9 +4,13 @@ package v1_test
 
 import (
 	"net/url"
+	"strings"
 	"testing"
+	"time"
 
 	"github.com/denisenkom/go-mssqldb/msdsn"
+	"github.com/go-sql-driver/mysql"
+	"github.com/jackc/pgx/v5"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -201,14 +205,175 @@ func TestMSSQLConfigDSNNamedInstance(t *testing.T) {
 	assert.Equal(t, cfg.Database, parsed.Database)
 }
 
-// TestMSSQLConfigDSNIPv6Host: an IPv6 host is bracketed beside its port, so the driver
-// reads the host and the port apart.
-func TestMSSQLConfigDSNIPv6Host(t *testing.T) {
-	cfg := v1.MSSQLConfig{User: "app", Password: "pw", Host: "fd00::5", Port: 1433, Database: "app", Encrypt: "true"}
-	parsed, _, err := msdsn.Parse(cfg.DSN())
-	require.NoError(t, err)
-	assert.Equal(t, "fd00::5", parsed.Host)
-	assert.Equal(t, uint64(1433), parsed.Port)
+// hostSpellings are the ways a host is written, each with the host the driver must read
+// back: an IPv6 address bare or bracketed alike, as an address beside a port is written.
+var hostSpellings = []struct{ written, host, mysqlAddr string }{
+	{"db.internal", "db.internal", "db.internal:3307"},
+	{"10.0.0.5", "10.0.0.5", "10.0.0.5:3307"},
+	{"::1", "::1", "[::1]:3307"},
+	{"[::1]", "::1", "[::1]:3307"},
+	{"fd00::5", "fd00::5", "[fd00::5]:3307"},
+	{"[fd00::5]", "fd00::5", "[fd00::5]:3307"},
+	{"fe80::1%eth0", "fe80::1%eth0", "[fe80::1%eth0]:3307"},
+	{"[fe80::1%eth0]", "fe80::1%eth0", "[fe80::1%eth0]:3307"},
+}
+
+// TestDSNsReachEveryKindOfHost: each driver reads the host and the port apart, an IPv6
+// host included. Joined with a bare colon, fd00::5 and its port read as one invalid
+// address; joined bracketed, [fd00::5] became [[fd00::5]].
+func TestDSNsReachEveryKindOfHost(t *testing.T) {
+	for _, s := range hostSpellings {
+		t.Run(s.written, func(t *testing.T) {
+			pg, err := pgx.ParseConfig(v1.PostgresConfig{Host: s.written, Port: 6432, User: "u", Password: "p", Database: "db"}.DSN())
+			if assert.NoError(t, err, "postgres") {
+				assert.Equal(t, s.host, pg.Host, "postgres host")
+				assert.Equal(t, uint16(6432), pg.Port, "postgres port")
+			}
+
+			my, err := mysql.ParseDSN(v1.MysqlConfig{Host: s.written, Port: 3307, User: "u", Password: "p", Database: "db"}.DSN())
+			if assert.NoError(t, err, "mysql") {
+				assert.Equal(t, s.mysqlAddr, my.Addr, "mysql address")
+			}
+
+			if strings.Contains(s.host, "%") {
+				return // refused for SQL Server by Validate: its driver dials without the zone
+			}
+			ms, _, err := msdsn.Parse(v1.MSSQLConfig{Host: s.written, Port: 1434, User: "u", Password: "p", Database: "db", Encrypt: "true"}.DSN())
+			if assert.NoError(t, err, "mssql") {
+				assert.Equal(t, s.host, ms.Host, "mssql host")
+				assert.Equal(t, uint64(1434), ms.Port, "mssql port")
+			}
+		})
+	}
+}
+
+// TestDSNsJoinAnyOtherHostAsWritten: only an IPv6 address is bracketed. Any other host
+// keeps the address it always had, so whatever a driver made of it before it makes of
+// it still: stripping brackets from [] turned the PostgreSQL parse error into a
+// connection to PGHOST or localhost.
+func TestDSNsJoinAnyOtherHostAsWritten(t *testing.T) {
+	for _, host := range []string{"[]", "[db.internal]", "[fd00::5", "[[fd00::5]]", "db.internal:5433"} {
+		t.Run(host, func(t *testing.T) {
+			pg := v1.PostgresConfig{Host: host, Port: 6432, User: "u", Password: "p", Database: "db"}.DSN()
+			assert.Contains(t, pg, "@"+host+":6432/", "postgres address")
+			my := v1.MysqlConfig{Host: host, Port: 3307, User: "u", Password: "p", Database: "db"}.DSN()
+			assert.Contains(t, my, "@tcp("+host+":3307)/", "mysql address")
+			// SQL Server joined any host with net.JoinHostPort, bracketing one with a colon,
+			// so a malformed [::1 became [[::1]:1434 and connected; it is passed as written.
+			ms := v1.MSSQLConfig{Host: host, Port: 1434, User: "u", Password: "p", Database: "db", Encrypt: "true"}.DSN()
+			assert.Contains(t, ms, "@"+host+":1434?", "mssql address")
+		})
+	}
+	_, err := pgx.ParseConfig(v1.PostgresConfig{Host: "[]", Port: 6432, User: "u", Password: "p", Database: "db"}.DSN())
+	assert.Error(t, err, "an empty host in brackets is refused, not taken for the default")
+}
+
+// TestMSSQLConfigValidate: a named instance at an IPv6 address cannot be reached, since
+// the driver asks SQL Server Browser at host:1434 joined without brackets, then looks
+// the host up with them kept; Validate refuses it rather than leave the driver to fail
+// on an error that names neither cause.
+func TestMSSQLConfigValidate(t *testing.T) {
+	tests := []struct {
+		host, refusal string // refusal: what the error names, "" when accepted
+	}{
+		{`fd00::5\INST`, "named instance"},
+		{`[fd00::5]\INST`, "named instance"},
+		// The driver dials a zoned address with its zone dropped, so a link-local one,
+		// which needs it, cannot be reached either.
+		{"fe80::1%eth0", "zone"},
+		{"[fe80::1%eth0]", "zone"},
+		{"fd00::5", ""},
+		{"[fd00::5]", ""},
+		{"db.internal", ""},
+		{`srv\INST`, ""},
+		{`10.0.0.5\INST`, ""},
+		{"", ""},
+	}
+	for _, tt := range tests {
+		t.Run(tt.host, func(t *testing.T) {
+			err := v1.MSSQLConfig{Host: tt.host}.Validate()
+			if tt.refusal == "" {
+				assert.NoError(t, err)
+			} else if assert.Error(t, err) {
+				assert.Contains(t, err.Error(), tt.refusal)
+			}
+		})
+	}
+}
+
+// TestMSSQLConfigValidateRefusesWhatTheDriverWouldMisread: a host the driver would not
+// read back as written is refused, naming the host and never the DSN. Handed on, it
+// connected elsewhere (on Go 1.27, 0:0:0:0:0:0:0 reached [::1]:1433), or failed with
+// the driver's parse error, which quotes the whole DSN, password included.
+func TestMSSQLConfigValidateRefusesWhatTheDriverWouldMisread(t *testing.T) {
+	for _, host := range []string{"0:0:0:0:0:0:0", "::1%", "[::1", "srv host", "[db.internal]", "db.internal:5433"} {
+		t.Run(host, func(t *testing.T) {
+			err := v1.MSSQLConfig{Host: host, Port: 1434, User: "u", Password: "pw-secret", Encrypt: "true"}.Validate()
+			if assert.Error(t, err) {
+				assert.Contains(t, err.Error(), host)
+				assert.NotContains(t, err.Error(), "pw-secret")
+			}
+		})
+	}
+}
+
+// TestMSSQLConfigValidateAcceptsWhatTheDriverReadsBack: every host Validate lets through
+// reaches the driver's own parser as the host, port and instance configured.
+func TestMSSQLConfigValidateAcceptsWhatTheDriverReadsBack(t *testing.T) {
+	tests := []struct {
+		written, host, instance string
+		port                    uint64
+	}{
+		{"localhost", "localhost", "", 1434},
+		{"db.internal", "db.internal", "", 1434},
+		{"10.0.0.5", "10.0.0.5", "", 1434},
+		{"::1", "::1", "", 1434},
+		{"[fd00::5]", "fd00::5", "", 1434},
+		{`srv\INST`, "srv", "INST", 0},
+		{`10.0.0.5\INST`, "10.0.0.5", "INST", 0},
+		// A zone the dial can do without: the loopback and a global address route
+		// without one, so dropping it loses nothing. These connected before.
+		{"::1%lo0", "::1%lo0", "", 1434},
+		{"fd00::5%eth0", "fd00::5%eth0", "", 1434},
+	}
+	for _, tt := range tests {
+		t.Run(tt.written, func(t *testing.T) {
+			cfg := v1.MSSQLConfig{Host: tt.written, Port: 1434, User: "u", Password: "p", Database: "db", Encrypt: "true"}
+			require.NoError(t, cfg.Validate())
+			parsed, _, err := msdsn.Parse(cfg.DSN())
+			require.NoError(t, err)
+			assert.Equal(t, tt.host, parsed.Host)
+			assert.Equal(t, tt.instance, parsed.Instance)
+			assert.Equal(t, tt.port, parsed.Port)
+		})
+	}
+}
+
+// TestNewMSSQLKeepsThePasswordOutOfAHostError: a malformed host stops the manager with
+// Validate's error, before the driver can quote the DSN.
+func TestNewMSSQLKeepsThePasswordOutOfAHostError(t *testing.T) {
+	_, err := v1.MSSQLCfgToDB(v1.MSSQLConfig{
+		Host: "[::1", Port: 1434, User: "u", Password: "pw-secret", Database: "db", Encrypt: "true", ConnectionTimeout: time.Second,
+	}, nil)
+	if assert.Error(t, err) {
+		assert.NotContains(t, err.Error(), "pw-secret")
+	}
+}
+
+// TestNewMSSQLValidatesTheHost: opening a manager runs Validate before the driver. The
+// timeout bounds the dial a regression would make.
+func TestNewMSSQLValidatesTheHost(t *testing.T) {
+	for host, refusal := range map[string]string{`fd00::5\INST`: "named instance", `[fd00::5]\INST`: "named instance", "fe80::1%eth0": "zone"} {
+		t.Run(host, func(t *testing.T) {
+			cfg := v1.MSSQLConfig{Host: host, User: "u", Password: "p", Database: "db", Encrypt: "true", ConnectionTimeout: time.Second}
+			for name, given := range map[string]v1.DBConfig{"value": cfg, "pointer": &cfg} {
+				_, err := v1.MSSQLCfgToDB(given, nil)
+				if assert.Error(t, err, name) {
+					assert.Contains(t, err.Error(), refusal, name)
+				}
+			}
+		})
+	}
 }
 
 // TestDatabaseConfigs tests all database config types

@@ -20,6 +20,14 @@ All four config structs implement the `db.DBConfig` interface, which is what
 `NewDB` accepts. The same `DB` interface is returned regardless of dialect, so
 application code that goes through the `DB` interface stays portable.
 
+`Host` takes a name, an IPv4 address or an IPv6 address. An IPv6 address may be
+written bare or in brackets, `fd00::5` or `[fd00::5]`, and is bracketed beside the
+port as the drivers need. A zone (`fe80::1%eth0`) reaches PostgreSQL and MySQL. The
+SQL Server driver dials without it, so `MSSQLConfig.Validate` refuses a link-local
+address with a zone, the one kind that needs it. Write
+the zone raw, `fe80::1%eth0`: the DSN escapes it, so the URL form `%25eth0` would reach
+the driver as the zone `25eth0`. Any other host is passed as written.
+
 ## Connection pool concepts
 
 vessel exposes connection pool tuning through the config structs. The exact
@@ -157,7 +165,12 @@ Notes:
   login, and `"disable"` nothing.
 - A named instance is written as the host, `Host: "srv\\INSTANCE"`. The driver then
   finds the instance's port through SQL Server Browser (UDP 1434), so `Port` is not sent
-  with an instance; to connect on a fixed port, give the host without it.
+  with an instance; to connect on a fixed port, give the host without it. A named
+  instance cannot be found at an IPv6 address: written bare, the driver cannot reach
+  SQL Server Browser at it, since it joins host and Browser port without brackets;
+  bracketed, it cannot look the host up, since it keeps the brackets.
+  `MSSQLConfig.Validate` refuses that host, as opening a manager and `migrate.New` do;
+  give the instance's port instead.
 - vessel does **not** generate `MERGE` for MSSQL upserts. Calls to
   `OnConflict/DoUpdate/Upsert` against MSSQL return an explicit
   unsupported-feature error rather than silently producing risky SQL.

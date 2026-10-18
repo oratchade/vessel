@@ -82,7 +82,7 @@ func (cfg PostgresConfig) DSN() string {
 	u := &url.URL{
 		Scheme: "postgres",
 		User:   url.UserPassword(cfg.User, cfg.Password),
-		Host:   fmt.Sprintf("%s:%d", cfg.Host, cfg.Port),
+		Host:   hostPort(cfg.Host, int(cfg.Port)),
 		Path:   cfg.Database,
 	}
 
