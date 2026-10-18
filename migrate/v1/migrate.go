@@ -116,6 +116,18 @@ func lockerFor(dialect goose.Dialect) (goose.ProviderOption, error) {
 	}
 }
 
+// checkConfig refuses a config before any connection is opened: one that can tell a
+// host its driver cannot reach (MSSQLConfig.Validate) says so, as opening a manager
+// does, then the DSN is checked for what migrating needs.
+func checkConfig(cfg db.DBConfig, dialect goose.Dialect, dsn string) error {
+	if v, ok := cfg.(interface{ Validate() error }); ok {
+		if err := v.Validate(); err != nil {
+			return fmt.Errorf("migrate: %w", err)
+		}
+	}
+	return checkDSN(dialect, dsn)
+}
+
 // checkDSN refuses a connection string goose cannot work with, before any
 // connection is opened.
 func checkDSN(dialect goose.Dialect, dsn string) error {
@@ -186,7 +198,7 @@ func New(cfg db.DBConfig, fsys fs.FS, opts ...Option) (*Migrator, error) {
 		return nil, err
 	}
 	dsn := cfg.DSN()
-	if err := checkDSN(dialect, dsn); err != nil {
+	if err := checkConfig(cfg, dialect, dsn); err != nil {
 		return nil, err
 	}
 	providerOpts, err := providerOptions(dialect, o)

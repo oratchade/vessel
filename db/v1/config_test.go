@@ -5,6 +5,7 @@ package v1_test
 import (
 	"net/url"
 	"testing"
+	"time"
 
 	"github.com/denisenkom/go-mssqldb/msdsn"
 	"github.com/go-sql-driver/mysql"
@@ -259,17 +260,30 @@ func TestDSNsJoinAnyOtherHostAsWritten(t *testing.T) {
 	assert.Error(t, err, "an empty host in brackets is refused, not taken for the default")
 }
 
-// TestMSSQLNamedInstanceAtIPv6IsRefused: the driver finds a named instance by asking
-// SQL Server Browser at host:1434, joined unbracketed, then looks the host up with the
-// brackets kept, so neither spelling of an IPv6 address can work. The manager says so
-// rather than failing on a parse or lookup error that names neither cause.
-func TestMSSQLNamedInstanceAtIPv6IsRefused(t *testing.T) {
+// TestMSSQLConfigValidate: a named instance at an IPv6 address cannot be reached, since
+// the driver asks SQL Server Browser at host:1434 joined without brackets, then looks
+// the host up with them kept; Validate refuses it rather than leave the driver to fail
+// on an error that names neither cause.
+func TestMSSQLConfigValidate(t *testing.T) {
 	for _, host := range []string{`fd00::5\INST`, `[fd00::5]\INST`} {
-		t.Run(host, func(t *testing.T) {
-			_, err := v1.MSSQLCfgToDB(v1.MSSQLConfig{Host: host, User: "u", Password: "p", Database: "db", Encrypt: "true"}, nil)
-			require.Error(t, err)
-			assert.Contains(t, err.Error(), "named instance")
-		})
+		err := v1.MSSQLConfig{Host: host}.Validate()
+		if assert.Error(t, err, host) {
+			assert.Contains(t, err.Error(), "named instance", host)
+		}
+	}
+	for _, host := range []string{"fd00::5", "[fd00::5]", "db.internal", `srv\INST`, `10.0.0.5\INST`, ""} {
+		assert.NoError(t, v1.MSSQLConfig{Host: host}.Validate(), host)
+	}
+}
+
+// TestNewMSSQLValidatesTheHost: opening a manager runs Validate before the driver. The
+// timeout bounds the dial a regression would make.
+func TestNewMSSQLValidatesTheHost(t *testing.T) {
+	_, err := v1.MSSQLCfgToDB(v1.MSSQLConfig{
+		Host: `fd00::5\INST`, User: "u", Password: "p", Database: "db", Encrypt: "true", ConnectionTimeout: time.Second,
+	}, nil)
+	if assert.Error(t, err) {
+		assert.Contains(t, err.Error(), "named instance")
 	}
 }
 

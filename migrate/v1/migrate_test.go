@@ -63,6 +63,13 @@ func TestNewRejectsWhatItCannotMigrate(t *testing.T) {
 	// without parseTime. Refused before any connection is opened.
 	_, err = migrate.New(db.MysqlConfig{Host: "localhost", Port: 3306, Database: "x"}, baseMigrations())
 	assert.ErrorIs(t, err, migrate.ErrMySQLParseTime)
+
+	// A host the SQL Server driver cannot reach is refused as the manager refuses it,
+	// not left to fail on the driver's own parse or lookup error.
+	_, err = migrate.New(db.MSSQLConfig{Host: `fd00::5\INST`, Database: "x", Encrypt: "true"}, baseMigrations())
+	if assert.Error(t, err) {
+		assert.Contains(t, err.Error(), "named instance")
+	}
 }
 
 func TestUpAppliesPendingMigrationsOnce(t *testing.T) {

@@ -81,8 +81,7 @@ func (cfg MSSQLConfig) DSN() string {
 		"read timeout":           {cfg.ReadTimeout.String()},
 		"write timeout":          {cfg.WriteTimeout.String()},
 	}
-	// A named instance is written server\instance; the driver takes it as the path (#89).
-	host, instance, _ := strings.Cut(cfg.Host, `\`)
+	host, instance := cfg.hostInstance()
 	address := hostPort(host, int(cfg.Port))
 	if instance != "" {
 		// SQL Server Browser gives the instance's port; the driver calls a port given
@@ -108,16 +107,31 @@ type MSSQL struct {
 	safeLogger   *SafeLogger          // SafeLogger for automatic error classification and logging
 }
 
+// hostInstance splits Host into the server and a named instance, written
+// server\instance; the driver takes the instance as the URL's path (#89).
+func (cfg MSSQLConfig) hostInstance() (host, instance string) {
+	host, instance, _ = strings.Cut(cfg.Host, `\`)
+	return host, instance
+}
+
+// Validate refuses a host the SQL Server driver cannot reach, which it would fail on
+// with an error naming neither cause: a named instance at an IPv6 address. The driver
+// asks SQL Server Browser for it at host:1434 joined without brackets, then looks the
+// host up with them kept, so neither spelling works. Opening a manager and migrate.New
+// both call it.
+func (cfg MSSQLConfig) Validate() error {
+	host, instance := cfg.hostInstance()
+	if _, ok := ipv6(host); ok && instance != "" {
+		return fmt.Errorf("MSSQL host %s: a named instance cannot be found at an IPv6 address; "+
+			"give the instance's port instead", host)
+	}
+	return nil
+}
+
 // newMSSQL initializes a new MSSQL connection using the provided config.
 func newMSSQL(cfg MSSQLConfig, logger Logger) (*MSSQL, error) {
-	// The driver asks SQL Server Browser for a named instance at host:1434, joined
-	// without brackets, then looks the host up with them kept: at an IPv6 address
-	// neither spelling can work, and its own error names neither cause.
-	if host, instance, _ := strings.Cut(cfg.Host, `\`); instance != "" {
-		if _, ok := ipv6(host); ok {
-			return nil, fmt.Errorf("MSSQL host %s: a named instance cannot be found at an IPv6 address; "+
-				"give the instance's port instead", host)
-		}
+	if err := cfg.Validate(); err != nil {
+		return nil, err
 	}
 	dsn := cfg.DSN()
 
