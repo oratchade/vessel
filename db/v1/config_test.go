@@ -273,22 +273,31 @@ func TestDSNsJoinAnyOtherHostAsWritten(t *testing.T) {
 // the host up with them kept; Validate refuses it rather than leave the driver to fail
 // on an error that names neither cause.
 func TestMSSQLConfigValidate(t *testing.T) {
-	for _, host := range []string{`fd00::5\INST`, `[fd00::5]\INST`} {
-		err := v1.MSSQLConfig{Host: host}.Validate()
-		if assert.Error(t, err, host) {
-			assert.Contains(t, err.Error(), "named instance", host)
-		}
+	tests := []struct {
+		host, refusal string // refusal: what the error names, "" when accepted
+	}{
+		{`fd00::5\INST`, "named instance"},
+		{`[fd00::5]\INST`, "named instance"},
+		// The driver dials a zoned address with its zone dropped, so a link-local one,
+		// which needs it, cannot be reached either.
+		{"fe80::1%eth0", "zone"},
+		{"[fe80::1%eth0]", "zone"},
+		{"fd00::5", ""},
+		{"[fd00::5]", ""},
+		{"db.internal", ""},
+		{`srv\INST`, ""},
+		{`10.0.0.5\INST`, ""},
+		{"", ""},
 	}
-	// The driver dials a zoned address with its zone dropped, so a link-local one,
-	// which needs it, cannot be reached either.
-	for _, host := range []string{"fe80::1%eth0", "[fe80::1%eth0]"} {
-		err := v1.MSSQLConfig{Host: host}.Validate()
-		if assert.Error(t, err, host) {
-			assert.Contains(t, err.Error(), "zone", host)
-		}
-	}
-	for _, host := range []string{"fd00::5", "[fd00::5]", "db.internal", `srv\INST`, `10.0.0.5\INST`, ""} {
-		assert.NoError(t, v1.MSSQLConfig{Host: host}.Validate(), host)
+	for _, tt := range tests {
+		t.Run(tt.host, func(t *testing.T) {
+			err := v1.MSSQLConfig{Host: tt.host}.Validate()
+			if tt.refusal == "" {
+				assert.NoError(t, err)
+			} else if assert.Error(t, err) {
+				assert.Contains(t, err.Error(), tt.refusal)
+			}
+		})
 	}
 }
 
@@ -354,11 +363,16 @@ func TestNewMSSQLKeepsThePasswordOutOfAHostError(t *testing.T) {
 // TestNewMSSQLValidatesTheHost: opening a manager runs Validate before the driver. The
 // timeout bounds the dial a regression would make.
 func TestNewMSSQLValidatesTheHost(t *testing.T) {
-	_, err := v1.MSSQLCfgToDB(v1.MSSQLConfig{
-		Host: `fd00::5\INST`, User: "u", Password: "p", Database: "db", Encrypt: "true", ConnectionTimeout: time.Second,
-	}, nil)
-	if assert.Error(t, err) {
-		assert.Contains(t, err.Error(), "named instance")
+	for host, refusal := range map[string]string{`fd00::5\INST`: "named instance", `[fd00::5]\INST`: "named instance", "fe80::1%eth0": "zone"} {
+		t.Run(host, func(t *testing.T) {
+			cfg := v1.MSSQLConfig{Host: host, User: "u", Password: "p", Database: "db", Encrypt: "true", ConnectionTimeout: time.Second}
+			for name, given := range map[string]v1.DBConfig{"value": cfg, "pointer": &cfg} {
+				_, err := v1.MSSQLCfgToDB(given, nil)
+				if assert.Error(t, err, name) {
+					assert.Contains(t, err.Error(), refusal, name)
+				}
+			}
+		})
 	}
 }
 

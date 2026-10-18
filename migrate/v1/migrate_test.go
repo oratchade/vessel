@@ -81,6 +81,12 @@ func TestNewRejectsWhatItCannotMigrate(t *testing.T) {
 	_, err = migrate.New(appConfig{sqliteConfig(t)}, baseMigrations())
 	assert.NoError(t, err)
 
+	// A link-local zone the SQL Server driver would drop is refused as well.
+	_, err = migrate.New(db.MSSQLConfig{Host: "fe80::1%eth0", Database: "x", Encrypt: "true"}, baseMigrations())
+	if assert.Error(t, err) {
+		assert.Contains(t, err.Error(), "zone")
+	}
+
 	// A pointer to the SQL Server config is checked too.
 	_, err = migrate.New(&db.MSSQLConfig{Host: `fd00::5\INST`, Database: "x", Encrypt: "true"}, baseMigrations())
 	if assert.Error(t, err) {
