@@ -115,15 +115,20 @@ func (cfg MSSQLConfig) hostInstance() (host, instance string) {
 }
 
 // Validate refuses a host the SQL Server driver cannot reach, which it would fail on
-// with an error naming neither cause: a named instance at an IPv6 address. The driver
-// asks SQL Server Browser for it at host:1434 joined without brackets, then looks the
-// host up with them kept, so neither spelling works. Opening a manager and migrate.New
-// both call it.
+// with an error naming neither cause. At an IPv6 address it cannot find a named
+// instance, as it asks SQL Server Browser at host:1434 joined without brackets, then
+// looks the host up with them kept; and it dials a zoned address with the zone
+// dropped, which a link-local one needs. Opening a manager and migrate.New both call it.
 func (cfg MSSQLConfig) Validate() error {
 	host, instance := cfg.hostInstance()
-	if _, ok := ipv6(host); ok && instance != "" {
+	addr, ok := ipv6(host)
+	switch {
+	case ok && instance != "":
 		return fmt.Errorf("MSSQL host %s: a named instance cannot be found at an IPv6 address; "+
 			"give the instance's port instead", host)
+	case ok && strings.Contains(addr, "%"):
+		return fmt.Errorf("MSSQL host %s: the SQL Server driver dials an IPv6 address without its zone; "+
+			"give an address that needs none", host)
 	}
 	return nil
 }

@@ -4,6 +4,7 @@ package v1_test
 
 import (
 	"net/url"
+	"strings"
 	"testing"
 	"time"
 
@@ -234,6 +235,9 @@ func TestDSNsReachEveryKindOfHost(t *testing.T) {
 				assert.Equal(t, s.mysqlAddr, my.Addr, "mysql address")
 			}
 
+			if strings.Contains(s.host, "%") {
+				return // refused for SQL Server by Validate: its driver dials without the zone
+			}
 			ms, _, err := msdsn.Parse(v1.MSSQLConfig{Host: s.written, Port: 1434, User: "u", Password: "p", Database: "db", Encrypt: "true"}.DSN())
 			if assert.NoError(t, err, "mssql") {
 				assert.Equal(t, s.host, ms.Host, "mssql host")
@@ -269,6 +273,14 @@ func TestMSSQLConfigValidate(t *testing.T) {
 		err := v1.MSSQLConfig{Host: host}.Validate()
 		if assert.Error(t, err, host) {
 			assert.Contains(t, err.Error(), "named instance", host)
+		}
+	}
+	// The driver dials a zoned address with its zone dropped, so a link-local one,
+	// which needs it, cannot be reached either.
+	for _, host := range []string{"fe80::1%eth0", "[fe80::1%eth0]"} {
+		err := v1.MSSQLConfig{Host: host}.Validate()
+		if assert.Error(t, err, host) {
+			assert.Contains(t, err.Error(), "zone", host)
 		}
 	}
 	for _, host := range []string{"fd00::5", "[fd00::5]", "db.internal", `srv\INST`, `10.0.0.5\INST`, ""} {

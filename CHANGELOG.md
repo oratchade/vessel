@@ -16,8 +16,9 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
   Any other host is passed as written, as before.
 - **An SQL Server named instance at an IPv6 address is refused, saying why.** The driver
   cannot find one there in either spelling, and failed on an unparseable URL or a
-  lookup; give the instance's port instead. The SQL Server driver also drops an IPv6
-  zone, which PostgreSQL and MySQL keep.
+  lookup; give the instance's port instead. A zoned IPv6 address (`fe80::1%eth0`) is
+  refused for SQL Server too, since its driver dials without the zone; PostgreSQL and
+  MySQL keep it.
 
 ## [0.5.0] - 2026-10-17
 
