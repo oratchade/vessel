@@ -34,3 +34,20 @@ func TestForms_CoverAQueryEscapedValue(t *testing.T) {
 		t.Errorf("Message = %q, want sslmode=[REDACTED]", got)
 	}
 }
+
+type withPassword struct{ Password string }
+
+type withoutPassword struct{ User string }
+
+// TestPassword: a config's Password field, by value or pointer; none for a nil pointer,
+// a struct without one, or a value that is not a struct.
+func TestPassword(t *testing.T) {
+	for cfg, want := range map[any]string{
+		withPassword{"s3cret"}: "s3cret", &withPassword{"s3cret"}: "s3cret",
+		(*withPassword)(nil): "", withoutPassword{"app"}: "", "s3cret": "", 42: "",
+	} {
+		if got := Password(cfg); got != want {
+			t.Errorf("Password(%#v) = %q, want %q", cfg, got, want)
+		}
+	}
+}

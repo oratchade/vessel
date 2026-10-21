@@ -7,6 +7,7 @@ import (
 	"context"
 	"errors"
 	"net/url"
+	"reflect"
 	"slices"
 	"strconv"
 	"strings"
@@ -82,4 +83,23 @@ func redactedForms(val string) []string {
 	}
 	slices.Sort(forms)
 	return slices.Compact(forms)
+}
+
+// Password is the Password field of cfg, a struct or a pointer to one, as every vessel
+// driver config holds it and a plugin's may; "" when it has none.
+func Password(cfg any) string {
+	v := reflect.ValueOf(cfg)
+	for v.Kind() == reflect.Pointer {
+		if v.IsNil() {
+			return ""
+		}
+		v = v.Elem()
+	}
+	if v.Kind() != reflect.Struct {
+		return ""
+	}
+	if f := v.FieldByName("Password"); f.IsValid() && f.Kind() == reflect.String {
+		return f.String()
+	}
+	return ""
 }

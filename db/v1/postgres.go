@@ -172,7 +172,11 @@ func postgresCfgToDB(cfg DBConfig, logger Logger) (*Postgres, error) {
 // Plugin authors can use this to reuse the PostgreSQL driver implementation.
 // The config type must be PostgresConfig or *PostgresConfig.
 func PostgresCfgToDB(cfg DBConfig, logger Logger) (DB, error) {
-	return postgresCfgToDB(cfg, logger)
+	db, err := postgresCfgToDB(cfg, logger)
+	if err != nil {
+		return nil, redactConfigError(err, cfg)
+	}
+	return db, nil
 }
 
 func (pg *Postgres) PoolStats() (*PoolStatistics, error) {
