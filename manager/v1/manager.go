@@ -10,6 +10,7 @@ import (
 	"time"
 
 	db "tounilab.com/vessel/db/v1"
+	"tounilab.com/vessel/internal/redact"
 	"tounilab.com/vessel/manager/v1/config"
 	"tounilab.com/vessel/pkg/query/condition"
 	"tounilab.com/vessel/pkg/query/options"
@@ -235,7 +236,7 @@ func NewDBManager(ctx context.Context, configPath string, logger db.Logger, envO
 
 	if err := cfg.Validate(); err != nil {
 		// Validation quotes the field it rejects, which may hold a substituted value.
-		return nil, fmt.Errorf("failed to validate config: %w", redactError(err, substituted))
+		return nil, fmt.Errorf("failed to validate config: %w", redact.Error(err, substituted))
 	}
 
 	// Use a no-op logger if none is provided
@@ -251,7 +252,7 @@ func NewDBManager(ctx context.Context, configPath string, logger db.Logger, envO
 		)
 		// A driver's error can keep the connection string, and a password the driver read
 		// itself (PGPASSWORD): only its message, redacted, and its safe causes leave.
-		return nil, fmt.Errorf("failed to setup DB entries: %w", redacted(err, secrets))
+		return nil, fmt.Errorf("failed to setup DB entries: %w", redact.Cut(err, secrets))
 	}
 
 	if len(readOnly) == 0 && len(readWrite) == 0 {
@@ -293,7 +294,7 @@ func redactSetup(cfg *config.ManagerConfig, logger db.Logger) ([]string, db.Logg
 	if len(secrets) == 0 {
 		return nil, logger
 	}
-	return secrets, redactingLogger{logger: logger, forms: redactions(secrets)}
+	return secrets, redactingLogger{logger: logger, forms: redact.Forms(secrets)}
 }
 
 // passwords are the passwords the config's entries hold.
@@ -457,7 +458,7 @@ func loadError(err error, resolver *envResolver) error {
 	if err == nil {
 		return nil
 	}
-	return fmt.Errorf("loadConfig: failed to load configuration: %w", redactError(err, resolver.substituted))
+	return fmt.Errorf("loadConfig: failed to load configuration: %w", redact.Error(err, resolver.substituted))
 }
 
 // Start initializes the database entries and starts their worker routines.
