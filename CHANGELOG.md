@@ -5,6 +5,20 @@ All notable changes to Vessel are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Security
+
+- **No password in an error from `NewDB`, the `*CfgToDB` functions or the migrator**
+  (#96). The manager redacted every password from its setup errors (#86), but these
+  returned a driver's error as written, and one that quotes the connection string, as
+  go-mssqldb's `url.Error` did, carried the password out; `errors.As` reached it too.
+  Each now redacts the config's password from the message and cuts the chain, keeping
+  only a context error, an errno and the migrator's own sentinels (`ErrNoMigrations`,
+  `ErrMySQLParseTime`, `ErrUnsupportedDriver`). The migrator opens its connection
+  lazily, so `Up`, `Status`, `Version` and `Close` redact theirs too. A plugin's config
+  is redacted of its `Password` field, if it has one.
+
 ## [0.5.1] - 2026-10-18
 
 ### Added

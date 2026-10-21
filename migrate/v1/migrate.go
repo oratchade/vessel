@@ -73,6 +73,10 @@ func WithVersionTable(name string) Option {
 // Migrator applies the migrations of one file system to one database.
 type Migrator struct {
 	provider *goose.Provider
+	// secrets are the config's password, redacted from every error: the connection is
+	// opened lazily, so Up, Status and Version can return a driver's error that quotes
+	// the connection string (#96).
+	secrets []string
 }
 
 // dialectFor maps a Vessel driver name to the database/sql driver that opens it
@@ -189,7 +193,19 @@ func open(sqlDriver string, dialect goose.Dialect, dsn string) (*sql.DB, error) 
 
 // New prepares a Migrator for the database cfg describes and the migrations in
 // fsys. It opens a connection pool of its own; call [Migrator.Close] to release it.
+//
+// An error carries no password: the config's password is redacted from it and the chain
+// cut, keeping a context error, an errno and this package's own sentinels, as the
+// manager does (#86, #96).
 func New(cfg db.DBConfig, fsys fs.FS, opts ...Option) (*Migrator, error) {
+	m, err := newMigrator(cfg, fsys, opts...)
+	if err != nil {
+		return nil, redactError(err, passwords(cfg))
+	}
+	return m, nil
+}
+
+func newMigrator(cfg db.DBConfig, fsys fs.FS, opts ...Option) (*Migrator, error) {
 	if cfg == nil {
 		return nil, errors.New("migrate: nil config")
 	}
@@ -227,7 +243,7 @@ func New(cfg db.DBConfig, fsys fs.FS, opts ...Option) (*Migrator, error) {
 		}
 		return nil, fmt.Errorf("migrate: %w", err)
 	}
-	return &Migrator{provider: provider}, nil
+	return &Migrator{provider: provider, secrets: passwords(cfg)}, nil
 }
 
 // Up applies every pending migration in version order, and returns the ones it
@@ -240,9 +256,10 @@ func (m *Migrator) Up(ctx context.Context) ([]Result, error) {
 		var partial *goose.PartialError
 		if errors.As(err, &partial) {
 			failed := sourceName(partial.Failed.Source)
-			return toResults(partial.Applied), fmt.Errorf("migrate: %s: %w", failed, partial.Err)
+			failure := fmt.Errorf("migrate: %s: %w", failed, partial.Err)
+			return toResults(partial.Applied), redactError(failure, m.secrets)
 		}
-		return toResults(results), fmt.Errorf("migrate: up: %w", err)
+		return toResults(results), redactError(fmt.Errorf("migrate: up: %w", err), m.secrets)
 	}
 	return toResults(results), nil
 }
@@ -251,7 +268,7 @@ func (m *Migrator) Up(ctx context.Context) ([]Result, error) {
 func (m *Migrator) Status(ctx context.Context) ([]Status, error) {
 	statuses, err := m.provider.Status(ctx)
 	if err != nil {
-		return nil, fmt.Errorf("migrate: status: %w", err)
+		return nil, redactError(fmt.Errorf("migrate: status: %w", err), m.secrets)
 	}
 	out := make([]Status, 0, len(statuses))
 	for _, s := range statuses {
@@ -269,7 +286,7 @@ func (m *Migrator) Status(ctx context.Context) ([]Status, error) {
 func (m *Migrator) Version(ctx context.Context) (int64, error) {
 	version, err := m.provider.GetDBVersion(ctx)
 	if err != nil {
-		return 0, fmt.Errorf("migrate: version: %w", err)
+		return 0, redactError(fmt.Errorf("migrate: version: %w", err), m.secrets)
 	}
 	return version, nil
 }
@@ -277,7 +294,7 @@ func (m *Migrator) Version(ctx context.Context) (int64, error) {
 // Close releases the Migrator's connection pool.
 func (m *Migrator) Close() error {
 	if err := m.provider.Close(); err != nil {
-		return fmt.Errorf("migrate: close: %w", err)
+		return redactError(fmt.Errorf("migrate: close: %w", err), m.secrets)
 	}
 	return nil
 }
