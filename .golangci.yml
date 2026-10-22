@@ -50,6 +50,11 @@ linters:
   settings:
     misspell:
       locale: US
+    wrapcheck:
+      # internal/redact returns the error it is given, its message (context included)
+      # redacted of secrets: wrapping it again would only repeat that context.
+      ignore-package-globs:
+        - tounilab.com/vessel/internal/redact
     revive:
       severity: warning
       rules:

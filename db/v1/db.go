@@ -59,7 +59,20 @@ type DBConfig interface {
 // It first checks the plugin registry for custom drivers, then falls back to
 // the built-in driver implementations (MySQL, PostgreSQL, SQLite, MSSQL).
 // Custom drivers can be registered via the plugin package.
+//
+// An error carries no password. A driver's error can quote the connection string, so
+// cfg's password is redacted from it and the chain cut, keeping only a context error or
+// an errno, as the manager does for its entries (#86, #96). A plugin's config is
+// redacted of its Password field, if it has one; any other secret it holds is not.
 func NewDB(cfg DBConfig, logger Logger) (DB, error) {
+	db, err := newDB(cfg, logger)
+	if err != nil {
+		return nil, redactConfigError(err, cfg)
+	}
+	return db, nil
+}
+
+func newDB(cfg DBConfig, logger Logger) (DB, error) {
 	driverName := cfg.Driver()
 
 	// Check plugin registry first - allows custom drivers to override or extend built-in ones

@@ -204,7 +204,11 @@ func mssqlCfgToDB(cfg DBConfig, logger Logger) (*MSSQL, error) {
 // Plugin authors can use this to reuse the MSSQL driver implementation.
 // The config type must be MSSQLConfig or *MSSQLConfig.
 func MSSQLCfgToDB(cfg DBConfig, logger Logger) (DB, error) {
-	return mssqlCfgToDB(cfg, logger)
+	db, err := mssqlCfgToDB(cfg, logger)
+	if err != nil {
+		return nil, redactConfigError(err, cfg)
+	}
+	return db, nil
 }
 
 func (m *MSSQL) PoolStats() (*PoolStatistics, error) {

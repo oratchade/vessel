@@ -4,7 +4,6 @@ import (
 	"bufio"
 	"bytes"
 	"cmp"
-	"context"
 	"encoding/base64"
 	"encoding/json"
 	"errors"
@@ -12,20 +11,19 @@ import (
 	"io"
 	"log/slog"
 	"maps"
-	"net/url"
 	"os"
 	"path/filepath"
 	"regexp"
 	"slices"
 	"strconv"
 	"strings"
-	"syscall"
 	"unicode/utf8"
 
 	"github.com/pelletier/go-toml/v2"
 	"gopkg.in/yaml.v3"
 
 	db "tounilab.com/vessel/db/v1"
+	"tounilab.com/vessel/internal/redact"
 )
 
 // envVarRe matches ${VAR} and ${VAR:default} patterns.
@@ -773,62 +771,6 @@ func boolLiteral(s string) (value, ok bool) {
 	return false, false
 }
 
-// redactError is err with each of values redacted, or err itself when there are none. It
-// is a new error rather than a wrapper, since a decoder's error can hold what it read,
-// as a TOML error holds its source; it unwraps only to the causes that carry no input.
-func redactError(err error, values []string) error {
-	if len(values) == 0 {
-		return err
-	}
-	return redacted(err, values)
-}
-
-// redacted is err as a redactedError, its message redacted of values.
-func redacted(err error, values []string) error {
-	redacted := &redactedError{msg: redact(err.Error(), redactions(values))}
-	if errno := syscall.Errno(0); errors.As(err, &errno) {
-		redacted.causes = append(redacted.causes, errno)
-	}
-	for _, cause := range []error{context.Canceled, context.DeadlineExceeded} {
-		if errors.Is(err, cause) {
-			redacted.causes = append(redacted.causes, cause)
-		}
-	}
-	return redacted
-}
-
-// redactedError is an error's message redacted. Its causes are what a caller retries
-// on, an errno or a context error, which hold no value.
-type redactedError struct {
-	msg    string
-	causes []error
-}
-
-func (e *redactedError) Error() string   { return e.msg }
-func (e *redactedError) Unwrap() []error { return e.causes }
-
-// redactions are the forms of the substituted values to replace in a message, longest
-// first so a value holding another is replaced whole: a decoder quotes the text it
-// rejects, and that text may be a secret (#85). A short value can redact more than
-// itself; a message with too much redacted is the safe side.
-func redactions(values []string) []string {
-	forms := make([]string, 0, len(values))
-	for _, val := range values {
-		forms = append(forms, redactedForms(val)...)
-	}
-	forms = slices.DeleteFunc(forms, func(form string) bool { return form == "" })
-	slices.SortFunc(forms, func(a, b string) int { return len(b) - len(a) })
-	return forms
-}
-
-// redact replaces each of forms in msg, in order.
-func redact(msg string, forms []string) string {
-	for _, form := range forms {
-		msg = strings.ReplaceAll(msg, form, "[REDACTED]")
-	}
-	return msg
-}
-
 // redactingLogger redacts the config's passwords from every message and field it logs.
 // The manager hands its logger to the drivers and entries, which log their own errors
 // for as long as the manager runs, a connection string among them.
@@ -838,19 +780,19 @@ type redactingLogger struct {
 }
 
 func (l redactingLogger) Debug(msg string, args ...any) {
-	l.logger.Debug(redact(msg, l.forms), l.redactAll(args)...)
+	l.logger.Debug(redact.Message(msg, l.forms), l.redactAll(args)...)
 }
 
 func (l redactingLogger) Info(msg string, args ...any) {
-	l.logger.Info(redact(msg, l.forms), l.redactAll(args)...)
+	l.logger.Info(redact.Message(msg, l.forms), l.redactAll(args)...)
 }
 
 func (l redactingLogger) Warn(msg string, args ...any) {
-	l.logger.Warn(redact(msg, l.forms), l.redactAll(args)...)
+	l.logger.Warn(redact.Message(msg, l.forms), l.redactAll(args)...)
 }
 
 func (l redactingLogger) Error(msg string, args ...any) {
-	l.logger.Error(redact(msg, l.forms), l.redactAll(args)...)
+	l.logger.Error(redact.Message(msg, l.forms), l.redactAll(args)...)
 }
 
 func (l redactingLogger) With(fields ...any) db.Logger {
@@ -872,33 +814,20 @@ func (l redactingLogger) redactAll(args []any) []any {
 func (l redactingLogger) redactArg(arg any) any {
 	switch v := arg.(type) {
 	case string:
-		return redact(v, l.forms)
+		return redact.Message(v, l.forms)
 	case []byte:
-		return redact(string(v), l.forms)
+		return redact.Message(string(v), l.forms)
 	case error:
-		return redact(v.Error(), l.forms)
+		return redact.Message(v.Error(), l.forms)
 	case slog.Attr: // before fmt.Stringer, which it is
 		return slog.Any(v.Key, l.redactArg(v.Value.Any()))
 	case fmt.Stringer:
-		return redact(v.String(), l.forms)
+		return redact.Message(v.String(), l.forms)
 	}
-	if text := fmt.Sprint(arg); redact(text, l.forms) != text {
-		return redact(text, l.forms)
+	if text := fmt.Sprint(arg); redact.Message(text, l.forms) != text {
+		return redact.Message(text, l.forms)
 	}
 	return arg
-}
-
-// redactedForms are the forms a value can take in a message: as the environment holds
-// it, trimmed as a decoder trims an unquoted value, escaped as %q prints it, and escaped
-// as a connection string's user, password or parameter.
-func redactedForms(val string) []string {
-	forms := make([]string, 0, 8)
-	for _, v := range []string{val, strings.TrimSpace(val)} {
-		quoted := strconv.Quote(v)
-		forms = append(forms, v, quoted[1:len(quoted)-1], url.User(v).String(), url.QueryEscape(v))
-	}
-	slices.Sort(forms)
-	return slices.Compact(forms)
 }
 
 // stripQuotes removes surrounding single or double quotes from a value.

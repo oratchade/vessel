@@ -144,7 +144,11 @@ func mysqlCfgToDB(cfg DBConfig, logger Logger) (*MySQL, error) {
 // Plugin authors can use this to reuse the MySQL driver implementation.
 // The config type must be MysqlConfig or *MysqlConfig.
 func MySQLCfgToDB(cfg DBConfig, logger Logger) (DB, error) {
-	return mysqlCfgToDB(cfg, logger)
+	db, err := mysqlCfgToDB(cfg, logger)
+	if err != nil {
+		return nil, redactConfigError(err, cfg)
+	}
+	return db, nil
 }
 
 // PoolStats implements the DB interface method for retrieving connection pool statistics.
